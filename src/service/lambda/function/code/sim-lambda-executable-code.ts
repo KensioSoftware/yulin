@@ -1,4 +1,5 @@
 import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
+import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 
@@ -35,8 +36,12 @@ export interface SimLambdaExecutableCode {
   /**
    * Record what this code writes to its standard streams, so an invocation's
    * output reaches the function's log group.
+   *
+   * The output settings come with the sink because they decide what happens to
+   * a line once it has been recorded, and only code with somewhere to record
+   * is ever given either.
    */
-  recordOutputTo(sink: SimLambdaOutputSink): void;
+  recordOutputTo(sink: SimLambdaOutputSink, output: SimLambdaOutput): void;
 
   /**
    * This code under changed function settings, cold rather than warm.
@@ -72,7 +77,8 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
    * function closing over the test's own module scope, and it prints through
    * the process console and the process standard streams. Its invocation is
    * run with those bridged to the function's sink instead, the way the clock
-   * and process.env are bridged for the same code.
+   * and process.env are bridged for the same code. The output settings reach
+   * that bridge by the same route.
    */
   recordOutputTo(): void {
     // Recorded by the invocation, from the process globals.

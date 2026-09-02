@@ -110,7 +110,6 @@ export class SimLambdaFunction {
       runAsOwner = this,
       version = SIM_LAMBDA_LATEST_VERSION,
       clock = new SimRealClock(),
-      logs,
       metrics,
       outboundHttp,
     } = properties;
@@ -140,7 +139,8 @@ export class SimLambdaFunction {
     this.metrics = new SimLambdaFunctionMetrics({ metrics, clock });
     this.logging = new SimLambdaFunctionLogging({
       functionName: name,
-      logs,
+      logs: properties.logs,
+      output: properties.output,
       clock,
     });
   }
@@ -293,8 +293,8 @@ export class SimLambdaFunction {
     }
 
     const { clock, outboundHttp } = this;
-    const output = this.logging.outputSink();
+    const scope = { clock, outboundHttp, ...this.logging.outputScope() };
 
-    return await runSimLambdaInHostScope({ clock, outboundHttp, output }, run);
+    return await runSimLambdaInHostScope(scope, run);
   }
 }

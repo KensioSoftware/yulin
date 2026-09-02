@@ -7,6 +7,7 @@ import type { SimLambdaContainerImages } from "../../function/code/image/sim-lam
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimCloudWatchServiceWriter } from "../../../cloudwatch/write/sim-cloudwatch-service-writer.js";
+import type { SimLambdaOutput } from "../../function/logging/sim-lambda-output.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
 import type { SimLambdaDestinationTargets } from "../../destination/sim-lambda-destination-targets.js";
@@ -68,6 +69,7 @@ interface SimLambdaFunctionCommandsProperties {
   readonly containerImages?: SimLambdaContainerImages | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
   readonly logs?: SimLogsServiceWriter | undefined;
+  readonly output?: SimLambdaOutput | undefined;
   readonly metrics?: SimCloudWatchServiceWriter | undefined;
   readonly outboundHttp?: SimLambdaOutboundHttp | undefined;
 }

@@ -2,6 +2,7 @@ import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
 import type { SimLambdaContainerImages } from "./function/code/image/sim-lambda-container-images.js";
+import type { SimLambdaOutput } from "./function/logging/sim-lambda-output.js";
 import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import type * as simLambdaCommands from "./command/sim-lambda-command.types.js";
 import {
@@ -56,6 +57,20 @@ export class SimLambda extends SimLambdaEventInvokeOperations {
    */
   containerImages(): SimLambdaContainerImages {
     return this.commands.containerImages;
+  }
+
+  /**
+   * Where this simulated Lambda's functions send what they print, besides the
+   * log group they always reach. The host console gets a copy until told
+   * otherwise, and these settings belong to one Account and Region as the
+   * functions do.
+   *
+   * ```typescript
+   * simAws.lambda().output().captureOnly();
+   * ```
+   */
+  output(): SimLambdaOutput {
+    return this.commands.output;
   }
 
   /** Handle a Create Function Command from the SDK. */

@@ -1,4 +1,5 @@
 export { SimLambda } from "./sim-lambda.js";
+export { SimLambdaOutput } from "./function/logging/sim-lambda-output.js";
 export {
   SimLambdaNoVmSdkModuleProvider,
   type SimLambdaVmSdkModuleProvider,

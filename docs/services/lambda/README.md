@@ -286,6 +286,70 @@ console.log(logged.events?.map((event) => event.message));
 await simAws.backgroundTasksComplete();
 ```
 
+#### Keeping handler output out of the test console
+
+A handler that logs on every invocation makes that tee expensive. Powertools' `Metrics` writes an
+EMF document for every metric it counts, and a suite invoking a function a few hundred times buries
+its own output under them. `captureOnly()` stops the forwarding for every function of one simulated
+Lambda:
+
+```typescript sim-lambda-capture-only-output
+/**
+ * Recording what a handler prints without printing it again.
+ */
+
+import { FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "user",
+    Role: "arn:aws:iam::111111111111:role/UserRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        // What AWS Lambda Powertools' Metrics writes for every metric it
+        // counts, once per request.
+        process.stdout.write(
+          `${JSON.stringify({ service: "user", UserRequest: 1 })}\n`,
+        );
+
+        return { statusCode: 200 };
+      }),
+    },
+  }),
+);
+
+// The test run's own console stays clean from here on.
+simAws.lambda().output().captureOnly();
+
+await simAws.lambda().invoke(new InvokeCommand({ FunctionName: "user" }));
+
+// The log group holds the line, as it did before.
+const found = await simAws
+  .logs()
+  .filterLogEvents(
+    new FilterLogEventsCommand({ logGroupName: "/aws/lambda/user" }),
+  );
+
+console.log(found.events?.[0]?.message);
+```
+
+The log group holds every line either way. Nothing is lost by it, and `teeToHost()` puts the
+forwarding back.
+
+The settings belong to one Account and Region, as the functions do. A suite invoking through
+`simAws.region("eu-west-1")` sets them on that scope. They are read as each line is written. A
+change reaches a function that has already cold started.
+
+A function with no simulated CloudWatch Logs behind it goes on printing whatever the settings say.
+That is a function on a standalone `SimLambda`, built outside a `SimAws` instance, and it has no log
+group for its output to be read back out of.
+
 ### When a handler throws
 
 An invocation that ends in an error nothing caught leaves an `ERROR Invoke Error` line in the
@@ -3933,6 +3997,8 @@ Sim Lambda currently supports:
 - A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations, and
   writable standard streams for handler output, including a bundled AWS Lambda Powertools logger's
   own console
+- Handler output recorded into the function's log group and forwarded to the host console, with
+  `simAws.lambda().output().captureOnly()` to drop the forwarding
 - Per-function environment variables with `Environment.Variables`
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment

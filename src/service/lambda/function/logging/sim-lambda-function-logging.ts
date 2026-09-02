@@ -1,6 +1,7 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutputSink } from "./sim-lambda-output-sink.js";
+import { SimLambdaOutput } from "./sim-lambda-output.js";
 import type { SimLambdaExecutableCode } from "../code/sim-lambda-executable-code.js";
 import { simLambdaInvokeErrorLine } from "./sim-lambda-invoke-error-log.js";
 import { SimLambdaLogWriter } from "./sim-lambda-log-writer.js";
@@ -18,6 +19,13 @@ interface SimLambdaFunctionLoggingProperties {
    * instance, has no simulated CloudWatch Logs to record to.
    */
   readonly logs?: SimLogsServiceWriter | undefined;
+
+  /**
+   * Where this function's output goes besides its log group. Shared with every
+   * other function of the same simulated Lambda, and read as each line is
+   * written.
+   */
+  readonly output?: SimLambdaOutput | undefined;
 }
 
 /**
@@ -37,6 +45,9 @@ interface SimLambdaFunctionLoggingProperties {
 export class SimLambdaFunctionLogging {
   readonly logGroupName: string;
 
+  /** Where this function's output goes besides its log group. */
+  readonly output: SimLambdaOutput;
+
   readonly #logs: SimLogsServiceWriter | undefined;
   readonly #clock: SimClock;
   #writer: SimLambdaLogWriter | undefined;
@@ -46,6 +57,7 @@ export class SimLambdaFunctionLogging {
     this.logGroupName = simLambdaLogGroupName(properties.functionName);
     this.#logs = properties.logs;
     this.#clock = properties.clock;
+    this.output = properties.output ?? new SimLambdaOutput();
   }
 
   /**
@@ -72,7 +84,7 @@ export class SimLambdaFunctionLogging {
     const writer = this.#writer;
 
     if (writer !== undefined) {
-      code.recordOutputTo(writer);
+      code.recordOutputTo(writer, this.output);
     }
   }
 
@@ -86,6 +98,17 @@ export class SimLambdaFunctionLogging {
    */
   outputSink(): SimLambdaOutputSink | undefined {
     return this.#writer;
+  }
+
+  /**
+   * Both halves of where a host-scope invocation's output goes, ready to
+   * bridge to the process globals it prints through.
+   */
+  outputScope(): {
+    readonly output: SimLambdaOutputSink | undefined;
+    readonly outputSettings: SimLambdaOutput;
+  } {
+    return { output: this.#writer, outputSettings: this.output };
   }
 
   /**

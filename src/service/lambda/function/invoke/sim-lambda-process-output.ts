@@ -2,7 +2,20 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { StringDecoder } from "node:string_decoder";
 import { format } from "node:util";
 
+import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
+
+/**
+ * What one invocation of host-scope code prints, and where it goes.
+ *
+ * The output settings are held rather than read once, so a simulated Lambda
+ * told to capture only part way through a run reaches an invocation already in
+ * flight.
+ */
+interface SimLambdaRecordedOutput {
+  readonly sink: SimLambdaOutputSink;
+  readonly output: SimLambdaOutput;
+}
 
 /**
  * The console methods an invocation's output is taken from.
@@ -81,7 +94,7 @@ function hostProcessGlobals(): SimLambdaProcessGlobals {
  * instance over streams it can watch. Everything else shares the one below.
  */
 export class SimLambdaProcessOutput {
-  private readonly storage = new AsyncLocalStorage<SimLambdaOutputSink>();
+  private readonly storage = new AsyncLocalStorage<SimLambdaRecordedOutput>();
   private installed = false;
 
   constructor(
@@ -91,10 +104,14 @@ export class SimLambdaProcessOutput {
   /**
    * Run an invocation with the given sink recording what it prints.
    */
-  async run<T>(sink: SimLambdaOutputSink, run: () => Promise<T>): Promise<T> {
+  async run<T>(
+    sink: SimLambdaOutputSink,
+    output: SimLambdaOutput,
+    run: () => Promise<T>,
+  ): Promise<T> {
     this.install();
 
-    return await this.storage.run(sink, run);
+    return await this.storage.run({ sink, output }, run);
   }
 
   /**
@@ -130,6 +147,10 @@ export class SimLambdaProcessOutput {
    * console afterwards wraps the patch, so its own interception still sees
    * every write, and one that replaces the console object outright takes the
    * patch with it and gets the output the handler wrote.
+   *
+   * An invocation whose simulated Lambda is capturing only stops at the
+   * recording. A line printed outside any invocation goes to the host as it
+   * always did.
    */
   private patchConsole(hostConsole: SimLambdaProcessConsole): void {
     for (const method of CONSOLE_METHODS) {
@@ -138,7 +159,13 @@ export class SimLambdaProcessOutput {
 
       // oxlint-disable-next-line security/detect-object-injection -- one of this module's own fixed method names.
       hostConsole[method] = (...arguments_: readonly unknown[]): void => {
-        this.storage.getStore()?.write(`${format(...arguments_)}\n`);
+        const recorded = this.storage.getStore();
+
+        recorded?.sink.write(`${format(...arguments_)}\n`);
+
+        if (recorded !== undefined && !recorded.output.reachesHost()) {
+          return;
+        }
 
         // Delegated outside the store, because the host console writing to
         // process.stdout would otherwise record the same line a second time.
@@ -162,12 +189,18 @@ export class SimLambdaProcessOutput {
     const decoder = new StringDecoder("utf8");
 
     hostStream.write = (chunk: StreamChunk, ...rest: never[]): boolean => {
-      const sink = this.storage.getStore();
+      const recorded = this.storage.getStore();
 
-      if (sink !== undefined) {
-        sink.write(
+      if (recorded !== undefined) {
+        recorded.sink.write(
           typeof chunk === "string" ? chunk : decoder.write(Buffer.from(chunk)),
         );
+
+        // Written and done with. The stream reports the write as accepted,
+        // which is what it would have answered had the host taken it.
+        if (!recorded.output.reachesHost()) {
+          return true;
+        }
       }
 
       return hostWrite(chunk, ...rest);

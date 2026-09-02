@@ -14,11 +14,16 @@ import {
   makeSimLambdaVmContext,
   type SimLambdaVmContextProperties,
 } from "./vm/sim-lambda-vm-context.js";
+import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import {
   simLambdaNoOutputSink,
   type SimLambdaOutputSink,
 } from "../logging/sim-lambda-output-sink.js";
 import { SimLambdaVmModules } from "./vm/sim-lambda-vm-modules.js";
+import {
+  importSimLambdaHandlerModule,
+  simLambdaExportedHandler,
+} from "./vm/sim-lambda-vm-handler-lookup.js";
 
 /**
  * The archive and handler this code runs, on top of everything its sandbox is
@@ -46,7 +51,10 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   readonly runsInHostScope = false;
 
   #handler: SimLambdaHandler | undefined;
-  #sink: SimLambdaOutputSink = simLambdaNoOutputSink;
+  /** Where this execution environment's output goes, and what happens to it. */
+  #recording: Pick<SimLambdaVmContextProperties, "sink" | "output"> = {
+    sink: simLambdaNoOutputSink,
+  };
 
   constructor(private readonly properties: SimLambdaVmZipCodeProperties) {}
 
@@ -57,8 +65,8 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
    * asks for the handler, so the streams function code is handed already carry
    * the sink by the time any of it runs.
    */
-  recordOutputTo(sink: SimLambdaOutputSink): void {
-    this.#sink = sink;
+  recordOutputTo(sink: SimLambdaOutputSink, output: SimLambdaOutput): void {
+    this.#recording = { sink, output };
   }
 
   /**
@@ -92,16 +100,22 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
 
     const modules = new SimLambdaVmModules({
       archive,
-      context: makeSimLambdaVmContext({ ...this.properties, sink: this.#sink }),
+      context: makeSimLambdaVmContext({
+        ...this.properties,
+        ...this.#recording,
+      }),
       sdkModuleProvider:
         sdkModuleProvider ?? new SimLambdaNoVmSdkModuleProvider(),
     });
-    const moduleExports = this.importHandlerModule(
+    const moduleExports = importSimLambdaHandlerModule(
       modules,
       parsedName.modulePath,
     );
+    const handler = simLambdaExportedHandler(
+      moduleExports,
+      parsedName.exportName,
+    );
 
-    const handler = this.exportedHandler(moduleExports, parsedName.exportName);
     if (typeof handler !== "function") {
       throw new SimLambdaRuntimeError(
         "Runtime.HandlerNotFound",
@@ -109,42 +123,5 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
       );
     }
     return handler as SimLambdaHandler;
-  }
-
-  /**
-   * Look up the handler export, tolerating a module that exported a nullish
-   * value so the lookup still reports Runtime.HandlerNotFound.
-   *
-   * Only own exports count. Walking the prototype chain would let a handler
-   * name like `index.constructor` resolve to an `Object.prototype` member and
-   * be invoked as the handler, where real Lambda reports HandlerNotFound.
-   */
-  private exportedHandler(moduleExports: unknown, exportName: string): unknown {
-    if (moduleExports === null || moduleExports === undefined) {
-      return undefined;
-    }
-    const exportedValues = moduleExports as Record<string, unknown>;
-    if (!Object.hasOwn(exportedValues, exportName)) {
-      return undefined;
-    }
-    return Reflect.get(exportedValues, exportName);
-  }
-
-  private importHandlerModule(
-    modules: SimLambdaVmModules,
-    modulePath: string,
-  ): unknown {
-    try {
-      return modules.requireModule(`./${modulePath}`);
-    } catch (error) {
-      if (error instanceof SimLambdaRuntimeError) {
-        throw error;
-      }
-      let message = String(error);
-      if (error instanceof Error) {
-        message = error.message;
-      }
-      throw new SimLambdaRuntimeError("Runtime.ImportModuleError", message);
-    }
   }
 }

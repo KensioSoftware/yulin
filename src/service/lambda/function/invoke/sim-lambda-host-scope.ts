@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 import { simLambdaProcessClock } from "./sim-lambda-process-clock.js";
@@ -25,6 +26,13 @@ interface SimLambdaHostScope {
    * and its output reaches the host console alone.
    */
   readonly output: SimLambdaOutputSink | undefined;
+
+  /**
+   * Whether what the invocation prints also reaches the host console once it
+   * has been recorded. Read only where there is a sink, because a function
+   * with nowhere to record has the host console alone.
+   */
+  readonly outputSettings: SimLambdaOutput;
 }
 
 /**
@@ -40,12 +48,13 @@ export async function runSimLambdaInHostScope<T>(
   scope: SimLambdaHostScope,
   run: () => Promise<T>,
 ): Promise<T> {
-  const { clock, outboundHttp, output } = scope;
+  const { clock, outboundHttp, output, outputSettings } = scope;
 
   const recording =
     output === undefined
       ? run
-      : async (): Promise<T> => await simLambdaProcessOutput.run(output, run);
+      : async (): Promise<T> =>
+          await simLambdaProcessOutput.run(output, outputSettings, run);
 
   const reachingTheSimulation =
     outboundHttp === undefined
