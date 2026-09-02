@@ -17,6 +17,7 @@ import {
   simS3CopyObjectXml,
   simS3GetObjectResponse,
 } from "./sim-s3-api-object-output.js";
+import { simS3ResponseHeaderOverrides } from "../../object/s3-object-response-headers.js";
 
 const xmlContentType = { "content-type": "application/xml" };
 
@@ -27,10 +28,15 @@ const xmlContentType = { "content-type": "application/xml" };
  * the operation rather than of its output: a listing answers in XML, a read
  * answers with the Object itself, and a write answers with a status and
  * headers alone.
+ *
+ * The request's query string is read alongside the output because a read can
+ * name the headers it wants served in place of the Object's own, and those are
+ * a property of the request rather than of what the operation answered.
  */
 export async function simS3ApiResponse(
   commandName: string,
   output: unknown,
+  query: URLSearchParams,
 ): Promise<Response> {
   const value = output as Record<string, unknown>;
 
@@ -45,7 +51,10 @@ export async function simS3ApiResponse(
       return xml(simS3ListObjectsXml(value, 2));
     }
     case "GetObjectCommand": {
-      return await simS3GetObjectResponse(value);
+      return await simS3GetObjectResponse(
+        value,
+        simS3ResponseHeaderOverrides(query),
+      );
     }
     case "GetBucketPolicyCommand": {
       // A Bucket policy is a JSON document, and real S3 answers this one
@@ -70,7 +79,10 @@ export async function simS3ApiResponse(
       return xml(deleteResultXml(value));
     }
     case "HeadObjectCommand": {
-      return simS3HeadObjectResponse(value);
+      return simS3HeadObjectResponse(
+        value,
+        simS3ResponseHeaderOverrides(query),
+      );
     }
     case "HeadBucketCommand": {
       return simS3HeadBucketResponse(value);

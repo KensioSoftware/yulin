@@ -27,6 +27,9 @@ export function simS3CopyObjectXml(output: CopyObjectOutput): string {
 /**
  * Answer a read with the Object itself, headers and all.
  *
+ * The headers the read named in its `response-` parameters are served in place
+ * of the Object's own, leaving what the Object was written with alone.
+ *
  * A read that asked for part of the Object is answered `206 Partial Content`
  * and says which part it carries, because a client reading a large Object in
  * pieces at once writes each response at the offset it asked for, and a `200`
@@ -34,6 +37,7 @@ export function simS3CopyObjectXml(output: CopyObjectOutput): string {
  */
 export async function simS3GetObjectResponse(
   output: Record<string, unknown>,
+  overrides: Readonly<Record<string, string>>,
 ): Promise<Response> {
   const body = await objectBodyBytes(output["Body"]);
   const contentRange = output["ContentRange"] as string | undefined;
@@ -42,6 +46,7 @@ export async function simS3GetObjectResponse(
     status: contentRange === undefined ? 200 : 206,
     headers: simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      overrides,
       bodyLength: body.length,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,

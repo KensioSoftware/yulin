@@ -1,6 +1,7 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { simS3CommonPrefixes } from "../../object/s3-common-prefix.js";
 import { simS3ObjectPage } from "../../object/s3-object-listing.js";
+import type { SimS3ListingEncoding } from "../../object/s3-listing-encoding.js";
 import { simS3ObjectSummaries } from "../../object/s3-object-summary.js";
 import {
   simS3ContinuationToken,
@@ -15,6 +16,7 @@ interface ListObjectsV2PageInput {
   readonly continuationToken?: string | undefined;
   readonly startAfter?: string | undefined;
   readonly maxKeys: number;
+  readonly encoding: SimS3ListingEncoding;
 }
 
 /**
@@ -23,6 +25,10 @@ interface ListObjectsV2PageInput {
  * Authorization is completed by the command handler before this class is
  * called, as it is for the first version of the operation, so a denied request
  * cannot examine Object keys or sizes.
+ *
+ * The keys, the prefix, the delimiter and the key a first page started after
+ * are written the way the listing asked for them, which is encoded or as they
+ * are stored. A continuation token is not, because it is opaque either way.
  *
  * The keys on a page are chosen exactly as ListObjects chooses them. What
  * differs is how a caller says where to carry on from: a continuation token
@@ -45,12 +51,16 @@ export class ListObjectsV2PageBuilder {
       maxKeys: input.maxKeys,
     });
 
+    const { encoding } = input;
+
     return {
-      Contents: simS3ObjectSummaries(page.objects),
-      CommonPrefixes: simS3CommonPrefixes(page.commonPrefixes),
+      Contents: encoding.summaries(simS3ObjectSummaries(page.objects)),
+      CommonPrefixes: encoding.commonPrefixes(
+        simS3CommonPrefixes(page.commonPrefixes),
+      ),
       Name: input.bucket.bucketName,
-      Prefix: input.prefix,
-      Delimiter: input.delimiter,
+      Prefix: encoding.value(input.prefix),
+      Delimiter: encoding.value(input.delimiter),
       MaxKeys: input.maxKeys,
       KeyCount: page.objects.length + page.commonPrefixes.length,
       IsTruncated: page.isTruncated,
@@ -59,7 +69,8 @@ export class ListObjectsV2PageBuilder {
         page.resumeAfter === undefined
           ? undefined
           : simS3ContinuationToken(page.resumeAfter),
-      StartAfter: input.startAfter,
+      StartAfter: encoding.value(input.startAfter),
+      EncodingType: encoding.encodingType,
       $metadata: {},
     };
   }

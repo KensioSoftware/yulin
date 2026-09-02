@@ -35,6 +35,7 @@ interface ListObjectsOutput {
   readonly StartAfter?: string | undefined;
   readonly Marker?: string | undefined;
   readonly NextMarker?: string | undefined;
+  readonly EncodingType?: string | undefined;
 }
 
 interface ListBucketsOutput {
@@ -71,6 +72,10 @@ export function simS3ListBucketsXml(output: ListBucketsOutput): string {
  * Both listing versions answer in a `ListBucketResult`, and differ only in how
  * they say where the next page starts. The version is passed in because the
  * output alone cannot say which was asked for.
+ *
+ * The keys arrive encoded or not according to what the listing was asked for,
+ * so nothing is encoded here. `EncodingType` says which of the two a client is
+ * reading, and is absent from a listing that asked for no encoding.
  */
 export function simS3ListObjectsXml(
   output: ListObjectsOutput,
@@ -88,6 +93,7 @@ export function simS3ListObjectsXml(
     xmlValue("Name", output.Name) +
       xmlValue("Prefix", output.Prefix) +
       xmlValue("Delimiter", output.Delimiter) +
+      xmlValue("EncodingType", output.EncodingType) +
       xmlValue("MaxKeys", output.MaxKeys) +
       xmlValue("IsTruncated", output.IsTruncated ?? false) +
       pagingXml(output, version) +

@@ -87,7 +87,11 @@ export class SimS3ApiEndpoint {
         caller,
       );
 
-      return await simS3ApiResponse(route.commandName, output);
+      return await simS3ApiResponse(
+        route.commandName,
+        output,
+        apiRequest.query,
+      );
     } catch (error) {
       if (error instanceof SimSdkUnsupportedCommandError) {
         return errors.notImplemented(error.message);

@@ -17,6 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimS3ListingEncoding } from "../../object/s3-listing-encoding.js";
 import { simS3EffectiveMaxKeys } from "../../object/s3-object-listing.js";
 import { SimS3ObjectListingLimits } from "../../object/s3-object-listing-limits.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
@@ -81,6 +82,10 @@ export class ListObjectsCommandHandler implements CommandHandler<
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
+    // Refused before anything is listed, the way real S3 refuses an argument
+    // it cannot read, rather than after a page has been built.
+    const encoding = new SimS3ListingEncoding(command.input.EncodingType);
+
     const maxKeys = simS3EffectiveMaxKeys(
       command.input.MaxKeys,
       this.listing.maxKeysPerPage,
@@ -100,6 +105,7 @@ export class ListObjectsCommandHandler implements CommandHandler<
       delimiter: command.input.Delimiter,
       marker: command.input.Marker,
       maxKeys,
+      encoding,
     });
   }
 }

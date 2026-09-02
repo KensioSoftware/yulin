@@ -1,4 +1,5 @@
-import { optional, simS3UserMetadata } from "./sim-s3-api-input.js";
+import { simS3WriteMetadataHeaders } from "../../object/s3-write-metadata.js";
+import { optional } from "./sim-s3-api-input.js";
 import type { SimS3ApiRequest } from "./sim-s3-api-request.js";
 
 /**
@@ -62,24 +63,21 @@ export function copyObjectInput(request: SimS3ApiRequest): object {
 /**
  * The input of a request that describes an Object without carrying its bytes,
  * which is what starting a multipart upload is.
+ *
+ * The metadata headers are read by the list a write and a read share, so an
+ * upload over this endpoint describes an Object exactly as a `PutObjectCommand`
+ * does. Where S3 keeps the Object and how it encrypts it are read alongside
+ * them, being facts about the storage rather than metadata about the Object.
  */
 export function createMultipartUploadInput(request: SimS3ApiRequest): object {
   return {
     Bucket: request.bucketName,
     Key: request.objectKey,
-    ...optional("ContentType", request.headers.get("content-type")),
-    ...optional("CacheControl", request.headers.get("cache-control")),
-    ...optional(
-      "ContentDisposition",
-      request.headers.get("content-disposition"),
-    ),
-    ...optional("ContentEncoding", request.headers.get("content-encoding")),
-    ...optional("ContentLanguage", request.headers.get("content-language")),
+    ...simS3WriteMetadataHeaders(request.headers),
     ...optional("StorageClass", request.headers.get("x-amz-storage-class")),
     ...optional(
       "ServerSideEncryption",
       request.headers.get("x-amz-server-side-encryption"),
     ),
-    ...simS3UserMetadata(request.headers),
   };
 }

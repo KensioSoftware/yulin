@@ -14,7 +14,9 @@ export interface SimListObjectsV2Command {
  *
  * `ContinuationToken` resumes a truncated listing and takes precedence over
  * `StartAfter`, which only positions the first page. `Delimiter` rolls every
- * key holding it after the `Prefix` up into a common prefix.
+ * key holding it after the `Prefix` up into a common prefix. `EncodingType`
+ * asks for the keys the listing answers with to be encoded, so that a key
+ * holding a character XML cannot carry survives the response.
  */
 export interface SimListObjectsV2CommandInput {
   readonly Bucket?: string | undefined;
@@ -23,6 +25,7 @@ export interface SimListObjectsV2CommandInput {
   readonly MaxKeys?: number | undefined;
   readonly ContinuationToken?: string | undefined;
   readonly StartAfter?: string | undefined;
+  readonly EncodingType?: string | undefined;
 }
 
 /**
@@ -45,5 +48,6 @@ export interface SimListObjectsV2CommandOutput {
   readonly ContinuationToken?: string | undefined;
   readonly NextContinuationToken?: string | undefined;
   readonly StartAfter?: string | undefined;
+  readonly EncodingType?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
