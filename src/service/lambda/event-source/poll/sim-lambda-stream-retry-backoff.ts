@@ -1,4 +1,15 @@
 /**
+ * The longest wait, in seconds, the simulation's clock can be scheduled at.
+ *
+ * A `Date` holds about 275,000 years either side of the epoch, and a wait past
+ * that would be scheduled at an instant that is not a date at all. Doubling
+ * reaches it on the 44th attempt, which is further than any test can advance
+ * the clock, so this is a guard on the arithmetic rather than a wait a mapping
+ * meets.
+ */
+const longestWaitSeconds = 2 ** 42;
+
+/**
  * How long a mapping waits before handing a failed batch to its function
  * again, and how many waits it has left.
  *
@@ -36,7 +47,7 @@ export class SimLambdaStreamRetryBackoff {
   nextSeconds(): number {
     this.attempts += 1;
 
-    return 2 ** (this.attempts - 1);
+    return Math.min(2 ** (this.attempts - 1), longestWaitSeconds);
   }
 
   /**

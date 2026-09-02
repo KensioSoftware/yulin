@@ -123,6 +123,7 @@ describe("the failed-batch limits a stream event source mapping is created with"
     assertIdentical(read.MaximumRetryAttempts, 3);
     assertIdentical(read.MaximumRecordAgeInSeconds, 120);
     assertArrayLength(listed.EventSourceMappings, 1);
+    assertIdentical(listed.EventSourceMappings[0].MaximumRetryAttempts, 3);
     assertIdentical(
       listed.EventSourceMappings[0].MaximumRecordAgeInSeconds,
       120,
