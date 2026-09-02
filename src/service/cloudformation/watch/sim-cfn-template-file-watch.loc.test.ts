@@ -7,6 +7,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
+import { simWatchConfig } from "../../../watch/sim-watch.config.js";
 import { SimCfnTemplateFileWatch } from "./sim-cfn-template-file-watch.js";
 import {
   putSitePage,
@@ -85,8 +86,15 @@ describe("a deployed template file that changes", () => {
   });
 
   it("makes one update out of a burst of writes", async () => {
-    // Given a Stack deployed from a watched template file
-    const watched = await WatchedTemplate.of(siteTemplate());
+    // Given a Stack deployed from a watched template file, watched with the
+    // window a real save gets. The window has to outlast the gaps between the
+    // writes below, and those gaps belong to the machine. A single write takes
+    // tens of milliseconds on a loaded runner, long enough to step over the
+    // short window the rest of these tests run on. The burst is then applied in
+    // pieces, one update for each template it was written with.
+    const watched = await WatchedTemplate.of(siteTemplate(), {
+      settleMs: simWatchConfig.settleMs,
+    });
 
     try {
       // When it is written several times in a row, as one save does
@@ -94,8 +102,10 @@ describe("a deployed template file that changes", () => {
       await watched.write(siteTemplate({ description: "two" }));
       await watched.write(siteTemplate({ withUploads: true }));
 
+      // A second update would settle in one more window. Waiting that out is
+      // what makes a burst applied in pieces show up in the count below.
       await watched.updated();
-      await templatePause(200);
+      await templatePause(simWatchConfig.settleMs * 2);
 
       // Then the Stack is updated once, to the template that was left there
       assertIdentical(watched.updateCount(), 1);

@@ -1,5 +1,10 @@
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
+import {
+  isSimAwsLocalRequest,
+  simAwsRequestHostname,
+} from "../../../../serve/http/url/sim-aws-request-hostname.js";
 import { stripSimAwsControlHeaders } from "../../../iam/request/sim-aws-control-headers.js";
+import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import type { SimCfForwardedToOrigin } from "../../origin-request-policy/sim-cf-forwarded-to-origin.js";
 import {
   simCfForwardedOriginHeaders,
@@ -10,6 +15,9 @@ interface SimCfCustomOriginRequestProperties {
   readonly domainName: string;
   readonly originPath: string;
   readonly request: Request;
+  readonly viewerProtocolPolicy?:
+    | SimCloudFrontBehavior["viewerProtocolPolicy"]
+    | undefined;
   /**
    * What the Behavior's cache policy and origin request policy carry to the
    * Origin between them.
@@ -57,6 +65,7 @@ export function simCfCustomOriginRequest(
 
   const headers = simCfForwardedOriginHeaders(request.headers, forwarded);
 
+  applyAwsFacingViewerOrigin(headers, request, properties.viewerProtocolPolicy);
   headers.set("host", originUrl.host);
 
   // Who the Origin request is from is the Origin's business, not the viewer's,
@@ -91,6 +100,68 @@ export function simCfCustomOriginRequest(
     redirect: request.redirect,
     signal: request.signal,
   });
+}
+
+/**
+ * Replace the local same-origin value a browser sends with the origin the
+ * viewer would use against CloudFront.
+ *
+ * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorCustomOrigin.html
+ */
+function applyAwsFacingViewerOrigin(
+  headers: Headers,
+  viewerRequest: Request,
+  viewerProtocolPolicy: SimCloudFrontBehavior["viewerProtocolPolicy"],
+): void {
+  const value = headers.get("origin");
+
+  if (value === null || !isSimAwsLocalRequest(viewerRequest)) {
+    return;
+  }
+
+  const origin = originUrl(value);
+  if (origin === undefined || origin.origin !== viewerOrigin(viewerRequest)) {
+    return;
+  }
+
+  origin.hostname = simAwsRequestHostname(viewerRequest);
+  origin.port = "";
+
+  if (
+    viewerProtocolPolicy === "redirect-to-https" ||
+    viewerProtocolPolicy === "https-only"
+  ) {
+    origin.protocol = "https:";
+  }
+
+  headers.set("origin", origin.origin);
+}
+
+/**
+ * The local origin the viewer used, including the Host header when it differs
+ * from the Request URL.
+ */
+function viewerOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("host");
+
+  if (host !== null) {
+    url.host = host;
+  }
+
+  return url.origin;
+}
+
+/**
+ * Read a serialized Origin without rejecting the request when it is `null` or
+ * malformed. CloudFront forwards those values unchanged.
+ */
+function originUrl(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
 }
 
 /**

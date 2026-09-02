@@ -98,6 +98,7 @@ export class SimCloudFrontCustomOrigin implements SimCloudFrontOrigin {
       domainName: this.domainName,
       originPath: this.originPath,
       request: request.req,
+      viewerProtocolPolicy: request.behavior.viewerProtocolPolicy,
       forwarded: simCfBehaviorForwardedToOrigin(
         request.behavior,
         this.policies,
