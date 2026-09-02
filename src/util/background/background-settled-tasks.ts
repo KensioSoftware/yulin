@@ -5,11 +5,14 @@
  * throws has nowhere to report to. Waiting for tasks to settle is that
  * moment: this is what turns a settled batch back into a thrown error, so a
  * failure in the background surfaces to whoever waited rather than vanishing.
+ *
+ * A wait that ended on something else, such as a task parking on the clock,
+ * settled no batch at all and has no failure to report.
  */
 export class BackgroundSettledTasks {
-  private readonly results: PromiseSettledResult<void>[];
+  private readonly results: readonly PromiseSettledResult<unknown>[];
 
-  constructor(results: PromiseSettledResult<void>[]) {
+  constructor(results: readonly PromiseSettledResult<unknown>[] = []) {
     this.results = results;
   }
 

@@ -5,12 +5,12 @@ import type {
   BackgroundTask,
 } from "./background.js";
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
+import { BackgroundPendingTasks } from "./background-pending-tasks.js";
 import {
   type BackgroundDueTask,
   BackgroundDueTasks,
 } from "./background-due-tasks.js";
 import { BackgroundJitter } from "./background-jitter.js";
-import { BackgroundSettledTasks } from "./background-settled-tasks.js";
 
 /* oxlint-disable unicorn-js/prefer-await  */
 
@@ -23,7 +23,7 @@ import { BackgroundSettledTasks } from "./background-settled-tasks.js";
 export class NonDeterministicBackgroundTasks
   implements BackgroundScheduler, BackgroundCompleter, BackgroundDueTaskSource
 {
-  private readonly pending = new Set<Promise<void>>();
+  private readonly pending = new BackgroundPendingTasks();
   private readonly dueTasks = new BackgroundDueTasks();
   private readonly jitter: BackgroundJitter;
   private readonly clock: SimClock;
@@ -52,23 +52,25 @@ export class NonDeterministicBackgroundTasks
    * Schedule a task to happen asynchronously in the background.
    */
   schedule(task: BackgroundTask): void {
-    const promise = this.sequence()
-      .then(task)
-      .then(
-        () => {
-          //
-        },
-        (error: unknown) => {
-          // Keep the promise rejected so complete() can surface failures
-          // deterministically.
-          throw error;
-        },
-      )
-      .finally(() => {
-        this.pending.delete(promise);
-      });
+    this.pending.hold(async () => {
+      await this.sequence();
 
-    this.pending.add(promise);
+      await task();
+    });
+  }
+
+  /**
+   * Run a task that is already due, keeping it outstanding until it settles.
+   */
+  runDue(task: BackgroundTask): void {
+    this.pending.hold(task);
+  }
+
+  /**
+   * Count work a caller started as outstanding until it settles.
+   */
+  async outstanding<T>(work: () => Promise<T>): Promise<T> {
+    return await this.pending.holdCallers(work);
   }
 
   /**
@@ -86,6 +88,13 @@ export class NonDeterministicBackgroundTasks
   }
 
   /**
+   * Say that the scheduled task running now is waiting on the clock.
+   */
+  waitingOnClock(): () => void {
+    return this.pending.waitingOnClock();
+  }
+
+  /**
    * Take the next task due at or before an instant, earliest first.
    */
   takeNextDueBy(instant: Date): BackgroundDueTask | undefined {
@@ -97,13 +106,7 @@ export class NonDeterministicBackgroundTasks
    * If tasks schedule more tasks, this will continue draining until idle.
    */
   public async complete(): Promise<void> {
-    while (this.pending.size > 0) {
-      // oxlint-disable-next-line no-await-in-loop
-      const results = await Promise.allSettled(this.pending);
-
-      // Surface a task that failed in the background to whoever waited here.
-      new BackgroundSettledTasks(results).throwFirstFailure();
-    }
+    await this.pending.complete();
   }
 
   /**

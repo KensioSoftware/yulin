@@ -1,3 +1,5 @@
+import { setTimeout } from "node:timers";
+
 /**
  * A short random pause between scheduling a task and running it.
  *

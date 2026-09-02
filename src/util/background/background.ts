@@ -1,6 +1,8 @@
 /* oxlint-disable unicorn-js/prefer-await  */
 
+import { setTimeout } from "node:timers";
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
+import { BackgroundPendingTasks } from "./background-pending-tasks.js";
 import {
   type BackgroundDueTask,
   BackgroundDueTasks,
@@ -29,6 +31,29 @@ export interface BackgroundScheduler extends SimClock {
   schedule(task: BackgroundTask): void;
 
   /**
+   * Count work a caller started as outstanding until it settles.
+   *
+   * Completion then waits for it, so a simulation asked to settle takes in
+   * work a caller is holding the promise of as well as work it was handed.
+   * Whoever asked for it still gets what it settles with, failure included.
+   *
+   * Work already running as a scheduled task is counted where it is, and this
+   * simply runs it.
+   */
+  outstanding<T>(work: () => Promise<T>): Promise<T>;
+
+  /**
+   * Run a task that is already due, and keep it outstanding until it settles.
+   *
+   * Started here and now rather than deferred to a host timer, because
+   * advancing the clock steps through every instant work falls due at and a
+   * timer for each of them would cost real time. It is counted as outstanding
+   * work all the same, so a task that goes on to wait for the clock stops
+   * holding up whatever is moving it.
+   */
+  runDue(task: BackgroundTask): void;
+
+  /**
    * Schedule a task to happen once simulated time reaches an instant.
    *
    * Nothing dispatches it until the clock gets there, so scheduled work
@@ -45,6 +70,17 @@ export interface BackgroundScheduler extends SimClock {
    * already run, is nothing to give up on.
    */
   cancelScheduled(task: BackgroundTask): void;
+
+  /**
+   * Say that the scheduled task running now is waiting for simulated time to
+   * reach an instant, and get back the way to say it no longer is.
+   *
+   * Completion stops waiting for the task while it waits here, because moving
+   * the clock is the only thing that releases it and completion is what
+   * moving the clock waits for. Called from outside a scheduled task, such as
+   * from work a caller is holding the promise of, this changes nothing.
+   */
+  waitingOnClock(): () => void;
 }
 
 interface BackgroundTasksProperties {
@@ -83,7 +119,7 @@ export interface BackgroundDueTaskSource {
 export class BackgroundTasks
   implements BackgroundScheduler, BackgroundCompleter, BackgroundDueTaskSource
 {
-  private readonly pending = new Set<Promise<void>>();
+  private readonly pending = new BackgroundPendingTasks();
   private readonly dueTasks = new BackgroundDueTasks();
   private readonly clock: SimClock;
 
@@ -109,26 +145,27 @@ export class BackgroundTasks
    * Schedule a task to happen asynchronously in the background.
    */
   schedule(task: BackgroundTask): void {
-    const promise = new Promise<void>((resolve) => {
-      setTimeout(resolve, 0);
-    })
-
-      .then(task)
-      .then(
-        () => {
-          //
-        },
-        (error: unknown) => {
-          // Keep the promise rejected so complete() can surface failures
-          // deterministically.
-          throw error;
-        },
-      )
-      .finally(() => {
-        this.pending.delete(promise);
+    this.pending.hold(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
       });
 
-    this.pending.add(promise);
+      await task();
+    });
+  }
+
+  /**
+   * Run a task that is already due, keeping it outstanding until it settles.
+   */
+  runDue(task: BackgroundTask): void {
+    this.pending.hold(task);
+  }
+
+  /**
+   * Count work a caller started as outstanding until it settles.
+   */
+  async outstanding<T>(work: () => Promise<T>): Promise<T> {
+    return await this.pending.holdCallers(work);
   }
 
   /**
@@ -143,6 +180,13 @@ export class BackgroundTasks
    */
   cancelScheduled(task: BackgroundTask): void {
     this.dueTasks.cancel(task);
+  }
+
+  /**
+   * Say that the scheduled task running now is waiting on the clock.
+   */
+  waitingOnClock(): () => void {
+    return this.pending.waitingOnClock();
   }
 
   /**
@@ -161,10 +205,7 @@ export class BackgroundTasks
    * clock releases it.
    */
   public async complete(): Promise<void> {
-    while (this.pending.size > 0) {
-      // oxlint-disable-next-line no-await-in-loop
-      await Promise.all(this.pending);
-    }
+    await this.pending.complete();
   }
 
   /**

@@ -19,11 +19,11 @@ import {
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
-import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
+import { SimLambdaInvocation } from "./invoke/sim-lambda-invocation.js";
 import { SimLambdaFunctionMetrics } from "../metric/sim-lambda-function-metrics.js";
-import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
+import type { BackgroundScheduler } from "../../../util/background/background.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import { defaultLambdaHandler } from "./sim-lambda-handler.type.js";
 import {
@@ -87,8 +87,8 @@ export class SimLambdaFunction {
   #code: SimLambdaExecutableCode;
   private readonly properties: SimLambdaFunctionProperties;
   private readonly runAsOwner: SimAwsRunAsOwner;
-  private readonly runner = new SimLambdaHandlerRunner();
   private readonly clock: SimClock;
+  private readonly background: BackgroundScheduler | undefined;
   private readonly logging: SimLambdaFunctionLogging;
   private readonly outboundHttp: SimLambdaOutboundHttp | undefined;
 
@@ -110,11 +110,13 @@ export class SimLambdaFunction {
       runAsOwner = this,
       version = SIM_LAMBDA_LATEST_VERSION,
       clock = new SimRealClock(),
+      background,
       metrics,
       outboundHttp,
     } = properties;
     this.properties = properties;
     this.clock = clock;
+    this.background = background;
     this.version = version;
     this.name = name as SimLambdaFunctionName;
     this.roleArn = roleArn;
@@ -246,13 +248,14 @@ export class SimLambdaFunction {
    * Runtime.* cold-start error.
    */
   async invoke(event: unknown): Promise<unknown> {
-    const contextBuilder = new SimLambdaInvokeContextBuilder({
+    const invocation = new SimLambdaInvocation({
       functionName: this.name,
       functionVersion: this.version,
       invokedFunctionArn: this.arn,
       timeoutSeconds: this.timeoutSeconds,
       memorySizeMb: this.memorySizeMb,
       clock: this.clock,
+      background: this.background,
       logGroupName: this.logging.logGroupName,
       logStreamName: this.logging.logStreamName(),
     });
@@ -270,11 +273,7 @@ export class SimLambdaFunction {
                 async () =>
                   await this.logging.around(
                     async () =>
-                      await this.runner.run(
-                        this.#code.handlerFunction(),
-                        event,
-                        contextBuilder,
-                      ),
+                      await invocation.run(this.#code.handlerFunction(), event),
                   ),
               ),
           ),

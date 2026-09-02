@@ -5,6 +5,7 @@ import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http
 import { simLambdaProcessClock } from "./sim-lambda-process-clock.js";
 import { simLambdaProcessOutbound } from "./sim-lambda-process-outbound.js";
 import { simLambdaProcessOutput } from "./sim-lambda-process-output.js";
+import { simLambdaProcessTimers } from "./timer/sim-lambda-process-timers.js";
 
 /**
  * What an invocation of host-scope code has bridged to it.
@@ -49,6 +50,10 @@ export async function runSimLambdaInHostScope<T>(
   run: () => Promise<T>,
 ): Promise<T> {
   const { clock, outboundHttp, output, outputSettings } = scope;
+
+  // Host-scope code reaches for the global timer functions, so the invocation
+  // its handler runs in has to be findable from them.
+  simLambdaProcessTimers.install();
 
   const recording =
     output === undefined

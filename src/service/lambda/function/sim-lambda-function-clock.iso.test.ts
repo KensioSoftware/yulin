@@ -23,10 +23,19 @@ const hostDate = Date;
  * Resolve after a real pause, so an invocation can be suspended part way
  * through while another one runs.
  */
-async function tick(milliseconds: number): Promise<void> {
-  await new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
+/**
+ * Suspend for a number of turns of the host event loop.
+ *
+ * Not a timer: a handler's timers wait on the simulation's clock, and these
+ * simulations are stopped, so a handler sleeping on one would stay asleep.
+ */
+async function tick(turns: number): Promise<void> {
+  for (let turn = 0; turn < turns; turn += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+  }
 }
 
 async function invokeStamper(simAws: SimAws): Promise<unknown> {

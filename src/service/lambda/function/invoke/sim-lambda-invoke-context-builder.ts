@@ -25,6 +25,13 @@ interface SimLambdaInvokeContextBuilderProperties {
    * handler with a constant budget, rather than one that drains in real time.
    */
   readonly clock?: SimClock | undefined;
+
+  /**
+   * The request id this invocation is known by. It comes from outside because
+   * the invocation names itself in the error it reports when it runs out of
+   * time, and a handler reading `awsRequestId` has to see the same one.
+   */
+  readonly awsRequestId?: string | undefined;
 }
 
 /**
@@ -51,9 +58,9 @@ export class SimLambdaInvokeContextBuilder {
       logGroupName,
       logStreamName,
       clock = new SimRealClock(),
+      awsRequestId = randomUUID(),
     } = this.properties;
     const startedAtMs = clock.now().getTime();
-    const awsRequestId = randomUUID();
 
     return {
       callbackWaitsForEmptyEventLoop: true,

@@ -12,6 +12,14 @@ import {
   type SimLambdaOutputSink,
 } from "../../logging/sim-lambda-output-sink.js";
 import { makeSimLambdaOutboundFetch } from "../../outbound/sim-lambda-outbound-fetch.js";
+import {
+  simLambdaClearInterval,
+  simLambdaClearTimeout,
+} from "../../invoke/timer/sim-lambda-clear-timer.js";
+import {
+  simLambdaSetInterval,
+  simLambdaSetTimeout,
+} from "../../invoke/timer/sim-lambda-process-timers.js";
 import type { SimLambdaOutboundHttp } from "../../outbound/sim-lambda-outbound-http.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
 
@@ -93,10 +101,14 @@ export function makeSimLambdaVmContext(
     // Function code asking JavaScript for the time gets the simulation's
     // time, so a frozen or advanced clock reaches the code under test.
     Date: makeSimClockDate(clock),
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
+    // Timers wait on the simulation's clock too, so a sandboxed handler that
+    // sleeps is released by a test advancing time rather than by the host.
+    // They belong to whichever invocation is running in the sandbox, which is
+    // why they are resolved per call rather than built into it.
+    setTimeout: simLambdaSetTimeout,
+    clearTimeout: simLambdaClearTimeout,
+    setInterval: simLambdaSetInterval,
+    clearInterval: simLambdaClearInterval,
     setImmediate,
     queueMicrotask,
     TextEncoder,

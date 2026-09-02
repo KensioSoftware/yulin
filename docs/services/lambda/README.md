@@ -3141,6 +3141,129 @@ otherwise. A time read at module scope is therefore read too early, exactly as i
 variables. See [simulated time](https://yulinsim.dev/time/) for the whole picture, including where real
 AWS puts the time on the event.
 
+## Timers and the invocation deadline
+
+A handler's `setTimeout`, `clearTimeout`, `setInterval` and `clearInterval` measure their delays on
+the simulation's clock. A handler that sleeps wakes when a test advances time past its delay, and a
+frozen clock holds it asleep for as long as the test wants. The timers belong to one invocation. Two
+simulations running at once each keep their own, and code outside an invocation keeps the host
+timers it already had.
+
+A sleeping handler is released by the clock. A test asks for the invocation and moves time before
+waiting on the answer.
+
+```typescript sim-lambda-handler-timers
+/**
+ * A simulated Lambda handler sleeping on the simulation's clock.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "batcher",
+    Role: "arn:aws:iam::111111111111:role/BatcherRole",
+    Timeout: 60,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 30_000);
+        });
+
+        return "batched";
+      }),
+    },
+  }),
+);
+
+// Asked for and left running, because the handler is waiting on the clock.
+const invocation = lambda.invoke(
+  new InvokeCommand({ FunctionName: "batcher" }),
+);
+
+await simAws.clock().advanceBy({ seconds: 30 });
+
+const output = await invocation;
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+```
+
+An interval runs once for each period an advance covers. Advancing eleven seconds past a two second
+interval runs it five times. A delay of zero, or none at all, is due at the instant it was asked
+for, and a handler yielding with `setTimeout(resolve, 0)` gets going again without the clock moving.
+
+The function's `Timeout` is a deadline on the same clock. Where it arrives before the handler
+answers, the invocation ends in the error the real runtime reports.
+
+```typescript sim-lambda-invocation-timeout
+/**
+ * A simulated Lambda invocation running out of the time its Timeout allows.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "slowcoach",
+    Role: "arn:aws:iam::111111111111:role/SlowcoachRole",
+    Timeout: 3,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 60_000);
+        });
+
+        return "too late";
+      }),
+    },
+  }),
+);
+
+const invocation = lambda.invoke(
+  new InvokeCommand({ FunctionName: "slowcoach" }),
+);
+
+await simAws.clock().advanceBy({ seconds: 10 });
+
+const output = await invocation;
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+
+// Unhandled
+console.log(output.FunctionError);
+
+const failure = JSON.parse(Buffer.from(output.Payload).toString()) as {
+  errorType: string;
+  errorMessage: string;
+};
+
+// Sandbox.Timedout
+console.log(failure.errorType);
+// <deadline instant> <request id> Task timed out after 3.00 seconds
+console.log(failure.errorMessage);
+```
+
+The log group gets the `ERROR Invoke Error` line the runtime writes, and `AWS/Lambda` counts an
+`Errors` datapoint beside the `Invocations`. A handler that answers after its deadline reaches
+nobody, and the timers it left running are given up with the rest of the invocation.
+
+For an `Event` invocation a timeout is a failed attempt. It goes to the same
+[retries and destinations](#asynchronous-retries-and-destinations) an attempt that threw goes to.
+
+A frozen clock never reaches the deadline. A handler under one runs for as long as the host process
+lets it, and `context.getRemainingTimeInMillis()` reports the same budget throughout.
+
 ## What an invocation counts in CloudWatch
 
 Every invocation publishes `Invocations` and a `Duration` into `AWS/Lambda`, dimensioned by
@@ -3956,6 +4079,8 @@ Sim Lambda currently supports:
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
+- Handler timers on the simulation's clock, and the function's `Timeout` as a deadline on the same
+  clock, reported as real Lambda reports a timeout
 - Asynchronous invocation retries on the simulated clock, and `OnSuccess`/`OnFailure` destinations
   written with `PutFunctionEventInvokeConfigCommand`, delivering the AWS destination record to a
   simulated SQS queue, SNS topic, EventBridge event bus or Lambda function after authorizing the
@@ -4048,8 +4173,9 @@ Current documented limitations:
   no dead-letter target. The `AWS::Lambda::EventInvokeConfig` Resource and the `DeadLetterConfig`
   property a CloudFormation or CDK template writes are both deployed. See
   [retries and destinations in templates](#retries-and-destinations-in-templates).
-- Throttling and timeouts do not drive a retry. A retry follows a handler that threw, and the
-  `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was accepted.
+- Throttling does not drive a retry. A retry follows a handler that threw or ran out of time, and
+  the `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was
+  accepted.
 - `DestinationConfig` on an event source mapping is left out. It is a different mechanism from the
   asynchronous invocation destinations above.
 - A settings change takes effect at once. Real Lambda reports `LastUpdateStatus: "InProgress"` while
@@ -4123,9 +4249,15 @@ Current documented limitations:
 - An unsigned request to a service API endpoint is served over HTTP when the simulation serves that
   endpoint, which today means Cognito's regional endpoint and the S3 endpoints. Anywhere else it is
   read as a Command and refused as one.
-- `Timeout` is recorded and never interrupts handler execution.
-- Timers inside a handler are host timers. `setTimeout` waits in real time, and advancing the
-  simulation's clock leaves a sleeping handler asleep.
+- A handler is interrupted at its deadline only where it yields. The deadline waits on the
+  simulation's clock like any other work, and dispatching it needs the event loop, so a handler
+  looping over the CPU without awaiting anything runs to the end of its loop.
+- The global `setTimeout`, `clearTimeout`, `setInterval` and `clearInterval` are the timers on the
+  simulation's clock. `node:timers`, `node:timers/promises` and `util.promisify(setTimeout)` are
+  imported directly rather than read from the globals, and they wait in real time.
+- Module-scope initialization time and execution environment recycling are left out. A cold start
+  costs nothing against the deadline, and a function keeps one warm environment for as long as it
+  exists.
 - A time read at module scope, like an environment variable read there, is read before any
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocation retries and failure destinations are left out, and handler errors are dropped.

@@ -1,3 +1,4 @@
+import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsRunAsOwner } from "../../aws/caller/sim-aws-run-as-context.js";
@@ -49,6 +50,12 @@ export interface SimLambdaFunctionProperties {
    * real clock.
    */
   clock?: SimClock | undefined;
+  /**
+   * Scheduler this function's handler timers and invocation deadline wait on.
+   * A function built standalone, outside a SimAws instance, has none, and its
+   * handler keeps the host timers and runs for as long as it likes.
+   */
+  background?: BackgroundScheduler | undefined;
   /**
    * Where this function's handler output is recorded. A function built
    * standalone, outside a SimAws instance, has nowhere to record to and writes
