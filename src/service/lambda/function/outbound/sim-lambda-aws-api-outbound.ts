@@ -5,6 +5,7 @@ import {
 } from "../../../../sdk/wire/sim-sdk-wire-operation.js";
 import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
+import { SimS3ApiEndpoint } from "../../../s3/serve/api/sim-s3-api.js";
 import type { SimLambdaOutboundHttp } from "./sim-lambda-outbound-http.js";
 import {
   simLambdaOutboundWireRequest,
@@ -38,6 +39,18 @@ const awsEndpointSuffixes: readonly string[] = [
  * way it answers for every other hostname a resource is issued.
  */
 const resourceEndpointLabel = ".execute-api.";
+
+/**
+ * The SigV4 signing name of the one service here whose requests an endpoint of
+ * its own reads.
+ *
+ * S3 states its operation in the method, the path and a query-string
+ * sub-resource. `SimS3ApiEndpoint` reads those. The signing name is where a
+ * signed request says which service it is for, whatever protocol that service
+ * speaks, and that is what selects the endpoint here, as it is on the served
+ * AWS API endpoint.
+ */
+const s3SigningName = "s3";
 
 /**
  * Whether a hostname is an AWS service API endpoint.
@@ -93,12 +106,14 @@ interface SimLambdaAwsApiOutboundProperties {
  */
 export class SimLambdaAwsApiOutbound implements SimLambdaOutboundHttp {
   private readonly dispatcher: SimSdkWireDispatcher;
+  private readonly s3: SimS3ApiEndpoint;
 
   constructor(properties: SimLambdaAwsApiOutboundProperties) {
     this.dispatcher = new SimSdkWireDispatcher(
       properties.simAws,
       properties.regionName,
     );
+    this.s3 = new SimS3ApiEndpoint({ simAws: properties.simAws });
   }
 
   /**
@@ -110,12 +125,29 @@ export class SimLambdaAwsApiOutbound implements SimLambdaOutboundHttp {
 
   /**
    * Answer an AWS API request from the simulated operation it names.
+   *
+   * A request signed for S3 goes to the endpoint that reads S3's protocol,
+   * since S3 names its operation where the wire dispatcher looks for a header.
+   * No caller travels with it. The SDK signed it with the placeholder
+   * credentials the runtime puts in the environment, and the invocation is
+   * already running as the execution Role, the ambient caller every other call
+   * out of function code runs as.
    */
   async fetch(request: Request): Promise<Response> {
+    const wireRequest = await simLambdaOutboundWireRequest(request);
+    const scope = readSimSdkWireCredentialScope(wireRequest);
+
+    if (scope?.signingName === s3SigningName) {
+      return await this.s3.handle(
+        request,
+        wireRequest.body,
+        undefined,
+        scope.regionName,
+      );
+    }
+
     return simLambdaOutboundWireResponse(
-      await this.dispatcher.dispatch(
-        await simLambdaOutboundWireRequest(request),
-      ),
+      await this.dispatcher.dispatch(wireRequest),
     );
   }
 }

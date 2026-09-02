@@ -326,6 +326,16 @@ without Lambda knowing which of them it is. An AWS service API endpoint goes to
 Command. Resolution is asked first, since a load balancer's own `.elb.amazonaws.com` name ends in a
 service API suffix while naming something served over HTTP.
 
+`SimLambdaAwsApiOutbound` reads the SigV4 credential scope to decide which of two things answers a
+service API request. A request signed for S3 goes to `SimS3ApiEndpoint`, the same endpoint the
+served AWS API routes S3 to, since S3 states its operation in the method and the path where the
+wire dispatcher looks for a header. Everything else goes to the wire dispatcher.
+
+Neither is given a caller. The SDK signs with the placeholder credentials in
+`sim-lambda-execution-credentials.ts`, and the simulation authenticates those against nothing. What
+the request runs as comes from the invocation. It is already running as the execution Role, and
+`SimSdkCommandDispatcher` picks that ambient caller up for a Command arriving without one.
+
 A service API endpoint also serves documents over plain HTTP, and a user pool's JWKS is the one a
 handler asks for. `isSimAwsApiRequest` is the test that separates the two, on the operation header
 of the AWS JSON protocol and the SigV4 credential scope, since a client fetching a published

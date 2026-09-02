@@ -687,7 +687,13 @@ AWS JSON protocol. Those are the ones that can be read back without the operatio
 ACM, CloudWatch Logs, Cognito Identity Provider, DynamoDB, DynamoDB Streams, ECS, EventBridge, KMS,
 Rekognition, Secrets Manager, SQS and SSM.
 
-A bundled call to any other simulated service, such as S3, SNS, SES or Lambda itself, fails with an
+S3 states its operation in the method and the path. A bundled S3 client reaches the endpoint that
+already serves S3 to a client given `--endpoint-url`, in either of the two addressing styles an SDK
+sends. A function can read and write Objects with an `S3Client` its archive inlines. The execution
+Role authorizes each request, and a read it holds no `s3:GetObject` for comes back to the SDK as
+`AccessDenied`.
+
+A bundled call to any other simulated service, such as SNS, SES or Lambda itself, fails with an
 error naming the service. Leaving the SDK out of that archive puts it back
 on the module interception path above, which every simulated service is reachable through.
 

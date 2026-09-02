@@ -1,14 +1,19 @@
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { faker } from "@faker-js/faker";
 import {
   assertFalse,
+  assertIdentical,
   assertObjectMatches,
   assertResponseStatus,
+  assertStringIncludes,
   assertTrue,
   describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 import {
   isSimAwsApiRequest,
   isSimAwsEndpointHostname,
@@ -139,5 +144,86 @@ describe("The AWS service API a sim Lambda's requests reach", () => {
     assertObjectMatches(await response.json(), {
       Item: { total: { N: "42" } },
     });
+  });
+
+  it("answers a request an SDK signed for S3, which names no operation header", async () => {
+    // Given a simulation holding an Object, and the outbound HTTP a function
+    // in it reaches AWS through.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const bucketName = faker.string.alpha({ length: 10, casing: "lower" });
+    const greeting = faker.lorem.sentence();
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: "greeting.txt",
+        Body: greeting,
+      }),
+    );
+    const outbound = new SimLambdaAwsApiOutbound({
+      simAws,
+      regionName: "eu-west-2",
+    });
+
+    // When a signed GetObject arrives, addressed the way an SDK resolving
+    // S3's own endpoint sends it.
+    const response = await outbound.fetch(
+      new Request(
+        `https://${bucketName}.s3.eu-west-2.amazonaws.com/greeting.txt?x-id=GetObject`,
+        { headers: { authorization: signedFor("s3") } },
+      ),
+    );
+
+    // Then simulated S3 answered with the Object, rather than the request
+    // being refused for carrying no operation header.
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), greeting);
+  });
+
+  it("runs an S3 request as the caller the function is running as", async () => {
+    // Given a simulation holding an Object, and a Role that may write to the
+    // Bucket but not read from it.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const bucketName = faker.string.alpha({ length: 10, casing: "lower" });
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: "greeting.txt",
+        Body: faker.lorem.sentence(),
+      }),
+    );
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "ObjectWriterRole",
+        actions: ["s3:PutObject"],
+        resource: `arn:aws:s3:::${bucketName}/*`,
+      },
+      simAws,
+    );
+    const outbound = new SimLambdaAwsApiOutbound({
+      simAws,
+      regionName: "eu-west-2",
+    });
+
+    // When a signed GetObject arrives while that Role is the ambient caller,
+    // as it is throughout a sim Lambda invocation.
+    const response = await simAws.runAs({ kind: "arn", arn: role.Arn }, () =>
+      outbound.fetch(
+        new Request(
+          `https://${bucketName}.s3.eu-west-2.amazonaws.com/greeting.txt?x-id=GetObject`,
+          { headers: { authorization: signedFor("s3") } },
+        ),
+      ),
+    );
+
+    // Then S3 refused it as the Role, in the response an SDK reads back as an
+    // AccessDenied error.
+    assertResponseStatus(response, 403, await describeResponse(response));
+    assertStringIncludes(await response.text(), "AccessDenied");
   });
 });

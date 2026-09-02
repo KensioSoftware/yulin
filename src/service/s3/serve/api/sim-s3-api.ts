@@ -46,11 +46,17 @@ export class SimS3ApiEndpoint {
    * The Region is the one the request was signed for, read from its credential
    * scope, so it arrives as whatever the client wrote rather than as a Region
    * the simulator has already recognised.
+   *
+   * A request nothing has authenticated arrives with no caller, and runs as
+   * the ambient caller of whatever sent it, in the same way an intercepted SDK
+   * client's Command does. A sim Lambda's outbound call relies on that. Its
+   * signature is over placeholder credentials, and the invocation is already
+   * running as the execution Role.
    */
   async handle(
     request: Request,
     body: Uint8Array,
-    caller: SimAwsCaller,
+    caller: SimAwsCaller | undefined,
     regionName: string,
   ): Promise<Response> {
     const apiRequest = readSimS3ApiRequest(request, body);
