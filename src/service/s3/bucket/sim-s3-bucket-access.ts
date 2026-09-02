@@ -1,6 +1,6 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
+import { filesystemS3MountStorage } from "../storage/filesystem/s3-filesystem-deleting-storage.js";
 import { simS3BucketUrl, simS3ServiceUrl } from "./sim-s3-endpoint-url.js";
 import type { SimS3Bucket, SimS3BucketName } from "./sim-s3-bucket.js";
 import { SimS3DeclaredSystemMetadata } from "../object/s3-declared-system-metadata.js";
@@ -98,6 +98,9 @@ export class SimS3BucketAccess {
    * cached. A deployment into the same Bucket has already said it, so the mount
    * inherits what the Bucket was told, and `systemMetadata` is where it
    * declares the rest or answers differently.
+   *
+   * The Bucket serves and accepts writes but refuses a delete, since the files
+   * are the user's own. `allowDelete` is how a mount asks for one.
    */
   mountFilesystem(
     bucketName: SimS3BucketName | string,
@@ -111,11 +114,12 @@ export class SimS3BucketAccess {
     });
 
     bucket.configureSimStorage(
-      new FilesystemS3BucketStorage({
+      filesystemS3MountStorage({
         directoryPath,
         ...(options.additionalFileExtensions !== undefined && {
           additionalFileExtensions: options.additionalFileExtensions,
         }),
+        allowDelete: options.allowDelete,
         systemMetadata,
       }),
     );

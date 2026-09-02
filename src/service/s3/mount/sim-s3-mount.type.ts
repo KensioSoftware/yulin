@@ -33,6 +33,17 @@ export interface SimS3MountFilesystemOptions {
   readonly settleMs?: number | undefined;
 
   /**
+   * Let a DeleteObject remove the file behind an Object key.
+   *
+   * A mounted Bucket refuses a delete by default, because the files under the
+   * directory are the user's own and a test that empties a Bucket would empty
+   * their build output with it. A mount that says so gets the deletion an
+   * in-memory Bucket performs, event notification included, within the same
+   * key and extension checks a read goes through.
+   */
+  readonly allowDelete?: boolean | undefined;
+
+  /**
    * File extensions to serve in addition to the usual web ones.
    *
    * A mounted Bucket only serves files whose extension is on a cautious list —

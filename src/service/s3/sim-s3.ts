@@ -10,6 +10,7 @@ import { SimS3Operations } from "./sim-s3-operations.js";
 import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimS3NotificationDeliveryFailure } from "./notification/sim-s3-notification-failures.js";
+import type { SimS3ObjectNotifier } from "./notification/sim-s3-object-notifier.js";
 import type { SimS3MountFilesystemOptions } from "./mount/sim-s3-mount.type.js";
 
 /**
@@ -74,6 +75,20 @@ export class SimS3 extends SimS3Operations {
    */
   getNotificationDeliveryFailures(): readonly SimS3NotificationDeliveryFailure[] {
     return this.commands.objectNotifier.deliveryFailures;
+  }
+
+  /**
+   * Get the notifier this scope's Object commands raise their events through.
+   *
+   * A write that reaches a Bucket without going through an S3 command still
+   * owes the Bucket's destinations an event. A CDK BucketDeployment is one. It
+   * stands in for a provider function that syncs a directory into the Bucket,
+   * and the Bucket notifies whatever it was configured to notify. One notifier
+   * serves the scope, so the events a deployment raises are sequenced against
+   * the commands' own rather than starting a sequence beside them.
+   */
+  objectNotifier(): SimS3ObjectNotifier {
+    return this.commands.objectNotifier;
   }
 
   /**

@@ -1290,6 +1290,11 @@ The event types a configuration can name are `s3:ObjectCreated:*`, `s3:ObjectCre
 `s3:ObjectRemoved:*` and `s3:ObjectRemoved:Delete`. Any other S3 event type is refused by name rather
 than stored and never raised.
 
+A CDK [`BucketDeployment`](https://yulinsim.dev/services/cloudformation/#cdk-s3-bucketdeployment) raises
+both. It copies its files in one Object at a time, so each file the deployment writes raises
+`ObjectCreated:Put`, and each Object a pruning deployment removes raises `ObjectRemoved:Delete`. The
+sync it stands in for raises the same two in AWS.
+
 A configuration can filter on an object key prefix, a suffix, or both. Two configurations that share
 an event type and whose filters could both match the same key are refused with `InvalidArgument`, as
 real S3 refuses them. Overlapping prefixes are fine when the suffixes do not overlap, so one function
@@ -2008,9 +2013,11 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
   same way.
 - The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is ignored.
   Queue encryption is left out.
-- A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
-  rather than putting Objects, and neither raises an event. Real CDK `BucketDeployment` fires one
-  `ObjectCreated:Put` per file.
+- `mountBucketFilesystem(...)` replaces the storage with the directory, and a file written there by
+  something other than S3 raises nothing. The watcher reports that the directory changed without
+  naming the file, and comparing the whole key set on every reload is a larger change than this
+  earns. A delete through S3 raises `ObjectRemoved:Delete` on a mount that
+  [allows deletion](#deleting-the-files-under-a-mount).
 - A topic destination publishes with no message attributes, since real S3 publishes none. The only
   thing on the message besides the event document is the `Amazon S3 Notification` subject.
 - `s3:TestEvent` is left out. Real S3 puts one on a queue or topic when a configuration naming it is
@@ -3348,13 +3355,7 @@ Filesystem storage is somewhat restrictive to make it slightly safer:
 - Object keys must not be absolute paths or contain `..`
 - Only files whose extension is on a cautious list are served (see below)
 - Symlinks are ignored when listing Objects
-- Deletion is refused, and never unlinks a real file
-
-`DeleteObject` against a filesystem-backed Bucket raises `NotImplemented`, and `DeleteObjects`
-reports the same code for every key. This is stricter than real S3, deliberately. The directory a
-Bucket is mounted on is an ordinary directory of yours, and removing files from it because a test
-called `DeleteObject` would be a poor default. Leave a Bucket on the default in-memory storage
-when a test needs deletion to work.
+- Deletion is refused until the mount asks for it (see below)
 
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
 file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.csv`, `.pdf`,
@@ -3362,6 +3363,43 @@ file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`,
 `binary/octet-stream`, as S3 reports for an Object whose type it was never told. That only comes up
 for an extension a mount named itself, below. No other file is served at all, with or without a
 type.
+
+### Deleting the files under a mount
+
+`DeleteObject` against a filesystem-backed Bucket raises `NotImplemented`, and `DeleteObjects`
+reports the same code for every key. This is stricter than real S3, deliberately. The directory a
+Bucket is mounted on is an ordinary directory of yours, and removing files from it because a test
+called `DeleteObject` would be a poor default.
+
+Code that deletes what it uploaded needs a Bucket that can. A mount says so with `allowDelete`, and
+a delete then unlinks the file, reports the removal and raises the `ObjectRemoved:Delete` event an
+in-memory Bucket raises:
+
+```typescript sim-s3-mount-allow-delete
+/**
+ * Letting a mounted Bucket delete the files it serves.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+simAws
+  .s3()
+  .mountBucketFilesystem("uploads", path.join(process.cwd(), "assets"), {
+    allowDelete: true,
+  });
+```
+
+The key goes through the checks above either way. A delete naming a path that climbs out of the
+directory is refused, and so is one naming a file type the mount does not serve. The directory the
+file was in stays where it is, since a Bucket has no directories for an empty one to be. Leave the
+option off and the refusal stands, naming the directory it would have unlinked from.
 
 ### Serving a file extension of your own
 
@@ -3659,9 +3697,9 @@ Sim S3 currently supports:
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
 - In-memory Object storage by default
 - Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`, watching the mounted
-  directory and reloading connected browsers when it is rebuilt, and reporting the system metadata a
+  directory and reloading connected browsers when it is rebuilt, reporting the system metadata a
   CDK `BucketDeployment` into the same Bucket published, alongside anything the mount declares for a
-  key prefix itself
+  key prefix itself, and deleting the files under it where the mount allows that
 
 The simulator aims at useful behaviour for tests and local development, short of full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
@@ -3678,8 +3716,11 @@ These apply across the page. The sections above each list what is specific to th
 - Object tags, ACLs and replication are left out. Server-side encryption is reported and never
   applied, and an `aws:kms` Object names no key, because there is no simulated KMS behind it. See
   [Default encryption](#default-encryption).
-- A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
-  notifications, because it swaps the whole storage backend in place of putting Objects.
+- A Bucket using filesystem-backed storage refuses a delete unless the mount allowed one, and hears
+  nothing about a file something else wrote under the directory. See
+  [Deleting the files under a mount](#deleting-the-files-under-a-mount).
+- Multipart upload parts for a mounted Bucket are held in memory, and only the assembled Object
+  reaches the directory.
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
   a presigned `PUT` unable to set the rest. A `PutObjectCommand` through the SDK keeps all of them.
 - A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other
