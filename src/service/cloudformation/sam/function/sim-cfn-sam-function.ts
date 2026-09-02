@@ -2,6 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
+import type { SamTemplateApiAuth } from "../api/auth/sim-cfn-sam-template-api-auth.js";
 import type { SamTemplateGlobals } from "../sim-cfn-sam-globals.js";
 import { samMergedFunctionProperties } from "../sim-cfn-sam-globals.js";
 import {
@@ -25,12 +26,12 @@ interface SamFunctionExpansionProperties {
    * `Function`, and its `Api` events take theirs from `Api`.
    */
   readonly globals: SamTemplateGlobals;
+  /**
+   * The `Auth` of every API of the template, for the function's `Api` and
+   * `HttpApi` events.
+   */
+  readonly apiAuth: SamTemplateApiAuth;
 }
-
-/**
- * The SAM Resource type this expansion covers.
- */
-export const samFunctionType = "AWS::Serverless::Function";
 
 /**
  * Expand one AWS::Serverless::Function into the Resources CloudFormation
@@ -88,6 +89,7 @@ export function samFunctionResources(
       functionProperties,
       condition,
       apiGlobals: globals.forApi,
+      apiAuth: properties.apiAuth,
     }),
   };
 }
@@ -114,5 +116,6 @@ export function samFunctionResourceEdits(
     ),
     condition: resource["Condition"],
     apiGlobals: globals.forApi,
+    apiAuth: properties.apiAuth,
   });
 }

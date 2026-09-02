@@ -2,6 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../template/value/sim-cfn-template-value.js";
+import { samEventAuthorization } from "../../api/auth/sim-cfn-sam-event-authorization.js";
 import { isSamTemplateRecord } from "../../sim-cfn-sam-record.js";
 import { samApiInvokePermissionResource } from "./sim-cfn-sam-api-invoke-permission.js";
 import {
@@ -120,8 +121,11 @@ interface SamApiEventMethodProperties {
  *
  * SAM integrates an `Api` event as a proxy, which is the shape the function is
  * handed the request in, and the REST API declares an integration as a block
- * of the method. `Auth` on the event is not expanded, so the method authorizes
- * nothing and every request matching it reaches the function.
+ * of the method.
+ *
+ * `Auth` on the event names one of the API's authorizers, and an event naming
+ * none takes the API's `DefaultAuthorizer`. A method neither of them closes
+ * authorizes nothing, and every request matching it reaches the function.
  */
 function methodResource(
   properties: SamApiEventMethodProperties,
@@ -135,7 +139,7 @@ function methodResource(
       RestApiId: { Ref: apiLogicalId },
       ResourceId: samApiEventResourceId(apiLogicalId, path),
       HttpMethod: samApiEventHttpMethod(event.properties),
-      AuthorizationType: "NONE",
+      ...samEventAuthorization(event, apiLogicalId),
       Integration: {
         Type: "AWS_PROXY",
         IntegrationHttpMethod: "POST",

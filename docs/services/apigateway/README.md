@@ -1792,7 +1792,9 @@ of that name by itself and the template carries one Resource fewer.
 A template naming the SAM transform reaches the same resource types.
 `AWS::Serverless::Api` becomes a REST API with its deployment and stage, and the `Api` event of an
 `AWS::Serverless::Function` becomes the path resources, the method and the invoke permission that
-put the function behind it. Events naming no `RestApiId` share one API on a `Prod` stage.
+put the function behind it. Events naming no `RestApiId` share one API on a `Prod` stage. An `Auth`
+block on the API becomes the `AWS::ApiGateway::Authorizer` resources it declares, and `Auth` on the
+event picks which of them guards that method.
 [The SAM section of the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#rest-apis) covers both.
 
 ### CDK

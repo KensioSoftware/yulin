@@ -9,13 +9,15 @@ import {
   samRestApiResources,
   samRestApiType,
 } from "./api/sim-cfn-sam-rest-api.js";
+import type { SamTemplateApiAuth } from "./api/auth/sim-cfn-sam-template-api-auth.js";
+import { samTemplateApiAuth } from "./api/auth/sim-cfn-sam-template-api-auth.js";
 import type { SamResourceEdit } from "./function/event/sim-cfn-sam-resource-edit.js";
 import { samEditedResources } from "./function/event/sim-cfn-sam-resource-edit.js";
 import {
   samFunctionResourceEdits,
   samFunctionResources,
-  samFunctionType,
 } from "./function/sim-cfn-sam-function.js";
+import { samFunctionType } from "./function/sim-cfn-sam-function-type.js";
 import {
   samSimpleTableResources,
   samSimpleTableType,
@@ -55,6 +57,7 @@ export function samExpandedTemplate(
   }
 
   const globals = samTemplateGlobals(template);
+  const apiAuth = samTemplateApiAuth(template, globals);
   const resources = Object.entries(template.Resources);
 
   return {
@@ -62,14 +65,27 @@ export function samExpandedTemplate(
     Resources: samEditedResources(
       Object.fromEntries(
         resources.flatMap(([logicalId, resource]) =>
-          Object.entries(expandedResource(logicalId, resource, globals)),
+          Object.entries(
+            expandedResource({ logicalId, resource, globals, apiAuth }),
+          ),
         ),
       ),
       resources.flatMap(([logicalId, resource]) =>
-        resourceEdits(logicalId, resource, globals),
+        resourceEdits({ logicalId, resource, globals, apiAuth }),
       ),
     ),
   };
+}
+
+/**
+ * What one Resource of a template is expanded against: the template's
+ * `Globals` defaults, and the `Auth` of every API its events may reach.
+ */
+interface SamExpandedResourceProperties {
+  readonly logicalId: string;
+  readonly resource: SimCfnTemplateValue;
+  readonly globals: SamTemplateGlobals;
+  readonly apiAuth: SamTemplateApiAuth;
 }
 
 /**
@@ -80,15 +96,15 @@ export function samExpandedTemplate(
  * SAM Resource of its own and may not have been read yet.
  */
 function resourceEdits(
-  logicalId: string,
-  resource: SimCfnTemplateValue,
-  globals: SamTemplateGlobals,
+  properties: SamExpandedResourceProperties,
 ): readonly SamResourceEdit[] {
+  const { logicalId, resource, globals, apiAuth } = properties;
+
   if (!isSamTemplateRecord(resource) || resource["Type"] !== samFunctionType) {
     return [];
   }
 
-  return samFunctionResourceEdits({ logicalId, resource, globals });
+  return samFunctionResourceEdits({ logicalId, resource, globals, apiAuth });
 }
 
 /**
@@ -96,10 +112,10 @@ function resourceEdits(
  * does not cover is deployed as itself.
  */
 function expandedResource(
-  logicalId: string,
-  resource: SimCfnTemplateValue,
-  globals: SamTemplateGlobals,
+  properties: SamExpandedResourceProperties,
 ): Record<string, SimCfnTemplateValue> {
+  const { logicalId, resource, globals, apiAuth } = properties;
+
   if (!isSamTemplateRecord(resource)) {
     return { [logicalId]: resource };
   }
@@ -107,7 +123,7 @@ function expandedResource(
   const type = resource["Type"];
 
   if (type === samFunctionType) {
-    return samFunctionResources({ logicalId, resource, globals });
+    return samFunctionResources({ logicalId, resource, globals, apiAuth });
   }
 
   if (type === samHttpApiType) {

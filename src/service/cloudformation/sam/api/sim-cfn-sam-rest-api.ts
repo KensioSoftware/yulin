@@ -8,6 +8,8 @@ import {
 } from "../function/sim-cfn-sam-function-properties.js";
 import { samMergedApiProperties } from "../sim-cfn-sam-globals.js";
 import { samPickedProperties } from "../sim-cfn-sam-picked.js";
+import { samApiAuthResources } from "./auth/sim-cfn-sam-api-auth.js";
+import { samRestApiAuth } from "./auth/sim-cfn-sam-rest-api-auth.js";
 import { samRestApiStageResources } from "./sim-cfn-sam-rest-api-stage.js";
 
 interface SamRestApiExpansionProperties {
@@ -31,10 +33,11 @@ export const samRestApiType = "AWS::Serverless::Api";
  * The properties whose names and meanings are the same on both Resource types.
  * Expanding one of them is carrying it across.
  *
- * `Auth`, `Cors`, `Domain`, `GatewayResponses`, `MethodSettings` and
+ * `Cors`, `Domain`, `GatewayResponses`, `MethodSettings` and
  * `BinaryMediaTypes` are absent from the list. SAM writes all of them into the
  * Swagger document it generates, and none is expanded here, so an API
- * declaring one is deployed without it.
+ * declaring one is deployed without it. `Auth` is absent for the opposite
+ * reason. It becomes authorizer Resources of its own beside the API.
  */
 const propertyNames = new Set([
   "Description",
@@ -89,6 +92,7 @@ export function samRestApiResources(
       },
     },
     ...samRestApiStageResources({ logicalId, resource, apiProperties }),
+    ...samApiAuthResources(samRestApiAuth(logicalId, apiProperties)),
   };
 }
 

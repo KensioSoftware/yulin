@@ -8,6 +8,8 @@ import {
 } from "../function/sim-cfn-sam-function-properties.js";
 import { samMergedApiProperties } from "../sim-cfn-sam-globals.js";
 import { samPickedProperties } from "../sim-cfn-sam-picked.js";
+import { samApiAuthResources } from "./auth/sim-cfn-sam-api-auth.js";
+import { samHttpApiAuth } from "./auth/sim-cfn-sam-http-api-auth.js";
 import { samHttpApiStageResources } from "./sim-cfn-sam-http-api-stage.js";
 
 interface SamHttpApiExpansionProperties {
@@ -25,10 +27,10 @@ export const samHttpApiType = "AWS::Serverless::HttpApi";
  * The properties whose names and meanings are the same on both Resource types.
  * Expanding one of them is carrying it across.
  *
- * `Auth` and `Domain` are absent from the list. SAM writes an `Auth` block
- * into the OpenAPI document it generates, and deploys a `Domain` as a custom
- * domain name Resource. Neither is expanded here, and an API declaring one is
- * deployed without it.
+ * `Auth` and `Domain` are absent from the list. SAM deploys a `Domain` as a
+ * custom domain name Resource. That is not expanded here, and an API declaring
+ * one is deployed without it. `Auth` becomes authorizer Resources of its own
+ * beside the API.
  */
 const propertyNames = new Set([
   "CorsConfiguration",
@@ -52,6 +54,10 @@ const propertyNames = new Set([
  * points at a document on disk or in S3. Nothing here reads either, and an API
  * declaring one is left as the template wrote it, to be recorded as
  * unsupported. The alternative is an API deployed with no routes at all.
+ *
+ * An `Auth` block becomes one `AWS::ApiGatewayV2::Authorizer` per authorizer it
+ * declares, named after the API and the authorizer, which the routes on the API
+ * name by `Ref`.
  */
 export function samHttpApiResources(
   properties: SamHttpApiExpansionProperties,
@@ -78,6 +84,7 @@ export function samHttpApiResources(
       },
     },
     ...samHttpApiStageResources({ logicalId, resource, apiProperties }),
+    ...samApiAuthResources(samHttpApiAuth(logicalId, apiProperties)),
   };
 }
 

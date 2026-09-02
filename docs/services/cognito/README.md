@@ -2331,6 +2331,11 @@ The function is a simulated Lambda function anywhere in the simulation, and it h
 `cognito-idp.amazonaws.com` for the pool. `AddPermission` grants that, and CDK's `addTrigger` emits
 an `AWS::Lambda::Permission` for it.
 
+A SAM template puts a function on a pool with a `Cognito` event, naming the pool under `UserPool`
+and the trigger under `Trigger`. The transform writes the `LambdaConfig` entry onto the pool and the
+permission beside it. See
+[the SAM section of the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#function-events).
+
 A `LambdaConfig` ARN can carry a version number or an alias name on the end, and the trigger runs the
 version that qualifier names. The permission is made on the same qualifier:
 

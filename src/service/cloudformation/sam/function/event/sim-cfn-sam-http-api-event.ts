@@ -31,15 +31,19 @@ export function samHttpApiEventResources(
   event: SamFunctionEvent,
 ): Record<string, SimCfnTemplateValue> {
   const apiId = samHttpApiEventApiId(event.properties);
+  const apiLogicalId = samHttpApiEventApiLogicalId(event.properties);
   const prefix = `${event.functionLogicalId}${event.eventName}HttpApi`;
   const integrationLogicalId = `${prefix}Integration`;
 
   return {
     ...(event.properties["ApiId"] === undefined &&
-      samImplicitHttpApiResources()),
+      samImplicitHttpApiResources(
+        event.apiAuth.get(samImplicitHttpApiLogicalId),
+      )),
     [integrationLogicalId]: integrationResource(event, apiId),
     [`${prefix}Route`]: samHttpApiRouteResource({
       apiId,
+      apiLogicalId,
       integrationLogicalId,
       event,
     }),
@@ -70,6 +74,33 @@ function samHttpApiEventApiId(
   }
 
   return isSamTemplateRecord(apiId) ? apiId : { Ref: apiId };
+}
+
+/**
+ * The logical ID of the API this event routes to, where that API is a Resource
+ * of this template.
+ *
+ * It is the name the event's `Auth` is read against, since an API's
+ * authorizers are declared on the API the template holds. An `ApiId` written
+ * as an intrinsic this cannot read names an API whose `Auth` block is out of
+ * reach, and the route it expands into takes no authorizer from it.
+ */
+function samHttpApiEventApiLogicalId(
+  properties: SimCfnTemplateValueRecord,
+): string | undefined {
+  const apiId = properties["ApiId"];
+
+  if (apiId === undefined) {
+    return samImplicitHttpApiLogicalId;
+  }
+
+  if (typeof apiId === "string") {
+    return apiId;
+  }
+
+  const reference = isSamTemplateRecord(apiId) ? apiId["Ref"] : undefined;
+
+  return typeof reference === "string" ? reference : undefined;
 }
 
 /**

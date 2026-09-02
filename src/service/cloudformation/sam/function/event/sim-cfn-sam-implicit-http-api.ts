@@ -1,4 +1,6 @@
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
+import { samApiAuthResources } from "../../api/auth/sim-cfn-sam-api-auth.js";
+import type { SamApiAuth } from "../../api/auth/sim-cfn-sam-api-auth.types.js";
 
 /**
  * The logical ID SAM gives the API that every `HttpApi` event naming no
@@ -22,11 +24,14 @@ const implicitStageLogicalId = `${samImplicitHttpApiLogicalId}ApiGatewayDefaultS
  *
  * Every event naming no `ApiId` produces this same pair, and they are keyed by
  * logical ID, so the API is created once however many events share it.
+ *
+ * The `Auth` it takes is the one `Globals.HttpApi` states, which is where SAM
+ * says an implicit API's authorizers come from. Nothing else of that section
+ * reaches this API.
  */
-export function samImplicitHttpApiResources(): Record<
-  string,
-  SimCfnTemplateValue
-> {
+export function samImplicitHttpApiResources(
+  auth: SamApiAuth | undefined,
+): Record<string, SimCfnTemplateValue> {
   return {
     [samImplicitHttpApiLogicalId]: {
       Type: "AWS::ApiGatewayV2::Api",
@@ -43,5 +48,6 @@ export function samImplicitHttpApiResources(): Record<
         AutoDeploy: true,
       },
     },
+    ...(auth !== undefined && samApiAuthResources(auth)),
   };
 }

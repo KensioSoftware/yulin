@@ -13,6 +13,10 @@ import {
   samSqsEventEdits,
 } from "./sim-cfn-sam-event-source-role.js";
 import { samApiEventResources } from "./sim-cfn-sam-api-event.js";
+import {
+  samCognitoEventEdits,
+  samCognitoEventResources,
+} from "./sim-cfn-sam-cognito-event.js";
 import { samEventBridgeRuleEventResources } from "./sim-cfn-sam-event-bridge-rule-event.js";
 import { samHttpApiEventResources } from "./sim-cfn-sam-http-api-event.js";
 import type { SamResourceEdit } from "./sim-cfn-sam-resource-edit.js";
@@ -53,6 +57,7 @@ export type SamFunctionEventEdit = (
 const eventExpansions: ReadonlyMap<string, SamFunctionEventExpansion> = new Map(
   [
     ["Api", samApiEventResources],
+    ["Cognito", samCognitoEventResources],
     ["DynamoDB", samDynamoDbEventResources],
     ["EventBridgeRule", samEventBridgeRuleEventResources],
     ["HttpApi", samHttpApiEventResources],
@@ -70,15 +75,16 @@ const eventExpansions: ReadonlyMap<string, SamFunctionEventExpansion> = new Map(
  *
  * This is the second half of the same table, for what an event cannot express
  * as a Resource of its own. An `S3` event notifies a Bucket the template
- * declares, and a polled event grants the function's own execution Role the
- * permission to poll. Keying either by the logical ID it changes would deploy
- * the change in place of the Resource, since expanded Resources are merged
- * last write wins.
+ * declares, a `Cognito` event puts a trigger on a user pool, and a polled event
+ * grants the function's own execution Role the permission to poll. Keying any
+ * of them by the logical ID it changes would deploy the change in place of the
+ * Resource, since expanded Resources are merged last write wins.
  *
- * An event type belongs in both tables where it does both, as all three of
+ * An event type belongs in both tables where it does both, as all four of
  * these do.
  */
 const eventEdits: ReadonlyMap<string, SamFunctionEventEdit> = new Map([
+  ["Cognito", samCognitoEventEdits],
   ["DynamoDB", samDynamoDbEventEdits],
   ["S3", samS3EventEdits],
   ["SQS", samSqsEventEdits],
