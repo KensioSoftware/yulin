@@ -516,9 +516,10 @@ never the thing caching holds on to.
 
 The second decision is what real S3 makes for a key that is not there. Admitting the absence tells
 the caller something a listing would have told it. A caller holding no `s3:ListBucket` is answered
-`AccessDenied` whether the key is there or not. `GetObjectLoader` raises the missing-key error and
-`GetObjectCommandHandler` catches it. The listing permission then stays out of the path a read of an
-Object that is there takes.
+`AccessDenied` for a missing key, and one holding it is answered `NoSuchKey`. `GetObjectLoader`
+answers `undefined` for a key that holds nothing, the way `simS3ReadObjectVersion` answers it, and
+`GetObjectCommandHandler` takes the decision from there. An Object that is there comes back before
+any of that, on `s3:GetObject` alone.
 
 Everything reading an Object through the GetObject command inherits this, including the served REST
 endpoint, the static website endpoint and a CloudFront S3 Origin. `grantPublicObjectRead` in
