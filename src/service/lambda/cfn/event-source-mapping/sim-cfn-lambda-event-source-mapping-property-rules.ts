@@ -7,7 +7,9 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
  * unsimulated ones because whether a mapping may carry one is the event
  * source's own rule: a stream has to be given a position and a queue is refused
  * for naming one. That is decided by CreateEventSourceMapping, which knows
- * which source the ARN names, so both are read and passed on.
+ * which source the ARN names, so both are read and passed on. The two
+ * failed-batch limits are read for the same reason: a stream mapping keeps them
+ * and a queue mapping is refused for naming one.
  */
 const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "BatchSize",
@@ -16,6 +18,8 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "FunctionName",
   "FunctionResponseTypes",
   "MaximumBatchingWindowInSeconds",
+  "MaximumRecordAgeInSeconds",
+  "MaximumRetryAttempts",
   "StartingPosition",
   "StartingPositionTimestamp",
 ]);
@@ -35,8 +39,6 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "DocumentDBEventSourceConfig",
   "FilterCriteria",
   "KmsKeyArn",
-  "MaximumRecordAgeInSeconds",
-  "MaximumRetryAttempts",
   "MetricsConfig",
   "ParallelizationFactor",
   "ProvisionedPollerConfig",

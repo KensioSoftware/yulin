@@ -1,36 +1,33 @@
 /**
- * How many times one batch is delivered again before it is given up on.
- */
-const attemptLimit = 5;
-
-/**
  * How long a mapping waits before handing a failed batch to its function
- * again, and when it stops trying.
+ * again, and how many waits it has left.
  *
- * Both are simulator constraints rather than AWS behaviour, and both are
- * deliberate.
- *
- * AWS documents no delay between attempts. A delay of zero here would be
- * scheduled at the instant the clock already reads, and advancing the clock
- * keeps dispatching whatever falls due inside the interval it is moving
+ * The delay is a simulator constraint rather than AWS behaviour, and it is
+ * deliberate. AWS documents no delay between attempts. A delay of zero here
+ * would be scheduled at the instant the clock already reads, and advancing the
+ * clock keeps dispatching whatever falls due inside the interval it is moving
  * through, so a batch the function always throws on would leave `advanceBy`
  * with work to do forever. The delay is therefore strictly positive and grows
- * with each attempt, which is also what a consumer under load actually wants.
+ * with each attempt, which is also what a consumer under load actually wants,
+ * and it is what lets a test walk through the attempts by advancing the clock.
  *
- * AWS retries a stream batch until the records age out of the stream, which is
- * a day. Waiting out a simulated day for a handler that is never going to
- * succeed is the same hang with more steps, so the attempts are counted
- * instead. What happens at the end is AWS's own behaviour: the records are
- * discarded and the mapping carries on with the stream.
+ * How many attempts there are belongs to the mapping rather than to this: a
+ * mapping that asked for a retry quota gets the quota it asked for, and one
+ * that asked for neither limit gets the simulator's own cap.
  */
 export class SimLambdaStreamRetryBackoff {
+  private readonly attemptLimit: number;
   private attempts = 0;
+
+  constructor(attemptLimit: number) {
+    this.attemptLimit = attemptLimit;
+  }
 
   /**
    * Whether this batch has had all the attempts it gets.
    */
   get isExhausted(): boolean {
-    return this.attempts >= attemptLimit;
+    return this.attempts >= this.attemptLimit;
   }
 
   /**

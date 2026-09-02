@@ -1,6 +1,5 @@
 import type { SimLambdaEventSourceStart } from "../sim-lambda-event-source-starting-position.js";
 import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
-import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 
 /**
  * How far along its stream one mapping has got.
@@ -8,9 +7,11 @@ import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outc
  * This is the difference between a stream and a queue. A queue hands a message
  * out and hides it, so a failed batch is the queue's problem afterwards. A
  * stream hands out a place, and the reader is the only thing that remembers it,
- * so a batch that failed is read again from exactly where it was. The
- * checkpoint therefore only moves when a batch is finished with: handled, or
- * discarded after its retries.
+ * so a batch that failed is read again from exactly where it was.
+ *
+ * The place is all this holds. Which place the next read starts from is decided
+ * by what became of the batch and what the mapping is willing to keep trying,
+ * and that decision is made elsewhere.
  */
 export class SimLambdaStreamCheckpoint {
   #position: SimLambdaEventSourceStreamPosition;
@@ -27,22 +28,12 @@ export class SimLambdaStreamCheckpoint {
   }
 
   /**
-   * Move past a batch that is finished with.
+   * Move to where the next read starts.
+   *
+   * That is past a batch the mapping is finished with, and back to the record a
+   * batch it is not finished with is delivered again from.
    */
   advanceTo(position: SimLambdaEventSourceStreamPosition): void {
     this.#position = position;
-  }
-
-  /**
-   * Take a batch the function did not finish.
-   *
-   * A batch that failed whole is read again from where it was. One the function
-   * reported failing partway through moves the checkpoint to the record it
-   * named, so that record and everything after it goes over again, including
-   * the records after it that the function did handle. The records before it
-   * are finished with.
-   */
-  retry(outcome: SimLambdaStreamBatchOutcome): void {
-    this.#position = outcome.retryPosition(this.#position);
   }
 }

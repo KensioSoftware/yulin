@@ -4,7 +4,7 @@ import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-la
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
 import { SimLambdaStreamCascadeGuard } from "../../stream/sim-lambda-stream-cascade-guard.js";
 import { countSimLambdaKinesisIteratorAge } from "../sim-lambda-stream-iterator-age.js";
-import { simLambdaStreamSequenceNumbers } from "../sim-lambda-stream-sequence-numbers.js";
+import { simLambdaKinesisStreamRecordTimes } from "../sim-lambda-stream-record-times.js";
 import type { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamBatchResponse } from "../sim-lambda-stream-batch-response.js";
 import { SimLambdaKinesisStreamEventBuilder } from "./sim-lambda-kinesis-stream-event.js";
@@ -78,28 +78,19 @@ export class SimLambdaKinesisStreamDelivery {
     simFunction: SimLambdaFunction,
     records: readonly SimLambdaKinesisStreamRecord[],
   ): Promise<SimLambdaStreamBatchOutcome> {
+    const times = simLambdaKinesisStreamRecordTimes(records);
+
     try {
       return this.batchResponse.handled(
-        sequenceNumbersOf(records),
+        times,
         await simFunction.invoke(this.eventBuilder.of(records)),
       );
     } catch {
       // As on real Lambda, the handler error goes to the function's logs. What
       // the stream sees is the batch being tried again.
-      return this.batchResponse.failed();
+      return this.batchResponse.failed(times);
     } finally {
       countSimLambdaKinesisIteratorAge(simFunction, records);
     }
   }
-}
-
-/**
- * The sequence numbers this batch's records can be named by.
- */
-function sequenceNumbersOf(
-  records: readonly SimLambdaKinesisStreamRecord[],
-): readonly string[] {
-  return simLambdaStreamSequenceNumbers(
-    records.map((one) => one.SequenceNumber),
-  );
 }

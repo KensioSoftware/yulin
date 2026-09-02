@@ -526,11 +526,21 @@ including the records after it that the function handled. Partitioning a stream 
 queue batch is partitioned would checkpoint past records the function never reached and lose them
 with no error. Reading the report itself is shared with the queue in `SimLambdaBatchItemFailures`,
 and so is the defence that a report naming something outside the batch fails the whole batch.
-`SimLambdaStreamRetryBackoff` is why the wait is strictly positive and why the attempts are counted.
-A retry scheduled at the instant the clock already reads falls due inside every interval
-`advanceBy` walks, so a handler that always throws would never let it return, and both that trap and
-its guard tests are in
+`SimLambdaStreamRetry` decides whether a failed batch goes over again, from which record, and after
+how long. `SimLambdaStreamRetryBackoff` is why the wait is strictly positive and why the attempts
+are counted. A retry scheduled at the instant the clock already reads falls due inside every
+interval `advanceBy` walks, so a handler that always throws would never let it return, and both that
+trap and its guard tests are in
 [issue 341](https://github.com/KensioSoftware/yulin/issues/341).
+
+`SimLambdaStreamRetryLimits` holds the mapping's `MaximumRetryAttempts` and
+`MaximumRecordAgeInSeconds` and answers two questions from them: how many attempts a batch gets, and
+whether a record is too old to be handed over again. Ages are read at the instant the next delivery
+falls due, because the wait before it is what ages the records out. A batch is in stream order, so
+records age out of its front and the retry position moves to the first record that is still young
+enough. The five-attempt cap applies to a mapping that named neither limit
+([issue 1219](https://github.com/KensioSoftware/yulin/issues/1219)). One that named a record age has
+an end of its own, and retries until the records reach it.
 
 Two polls must never overlap, which a queue mapping does not have to care about: a received message
 is hidden and a read record is not, so a second poll from the same checkpoint would deliver the same

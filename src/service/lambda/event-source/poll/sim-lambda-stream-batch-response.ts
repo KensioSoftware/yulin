@@ -1,5 +1,7 @@
 import { SimLambdaBatchItemFailures } from "./sim-lambda-batch-item-failures.js";
 import { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
+import type { SimLambdaStreamRecordTime } from "./sim-lambda-stream-record-times.js";
+import { simLambdaStreamSequenceNumbers } from "./sim-lambda-stream-sequence-numbers.js";
 
 /**
  * Reads what a function said about the batch of stream records it was given.
@@ -26,36 +28,38 @@ export class SimLambdaStreamBatchResponse {
   /**
    * What became of a batch the function returned from.
    *
-   * The sequence numbers are the batch's own, in stream order, and each source
-   * cuts them out of its own record shape. A record carrying none is left out
-   * rather than given an empty name, so a report entry with no identifier names
-   * nothing and the whole batch goes back.
+   * The records are the batch's own, in stream order, and each source cuts them
+   * out of its own record shape. A record carrying no sequence number cannot be
+   * named, and is left out of the names a report is read against, so a report
+   * entry with no identifier names nothing and the whole batch goes back.
    */
   handled(
-    sequenceNumbers: readonly string[],
+    records: readonly SimLambdaStreamRecordTime[],
     result: unknown,
   ): SimLambdaStreamBatchOutcome {
     const failedIds = this.batchItemFailures.idsIn(result);
 
     if (failedIds === undefined) {
-      return SimLambdaStreamBatchOutcome.handled();
+      return SimLambdaStreamBatchOutcome.handled(records);
     }
 
-    const rewindTo = rewindPoint(failedIds, sequenceNumbers);
+    const rewindTo = rewindPoint(failedIds, records);
 
     if (rewindTo === undefined) {
-      return this.failed();
+      return this.failed(records);
     }
 
-    return SimLambdaStreamBatchOutcome.failedFrom(rewindTo);
+    return SimLambdaStreamBatchOutcome.failedFrom(records, rewindTo);
   }
 
   /**
    * What becomes of a batch the function threw on: the whole of it is read
    * again.
    */
-  failed(): SimLambdaStreamBatchOutcome {
-    return SimLambdaStreamBatchOutcome.failed();
+  failed(
+    records: readonly SimLambdaStreamRecordTime[],
+  ): SimLambdaStreamBatchOutcome {
+    return SimLambdaStreamBatchOutcome.failed(records);
   }
 }
 
@@ -68,8 +72,12 @@ export class SimLambdaStreamBatchResponse {
  */
 function rewindPoint(
   failedIds: readonly string[],
-  sequenceNumbers: readonly string[],
+  records: readonly SimLambdaStreamRecordTime[],
 ): string | undefined {
+  const sequenceNumbers = simLambdaStreamSequenceNumbers(
+    records.map((record) => record.sequenceNumber),
+  );
+
   if (failedIds.some((failedId) => !sequenceNumbers.includes(failedId))) {
     return undefined;
   }

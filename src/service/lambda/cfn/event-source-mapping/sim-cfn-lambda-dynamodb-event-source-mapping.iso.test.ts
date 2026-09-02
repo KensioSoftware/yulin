@@ -1,4 +1,5 @@
 import { PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { ListEventSourceMappingsCommand } from "@aws-sdk/client-lambda";
 import {
   assertArrayLength,
   assertIdentical,
@@ -180,6 +181,54 @@ describe("Lambda CloudFormation DynamoDB stream event source mapping", () => {
     assertNonNullable(record);
     assertIdentical(record.eventName, "INSERT");
     assertIdentical(record.dynamodb.NewImage?.["total"]?.N, "101");
+  });
+
+  it("deploys a mapping with the failed-batch limits the template states", async () => {
+    // Given a template stating a retry quota and a record age on the mapping.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: projectorTemplate({
+        ...mappingProperties,
+        MaximumRetryAttempts: 2,
+        MaximumRecordAgeInSeconds: 300,
+      }),
+      bindings: [
+        {
+          logicalId: "ProjectorFunction",
+          handler: (): undefined => undefined,
+        },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // When the mappings of the deployed function are listed.
+    const listed = await simAws
+      .lambda()
+      .listEventSourceMappings(
+        new ListEventSourceMappingsCommand({ FunctionName: "order-projector" }),
+      );
+
+    // Then the mapping keeps both, rather than the no-limit defaults a mapping
+    // stating neither of them gets.
+    assertArrayLength(listed.EventSourceMappings, 1);
+    assertIdentical(listed.EventSourceMappings[0].MaximumRetryAttempts, 2);
+    assertIdentical(
+      listed.EventSourceMappings[0].MaximumRecordAgeInSeconds,
+      300,
+    );
+  });
+
+  it("refuses a failed-batch limit outside the range Lambda takes", async () => {
+    // Given a template asking for more retries than Lambda's maximum.
+    const error = await projectorDeployError({
+      ...mappingProperties,
+      MaximumRetryAttempts: 10_001,
+    });
+
+    // Then the Resource fails the stack, in the words CreateEventSourceMapping
+    // refuses an SDK caller in, rather than being skipped as unsupported.
+    assertStringIncludes(error.message, "maximumRetryAttempts");
   });
 
   it("refuses a stream mapping with no StartingPosition", async () => {

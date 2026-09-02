@@ -1,4 +1,5 @@
 import { SimLambdaEventSourceBatchRules } from "../../sim-lambda-event-source-batch-rules.js";
+import { SimLambdaStreamRetryLimitRules } from "../../sim-lambda-event-source-retry-limits.js";
 import { SimLambdaStreamStartingPosition } from "../../sim-lambda-event-source-starting-position.js";
 
 /**
@@ -41,3 +42,10 @@ export const kinesisStreamStartingPositionRules =
     positions: ["TRIM_HORIZON", "LATEST", "AT_TIMESTAMP"],
     sourceDescription: "a Kinesis stream",
   });
+
+/**
+ * A Kinesis stream mapping counts a failed batch's attempts itself, so it takes
+ * both of Lambda's failed-batch limits.
+ */
+export const kinesisStreamRetryLimitRules =
+  new SimLambdaStreamRetryLimitRules();

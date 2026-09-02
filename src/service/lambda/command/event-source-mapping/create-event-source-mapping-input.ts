@@ -4,6 +4,7 @@ import {
   simLambdaEventSourceArnOf,
 } from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
+import type { SimLambdaStreamRetryLimits } from "../../event-source/sim-lambda-stream-retry-limits.js";
 import type { SimLambdaEventSourceStart } from "../../event-source/sim-lambda-event-source-starting-position.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
@@ -25,6 +26,7 @@ interface SimLambdaEventSourceMappingInputProperties {
   readonly start: SimLambdaEventSourceStart | undefined;
   readonly enabled: boolean;
   readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
+  readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
 }
 
 /**
@@ -54,6 +56,12 @@ export class SimLambdaEventSourceMappingInput {
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
+  /**
+   * When a failed batch stops being delivered again, for a source that leaves
+   * the counting to the mapping.
+   */
+  public readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
+
   private constructor(properties: SimLambdaEventSourceMappingInputProperties) {
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
@@ -62,6 +70,7 @@ export class SimLambdaEventSourceMappingInput {
     this.start = properties.start;
     this.enabled = properties.enabled;
     this.functionResponseTypes = properties.functionResponseTypes;
+    this.streamRetryLimits = properties.streamRetryLimits;
   }
 
   /**
@@ -89,6 +98,10 @@ export class SimLambdaEventSourceMappingInput {
       }),
       enabled: input.Enabled ?? true,
       functionResponseTypes: functionResponseTypesIn(input),
+      streamRetryLimits: eventSourceArn.retryLimitRules.limitsIn({
+        maximumRetryAttempts: input.MaximumRetryAttempts,
+        maximumRecordAgeInSeconds: input.MaximumRecordAgeInSeconds,
+      }),
     });
   }
 }

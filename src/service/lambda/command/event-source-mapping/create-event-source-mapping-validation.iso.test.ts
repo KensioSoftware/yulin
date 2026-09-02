@@ -189,6 +189,33 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "MaximumBatchingWindowInSeconds");
   });
 
+  it("refuses a failed-batch limit on a queue mapping", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping on the queue asks for a retry quota.
+    const error = await refusedMapping(ready, { MaximumRetryAttempts: 2 });
+
+    // Then it is refused, because a message the function never handles goes
+    // back to the queue and is the queue's own redrive policy to answer for.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(error.message, "redrive policy");
+  });
+
+  it("refuses a record age on a queue mapping", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping on the queue asks to discard old messages.
+    const error = await refusedMapping(ready, {
+      MaximumRecordAgeInSeconds: 60,
+    });
+
+    // Then it is refused rather than accepted and never acted on.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(error.message, "MaximumRecordAgeInSeconds");
+  });
+
   it("refuses a function response type Lambda does not have", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();

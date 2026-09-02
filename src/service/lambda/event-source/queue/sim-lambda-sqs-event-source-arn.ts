@@ -1,11 +1,13 @@
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { sqsQueueUrl } from "../../../sqs/queue/sim-sqs-queue-arn.js";
 import type { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
+import type { SimLambdaEventSourceRetryLimitRules } from "../sim-lambda-event-source-retry-limits.js";
 import { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-source-polling-permission.js";
 import type { SimLambdaEventSourceStartingPositionRules } from "../sim-lambda-event-source-starting-position.js";
 import {
   sqsBatchRules,
   sqsPollingOperations,
+  sqsRetryLimitRules,
   sqsStartingPositionRules,
 } from "./sim-lambda-sqs-event-source-rules.js";
 
@@ -92,6 +94,14 @@ export class SimLambdaSqsEventSourceArn {
    */
   get startingPositionRules(): SimLambdaEventSourceStartingPositionRules {
     return sqsStartingPositionRules;
+  }
+
+  /**
+   * The failed-batch limits a mapping on this queue may be created with, which
+   * is neither of them.
+   */
+  get retryLimitRules(): SimLambdaEventSourceRetryLimitRules {
+    return sqsRetryLimitRules;
   }
 
   /**

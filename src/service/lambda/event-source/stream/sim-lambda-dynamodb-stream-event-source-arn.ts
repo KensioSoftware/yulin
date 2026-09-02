@@ -1,10 +1,12 @@
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import type { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
-import { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-source-polling-permission.js";
+import type { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-source-polling-permission.js";
+import type { SimLambdaEventSourceRetryLimitRules } from "../sim-lambda-event-source-retry-limits.js";
 import type { SimLambdaEventSourceStartingPositionRules } from "../sim-lambda-event-source-starting-position.js";
 import {
   dynamoDbStreamBatchRules,
-  dynamoDbStreamPollingOperations,
+  dynamoDbStreamPollingPermissions,
+  dynamoDbStreamRetryLimitRules,
   dynamoDbStreamStartingPositionRules,
 } from "./sim-lambda-dynamodb-stream-event-source-rules.js";
 
@@ -49,16 +51,7 @@ export class SimLambdaDynamoDbStreamEventSourceArn {
     this.accountId = parts["account"] ?? "";
     this.tableName = parts["table"] ?? "";
     this.label = parts["label"] ?? "";
-    this.pollingPermissions = [
-      ...dynamoDbStreamPollingOperations.map(
-        (operation) =>
-          new SimLambdaEventSourcePollingPermission(
-            `dynamodb:${operation}`,
-            value,
-          ),
-      ),
-      new SimLambdaEventSourcePollingPermission("dynamodb:ListStreams", "*"),
-    ];
+    this.pollingPermissions = dynamoDbStreamPollingPermissions(value);
   }
 
   /**
@@ -107,6 +100,13 @@ export class SimLambdaDynamoDbStreamEventSourceArn {
    */
   get startingPositionRules(): SimLambdaEventSourceStartingPositionRules {
     return dynamoDbStreamStartingPositionRules;
+  }
+
+  /**
+   * The failed-batch limits a mapping on this stream may be created with.
+   */
+  get retryLimitRules(): SimLambdaEventSourceRetryLimitRules {
+    return dynamoDbStreamRetryLimitRules;
   }
 
   /**

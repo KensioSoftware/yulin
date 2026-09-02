@@ -1,4 +1,6 @@
 import { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
+import { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-source-polling-permission.js";
+import { SimLambdaStreamRetryLimitRules } from "../sim-lambda-event-source-retry-limits.js";
 import { SimLambdaStreamStartingPosition } from "../sim-lambda-event-source-starting-position.js";
 
 /**
@@ -10,11 +12,30 @@ import { SimLambdaStreamStartingPosition } from "../sim-lambda-event-source-star
  * here ever calls it, but both the AWS managed policy and CDK's own grant
  * include it, so a role that would work on AWS is a role that works here.
  */
-export const dynamoDbStreamPollingOperations = [
+const dynamoDbStreamPollingOperations = [
   "DescribeStream",
   "GetRecords",
   "GetShardIterator",
 ] as const;
+
+/**
+ * What an execution role has to be allowed before a mapping on one stream can
+ * be created, as the permissions simulated IAM is asked for.
+ */
+export function dynamoDbStreamPollingPermissions(
+  streamArn: string,
+): readonly SimLambdaEventSourcePollingPermission[] {
+  return [
+    ...dynamoDbStreamPollingOperations.map(
+      (operation) =>
+        new SimLambdaEventSourcePollingPermission(
+          `dynamodb:${operation}`,
+          streamArn,
+        ),
+    ),
+    new SimLambdaEventSourcePollingPermission("dynamodb:ListStreams", "*"),
+  ];
+}
 
 /**
  * The batch sizes a DynamoDB stream event source delivers with.
@@ -42,3 +63,10 @@ export const dynamoDbStreamStartingPositionRules =
     sourceDescription: "a DynamoDB stream",
     positionElsewhere: "AT_TIMESTAMP is for a Kinesis stream",
   });
+
+/**
+ * A DynamoDB stream mapping counts a failed batch's attempts itself, so it
+ * takes both of Lambda's failed-batch limits.
+ */
+export const dynamoDbStreamRetryLimitRules =
+  new SimLambdaStreamRetryLimitRules();

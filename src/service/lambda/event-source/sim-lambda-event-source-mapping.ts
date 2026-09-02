@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
 import type {
+  SimLambdaStreamRetryLimits,
+  SimLambdaStreamRetryLimitsConfiguration,
+} from "./sim-lambda-stream-retry-limits.js";
+import type {
   SimLambdaEventSourceStart,
   SimLambdaEventSourceStartingPosition,
 } from "./sim-lambda-event-source-starting-position.js";
@@ -44,6 +48,7 @@ interface SimLambdaEventSourceMappingProperties {
   readonly functionResponseTypes?:
     | readonly SimLambdaFunctionResponseType[]
     | undefined;
+  readonly streamRetryLimits?: SimLambdaStreamRetryLimits | undefined;
   readonly createdAt: Date;
 }
 
@@ -52,7 +57,7 @@ interface SimLambdaEventSourceMappingProperties {
  * CreateEventSourceMapping, GetEventSourceMapping, ListEventSourceMappings and
  * DeleteEventSourceMapping responses all report it.
  */
-export interface SimLambdaEventSourceMappingConfiguration {
+export interface SimLambdaEventSourceMappingConfiguration extends Partial<SimLambdaStreamRetryLimitsConfiguration> {
   readonly UUID: string;
   readonly EventSourceMappingArn: SimLambdaEventSourceMappingArn;
   readonly EventSourceArn: string;
@@ -100,6 +105,15 @@ export class SimLambdaEventSourceMapping {
   public readonly start: SimLambdaEventSourceStart | undefined;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
+  /**
+   * When this mapping stops delivering a batch its function keeps failing, for
+   * a source that leaves the counting to the mapping.
+   *
+   * A queue mapping has none, because a message the function never handles is
+   * the queue's own problem once the batch comes back.
+   */
+  public readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
+
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly enabled: boolean;
   private readonly lastModified: Date;
@@ -116,6 +130,7 @@ export class SimLambdaEventSourceMapping {
     // Copied rather than held, so a caller keeping the list it passed in
     // cannot change what this mapping does with a batch afterwards.
     this.functionResponseTypes = [...(properties.functionResponseTypes ?? [])];
+    this.streamRetryLimits = properties.streamRetryLimits;
     this.enabled = properties.enabled ?? true;
     this.lastModified = properties.createdAt;
   }
@@ -177,6 +192,10 @@ export class SimLambdaEventSourceMapping {
       // Partial batches are delivered as soon as anything is available, so the
       // batching window is always zero. Anything else is refused at creation.
       MaximumBatchingWindowInSeconds: 0,
+      // Real Lambda reports both failed-batch limits for a stream mapping and
+      // neither for a queue one, so a mapping with no limits to keep leaves
+      // them out rather than reporting a limit it does not have.
+      ...this.streamRetryLimits?.configuration(),
       FunctionResponseTypes: this.functionResponseTypes,
       State: this.#state,
       StateTransitionReason: "USER_INITIATED",
