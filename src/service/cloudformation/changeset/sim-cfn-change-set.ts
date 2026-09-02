@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import type { SimCloudFormationStackName } from "../stack/sim-cfn-stack.type.js";
+import type { SimCfnStackId } from "../stack/sim-cfn-stack-id.js";
 import { simCfnChangeSetArn } from "./sim-cfn-change-set-arn.js";
 import type {
   SimCfnChangeSetExecutionStatus,
@@ -14,6 +15,7 @@ interface SimCfnChangeSetProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly changeSetName: SimCfnChangeSetName;
   readonly stackName: SimCloudFormationStackName;
+  readonly stackId: SimCfnStackId;
   readonly type: SimCfnChangeSetType;
   readonly template: SimCfnTemplate;
   readonly changes: readonly SimCfnResourceChange[];
@@ -45,6 +47,7 @@ export class SimCfnChangeSet {
   public readonly changeSetId: string;
   public readonly changeSetName: SimCfnChangeSetName;
   public readonly stackName: SimCloudFormationStackName;
+  public readonly stackId: SimCfnStackId;
   public readonly type: SimCfnChangeSetType;
   public readonly template: SimCfnTemplate;
   public readonly changes: readonly SimCfnResourceChange[];
@@ -66,6 +69,7 @@ export class SimCfnChangeSet {
 
     this.changeSetName = changeSetName;
     this.stackName = properties.stackName;
+    this.stackId = properties.stackId;
     this.type = properties.type;
     this.template = properties.template;
     this.changes = properties.changes;

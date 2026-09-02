@@ -11,6 +11,7 @@ import {
   SimCfnStack,
   type SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
+import { makeSimCfnStackId } from "../../stack/sim-cfn-stack-id.js";
 import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudformation.error.js";
 import type {
   SimCreateStackCommand,
@@ -107,10 +108,16 @@ export class CreateStackCommandHandler implements CommandHandler<
       );
     }
 
+    const stackId = makeSimCfnStackId({
+      accountRegionScope: this.accountRegionScope,
+      stackName,
+    });
+
     const template = simCfnCommandTemplate({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stackName,
+      stackId,
       templateBody: command.input.TemplateBody,
       input: command.input,
       exports: this.exports,
@@ -121,6 +128,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       accountRegionScope: this.accountRegionScope,
       background: this.background,
       stackName,
+      stackId,
       template,
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
@@ -134,7 +142,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     await stack.deploy();
 
     return {
-      StackId: stack.stackName,
+      StackId: stack.stackId,
       $metadata: {},
     };
   }

@@ -53,12 +53,14 @@ interface SimCfnTemplateProperties {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: SimCfnParameters | undefined;
   readonly stackName?: string | undefined;
+  readonly stackId?: string | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
   readonly exports?: SimCfnExports | undefined;
 }
 
 interface SimCfnTemplateFromBodyProperties {
   readonly stackName?: string | undefined;
+  readonly stackId?: string | undefined;
   readonly parameters?: SimCfnParameters | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
   readonly exports?: SimCfnExports | undefined;
@@ -72,6 +74,8 @@ interface SimCfnTemplateFromBodyProperties {
 export class SimCfnTemplate {
   public readonly template: CfnTemplateBodyRecord;
   public readonly stackName: string | undefined;
+  /** The unique ID of the Stack this template is being deployed as. */
+  public readonly stackId: string | undefined;
   public readonly parameters: SimCfnParameters;
   /** The export names a Stack deployed from this template can import. */
   public readonly exports: SimCfnExports | undefined;
@@ -79,11 +83,18 @@ export class SimCfnTemplate {
   private evaluatedConditions: SimCfnConditions | undefined;
 
   constructor(properties: SimCfnTemplateProperties) {
-    const { template, parameters, stackName, accountRegionScope, exports } =
-      properties;
+    const {
+      template,
+      parameters,
+      stackName,
+      stackId,
+      accountRegionScope,
+      exports,
+    } = properties;
 
     this.template = template;
     this.stackName = stackName;
+    this.stackId = stackId;
     this.accountRegionScope = accountRegionScope;
     this.exports = exports;
 
@@ -118,6 +129,7 @@ export class SimCfnTemplate {
       template: samExpandedTemplate(template),
       parameters: properties.parameters,
       stackName: properties.stackName,
+      stackId: properties.stackId,
       accountRegionScope: properties.accountRegionScope,
       exports: properties.exports,
     });
@@ -200,6 +212,7 @@ export class SimCfnTemplate {
     return new SimCfnPseudoParameters({
       accountRegionScope: this.accountRegionScope,
       stackName: this.stackName,
+      stackId: this.stackId,
     });
   }
 

@@ -8,6 +8,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
+import type { SimCfnDeletedStacks } from "../../stack/sim-cfn-deleted-stacks.js";
 import type {
   SimDeleteStackCommand,
   SimDeleteStackCommandOutput,
@@ -15,6 +16,10 @@ import type {
 
 interface DeleteStackCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+
+  /** Where a Stack that has finished deleting is kept, to stay describable. */
+  readonly deleted: SimCfnDeletedStacks;
+
   readonly background: BackgroundScheduler & BackgroundCompleter;
 }
 
@@ -28,10 +33,12 @@ export class DeleteStackCommandHandler implements CommandHandler<
   SimDeleteStackCommandOutput
 > {
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+  private readonly deleted: SimCfnDeletedStacks;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   constructor(properties: DeleteStackCommandHandlerProperties) {
     this.stacks = properties.stacks;
+    this.deleted = properties.deleted;
     this.background = properties.background;
   }
 
@@ -47,6 +54,9 @@ export class DeleteStackCommandHandler implements CommandHandler<
    * the background, and the Stack name is only released when that finishes, so
    * a CreateStack that reuses the name should follow a wait for deletion to
    * complete.
+   *
+   * The Stack itself is kept once its name has gone, so DescribeStacks can
+   * still answer for it by Stack ID, as CloudFormation does for 90 days.
    */
   async handle(
     command: SimDeleteStackCommand,
@@ -62,9 +72,14 @@ export class DeleteStackCommandHandler implements CommandHandler<
     const stackName = command.input.StackName as SimCloudFormationStackName;
     const stack = this.stacks.get(stackName);
 
-    await stack?.delete({
+    if (stack === undefined) {
+      return { $metadata: {} };
+    }
+
+    await stack.delete({
       onDeleteComplete: (): void => {
         this.stacks.delete(stackName);
+        this.deleted.record(stack);
       },
     });
 

@@ -109,6 +109,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
         simAws: this.simAws,
         accountRegionScope: this.accountRegionScope,
         stackName,
+        stackId: stack.stackId,
         templateBody: command.input.TemplateBody,
         input: command.input,
         exports: this.exports,
@@ -117,7 +118,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
     );
 
     return {
-      StackId: stack.stackName,
+      StackId: stack.stackId,
       $metadata: {},
     };
   }

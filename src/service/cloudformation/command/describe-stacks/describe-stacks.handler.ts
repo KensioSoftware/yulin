@@ -11,11 +11,13 @@ import type {
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput,
 } from "./describe-stacks.command.js";
+import type { SimCfnDeletedStacks } from "../../stack/sim-cfn-deleted-stacks.js";
 import { SimCfnStackDescriber } from "./sim-cfn-stack-describer.js";
 import { SimCfnDescribedStacks } from "./sim-cfn-described-stacks.js";
 
 interface DescribeStacksCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+  readonly deleted: SimCfnDeletedStacks;
   readonly background?: BackgroundScheduler;
   readonly describer?: SimCfnStackDescriber;
 }
@@ -30,17 +32,20 @@ export class DescribeStacksCommandHandler implements CommandHandler<
   SimDescribeStacksCommandOutput
 > {
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+  private readonly deleted: SimCfnDeletedStacks;
   private readonly background: BackgroundScheduler;
   private readonly describer: SimCfnStackDescriber;
 
   constructor(properties: DescribeStacksCommandHandlerProperties) {
     const {
       stacks,
+      deleted,
       background = new BackgroundTasks(),
       describer = new SimCfnStackDescriber(),
     } = properties;
 
     this.stacks = stacks;
+    this.deleted = deleted;
     this.background = background;
     this.describer = describer;
   }
@@ -54,13 +59,12 @@ export class DescribeStacksCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const stackName = command.input.StackName as
-      | SimCloudFormationStackName
-      | undefined;
-
     return {
-      Stacks: new SimCfnDescribedStacks(this.stacks)
-        .matching(stackName)
+      Stacks: new SimCfnDescribedStacks({
+        stacks: this.stacks,
+        deleted: this.deleted,
+      })
+        .matching(command.input.StackName)
         .map((stack) => this.describer.describe(stack)),
       $metadata: {},
     };

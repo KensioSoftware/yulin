@@ -5,6 +5,7 @@ import {
   assertNonNullable,
   assertThrowsErrorAsync,
   assertInstanceOf,
+  assertStringIncludes,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudformation.error.js";
@@ -31,7 +32,7 @@ describe("CloudFormation CreateStackCommand", () => {
     );
 
     // Then the Stack is registered and starts deploying in the background.
-    assertIdentical(stackCreation.StackId, "test-stack");
+    assertStringIncludes(stackCreation.StackId, ":stack/test-stack/");
 
     const describeStacksOut = await cloudFormation.describeStacks(
       new DescribeStacksCommand({
@@ -40,7 +41,7 @@ describe("CloudFormation CreateStackCommand", () => {
     );
 
     assertArrayLength(describeStacksOut.Stacks, 1);
-    assertIdentical(describeStacksOut.Stacks[0].StackId, "test-stack");
+    assertIdentical(describeStacksOut.Stacks[0].StackId, stackCreation.StackId);
     assertIdentical(describeStacksOut.Stacks[0].StackName, "test-stack");
     assertIdentical(
       describeStacksOut.Stacks[0].StackStatus,

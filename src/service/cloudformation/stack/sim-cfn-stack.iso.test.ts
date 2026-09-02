@@ -26,7 +26,7 @@ describe("SimCfnStack", () => {
     );
     const stack = cloudFormation.getStackByName("TestStack");
 
-    assertIdentical(stackCreation.StackId, "TestStack");
+    assertStringIncludes(stackCreation.StackId, ":stack/TestStack/");
     assertIdentical(stack?.status, "CREATE_IN_PROGRESS");
 
     await simAws.backgroundTasksComplete();

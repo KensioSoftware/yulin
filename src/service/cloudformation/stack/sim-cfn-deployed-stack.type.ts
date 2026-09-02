@@ -19,6 +19,13 @@ export interface SimCfnDeployedStack {
   /** What the Stack was deployed as. */
   readonly stackName: string;
 
+  /**
+   * The Stack's unique ID, which is the ARN CloudFormation gave it when it was
+   * created. A Stack deployed again under the same name gets a new one, and a
+   * deleted Stack is described by this rather than by the name it gave back.
+   */
+  readonly stackId: string;
+
   /** What CloudFormation last did to the Stack. */
   readonly status: SimCloudFormationStackStatus;
 

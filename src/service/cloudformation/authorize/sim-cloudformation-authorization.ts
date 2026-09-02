@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { SimIamActionAuthorizer } from "../../iam/authorize/sim-iam-action-authorizer.js";
+import { isSimCfnStackId } from "../stack/sim-cfn-stack-id.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 
 interface SimCloudFormationAuthorizationProperties {
@@ -102,8 +103,15 @@ export class SimCloudFormationAuthorization {
   /**
    * The Stack ARN a command operates on. A command naming no Stack, which
    * DescribeStacks allows, is asking about every Stack in the scope.
+   *
+   * A command that named the Stack by its ID named the ARN itself, so that is
+   * what gets authorized rather than an ARN built around it.
    */
   private stackArn(stackName: string | undefined): string {
+    if (stackName !== undefined && isSimCfnStackId(stackName)) {
+      return stackName;
+    }
+
     const { accountId, regionName } = this.accountRegionScope;
 
     return `arn:aws:cloudformation:${regionName}:${accountId}:stack/${stackName ?? "*"}/*`;

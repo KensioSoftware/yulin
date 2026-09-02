@@ -53,6 +53,7 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       logicalId = "Resource",
       stackName,
+      stackId,
       template = {},
       parameters,
       resourceLogicalIds = new Set(),
@@ -75,6 +76,7 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
       pseudoParameters: new SimCfnPseudoParameters({
         accountRegionScope: this.accountRegionScope,
         stackName,
+        stackId,
       }),
       propertyIgnorer: this,
       resourceType: this.type,

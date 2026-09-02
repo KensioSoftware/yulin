@@ -7,6 +7,13 @@ import { DEFAULT_SIM_AWS_REGION_NAME } from "../../../aws/sim-aws-region.js";
 interface SimCfnPseudoParametersProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
   readonly stackName?: string | undefined;
+
+  /**
+   * The Stack's unique ID, for a template being resolved for a Stack that has
+   * one. A template resolved outside a Stack has none, and reads `AWS::StackId`
+   * as the Stack name, which is the closest thing to an identity it has.
+   */
+  readonly stackId?: string | undefined;
 }
 
 /**
@@ -15,10 +22,12 @@ interface SimCfnPseudoParametersProperties {
 export class SimCfnPseudoParameters {
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
   private readonly stackName: string | undefined;
+  private readonly stackId: string | undefined;
 
   constructor(properties: SimCfnPseudoParametersProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.stackName = properties.stackName;
+    this.stackId = properties.stackId;
   }
 
   /**
@@ -45,7 +54,7 @@ export class SimCfnPseudoParameters {
       }
 
       case "AWS::StackId": {
-        return this.stackName;
+        return this.stackId ?? this.stackName;
       }
 
       case "AWS::NotificationARNs": {

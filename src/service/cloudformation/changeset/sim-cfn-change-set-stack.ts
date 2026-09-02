@@ -6,6 +6,7 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import type { SimCfnStackId } from "../stack/sim-cfn-stack-id.js";
 import type { SimCloudFormationStackName } from "../stack/sim-cfn-stack.type.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
@@ -21,6 +22,7 @@ interface SimCfnChangeSetStackProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly stackName: SimCloudFormationStackName;
+  readonly stackId: SimCfnStackId;
   readonly type: SimCfnChangeSetType;
   readonly template: SimCfnTemplate;
   readonly caller?: SimAwsCaller | undefined;
@@ -65,6 +67,7 @@ export function simCfnChangeSetStack(
     accountRegionScope: properties.accountRegionScope,
     background: properties.background,
     stackName,
+    stackId: properties.stackId,
     template: properties.template,
     caller: properties.caller,
     exports: properties.exports,

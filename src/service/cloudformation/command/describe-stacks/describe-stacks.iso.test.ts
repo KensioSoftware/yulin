@@ -47,21 +47,18 @@ describe("CloudFormation DescribeStacksCommand", () => {
     // Then all existing Stacks are returned in creation order.
     assertArrayLength(describeStacksOutput.Stacks, 3);
 
-    assertIdentical(describeStacksOutput.Stacks[0].StackId, "stack-a");
     assertIdentical(describeStacksOutput.Stacks[0].StackName, "stack-a");
     assertIdentical(
       describeStacksOutput.Stacks[0].StackStatus,
       "CREATE_IN_PROGRESS",
     );
 
-    assertIdentical(describeStacksOutput.Stacks[1].StackId, "stack-b");
     assertIdentical(describeStacksOutput.Stacks[1].StackName, "stack-b");
     assertIdentical(
       describeStacksOutput.Stacks[1].StackStatus,
       "CREATE_IN_PROGRESS",
     );
 
-    assertIdentical(describeStacksOutput.Stacks[2].StackId, "stack-c");
     assertIdentical(describeStacksOutput.Stacks[2].StackName, "stack-c");
     assertIdentical(
       describeStacksOutput.Stacks[2].StackStatus,
@@ -98,7 +95,6 @@ describe("CloudFormation DescribeStacksCommand", () => {
     // Then only the matching Stack description is returned.
     assertArrayLength(describeStacksOutput.Stacks, 1);
 
-    assertIdentical(describeStacksOutput.Stacks[0].StackId, "stack-b");
     assertIdentical(describeStacksOutput.Stacks[0].StackName, "stack-b");
     assertIdentical(
       describeStacksOutput.Stacks[0].StackStatus,
@@ -131,7 +127,6 @@ describe("CloudFormation DescribeStacksCommand", () => {
     // Then the Stack description includes the completed Stack status.
     assertArrayLength(describeStacksOutput.Stacks, 1);
 
-    assertIdentical(describeStacksOutput.Stacks[0].StackId, "test-stack");
     assertIdentical(describeStacksOutput.Stacks[0].StackName, "test-stack");
     assertIdentical(
       describeStacksOutput.Stacks[0].StackStatus,

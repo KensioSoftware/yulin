@@ -21,7 +21,7 @@ export class SimCfnStackDescriber {
    */
   describe(stack: SimCfnStack): SimCloudFormationStackDescription {
     return {
-      StackId: stack.stackName,
+      StackId: stack.stackId,
       StackName: stack.stackName,
       StackStatus: stack.status,
       StackStatusReason: stack.error?.message,

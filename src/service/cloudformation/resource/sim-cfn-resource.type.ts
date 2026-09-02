@@ -15,6 +15,7 @@ export interface SimCloudFormationResourceProperties {
   readonly background?: BackgroundScheduler;
   readonly logicalId?: string;
   readonly stackName?: string | undefined;
+  readonly stackId?: string | undefined;
   readonly template?: SimCfnTemplateValueRecord;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
   readonly parameters?: SimCfnParameters | undefined;

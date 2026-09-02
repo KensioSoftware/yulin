@@ -104,7 +104,7 @@ describe("Serving simulated CloudFormation on an endpoint URL", () => {
         ],
       }),
     );
-    assertIdentical(created.StackId, "site");
+    assertStringIncludes(created.StackId, ":stack/site/");
 
     // When the deployment the call started has finished
     await simAws.cloudFormation().waitForStackDeployComplete("site");
@@ -153,7 +153,7 @@ describe("Serving simulated CloudFormation on an endpoint URL", () => {
         ],
       }),
     );
-    assertIdentical(updated.StackId, "reports");
+    assertStringIncludes(updated.StackId, ":stack/reports/");
     await simAws.cloudFormation().waitForStackUpdateComplete("reports");
 
     // Then the Stack reports the update and the Bucket it now holds
