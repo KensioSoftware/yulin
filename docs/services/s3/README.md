@@ -2464,8 +2464,10 @@ handlers an SDK caller does.
   `x-amz-tagging-count`.
 - Tag keys and values are stored as they arrive. Real S3 bounds a key at 128 characters and a value
   at 256, and sim S3 accepts a longer one of either.
-- A Bucket mounted on a filesystem directory rebuilds each Object from the file on every read. A tag
-  set put on one is lost. Use the default in-memory storage to test tagging.
+- A Bucket mounted on a filesystem directory rebuilds each Object from the file on every read, and a
+  directory holds no tags. Tagging one writes the same bytes back to the file, and the next read
+  reports an untagged Object. Use the default in-memory storage to test tagging. See
+  [Metadata a file cannot carry](#metadata-a-file-cannot-carry).
 
 ## Default encryption
 

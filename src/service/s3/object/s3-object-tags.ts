@@ -28,10 +28,10 @@ export interface SimS3ObjectTagInput {
 /**
  * The tags one simulated S3 Object carries.
  *
- * Held as a map because a tag set is keyed: real S3 refuses two tags sharing a
+ * Held as a map because a tag set is keyed. Real S3 refuses two tags sharing a
  * key, and every question anything asks of a tag set is about the value under
- * one. The insertion order is the order the request stated, which is the order
- * a read hands them back in.
+ * one. The insertion order is the order the request stated, and a read hands
+ * them back in it.
  *
  * A set is built once and never changed, so the Object holding it cannot have
  * its tags rewritten by whoever was handed them. `PutObjectTagging` replaces
@@ -56,7 +56,7 @@ export class SimS3ObjectTagSet {
   /**
    * The tag set a request states, refusing one real S3 would not hold.
    *
-   * Both refusals are checked before anything is stored, so an Object is never
+   * Every refusal is checked before anything is stored. An Object is never
    * left carrying part of a tag set S3 would have rejected whole. The context
    * names the request, since the same tag set can arrive on a write, on a copy
    * or on a tagging request of its own.
