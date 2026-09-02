@@ -42,11 +42,18 @@ export class SimCfnStackUpdatePlan {
 
   public readonly updated: ReadonlyMap<string, SimCfnResource>;
 
+  /**
+   * The logical IDs being replaced rather than removed, which is what decides
+   * whether UpdateReplacePolicy or DeletionPolicy can keep a deleted Resource.
+   */
+  public readonly replaced: ReadonlySet<string>;
+
   constructor(properties: SimCfnStackUpdatePlanProperties) {
     const { current, updated } = properties;
     const replaced = simCfnStackReplacedLogicalIds({ current, updated });
 
     this.updated = updated;
+    this.replaced = replaced;
     this.replacements = replaced
       .values()
       .map((logicalId) => {

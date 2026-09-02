@@ -516,9 +516,15 @@ resource holds, and it is recorded in the usage docs rather than hidden. Two thi
 - A resource naming a replaced resource is replaced too, all the way up the chain, so nothing is
   left pointing at a resource that has gone. Real CloudFormation hands the dependent the new
   physical name instead.
-- `UpdateReplacePolicy` is not read. Retaining the old resource would leave it holding the name its
-  replacement needs, and CDK marks buckets and tables `Retain` as a matter of course, so honouring
-  it would fail every such update.
+- A resource carrying `UpdateReplacePolicy: Retain` is kept. The plan tells the deleter which
+  logical IDs it is replacing, through `SimCfnResourceRetention`, and the replaced half of each one
+  reads that attribute where a dropped resource reads `DeletionPolicy`. The kept resource holds the
+  name it was created with, and a replacement whose name comes from `SimCfnGeneratedResourceName`
+  asks for that same name and fails, since the generated name is a hash of the stack name and the
+  logical ID. Real CloudFormation gives the replacement a fresh random name.
+- `SimCfnStackResourceOperations` keeps the resources an update retained. The stack cannot, since
+  the resource map has already given the logical ID to the replacement, and
+  `stack.retainedResources` reads both lists.
 
 ## Change sets
 
@@ -683,10 +689,14 @@ same teardown.
 `SimCfnResourceDeleteOperation` owns the asynchronous lifecycle for deleting one resource, and is
 the mirror image of the creation operation.
 
-A resource whose `DeletionPolicy` is `Retain` never reaches the operation at all. `SimCfnResource`
-answers the deletion itself by marking the resource `DELETE_SKIPPED`, which is the status
-CloudFormation reports for a resource it stepped over, and the stack reads them back as
-`stack.retainedResources`. `RetainExceptOnCreate` is treated the same way, because the two differ
+A resource the operation's `SimCfnResourceRetention` keeps never reaches `SimCfnResourceDeleter` at
+all. The operation marks the resource `DELETE_SKIPPED`, which is the status CloudFormation reports
+for a resource it stepped over, and the stack reads them back as `stack.retainedResources`.
+
+`SimCfnResourceRetention` gathers the three things that can keep a resource. A `DeleteStack` call
+naming it in `RetainResources` keeps it whatever its attributes say. Otherwise a resource an update
+is replacing reads `UpdateReplacePolicy` and one being removed reads `DeletionPolicy`, which is the
+split CloudFormation makes. `RetainExceptOnCreate` is treated as `Retain`, because the two differ
 only in what a rolled back creation does and sim CloudFormation does not roll a deployment back.
 `Snapshot` is treated as `Delete`, because no simulated service takes snapshots.
 
@@ -982,7 +992,7 @@ Useful areas:
 
 - `command/delete-stack/*.iso.test.ts`
   - stack deletion and stack name release
-  - `DeletionPolicy` handling
+  - `DeletionPolicy` and `RetainResources` handling
   - failed teardowns and the statuses they leave behind
 
 - `command/update-stack/*.iso.test.ts`

@@ -14,6 +14,13 @@ export interface SimDeleteStackCommand {
  */
 export interface SimDeleteStackCommandInput {
   readonly StackName?: string | undefined;
+
+  /**
+   * Logical IDs of Resources to leave in simulated AWS. Each one is stepped
+   * over the way a DeletionPolicy of Retain steps over a Resource, and an ID
+   * the Stack has no Resource for is refused.
+   */
+  readonly RetainResources?: string[] | undefined;
 }
 
 /**

@@ -38,6 +38,17 @@ export class SimCfnResourceTemplateReader {
   }
 
   /**
+   * The CloudFormation UpdateReplacePolicy attribute, for example Retain.
+   */
+  updateReplacePolicy(): string | undefined {
+    const updateReplacePolicy = this.template["UpdateReplacePolicy"];
+
+    return typeof updateReplacePolicy === "string"
+      ? updateReplacePolicy
+      : undefined;
+  }
+
+  /**
    * The CloudFormation Resource properties object.
    *
    * CloudFormation Resources may omit Properties. In that case, and when the

@@ -7,6 +7,7 @@ import type { SimCfnStackResourceOperations } from "../sim-cfn-stack-resource-op
 import { makeSimCfnStackResourceMap } from "../resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackUpdatePlan } from "./sim-cfn-stack-update-plan.js";
 import { simCfnStackTemplateChanged } from "./sim-cfn-stack-template-changes.js";
+import { SimCfnResourceRetention } from "../../resource/delete/sim-cfn-resource-retention.js";
 
 /**
  * What CloudFormation answers an update that would change nothing.
@@ -87,9 +88,20 @@ export class SimCfnStackUpdater {
       plan.replacements,
     );
 
-    await operations.delete(resources, plan.deletions);
+    await operations.delete(
+      resources,
+      plan.deletions,
+      new SimCfnResourceRetention({ replaced: plan.replaced }),
+    );
 
     plan.applyTo(resources);
+
+    // Once the Stack has stopped holding them, and before the replacements are
+    // created, so an update that keeps a Resource and then fails to create the
+    // one taking its place still reports what it kept.
+    operations.recordRetained(
+      plan.deletions.filter((resource) => resource.retained),
+    );
 
     await operations.create(resources, plan.creations);
   }
