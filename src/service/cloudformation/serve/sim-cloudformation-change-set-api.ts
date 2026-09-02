@@ -27,6 +27,7 @@ const changeSetMembers = [
 const changeSetSummaryMembers = [
   "ChangeSetId",
   "ChangeSetName",
+  "StackId",
   "StackName",
   "Description",
   "Status",

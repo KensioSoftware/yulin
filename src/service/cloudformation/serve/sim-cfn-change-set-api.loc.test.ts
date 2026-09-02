@@ -154,6 +154,8 @@ describe("Serving simulated CloudFormation change sets on an endpoint URL", () =
     // Then the executed one and the pending one are both there
     assertArrayLength(listed.Summaries, 2);
     assertIdentical(listed.Summaries[1].ChangeSetName, "site-rename");
+    assertIdentical(listed.Summaries[1].StackId, "site");
+    assertIdentical(listed.Summaries[1].StackName, "site");
     assertIdentical(listed.Summaries[1].ExecutionStatus, "AVAILABLE");
 
     // And deleting them leaves the Stack holding none

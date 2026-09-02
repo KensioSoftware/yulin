@@ -1,10 +1,22 @@
 import type { SimCloudFormationStackName } from "../stack/sim-cfn-stack.type.js";
 import {
+  SimCloudFormationChangeSetNotFoundException,
   SimCloudFormationInvalidChangeSetStatusException,
-  SimCloudFormationValidationError,
 } from "../error/sim-cloudformation.error.js";
 import type { SimCfnChangeSet } from "./sim-cfn-change-set.js";
 import type { SimCfnChangeSetName } from "./sim-cfn-change-set.type.js";
+
+/**
+ * How CloudFormation refuses a change set that cannot be executed.
+ */
+export function simCfnChangeSetNotExecutable(
+  changeSet: SimCfnChangeSet,
+): Error {
+  return new SimCloudFormationInvalidChangeSetStatusException(
+    `ChangeSet [${changeSet.changeSetId}] cannot be executed in its ` +
+      `current status of [${changeSet.executionStatus}]`,
+  );
+}
 
 interface SimCfnChangeSetLookup {
   /** A change set name, or the change set ARN CreateChangeSet returned. */
@@ -55,7 +67,7 @@ export class SimCfnChangeSets {
     const changeSet = this.find(lookup);
 
     if (changeSet === undefined) {
-      throw new SimCloudFormationValidationError(
+      throw new SimCloudFormationChangeSetNotFoundException(
         `ChangeSet [${lookup.changeSetName}] does not exist`,
       );
     }
@@ -74,10 +86,7 @@ export class SimCfnChangeSets {
     const changeSet = this.require(lookup);
 
     if (!changeSet.executable) {
-      throw new SimCloudFormationInvalidChangeSetStatusException(
-        `ChangeSet [${changeSet.changeSetId}] cannot be executed in its ` +
-          `current status of [${changeSet.executionStatus}]`,
-      );
+      throw simCfnChangeSetNotExecutable(changeSet);
     }
 
     return changeSet;

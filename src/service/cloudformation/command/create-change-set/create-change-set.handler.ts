@@ -87,6 +87,7 @@ export class CreateChangeSetCommandHandler implements CommandHandler<
       ...request,
       template,
       changes,
+      plannedFrom: stack.currentTemplate,
       description: command.input.Description,
       failureReason: simCfnChangeSetFailure({
         ...request,

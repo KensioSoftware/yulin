@@ -2,8 +2,10 @@ import { describe, it } from "vitest";
 import {
   assertArrayEmpty,
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import {
   CreateChangeSetCommand,
@@ -15,6 +17,7 @@ import {
   ListChangeSetsCommand,
   UpdateStackCommand,
 } from "@aws-sdk/client-cloudformation";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { SimAws } from "../../aws/sim-aws.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
@@ -179,8 +182,8 @@ describe("Simulated CloudFormation change set refusals", () => {
     assertStringIncludes(error.message, "reports-stack");
   });
 
-  it("fails a change set whose Stack has already been given the change", async () => {
-    // Given a change set adding a Bucket that an update then adds itself.
+  it("gives up on a change set whose Stack has moved on", async () => {
+    // Given a change set that only adds a second Bucket.
     const simAws = new SimAws();
     const cloudFormation = simAws.cloudFormation();
 
@@ -193,15 +196,23 @@ describe("Simulated CloudFormation change set refusals", () => {
       }),
     );
 
+    // And an update that renames the Bucket the change set left alone.
     await cloudFormation.updateStack(
       new UpdateStackCommand({
         StackName: "reports-stack",
-        TemplateBody: jsonStringify(withArchive),
+        TemplateBody: jsonStringify({
+          Resources: {
+            ReportsBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "reports-v2" },
+            },
+          },
+        }),
       }),
     );
     await cloudFormation.waitForStackUpdateComplete("reports-stack");
 
-    // When the change set is executed anyway.
+    // When the change set is executed.
     const error = await assertThrowsErrorAsync(async () =>
       cloudFormation.executeChangeSet(
         new ExecuteChangeSetCommand({
@@ -211,9 +222,13 @@ describe("Simulated CloudFormation change set refusals", () => {
       ),
     );
 
-    // Then it is refused as an update with nothing to do, and the change set
-    // records that its execution failed.
-    assertStringIncludes(error.message, "No updates are to be performed.");
+    // Then it is refused as obsolete, because what it reports was worked out
+    // against a template the Stack has moved on from. Executing it would put
+    // the renamed Bucket back, which its Changes never said it would.
+    assertIdentical(error.name, "InvalidChangeSetStatusException");
+    assertStringIncludes(error.message, "OBSOLETE");
+    assertNonNullable(simAws.s3().getSimBucketByName("reports-v2"));
+    assertUndefined(simAws.s3().getSimBucketByName("reports-archive"));
 
     const described = await cloudFormation.describeChangeSet(
       new DescribeChangeSetCommand({
@@ -221,7 +236,7 @@ describe("Simulated CloudFormation change set refusals", () => {
         ChangeSetName: "reports-change",
       }),
     );
-    assertIdentical(described.ExecutionStatus, "EXECUTE_FAILED");
+    assertIdentical(described.ExecutionStatus, "OBSOLETE");
   });
 
   it("records a failed execution on the change set", async () => {
@@ -274,5 +289,60 @@ describe("Simulated CloudFormation change set refusals", () => {
       }),
     );
     assertIdentical(described.ExecutionStatus, "EXECUTE_FAILED");
+  });
+
+  it("authorizes a change set named by ARN against the Stack it belongs to", async () => {
+    // Given a caller allowed change sets on one Stack only.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+    const roleArn = `arn:aws:iam::${simAws.defaultAccountId}:role/Deployer`;
+
+    await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "Deployer",
+        AssumeRolePolicyDocument: jsonStringify({
+          Version: "2012-10-17",
+          Statement: [],
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Deployer",
+        PolicyName: "ReportsStackOnly",
+        PolicyDocument: jsonStringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "cloudformation:*",
+              Resource: `arn:aws:cloudformation:${simAws.defaultRegionName}:${simAws.defaultAccountId}:stack/reports-stack/*`,
+            },
+          ],
+        }),
+      }),
+    );
+
+    await deployReportsStack(simAws);
+
+    const created = await cloudFormation.createChangeSet(
+      new CreateChangeSetCommand({
+        StackName: "reports-stack",
+        ChangeSetName: "reports-change",
+        TemplateBody: jsonStringify(withArchive),
+      }),
+      { caller: { kind: "arn", arn: roleArn } },
+    );
+
+    // When that caller describes it by ARN alone, with no Stack name.
+    const described = await cloudFormation.describeChangeSet(
+      new DescribeChangeSetCommand({ ChangeSetName: created.Id }),
+      { caller: { kind: "arn", arn: roleArn } },
+    );
+
+    // Then it is allowed, because the change set says which Stack it belongs
+    // to. Authorizing on what the request carried would have asked about every
+    // Stack in the Account and Region.
+    assertIdentical(described.ChangeSetName, "reports-change");
   });
 });

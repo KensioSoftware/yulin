@@ -1,8 +1,12 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
+import { simCfnStackTemplateChanged } from "../stack/update/sim-cfn-stack-template-changes.js";
 import type { SimCfnChangeSet } from "./sim-cfn-change-set.js";
-import type { SimCfnChangeSets } from "./sim-cfn-change-sets.js";
+import {
+  simCfnChangeSetNotExecutable,
+  type SimCfnChangeSets,
+} from "./sim-cfn-change-sets.js";
 
 interface SimCfnChangeSetExecutionProperties {
   readonly changeSet: SimCfnChangeSet;
@@ -20,13 +24,27 @@ interface SimCfnChangeSetExecutionProperties {
  * against. Either way the work is scheduled in the background, so this returns
  * once the operation has started.
  *
- * Every other executable change set against the Stack becomes obsolete, because
- * each was worked out against a Stack this execution has moved on.
+ * A Stack that has moved on since the change set was worked out leaves the
+ * change set obsolete, which is what CloudFormation calls a change set whose
+ * Stack was already updated. Executing it would apply a difference nobody has
+ * seen, because what it reports was worked out against the template the Stack
+ * held then.
+ *
+ * Every other executable change set against the Stack becomes obsolete for the
+ * same reason once this one has been applied.
  */
 export async function runSimCfnChangeSet(
   properties: SimCfnChangeSetExecutionProperties,
 ): Promise<void> {
   const { changeSet, stack, changeSets, background, caller } = properties;
+
+  if (
+    simCfnStackTemplateChanged(changeSet.plannedFrom, stack.currentTemplate)
+  ) {
+    changeSet.executionStatus = "OBSOLETE";
+
+    throw simCfnChangeSetNotExecutable(changeSet);
+  }
 
   changeSet.executionStatus = "EXECUTE_IN_PROGRESS";
 

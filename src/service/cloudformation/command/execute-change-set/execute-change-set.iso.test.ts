@@ -251,7 +251,7 @@ describe("CloudFormation ExecuteChangeSetCommand", () => {
     const error = await assertThrowsErrorAsync(async () =>
       describeChangeSet(simAws, "reports-change"),
     );
-    assertIdentical(error.name, "ValidationError");
+    assertIdentical(error.name, "ChangeSetNotFoundException");
   });
 
   it("lists the change sets a Stack holds", async () => {

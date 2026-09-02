@@ -181,9 +181,10 @@ describe("CloudFormation CreateChangeSetCommand", () => {
     // and it cannot be executed.
     assertIdentical(described.Status, "FAILED");
     assertIdentical(described.ExecutionStatus, "UNAVAILABLE");
-    assertStringIncludes(
-      described.StatusReason ?? "",
-      "didn't contain changes",
+    assertIdentical(
+      described.StatusReason,
+      "The submitted information didn't contain changes. " +
+        "Submit different information to create a change set.",
     );
   });
 

@@ -34,6 +34,7 @@ export interface SimListChangeSetsCommandOutput {
 export interface SimCfnChangeSetSummary {
   readonly ChangeSetId?: string | undefined;
   readonly ChangeSetName?: string | undefined;
+  readonly StackId?: string | undefined;
   readonly StackName?: string | undefined;
   readonly Description?: string | undefined;
   readonly Status?: SimCfnChangeSetStatus | undefined;

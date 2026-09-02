@@ -116,6 +116,7 @@ export class SimCloudFormation {
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
+      authorization: this.authorization,
       exports: this.exports,
     });
     this.templateDeployer = new SimCloudFormationTemplateDeployer({
@@ -202,6 +203,10 @@ export class SimCloudFormation {
 
   /**
    * Handle a Create Change Set Command from the SDK.
+   *
+   * The change set commands authorize themselves, unlike the Stack commands
+   * above. Three of them can name a change set by its ARN alone, and only the
+   * change set registry knows which Stack such a request operates on.
    */
   async createChangeSet(
     command: SimCreateChangeSetCommand,
@@ -222,12 +227,7 @@ export class SimCloudFormation {
     command: SimDescribeChangeSetCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimDescribeChangeSetCommandOutput> {
-    this.authorization.describeChangeSet(
-      command.input.StackName,
-      options?.caller,
-    );
-
-    return await this.changeSetCommands.describe(command);
+    return await this.changeSetCommands.describe(command, options?.caller);
   }
 
   /**
@@ -237,11 +237,6 @@ export class SimCloudFormation {
     command: SimExecuteChangeSetCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimExecuteChangeSetCommandOutput> {
-    this.authorization.executeChangeSet(
-      command.input.StackName,
-      options?.caller,
-    );
-
     return await this.changeSetCommands.execute(command, options?.caller);
   }
 
@@ -267,9 +262,7 @@ export class SimCloudFormation {
     command: SimListChangeSetsCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimListChangeSetsCommandOutput> {
-    this.authorization.listChangeSets(command.input.StackName, options?.caller);
-
-    return await this.changeSetCommands.list(command);
+    return await this.changeSetCommands.list(command, options?.caller);
   }
 
   /**

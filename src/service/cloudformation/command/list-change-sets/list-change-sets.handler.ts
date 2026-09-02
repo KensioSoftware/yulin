@@ -53,6 +53,7 @@ export class ListChangeSetsCommandHandler implements CommandHandler<
       Summaries: this.changeSets.forStack(stackName).map((changeSet) => ({
         ChangeSetId: changeSet.changeSetId,
         ChangeSetName: changeSet.changeSetName,
+        StackId: changeSet.stackName,
         StackName: changeSet.stackName,
         Description: changeSet.description,
         Status: changeSet.status,

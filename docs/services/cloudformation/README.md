@@ -431,8 +431,14 @@ The change set reports its own execution through `ExecutionStatus`. It reads `AV
 after. Every other executable change set against the same stack becomes `OBSOLETE`, because each was
 worked out against a stack the execution has moved on.
 
+A change set whose stack has moved on since it was created is refused as `OBSOLETE`, which is what
+CloudFormation calls a change set whose stack was already updated. An update sent directly, and
+another change set executed first, both leave it there. Executing it would apply a difference nobody
+has seen, because what it reports was worked out against the template the stack held then.
+
 `DeleteChangeSetCommand` takes a change set away without executing it, and a change set name that is
-not there is a success rather than an error. `ListChangeSetsCommand` reports the ones a stack still
+not there is a success rather than an error. Every other command naming one that is not there is
+refused with a `ChangeSetNotFoundException`. `ListChangeSetsCommand` reports the ones a stack still
 holds, in the order they were created.
 
 ## Deleting a stack

@@ -17,6 +17,13 @@ interface SimCfnChangeSetProperties {
   readonly type: SimCfnChangeSetType;
   readonly template: SimCfnTemplate;
   readonly changes: readonly SimCfnResourceChange[];
+
+  /**
+   * The template the Stack was on when the changes were worked out. A Stack
+   * that has moved on from it leaves the change set obsolete.
+   */
+  readonly plannedFrom: SimCfnTemplate;
+
   readonly description?: string | undefined;
 
   /** Why the change set failed, for one the simulator refused to build. */
@@ -41,6 +48,7 @@ export class SimCfnChangeSet {
   public readonly type: SimCfnChangeSetType;
   public readonly template: SimCfnTemplate;
   public readonly changes: readonly SimCfnResourceChange[];
+  public readonly plannedFrom: SimCfnTemplate;
   public readonly description: string | undefined;
 
   /** How far the change set itself got. */
@@ -61,6 +69,7 @@ export class SimCfnChangeSet {
     this.type = properties.type;
     this.template = properties.template;
     this.changes = properties.changes;
+    this.plannedFrom = properties.plannedFrom;
     this.description = properties.description;
     this.changeSetId = simCfnChangeSetArn(
       properties.accountRegionScope,
