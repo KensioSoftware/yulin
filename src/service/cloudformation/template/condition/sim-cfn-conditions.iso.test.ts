@@ -165,6 +165,47 @@ describe("SimCfnTemplate Conditions", () => {
     assertFalse(evaluated.value("IsProd"));
   });
 
+  it("picks a condition with Fn::If", () => {
+    // Given a Condition that chooses between two conditions by a third.
+    const conditions = {
+      IsProd: { "Fn::Equals": [{ Ref: "EnvName" }, "prod"] },
+      IsBackedUp: {
+        "Fn::If": [
+          "IsProd",
+          { "Fn::Equals": ["nightly", "nightly"] },
+          { "Fn::Equals": ["never", "nightly"] },
+        ],
+      },
+    };
+
+    // When the Stack is deployed with the value the chooser agrees with.
+    const evaluated = evaluateWith(conditions, "prod");
+
+    // Then the branch it selected is the one that answered.
+    assertTrue(evaluated.value("IsBackedUp"));
+
+    // And another value takes the other branch.
+    assertFalse(evaluateWith(conditions, "dev").value("IsBackedUp"));
+  });
+
+  it("evaluates an Fn::If naming a Condition written below it", () => {
+    // Given an Fn::If whose chooser and branches all name Conditions the
+    // section carries further down, as a template section has no ordering.
+    const conditions = {
+      IsBackedUp: {
+        "Fn::If": ["IsProd", { Condition: "IsNamed" }, { Condition: "IsProd" }],
+      },
+      IsProd: { "Fn::Equals": [{ Ref: "EnvName" }, "prod"] },
+      IsNamed: { "Fn::Not": [{ "Fn::Equals": [{ Ref: "EnvName" }, ""] }] },
+    };
+
+    // When the Stack is deployed as prod.
+    const evaluated = evaluateWith(conditions, "prod");
+
+    // Then the Fn::If answers with the Condition its true branch names.
+    assertTrue(evaluated.value("IsBackedUp"));
+  });
+
   it("reads a template with no Conditions section", () => {
     // Given a template with no Conditions.
     const template = new SimCfnTemplate({ template: { Resources: {} } });

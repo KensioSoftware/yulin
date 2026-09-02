@@ -16,6 +16,7 @@ import type {
   SimCfnConditions,
   SimCfnConditionsSection,
 } from "./condition/sim-cfn-conditions.js";
+import { SimCfnOutputConditions } from "./condition/sim-cfn-output-conditions.js";
 import { SimCfnResourceConditions } from "./condition/sim-cfn-resource-conditions.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 import { samExpandedTemplate } from "../sam/sim-cfn-sam-expansion.js";
@@ -162,14 +163,25 @@ export class SimCfnTemplate {
    *
    * Resource-backed intrinsic functions are left unresolved here because
    * Outputs are resolved after Resource creation.
+   *
+   * An Output whose `Condition` attribute is false is left out entirely, so it
+   * never reaches the Stack's Outputs and publishes no export.
    */
   outputTemplates(): SimCfnOutputTemplateRecord[] {
     const valueResolver = this.valueResolver();
+    const outputConditions = new SimCfnOutputConditions({
+      conditions: this.conditions(),
+      stackName: this.stackName,
+    });
 
     return Object.entries(this.template.Outputs ?? {})
       .filter((entry): entry is [string, SimCfnTemplateValueRecord] => {
         return isRecord(entry[1]);
       })
+      .filter(
+        ([outputKey, outputTemplate]) =>
+          !outputConditions.excludes(outputKey, outputTemplate),
+      )
       .map(([outputKey, outputTemplate]) => ({
         outputKey,
         template: valueResolver.resolveRecordFor(

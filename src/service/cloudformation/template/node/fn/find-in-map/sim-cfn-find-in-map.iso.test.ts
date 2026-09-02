@@ -88,7 +88,7 @@ describe("SimCfnTemplate Fn::FindInMap Resources", () => {
     });
   });
 
-  it("throws when Fn::FindInMap is not a three-item array", () => {
+  it("throws when Fn::FindInMap carries fewer than three values", () => {
     // Given a template with an invalid Fn::FindInMap value.
     const template = new SimCfnTemplate({
       template: {
@@ -118,7 +118,8 @@ describe("SimCfnTemplate Fn::FindInMap Resources", () => {
     // Then a clear validation error is thrown.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::FindInMap value must be [mapName, topLevelKey, secondLevelKey]",
+      "Sim CloudFormation Fn::FindInMap value must be [mapName, topLevelKey, " +
+        'secondLevelKey] with an optional { "DefaultValue": ... }',
     );
   });
 

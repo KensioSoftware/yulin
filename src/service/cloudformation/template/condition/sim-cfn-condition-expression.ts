@@ -23,9 +23,9 @@ interface SimCfnConditionExpressionProperties {
  *
  * The tree is `Fn::Equals` at the leaves and `Fn::And`, `Fn::Or` and `Fn::Not`
  * above them, with `{ "Condition": "OtherCondition" }` handing off to the
- * Condition of that name. Where that other Condition comes from is the
- * evaluator's business, so it arrives as a reader rather than being looked up
- * here.
+ * Condition of that name. `Fn::If` picks one of two conditions by the answer to
+ * a third. Where a named Condition comes from is the evaluator's business, so it
+ * arrives as a reader rather than being looked up here.
  *
  * A function name this simulation has no behaviour for is refused rather than
  * read as false, which would deploy a Stack the template did not describe. The
@@ -84,6 +84,10 @@ export class SimCfnConditionExpression {
       return this.negated(value);
     }
 
+    if (functionName === "Fn::If") {
+      return this.selected(value);
+    }
+
     if (functionName === "Condition") {
       return this.named(
         this.shape.string(value, `${this.label} Condition reference`),
@@ -109,6 +113,38 @@ export class SimCfnConditionExpression {
     }
 
     return listed.map((operand) => this.evaluate(operand));
+  }
+
+  /**
+   * Evaluate whichever of an `Fn::If`'s two conditions its Condition selects.
+   *
+   * Only the selected one is evaluated, as CloudFormation resolves only the
+   * branch it takes. The name goes through the same reader a
+   * `{ "Condition": ... }` reference uses, so an `Fn::If` that closes a cycle
+   * is caught by the chain the evaluator carries rather than recursing.
+   */
+  private selected(value: SimCfnTemplateValue): boolean {
+    const listed = this.shape.list(value, `${this.label} Fn::If`);
+
+    if (listed.length !== 3) {
+      throw this.error(
+        `${this.label} Fn::If must be a list of a Condition name and two ` +
+          "conditions",
+      );
+    }
+
+    const conditionName = listed[0];
+    const whenTrue = listed[1];
+    const whenFalse = listed[2];
+    assertDefined(conditionName, `${this.label} Fn::If Condition name`);
+    assertDefined(whenTrue, `${this.label} Fn::If condition if true`);
+    assertDefined(whenFalse, `${this.label} Fn::If condition if false`);
+
+    const selected = this.named(
+      this.shape.string(conditionName, `${this.label} Fn::If Condition name`),
+    );
+
+    return this.evaluate(selected ? whenTrue : whenFalse);
   }
 
   private negated(value: SimCfnTemplateValue): boolean {

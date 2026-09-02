@@ -888,6 +888,23 @@ The value a lookup returns can be any type. A list value is returned as a list.
 used in resource properties and in `Outputs`. A map name or key missing from `Mappings` fails the
 deployment with an error naming the path that could not be found.
 
+A fourth argument of `{ "DefaultValue": ... }` gives the lookup an answer for that case.
+
+```json
+{
+  "Fn::FindInMap": [
+    "EnvironmentMap",
+    { "Ref": "Environment" },
+    "BucketName",
+    { "DefaultValue": "fallback-site-bucket" }
+  ]
+}
+```
+
+The default answers a map name, a top-level key or a second-level key the `Mappings` section does
+not carry. It is a template value like any other, so it can itself be a `Ref` or a nested
+expression. A lookup that finds its value in the map ignores the default.
+
 ### `Fn::Split` and `Fn::Select`
 
 `Fn::Split` cuts a string into a list on a delimiter. `Fn::Select` reads one value out of a list by
@@ -1119,10 +1136,10 @@ console.log(stack.getResource("Backups") !== undefined);
 
 ### Writing a condition
 
-A condition is built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`. `Fn::And` and `Fn::Or`
-take a list of two to ten conditions, and `Fn::Not` takes a list of exactly one. A condition can
-name another condition with `{ "Condition": "OtherCondition" }`, in any order, so a condition may
-name one written below it in the section.
+A condition is built from `Fn::Equals`, `Fn::And`, `Fn::Or`, `Fn::Not` and `Fn::If`. `Fn::And` and
+`Fn::Or` take a list of two to ten conditions, and `Fn::Not` takes a list of exactly one. A
+condition can name another condition with `{ "Condition": "OtherCondition" }`, in any order, so a
+condition may name one written below it in the section.
 
 ```json
 {
@@ -1137,9 +1154,27 @@ name one written below it in the section.
 `Fn::Equals` compares its two values as strings, as CloudFormation does. A JSON number in the
 template matches the string a parameter carries.
 
+An `Fn::If` inside the section takes a condition name and two conditions, and evaluates whichever
+one the named condition selects. The condition it names can be written anywhere in the section.
+
+```json
+{
+  "IsProd": { "Fn::Equals": [{ "Ref": "EnvName" }, "prod"] },
+  "IsBackedUp": {
+    "Fn::If": [
+      "IsProd",
+      { "Fn::Equals": [{ "Ref": "BackupPlan" }, "nightly"] },
+      { "Fn::Equals": ["never", "nightly"] }
+    ]
+  }
+}
+```
+
 The whole section is evaluated once per deployment, before any resource is created. A condition can
 read parameters and pseudo parameters and nothing else. A comparison that would need a created
-resource, such as an `Fn::GetAtt`, fails the deployment rather than reading as false.
+resource, such as an `Fn::GetAtt`, fails the deployment rather than reading as false. A condition
+that closes a cycle through `{ "Condition": ... }` or `Fn::If` fails the deployment naming the route
+it took back to itself.
 
 ### `Fn::If`
 
@@ -1162,6 +1197,15 @@ resources and the condition. That covers a `Ref` or `Fn::GetAtt` that is actuall
 fails.
 
 A `Condition` attribute naming a condition the template leaves undefined fails the same way.
+
+### The output `Condition` attribute
+
+An output carrying a `Condition` attribute whose condition is false is left out of the stack. It is
+absent from `stack.outputs` and from `DescribeStacks`, and the export name it carries is never
+published, so another stack's `Fn::ImportValue` for that name finds nothing.
+
+An output whose condition is true resolves and exports as any other output does. One naming a
+condition the template leaves undefined fails the deployment.
 
 ## Resource dependencies
 
@@ -3619,8 +3663,9 @@ Sim CloudFormation currently supports:
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`
 - Template `Mappings`, read with `Fn::FindInMap`
-- Template `Conditions`, built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`
-- The resource `Condition` attribute, which decides whether a resource is created
+- Template `Conditions`, built from `Fn::Equals`, `Fn::And`, `Fn::Or`, `Fn::Not` and `Fn::If`
+- The `Condition` attribute on a resource, which decides whether the resource is created, and on an
+  output, which decides whether the output and its export are published
 - The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub`, `Fn::FindInMap`, `Fn::If`, `Fn::Split` and
   `Fn::Select` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
@@ -3731,21 +3776,16 @@ Each service's own docs describe what its resource types support.
   way `FORCE_DELETE_STACK` forces it in AWS.
 - A deleted stack cannot be described. Real CloudFormation keeps a deleted stack readable by its
   unique stack ID, and the simulator identifies a stack by its name alone.
-- `Fn::FindInMap` accepts only the three-argument form. The four-argument form, where the fourth
-  argument is `{ "DefaultValue": ... }`, is rejected.
 - `Fn::FindInMap` arguments are resolved from literals, `Parameters` and pseudo parameters. An
   argument that depends on a created resource, such as a `Ref` to a resource logical ID, fails the
   resource with a "could not find map" error. Real CloudFormation allows only `Ref` and a nested
   `Fn::FindInMap` inside `Fn::FindInMap`. The templates affected here are ones real CloudFormation
   would reject as well. The simulator just rejects them later rather than up front.
-- `Fn::If` is unsupported inside the `Conditions` section itself. It is rejected there rather than
-  read against a half-evaluated section.
+- `Fn::If` is a condition function inside the `Conditions` section, and is not a value an
+  `Fn::Equals` can compare. Real CloudFormation allows only `Ref` and `Fn::FindInMap` there.
 - `Fn::Split` and `Fn::Select` accept any argument that resolves to the type they need. Real
   CloudFormation allows only a named set of functions inside each of them. A template the simulator
   resolves may still be one CloudFormation rejects.
-- The `Condition` attribute is read on resources but not on outputs. An output carrying one is
-  resolved and present in `stack.outputs` whichever way its condition falls, where real
-  CloudFormation would leave it out.
 - The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable`,
   `AWS::Serverless::HttpApi` and `AWS::Serverless::Api`. Every other `AWS::Serverless::*` resource
   type is recorded as unsupported. `Api`, `HttpApi`, `SQS`, `DynamoDB`, `SNS`, `S3`, `Schedule`,
