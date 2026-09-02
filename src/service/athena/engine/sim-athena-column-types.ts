@@ -74,6 +74,11 @@ export function simAthenaSqliteAffinity(glueType: string | undefined): string {
   return realTypes.has(type) ? "REAL" : "TEXT";
 }
 
+/** Whether a Glue column type holds a day with no time on it. */
+export function simAthenaIsDateType(glueType: string | undefined): boolean {
+  return baseType(glueType) === "date";
+}
+
 /** Whether a Glue column type holds a boolean. */
 export function simAthenaIsBooleanType(glueType: string | undefined): boolean {
   return baseType(glueType) === "boolean";

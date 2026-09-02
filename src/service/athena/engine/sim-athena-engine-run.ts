@@ -30,7 +30,8 @@ export interface SimAthenaEngineRun {
  * can fail on an object the caller cannot open, building the database can fail
  * on a schema SQLite refuses, and running the statement can fail on anything
  * the parser wrote that SQLite does not have. All three leave the declared
- * result to answer.
+ * result to answer. So does a Parquet table in a project that has not installed
+ * the reader, and `hyparquet` is named in the docs for that reason.
  */
 export async function simAthenaEngineRun(
   run: SimAthenaEngineRun,

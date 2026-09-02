@@ -30,20 +30,24 @@ export function simAthenaTableObjects(
     : (s3 as SimAthenaTableObjects);
 }
 
-/** One object's bytes, decompressed by its key and read as UTF-8 text. */
-export async function simAthenaObjectText(
+/**
+ * One object's bytes, decompressed by the codec its key names.
+ *
+ * Decoding is left to the reader the table's SerDe picks, because a Parquet
+ * object holds no text to decode.
+ */
+export async function simAthenaObjectBytes(
   objects: SimAthenaTableObjects,
   bucket: string,
   key: string,
   caller: SimAwsCaller | undefined,
-): Promise<string> {
+): Promise<Uint8Array> {
   const got = await objects.getObject(
     { input: { Bucket: bucket, Key: key } },
     caller === undefined ? undefined : { caller },
   );
 
   const chunks = await Array.fromAsync(got.Body ?? []);
-  const bytes = simAthenaDecompressedBytes(key, Buffer.concat(chunks));
 
-  return new TextDecoder().decode(bytes);
+  return simAthenaDecompressedBytes(key, Buffer.concat(chunks));
 }
