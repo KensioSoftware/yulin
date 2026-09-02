@@ -15,10 +15,7 @@ import {
 } from "./sim-athena-sqlite-module.js";
 import { simAthenaSqliteSql } from "./sim-athena-sql-translation.js";
 import type { SimAthenaTableObjects } from "./sim-athena-table-objects.js";
-import {
-  simAthenaNoObjects,
-  simAthenaUnreadableStatement,
-} from "./sim-athena-turn-down.js";
+import { simAthenaNoObjects } from "./sim-athena-turn-down.js";
 
 /** How one scope's engine is turned on. */
 export interface SimAthenaEngineOptions {
@@ -119,14 +116,20 @@ export class SimAthenaQueryEngine {
       return simAthenaEngineTurnedDown(simAthenaNoObjects);
     }
 
-    const sql = simAthenaSqliteSql({
+    const translated = simAthenaSqliteSql({
       parser,
       athenaSql: request.queryString,
       tables: request.tables.map((planned) => planned.table),
     });
 
-    return sql === undefined
-      ? simAthenaEngineTurnedDown(simAthenaUnreadableStatement)
-      : simAthenaEngineRun({ ...request, parser, sqlite, objects, sql });
+    return translated.sql === undefined
+      ? simAthenaEngineTurnedDown(translated.turnedDown)
+      : simAthenaEngineRun({
+          ...request,
+          parser,
+          sqlite,
+          objects,
+          sql: translated.sql,
+        });
   }
 }

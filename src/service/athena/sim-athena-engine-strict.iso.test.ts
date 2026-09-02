@@ -80,10 +80,28 @@ describe("a strict Athena query engine", () => {
       "SELECT id FROM rainlytics.orders GROUP BY GROUPING SETS ((id))",
     );
 
-    // Then it failed rather than answering from the default declaration.
+    // Then it failed rather than answering from the default declaration, and
+    // the reason says the grammar is what refused it. Nothing had reached
+    // SQLite by then.
     assertIdentical(answered.state, "FAILED");
-    assertStringIncludes(answered.reason ?? "", "cannot run this statement");
+    assertStringIncludes(answered.reason ?? "", "The Athena grammar refused");
     assertStringIncludes(answered.reason ?? "", "results()");
+  });
+
+  it("fails an UNNEST it cannot rewrite, saying so", async () => {
+    // Given a strict engine over a table with no array column.
+    const simulation = await anOrdersSimulation(true);
+
+    // When a statement unnests a column the table has not got.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT tag FROM rainlytics.orders CROSS JOIN UNNEST(tags) AS t (tag)",
+    );
+
+    // Then the reason names the rewrite, rather than the grammar that took the
+    // statement happily.
+    assertIdentical(answered.state, "FAILED");
+    assertStringIncludes(answered.reason ?? "", "UNNEST");
   });
 
   it("fails a table in a format it has no reader for", async () => {
@@ -144,10 +162,12 @@ describe("a strict Athena query engine", () => {
       "SELECT missing FROM rainlytics.orders",
     );
 
-    // Then the reason carries what stopped it, rather than the query passing
-    // on rows the default declaration held.
+    // Then the reason carries what SQLite said, rather than the query passing
+    // on rows the default declaration held. This is the one turn-down SQLite
+    // reaches, and the statement was translated for it before it got there.
     assertIdentical(answered.state, "FAILED");
     assertStringIncludes(answered.reason ?? "", "could not answer");
+    assertStringIncludes(answered.reason ?? "", "missing");
   });
 
   it("answers a query it can run", async () => {

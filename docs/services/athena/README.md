@@ -373,9 +373,12 @@ console.log(described.QueryExecution?.Status?.State);
 console.log(described.QueryExecution?.Status?.StateChangeReason);
 ```
 
-The query reaches `FAILED`, and `StateChangeReason` names what the engine could not do. Each of the
-four turn-downs says something different, so a reader of the failing test learns which one it hit
-rather than only that something went wrong.
+The query reaches `FAILED`, and `StateChangeReason` names what the engine could not do. Each
+turn-down says something different, so a reader of the failing test learns which one it hit rather
+than only that something went wrong. The Athena grammar refusing a statement, an `UNNEST` with no
+`json_each` to become, a statement SQLite will not run, a table in a format with no reader, and
+nothing in scope holding the objects all read differently. A statement SQLite refuses carries
+SQLite's own message out with it.
 
 ```
 The simulated Athena query engine has no reader for

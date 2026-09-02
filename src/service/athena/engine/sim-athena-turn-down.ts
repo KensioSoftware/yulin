@@ -11,10 +11,19 @@ const alternatives =
 /** Nothing in scope holds the objects a query would read. */
 export const simAthenaNoObjects = `${engine} has no simulated S3 to read this query's objects from.`;
 
-/** The statement could not be written back out for SQLite. */
-export const simAthenaUnreadableStatement =
-  `${engine} cannot run this statement. The Athena grammar refused it, or it ` +
-  `uses something SQLite has not got.`;
+/**
+ * The Athena grammar would not parse the statement.
+ *
+ * Nothing has reached SQLite at this point. A statement SQLite refuses to run
+ * is its own case, and it carries SQLite's own message out.
+ */
+export const simAthenaUnparsedStatement = `${engine} cannot read this statement. The Athena grammar refused it.`;
+
+/** The statement's `UNNEST` has no `json_each` to become. */
+export const simAthenaUnrewrittenUnnest = `${engine} cannot rewrite this statement's UNNEST onto SQLite's json_each.`;
+
+/** The parsed statement would not come back out as SQLite's dialect. */
+export const simAthenaUnwrittenStatement = `${engine} cannot write this statement back out for SQLite.`;
 
 /** Whatever went wrong while the tables were loaded or the statement ran. */
 export function simAthenaRunFailure(error: unknown): string {

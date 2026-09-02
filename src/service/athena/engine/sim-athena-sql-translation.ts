@@ -4,7 +4,17 @@ import {
   simAthenaSqlForParser,
   simAthenaSqlForSqlite,
 } from "./sim-athena-sql-rewrites.js";
+import {
+  simAthenaUnparsedStatement,
+  simAthenaUnrewrittenUnnest,
+  simAthenaUnwrittenStatement,
+} from "./sim-athena-turn-down.js";
 import { simAthenaRewriteUnnest } from "./sim-athena-unnest-rewrite.js";
+
+/** One statement translated for SQLite, or why it could not be. */
+export type SimAthenaTranslatedSql =
+  | { readonly sql: string; readonly turnedDown: undefined }
+  | { readonly sql: undefined; readonly turnedDown: string };
 
 interface SimAthenaSqlTranslationRequest {
   readonly parser: SimAthenaSqlParser;
@@ -15,25 +25,29 @@ interface SimAthenaSqlTranslationRequest {
 }
 
 /**
- * One Athena statement written back out for SQLite, or nothing where it cannot
- * be.
+ * One Athena statement written back out for SQLite, or why it cannot be.
  *
- * A statement the Athena grammar refuses, one carrying an `UNNEST` that cannot
- * become a `json_each`, and one the parser cannot write back out all land the
- * same way. The engine has one answer to any of them, which is to turn the
- * query down and let the declared result take it. Nothing is reported from
- * here, since a query the engine cannot run is an ordinary thing for a test to
- * write.
+ * Three things stop it, and each is told apart because a strict engine fails
+ * the query with the reason. The Athena grammar can refuse the statement, an
+ * `UNNEST` in it can have no `json_each` to become, and the parser can decline
+ * to write the statement back out. A lenient engine answers all three the same
+ * way, by turning the query down and letting the declared result take it.
  */
 export function simAthenaSqliteSql(
   request: SimAthenaSqlTranslationRequest,
-): string | undefined {
+): SimAthenaTranslatedSql {
   const { parser } = request;
+  let read;
+  let ast;
 
   try {
-    const read = simAthenaSqlForParser(request.athenaSql);
-    const ast = parser.astify(read.sql, { database: "athena" });
+    read = simAthenaSqlForParser(request.athenaSql);
+    ast = parser.astify(read.sql, { database: "athena" });
+  } catch {
+    return turnedDown(simAthenaUnparsedStatement);
+  }
 
+  try {
     if (
       !simAthenaRewriteUnnest({
         ast,
@@ -41,11 +55,18 @@ export function simAthenaSqliteSql(
         tables: request.tables,
       })
     ) {
-      return undefined;
+      return turnedDown(simAthenaUnrewrittenUnnest);
     }
 
-    return simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" }));
+    return {
+      sql: simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" })),
+      turnedDown: undefined,
+    };
   } catch {
-    return undefined;
+    return turnedDown(simAthenaUnwrittenStatement);
   }
+}
+
+function turnedDown(reason: string): SimAthenaTranslatedSql {
+  return { sql: undefined, turnedDown: reason };
 }
