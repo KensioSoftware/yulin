@@ -13,11 +13,6 @@ export function refuseUnsimulatedQueryInput(input: SimQueryCommandInput): void {
   const unsimulated = new SimDynamoDbUnsimulatedInput("Query");
 
   unsimulated.refuse(
-    input.ProjectionExpression !== undefined,
-    "ProjectionExpression",
-    "answering with whole items where part of them was asked for",
-  );
-  unsimulated.refuse(
     (input.AttributesToGet ?? []).length > 0,
     "AttributesToGet",
     "answering with whole items where part of them was asked for",

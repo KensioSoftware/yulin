@@ -18,6 +18,11 @@ interface SimDynamoDbProjectionRequest extends SimDynamoDbExpressionParameterInp
  *
  * A request with no ProjectionExpression asks for the whole item, so there is
  * nothing to project.
+ *
+ * This is the form for a request whose projection is its only expression, which
+ * is every read that names one item or a list of them. A query or a scan can
+ * carry a filter alongside its projection, and reads both against one set of
+ * placeholders through `parseSimDynamoDbProjection`.
  */
 export function readSimDynamoDbProjection(
   request: SimDynamoDbProjectionRequest,
@@ -31,6 +36,25 @@ export function readSimDynamoDbProjection(
   }
 
   const parameters = new SimDynamoDbExpressionParameters(request);
+  const projection = parseSimDynamoDbProjection(expression, parameters);
+
+  parameters.assertAllUsed();
+
+  return projection;
+}
+
+/**
+ * Read one ProjectionExpression against placeholders that have already been
+ * gathered.
+ *
+ * A query carries a key condition and may carry a filter alongside its
+ * projection, and all three draw on the same `ExpressionAttributeNames`, so the
+ * placeholders are checked once every expression has been read.
+ */
+export function parseSimDynamoDbProjection(
+  expression: string,
+  parameters: SimDynamoDbExpressionParameters,
+): SimDynamoDbProjection {
   const paths = projectedPaths(
     SimDynamoDbExpressionTokens.of(
       expressionName,
@@ -39,8 +63,6 @@ export function readSimDynamoDbProjection(
     ),
     parameters.names,
   );
-
-  parameters.assertAllUsed();
 
   return new SimDynamoDbProjection({ expressionName, paths });
 }

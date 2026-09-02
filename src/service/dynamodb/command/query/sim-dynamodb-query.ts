@@ -78,6 +78,7 @@ export class SimDynamoDbQuery {
     // waits for the view the same way the key condition does.
     expressions.filter?.assertNamesNoKeyAttribute(view.keySchema);
     expressions.filter?.assertNamesOnlyCarried(view);
+    expressions.projection?.assertNamesOnlyCarried(view);
 
     // The token names an item of the collection being read, so it can only be
     // checked once that collection is known.
@@ -100,6 +101,7 @@ export class SimDynamoDbQuery {
       ...new SimDynamoDbReadAnswer({
         page,
         filter: expressions.filter,
+        projection: expressions.projection,
         select,
         view,
       }).fields(),

@@ -1,4 +1,8 @@
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectEquals,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimQueryCommandInput } from "../command/query/query.command.js";
@@ -121,5 +125,18 @@ describe("DynamoDB reads beyond what a local secondary index projects", () => {
     // Then the count is of the index entries, with no Items at all.
     assertIdentical(page.Count, 3);
     assertUndefined(page.Items);
+  });
+
+  it("projects an attribute the index does not carry", async () => {
+    // When a read of a KEYS_ONLY index names an unprojected attribute.
+    const item = await firstOrder(
+      { projectionType: "KEYS_ONLY" },
+      { ProjectionExpression: "title" },
+    );
+
+    // Then it comes back, fetched from the base table the way Select
+    // ALL_ATTRIBUTES fetches it. A global secondary index refuses the same
+    // read, since it has no base table entry to reach for.
+    assertObjectEquals(item, { title: { S: "Order order-02" } });
   });
 });

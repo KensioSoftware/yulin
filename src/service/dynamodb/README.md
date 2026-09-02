@@ -252,15 +252,19 @@ the same walking a table gets and the same walking whichever kind of index it is
 
 `SimDynamoDbProjectedIndexAttributes` is the global secondary index half. `assertCarriesWholeItem`
 and `assertCarriesPaths` refuse a `Select` of `ALL_ATTRIBUTES` against a projection that is not ALL,
-and a filter naming an attribute the index does not project. Both fail closed. The alternative to
-the second is an empty page, which reads as a collection that happens to hold nothing.
+and a filter or a `ProjectionExpression` naming an attribute the index does not project. Both fail
+closed. The alternative to the second is an empty page for a filter, or an attribute quietly missing
+from every item for a projection.
 
 `SimDynamoDbFetchedIndexAttributes` is the local secondary index half, and refuses neither. The index
 entry is in the same partition as the item, so DynamoDB reads the base table for what the index does
 not project and charges the extra capacity for it. Cutting an item down to the projection is still
 the same job, so it is delegated to the projected implementation rather than written twice. What the
-read then answers with is decided by `SimDynamoDbSelect.wholeItems` in `SimDynamoDbReadAnswer`: a
-read asking for whole items gets the item, and anything else gets the view's projection of it.
+read then answers with is decided in `SimDynamoDbReadAnswer`. A request carrying a
+`ProjectionExpression` has that applied to the whole item, which is what fetches an unprojected
+attribute here and changes nothing on a global secondary index, where every projected path has been
+checked already. Otherwise `SimDynamoDbSelect.wholeItems` decides: a read asking for whole items gets
+the item, and anything else gets the view's projection of it.
 
 The other place the kinds differ is `assertAnswersConsistentRead`, reached through
 `SimDynamoDbReadView.assertConsistentRead` and applied by
@@ -572,10 +576,10 @@ The order it works in is the order the other commands follow, with one addition:
 1. `SimDynamoDbSelect.from` reads which attributes the request asks for. It comes first because it
    decides whether the projection the request carries is one it could have asked for at all.
 2. `refuseUnsimulatedQueryInput` refuses the inputs this simulation does not model.
-3. `readSimDynamoDbQueryExpressions` reads the `KeyConditionExpression` and the `FilterExpression`,
-   before the table is reached, so an expression DynamoDB would refuse is refused whether or not the
-   table is there. Both draw on one `SimDynamoDbExpressionParameters`, the way UpdateItem's two
-   expressions do.
+3. `readSimDynamoDbQueryExpressions` reads the `KeyConditionExpression`, the `FilterExpression` and
+   the `ProjectionExpression`, before the table is reached, so an expression DynamoDB would refuse is
+   refused whether or not the table is there. All three draw on one
+   `SimDynamoDbExpressionParameters`, the way UpdateItem's two expressions do.
 4. The table is found and the caller authorized.
 5. `SimDynamoDbKeyConditionTerms.forTable` reads the terms against the table's key schema, which is
    the part that could not be checked without it: which attribute is the partition key, and what type
@@ -634,9 +638,10 @@ and no key knowledge. It takes the same steps a query does, minus the key condit
 
 1. `SimDynamoDbSelect.from` reads which attributes the request asks for.
 2. `refuseUnsimulatedScanInput` refuses the inputs this simulation does not model.
-3. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, and `readSimDynamoDbFilter` the
-   `FilterExpression`, before the table is reached, so input DynamoDB would refuse is refused whether
-   or not the table is there. A scan filter needs nothing from the table, unlike a query's.
+3. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, and
+   `readSimDynamoDbScanExpressions` the `FilterExpression` and the `ProjectionExpression` against one
+   set of placeholders, before the table is reached, so input DynamoDB would refuse is refused
+   whether or not the table is there. A scan filter needs nothing from the table, unlike a query's.
 4. The table is found and the caller authorized.
 5. The table is put in scan order, walked from the `ExclusiveStartKey`, and cut to a page by the same
    `SimDynamoDbItemPage` a query uses, then filtered by the same `SimDynamoDbReadAnswer`.
@@ -916,7 +921,9 @@ parser reads one and refuses a second. That is a grammar rule rather than a simu
 DynamoDB refuses `:a + :b + :c` as a syntax error too.
 
 `expression/projection/` is the other consumer. `readSimDynamoDbProjection` reads a
-`ProjectionExpression` and its names into a `SimDynamoDbProjection`, and `SimDynamoDbProjectionNode`
+`ProjectionExpression` and its names into a `SimDynamoDbProjection` for a read whose projection is
+its only expression, and `parseSimDynamoDbProjection` does the same against placeholders a query or a
+scan has already gathered for its other expressions. `SimDynamoDbProjectionNode`
 merges the paths into a tree before anything is read, so `address.city` and `address.postcode` become
 one `address` holding two attributes. Two paths where one contains the other are refused there, as
 real DynamoDB refuses them.
