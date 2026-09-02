@@ -3,6 +3,7 @@ import { faker } from "@faker-js/faker";
 import type { Brand } from "../../../../util/brand.type.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimLambdaFunctionName } from "../sim-lambda-function.js";
+import type { SimLambdaFunctionUrlCors } from "./sim-lambda-function-url-cors.js";
 import { simLambdaFunctionUrlHost } from "./sim-lambda-function-url-host.js";
 import {
   type SimClock,
@@ -44,6 +45,7 @@ interface SimLambdaFunctionUrlProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
   readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
+  readonly cors?: SimLambdaFunctionUrlCors | undefined;
   /**
    * Clock stamping this Function URL's creation and last modified times. A
    * Function URL built standalone, outside a SimAws instance, falls back to the
@@ -56,12 +58,16 @@ interface SimLambdaFunctionUrlProperties {
  * Minimal structural Function URL configuration, as returned by the
  * CreateFunctionUrlConfig, GetFunctionUrlConfig and UpdateFunctionUrlConfig
  * commands.
+ *
+ * A URL configured without CORS has no `Cors` member at all. An empty block
+ * would still decide headers.
  */
 export interface SimLambdaFunctionUrlConfiguration {
   FunctionUrl: string;
   FunctionArn: string;
   AuthType: SimLambdaFunctionUrlAuthType;
   InvokeMode: SimLambdaFunctionUrlInvokeMode;
+  Cors?: SimLambdaFunctionUrlCors | undefined;
   CreationTime: string;
   LastModifiedTime: string;
 }
@@ -82,6 +88,7 @@ export class SimLambdaFunctionUrl {
 
   #authType: SimLambdaFunctionUrlAuthType;
   #invokeMode: SimLambdaFunctionUrlInvokeMode;
+  #cors: SimLambdaFunctionUrlCors | undefined;
   #lastModifiedTime: string;
   private readonly clock: SimClock;
 
@@ -93,6 +100,7 @@ export class SimLambdaFunctionUrl {
       accountRegionScope,
       authType = "NONE",
       invokeMode = "BUFFERED",
+      cors,
       clock = new SimRealClock(),
     } = properties;
 
@@ -104,6 +112,7 @@ export class SimLambdaFunctionUrl {
     this.accountRegionScope = accountRegionScope;
     this.#authType = authType;
     this.#invokeMode = invokeMode;
+    this.#cors = cors;
     this.creationTime = clock.now().toISOString();
     this.#lastModifiedTime = this.creationTime;
   }
@@ -120,6 +129,14 @@ export class SimLambdaFunctionUrl {
    */
   get invokeMode(): SimLambdaFunctionUrlInvokeMode {
     return this.#invokeMode;
+  }
+
+  /**
+   * Get the CORS configuration for this Function URL. A URL without one sends
+   * no CORS headers of its own.
+   */
+  get cors(): SimLambdaFunctionUrlCors | undefined {
+    return this.#cors;
   }
 
   /**
@@ -144,13 +161,19 @@ export class SimLambdaFunctionUrl {
    * Apply an update to this Function URL's configuration.
    *
    * Omitted values are left as they are, as real UpdateFunctionUrlConfig does.
+   *
+   * A stated `Cors` replaces the whole block. An update naming only
+   * `AllowOrigins` drops the methods and headers the URL was created with, the
+   * way it does on AWS.
    */
   update(properties: {
     readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
     readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
+    readonly cors?: SimLambdaFunctionUrlCors | undefined;
   }): void {
     this.#authType = properties.authType ?? this.#authType;
     this.#invokeMode = properties.invokeMode ?? this.#invokeMode;
+    this.#cors = properties.cors ?? this.#cors;
     this.#lastModifiedTime = this.clock.now().toISOString();
   }
 
@@ -163,6 +186,7 @@ export class SimLambdaFunctionUrl {
       FunctionArn: this.functionArn,
       AuthType: this.#authType,
       InvokeMode: this.#invokeMode,
+      ...(this.#cors !== undefined && { Cors: this.#cors }),
       CreationTime: this.creationTime,
       LastModifiedTime: this.#lastModifiedTime,
     };

@@ -633,6 +633,29 @@ The endpoint's own error responses (403 for a denied caller, 404 for an unknown 
 for a handler error) are AWS-shaped JSON documents. The 403 body is real Lambda's wording; the other
 two are approximations.
 
+### CORS
+
+`SimLambdaUrlCorsHeaders` (`serve/response/`) turns a URL's `Cors` block into headers. The
+controller uses it around the invocation, after the auth type has had its say. A preflight (an
+`OPTIONS` request carrying `Origin` and `Access-Control-Request-Method`) is answered from the
+configuration and the function never runs. Any other request reaches the handler and has the
+configured headers appended to whatever it returned, so a handler sending its own CORS header leaves
+the response carrying both values, which is what AWS documents.
+
+Ordering CORS after authorization is a deliberate call. A browser cannot sign a preflight, so an
+`AWS_IAM` URL answers one with 403. Answering the preflight first would make the CORS block a way
+past the URL's auth type, and AWS documents no such exemption.
+
+`Access-Control-Allow-Origin` is the one header the request decides. A block naming `*` allows every
+Origin, and any other block echoes the request's `Origin` when the list holds it, since a browser
+reads one value there.
+
+`command/function-url/function-url-cors-input.ts` checks the block before the store is touched. It
+applies only the bounds the Lambda API publishes (list sizes, member lengths and the `MaxAge` range)
+because a refusal AWS would not make costs a working deployment. The six-character cap on
+`AllowMethods` is what keeps `OPTIONS` out of a configuration, which follows from Lambda answering
+preflight itself.
+
 ### Invocation events without a request
 
 `factory/lambda-function-url-event.factory.ts` exports `lambdaFunctionUrlEventFactory`, which makes
@@ -790,7 +813,6 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig`
 - event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
   `UpdateEventSourceMapping`, and polling concurrency
-- Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real

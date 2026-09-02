@@ -2507,8 +2507,7 @@ time window gets `OFF`.
 once, and a failed one is recorded by the rule or the schedule that made it.
 
 A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
-for a function called `Rates`. `AuthType` and `InvokeMode` carry over. `Cors` is left out (the
-simulated Function URL answers no preflight request).
+for a function called `Rates`. `AuthType`, `InvokeMode` and `Cors` carry over.
 
 ### Queue, stream, topic and bucket events
 

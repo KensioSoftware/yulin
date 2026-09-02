@@ -13,11 +13,8 @@ interface SamFunctionUrlProperties {
 
 /**
  * The `FunctionUrlConfig` properties the AWS::Lambda::Url carries over.
- *
- * `Cors` is left out. The simulated Function URL answers no preflight request,
- * and carrying the property over would say it did.
  */
-const carriedNames = new Set(["AuthType", "InvokeMode"]);
+const carriedNames = new Set(["AuthType", "InvokeMode", "Cors"]);
 
 /**
  * The AWS::Lambda::Url a function's `FunctionUrlConfig` is expanded into.

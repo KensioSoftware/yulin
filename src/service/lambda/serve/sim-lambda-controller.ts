@@ -6,6 +6,7 @@ import { SimPayload2EventBuilder } from "../../../serve/payload-2/sim-payload-2-
 import { SimPayload2ResponseBuilder } from "../../../serve/payload-2/sim-payload-2-response-builder.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { simLambdaUrlEndpoint } from "./event/sim-lambda-url-endpoint.js";
+import { SimLambdaUrlCorsHeaders } from "./response/sim-lambda-url-cors-headers.js";
 import { SimLambdaUrlErrorResponse } from "./response/sim-lambda-url-error-response.js";
 import {
   type SimLambdaFunctionUrlRoute,
@@ -31,6 +32,11 @@ interface SimLambdaServiceControllerProperties {
  * Either way the function itself runs as its execution Role, as it does for
  * any other invocation. Who invoked it and what it runs as are separate
  * questions on real Lambda, and stay separate here.
+ *
+ * A URL configured for CORS answers a preflight request itself, once the
+ * request has got past whatever its auth type asks of it. A browser cannot sign
+ * a preflight, and an `AWS_IAM` URL refuses one on the same terms it refuses
+ * any other unsigned request.
  */
 export class SimLambdaServiceController implements SimAwsServiceController {
   private readonly router: SimLambdaUrlRouter;
@@ -112,7 +118,42 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     return await this.invoke(route, serviceRequest.request, caller);
   }
 
+  /**
+   * Serve a request the Function URL has admitted.
+   *
+   * CORS is settled around the invocation. A preflight is answered from the
+   * configuration alone, and every other response carries the configured
+   * headers alongside whatever the handler sent, including a duplicate where
+   * the two disagree.
+   */
   private async invoke(
+    route: SimLambdaFunctionUrlRoute,
+    request: Request,
+    authenticatedCaller?: SimAwsRequestCaller,
+  ): Promise<Response> {
+    const { cors } = route.functionUrl;
+
+    if (cors === undefined) {
+      return await this.invokeFunction(route, request, authenticatedCaller);
+    }
+
+    const corsHeaders = new SimLambdaUrlCorsHeaders(cors);
+
+    if (corsHeaders.isPreflight(request)) {
+      return corsHeaders.preflightResponse(request);
+    }
+
+    const response = await this.invokeFunction(
+      route,
+      request,
+      authenticatedCaller,
+    );
+    corsHeaders.apply(response.headers, request);
+
+    return response;
+  }
+
+  private async invokeFunction(
     route: SimLambdaFunctionUrlRoute,
     request: Request,
     authenticatedCaller?: SimAwsRequestCaller,

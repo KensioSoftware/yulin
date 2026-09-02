@@ -1,7 +1,9 @@
+import { GetFunctionUrlConfigCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertStringMatches,
   assertThrowsErrorAsync,
@@ -180,6 +182,111 @@ describe("Lambda CloudFormation Function URL deployment", () => {
     assertNonNullable(functionUrl);
     assertIdentical(functionUrl.authType, "AWS_IAM");
     assertIdentical(functionUrl.invokeMode, "RESPONSE_STREAM");
+  });
+
+  it("deploys the CORS configuration the template states", async () => {
+    // Given a template whose Function URL is configured for CORS.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "greeter-stack",
+      template: greeterTemplate({
+        TargetFunctionArn: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+        AuthType: "NONE",
+        Cors: {
+          AllowCredentials: true,
+          AllowHeaders: ["content-type", "x-api-key"],
+          AllowMethods: ["GET", "POST"],
+          AllowOrigins: ["https://shop.example.com"],
+          ExposeHeaders: ["x-request-id"],
+          MaxAge: 600,
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the Lambda API reports the configuration the template carried.
+    const { Cors } = await simAws
+      .lambda()
+      .getFunctionUrlConfig(
+        new GetFunctionUrlConfigCommand({ FunctionName: "greeter" }),
+      );
+    assertObjectEquals(Cors, {
+      AllowCredentials: true,
+      AllowHeaders: ["content-type", "x-api-key"],
+      AllowMethods: ["GET", "POST"],
+      AllowOrigins: ["https://shop.example.com"],
+      ExposeHeaders: ["x-request-id"],
+      MaxAge: 600,
+    });
+
+    // And the served endpoint answers a preflight from that Origin itself.
+    const functionUrl = simAws.lambda().getSimFunctionUrl("greeter");
+    assertNonNullable(functionUrl);
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      new SimAwsLocalUrl({ input: functionUrl.url }).toString(),
+      {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://shop.example.com",
+          "access-control-request-method": "POST",
+        },
+      },
+    );
+    assertIdentical(
+      response.headers.get("access-control-allow-origin"),
+      "https://shop.example.com",
+    );
+    assertIdentical(response.headers.get("access-control-max-age"), "600");
+  });
+
+  it("fails the Resource when Cors is not an object", async () => {
+    // Given a template whose Function URL states a CORS block as a string.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "greeter-stack",
+        template: greeterTemplate({
+          TargetFunctionArn: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+          AuthType: "NONE",
+          Cors: "everyone",
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the failure names the Resource type, property and logical ID.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::Lambda::Url GreeterUrl: Cors must be an object",
+    );
+  });
+
+  it("fails the Resource when a Cors member has the wrong shape", async () => {
+    // Given a template stating one allowed Origin rather than a list of them.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "greeter-stack",
+        template: greeterTemplate({
+          TargetFunctionArn: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+          AuthType: "NONE",
+          Cors: { AllowOrigins: "https://shop.example.com" },
+        }),
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the failure names the member inside the block.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::Lambda::Url GreeterUrl: Cors.AllowOrigins must be a list",
+    );
   });
 
   it("fails the Resource when TargetFunctionArn is missing", async () => {

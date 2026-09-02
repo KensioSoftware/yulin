@@ -88,6 +88,7 @@ export class UpdateFunctionUrlConfigCommandHandler implements CommandHandler<
       invokeMode: this.inputParser.parseOptionalInvokeMode(
         command.input.InvokeMode,
       ),
+      cors: this.inputParser.parseOptionalCors(command.input.Cors),
     });
 
     return {

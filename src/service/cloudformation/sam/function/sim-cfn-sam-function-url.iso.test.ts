@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -56,6 +57,39 @@ describe("SAM function FunctionUrlConfig expansion", () => {
     );
 
     assertIdentical(await response.text(), "rates at /rates");
+  });
+
+  it("carries the config's CORS settings over to the URL", async () => {
+    // Given a SAM function whose Function URL config allows one Origin
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rates-cors-stack",
+      template: simCfnSamFunctionTemplateFactory.make({
+        functionProperties: {
+          FunctionUrlConfig: {
+            AuthType: "NONE",
+            Cors: {
+              AllowOrigins: ["https://rates.example.com"],
+              AllowMethods: ["GET"],
+              MaxAge: 300,
+            },
+          },
+        },
+      }),
+    });
+
+    // Then the expanded Function URL holds them
+    const functionUrl = stack.getResource(
+      `${samFunctionTemplateLogicalId}Url`,
+    )?.simResource;
+    assertInstanceOf(functionUrl, SimLambdaFunctionUrl);
+    assertObjectEquals(functionUrl.cors, {
+      AllowOrigins: ["https://rates.example.com"],
+      AllowMethods: ["GET"],
+      MaxAge: 300,
+    });
   });
 
   it("leaves a function stating no URL config without one", async () => {
