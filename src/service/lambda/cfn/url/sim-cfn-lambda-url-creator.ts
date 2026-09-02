@@ -8,6 +8,7 @@ import type {
 } from "../../function/url/sim-lambda-function-url.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
+import { simCfnLambdaUrlCors } from "./sim-cfn-lambda-url-cors.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -59,6 +60,11 @@ export class SimCfnLambdaUrlCreator {
             properties["InvokeMode"],
             "InvokeMode",
           ) as SimLambdaFunctionUrlInvokeMode | undefined,
+          Cors: simCfnLambdaUrlCors({
+            parser: this.propertyParser,
+            resource,
+            value: properties["Cors"],
+          }),
         },
       },
       options,

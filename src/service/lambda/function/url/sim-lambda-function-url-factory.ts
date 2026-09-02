@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimLambdaUrlRegistry } from "../../registry/sim-lambda-url-registry.js";
 import type { SimLambdaFunction } from "../sim-lambda-function.js";
+import type { SimLambdaFunctionUrlCors } from "./sim-lambda-function-url-cors.js";
 import {
   SimLambdaFunctionUrl,
   type SimLambdaFunctionUrlAuthType,
@@ -21,6 +22,7 @@ interface MakeSimLambdaFunctionUrlProperties {
   readonly simFunction: SimLambdaFunction;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
   readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
+  readonly cors?: SimLambdaFunctionUrlCors | undefined;
 }
 
 /**
@@ -44,7 +46,7 @@ export class SimLambdaFunctionUrlFactory {
    * Make a registered Function URL for a function.
    */
   make(properties: MakeSimLambdaFunctionUrlProperties): SimLambdaFunctionUrl {
-    const { simFunction, authType, invokeMode } = properties;
+    const { simFunction, authType, invokeMode, cors } = properties;
     const urlId = this.urlRegistry.allocateFunctionUrlId();
 
     this.urlRegistry.registerFunctionUrl(
@@ -59,6 +61,7 @@ export class SimLambdaFunctionUrlFactory {
       accountRegionScope: this.accountRegionScope,
       authType,
       invokeMode,
+      cors,
       clock: this.clock,
     });
   }

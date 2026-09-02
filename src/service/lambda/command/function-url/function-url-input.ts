@@ -1,8 +1,10 @@
 import { SimLambdaValidationException } from "../../error/sim-lambda.error.js";
+import type { SimLambdaFunctionUrlCors } from "../../function/url/sim-lambda-function-url-cors.js";
 import type {
   SimLambdaFunctionUrlAuthType,
   SimLambdaFunctionUrlInvokeMode,
 } from "../../function/url/sim-lambda-function-url.js";
+import { FunctionUrlCorsInputParser } from "./function-url-cors-input.js";
 
 const authTypes: readonly string[] = ["NONE", "AWS_IAM"];
 const invokeModes: readonly string[] = ["BUFFERED", "RESPONSE_STREAM"];
@@ -15,6 +17,8 @@ const invokeModes: readonly string[] = ["BUFFERED", "RESPONSE_STREAM"];
  * runtime and reported the way real Lambda reports a bad enum member.
  */
 export class FunctionUrlInputParser {
+  private readonly corsParser = new FunctionUrlCorsInputParser();
+
   /**
    * Parse a required AuthType, as CreateFunctionUrlConfig requires one.
    */
@@ -58,6 +62,16 @@ export class FunctionUrlInputParser {
     }
 
     return value as SimLambdaFunctionUrlInvokeMode;
+  }
+
+  /**
+   * Parse an optional `Cors` block, which every Function URL config command
+   * allows a caller to leave out.
+   */
+  parseOptionalCors(
+    value: SimLambdaFunctionUrlCors | undefined,
+  ): SimLambdaFunctionUrlCors | undefined {
+    return this.corsParser.parseOptional(value);
   }
 
   private parseAuthType(value: string): SimLambdaFunctionUrlAuthType {

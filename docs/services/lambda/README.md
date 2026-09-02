@@ -2450,10 +2450,114 @@ the route key, the stage and the path parameters are the endpoint's rather than 
 ### Managing a Function URL
 
 `GetFunctionUrlConfigCommand` reads the configuration back, `UpdateFunctionUrlConfigCommand`
-changes the `AuthType` or `InvokeMode` while keeping the same endpoint, and
+changes the `AuthType`, `InvokeMode` or `Cors` while keeping the same endpoint, and
 `DeleteFunctionUrlConfigCommand` removes it, after which the hostname stops resolving and returns
 `404`. `ListFunctionUrlConfigsCommand` lists what a function has, which is one configuration or
 none, since a function has at most one Function URL.
+
+A `Cors` block on an update replaces the whole block the URL was created with. An update that leaves
+`Cors` out keeps the block already in place.
+
+### Cross-origin resource sharing
+
+A Function URL created with a `Cors` block sends the CORS headers that block describes on every
+response it serves, and answers a browser preflight from the block alone.
+
+```typescript sim-lambda-function-url-cors
+/**
+ * Serving a simulated Lambda Function URL configured for CORS.
+ */
+
+import {
+  CreateFunctionCommand,
+  CreateFunctionUrlConfigCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "rates",
+    Role: "arn:aws:iam::111111111111:role/RatesRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => ({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gbp: 1.27 }),
+      })),
+    },
+  }),
+);
+
+const urlConfig = await lambda.createFunctionUrlConfig(
+  new CreateFunctionUrlConfigCommand({
+    FunctionName: "rates",
+    AuthType: "NONE",
+    Cors: {
+      AllowOrigins: ["https://shop.example.com"],
+      AllowMethods: ["GET", "POST"],
+      AllowHeaders: ["content-type"],
+      ExposeHeaders: ["x-request-id"],
+      AllowCredentials: true,
+      MaxAge: 600,
+    },
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const endpoint = srv.localUrl(urlConfig.FunctionUrl);
+
+try {
+  const preflight = await fetch(endpoint, {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://shop.example.com",
+      "access-control-request-method": "GET",
+    },
+  });
+
+  // 200 https://shop.example.com GET,POST
+  console.log(
+    preflight.status,
+    preflight.headers.get("access-control-allow-origin"),
+    preflight.headers.get("access-control-allow-methods"),
+  );
+
+  const response = await fetch(endpoint, {
+    headers: { origin: "https://shop.example.com" },
+  });
+
+  // {"gbp":1.27} x-request-id
+  console.log(
+    await response.text(),
+    response.headers.get("access-control-expose-headers"),
+  );
+} finally {
+  await srv.close();
+}
+```
+
+`AllowOrigins` decides what goes in `Access-Control-Allow-Origin`. A list holding `*` allows every
+Origin. Any other list is matched against the `Origin` header the request carried, and a request
+from an Origin the list does not name gets no `Access-Control-Allow-Origin` header. `AllowMethods`,
+`AllowHeaders` and `ExposeHeaders` each go out as one comma-separated header, and an empty list
+leaves its header off. `AllowCredentials` sends `Access-Control-Allow-Credentials: true` when it is
+set. `MaxAge` sets `Access-Control-Max-Age` in seconds.
+
+A preflight is an `OPTIONS` request carrying both `Origin` and `Access-Control-Request-Method`.
+Lambda answers it from the configuration and the function never runs. Every other method reaches the
+handler, and the configured headers are added to the response it returned. A handler that sends CORS
+headers of its own leaves the response carrying both values, which is what real Lambda serves.
+Browsers report the duplicate as an error, so keep CORS on the Function URL and leave it out of the
+handler.
+
+An `AWS_IAM` Function URL authorizes a preflight the way it authorizes any other request. A browser
+cannot sign the preflight it sends, and an unsigned request to that URL is answered with `403`.
 
 ### IAM-authenticated Function URLs
 
@@ -3660,6 +3764,8 @@ Sim Lambda currently supports:
   event to a simulated SQS queue or SNS topic
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
   with `serveSimAws`
+- `Cors` on a Function URL, adding the configured headers to every response and answering a browser
+  preflight without invoking the function
 - `iam:PassRole` authorization of the execution role named by `CreateFunctionCommand` and
   `UpdateFunctionConfigurationCommand`, with `iam:PassedToService` supplied
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
@@ -3755,7 +3861,9 @@ Current documented limitations:
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
-- The Function URL `Cors` configuration is left out, including OPTIONS preflight handling.
+- A Function URL's `Cors` block is checked against the bounds the Lambda API documents for each
+  member. Values inside those bounds are taken as they are. An `AllowOrigins` entry that is not a
+  well-formed Origin is stored and matches no request.
 - `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
   buffered.
 - A function has at most one Function URL, and qualified (version or alias) Function URLs are left

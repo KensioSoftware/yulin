@@ -10,6 +10,7 @@ import {
   SimLambdaFunctionUrlFactory,
   type SimLambdaFunctionUrlFactoryProperties,
 } from "./sim-lambda-function-url-factory.js";
+import type { SimLambdaFunctionUrlCors } from "./sim-lambda-function-url-cors.js";
 import type {
   SimLambdaFunctionUrl,
   SimLambdaFunctionUrlAuthType,
@@ -21,6 +22,7 @@ interface CreateSimLambdaFunctionUrlProperties {
   readonly simFunction: SimLambdaFunction;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
   readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
+  readonly cors?: SimLambdaFunctionUrlCors | undefined;
 }
 
 /**
