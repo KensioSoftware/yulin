@@ -14,10 +14,11 @@ import { describe, it } from "vitest";
 import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../../lambda/function/code/lambda-zip-file-input.js";
+import { simCfManagedOriginRequestPolicyIds } from "../../origin-request-policy/sim-cf-managed-origin-request-policies.js";
 
 describe("Serving a sim CloudFront custom Origin on localhost", () => {
-  it("reaches the Origin in process for a real localhost request", async () => {
-    // Given a function behind a public Function URL.
+  it("presents the AWS-facing viewer Origin to a custom Origin", async () => {
+    // Given a function reporting the request it receives.
     const simAws = new SimAws();
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
@@ -25,10 +26,18 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
         Code: {
           ZipFile: makeLambdaZipFileInput(
-            (event: { rawPath?: string; body?: string }) => ({
+            (event: {
+              rawPath?: string;
+              body?: string;
+              headers?: Record<string, string>;
+            }) => ({
               statusCode: 200,
               headers: { "content-type": "text/plain" },
-              body: `${event.rawPath ?? ""} ${event.body ?? ""}`.trim(),
+              body: JSON.stringify({
+                path: event.rawPath,
+                body: event.body,
+                origin: event.headers?.["origin"],
+              }),
             }),
           ),
         },
@@ -67,7 +76,9 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
           },
           DefaultCacheBehavior: {
             TargetOriginId: "function-origin",
-            ViewerProtocolPolicy: "allow-all",
+            ViewerProtocolPolicy: "redirect-to-https",
+            OriginRequestPolicyId:
+              simCfManagedOriginRequestPolicyIds.allViewerExceptHostHeader,
             AllowedMethods: {
               Quantity: 3,
               Items: ["GET", "HEAD", "POST"],
@@ -83,15 +94,24 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
     const srv = await serveSimAws({ simAws });
 
     try {
-      // When the Distribution is requested over localhost.
-      const response = await fetch(
-        srv.localUrl(`http://${distroHostname}/greet`),
-        { method: "POST", body: "Yulin" },
-      );
+      // When a browser sends its local same-origin value through CloudFront.
+      const viewerUrl = srv.localUrl(`https://${distroHostname}/greet`);
+      const response = await fetch(viewerUrl, {
+        method: "POST",
+        headers: { origin: viewerUrl.origin },
+        body: "Yulin",
+      });
 
-      // Then the Origin served it, over the same request path and body.
+      // Then the custom Origin receives the production URL with the request.
       assertResponseStatus(response, 200, await describeResponse(response));
-      assertIdentical(await response.text(), "/greet Yulin");
+      assertIdentical(
+        await response.text(),
+        JSON.stringify({
+          path: "/greet",
+          body: "Yulin",
+          origin: `https://${distroHostname}`,
+        }),
+      );
     } finally {
       await srv.close();
     }
