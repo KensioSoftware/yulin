@@ -757,6 +757,18 @@
       }
     },
     {
+      // The CloudFormation service facade. As with the IAM one below, it
+      // carries one method per SDK command CloudFormation handles, each a doc
+      // comment and a line or two of delegation. The Stack commands and the
+      // change set commands together take it past 300 lines of that, and the
+      // work behind them sits in the handler classes and in
+      // SimCfnChangeSetCommands.
+      "files": ["src/service/cloudformation/sim-cloudformation.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", 400]
+      }
+    },
+    {
       // The IAM service facade. It carries one method per SDK command IAM
       // handles, each a doc comment and a line of delegation, so its length
       // tracks the size of that command surface rather than the complexity of

@@ -43,3 +43,32 @@ export class SimCloudFormationValidationError extends SimCloudFormationError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated CloudFormation InvalidChangeSetStatusException error.
+ *
+ * CloudFormation returns this for an ExecuteChangeSet naming a change set that
+ * cannot be executed, such as one that has already been executed or one another
+ * execution has made obsolete.
+ */
+export class SimCloudFormationInvalidChangeSetStatusException extends SimCloudFormationError {
+  public override readonly name = "InvalidChangeSetStatusException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated CloudFormation ChangeSetNotFoundException error.
+ *
+ * CloudFormation returns this for a command naming a change set it cannot
+ * find, which includes one DeleteChangeSet has taken away.
+ */
+export class SimCloudFormationChangeSetNotFoundException extends SimCloudFormationError {
+  public override readonly name = "ChangeSetNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}

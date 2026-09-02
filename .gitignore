@@ -326,3 +326,6 @@ test/terraform/**/builds/
 test/terraform/**/terraform.tfstate*
 test/terraform/**/.terraform.tfstate.lock.info
 *.tfplan
+
+.worktrees/
+.pnpm-store

@@ -12,9 +12,7 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
-import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
-import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
-import { makeSimCfnParameterStore } from "../../parameters/store/sim-cfn-parameter-store.js";
+import { simCfnCommandTemplate } from "../../template/sim-cfn-command-template.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
 import type {
@@ -106,19 +104,13 @@ export class UpdateStackCommandHandler implements CommandHandler<
       );
     }
 
-    const parameters = SimCfnParameters.fromInput(command.input, {
-      stackName,
-      parameterStore: makeSimCfnParameterStore({
+    await stack.update(
+      simCfnCommandTemplate({
         simAws: this.simAws,
         accountRegionScope: this.accountRegionScope,
-      }),
-    });
-
-    await stack.update(
-      SimCfnTemplate.fromTemplateBody(command.input.TemplateBody, {
         stackName,
-        parameters,
-        accountRegionScope: this.accountRegionScope,
+        templateBody: command.input.TemplateBody,
+        input: command.input,
         exports: this.exports,
       }),
       { cdkOutContext: this.cdkOutContext, caller: this.caller },

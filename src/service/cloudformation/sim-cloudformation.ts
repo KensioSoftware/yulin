@@ -30,6 +30,27 @@ import type {
   SimUpdateStackCommandOutput,
 } from "./command/update-stack/update-stack.command.js";
 import { UpdateStackCommandHandler } from "./command/update-stack/update-stack.handler.js";
+import type {
+  SimCreateChangeSetCommand,
+  SimCreateChangeSetCommandOutput,
+} from "./command/create-change-set/create-change-set.command.js";
+import type {
+  SimDescribeChangeSetCommand,
+  SimDescribeChangeSetCommandOutput,
+} from "./command/describe-change-set/describe-change-set.command.js";
+import type {
+  SimExecuteChangeSetCommand,
+  SimExecuteChangeSetCommandOutput,
+} from "./command/execute-change-set/execute-change-set.command.js";
+import type {
+  SimDeleteChangeSetCommand,
+  SimDeleteChangeSetCommandOutput,
+} from "./command/delete-change-set/delete-change-set.command.js";
+import type {
+  SimListChangeSetsCommand,
+  SimListChangeSetsCommandOutput,
+} from "./command/list-change-sets/list-change-sets.command.js";
+import { SimCfnChangeSetCommands } from "./changeset/sim-cfn-change-set-commands.js";
 import {
   type SimCloudFormationCreateStackProperties as SimCloudFormationCreateStackProperties,
   SimCloudFormationTemplateDeployer,
@@ -72,6 +93,7 @@ export class SimCloudFormation {
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
   private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
   private readonly authorization: SimCloudFormationAuthorization;
+  private readonly changeSetCommands: SimCfnChangeSetCommands;
 
   constructor(properties: SimCloudFormationProperties) {
     const {
@@ -88,6 +110,14 @@ export class SimCloudFormation {
     this.authorization = new SimCloudFormationAuthorization({
       iam,
       accountRegionScope: this.accountRegionScope,
+    });
+    this.changeSetCommands = new SimCfnChangeSetCommands({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+      authorization: this.authorization,
+      exports: this.exports,
     });
     this.templateDeployer = new SimCloudFormationTemplateDeployer({
       simAws: this.simAws,
@@ -169,6 +199,70 @@ export class SimCloudFormation {
       background: this.background,
     });
     return await handler.handle(command);
+  }
+
+  /**
+   * Handle a Create Change Set Command from the SDK.
+   *
+   * The change set commands authorize themselves, unlike the Stack commands
+   * above. Three of them can name a change set by its ARN alone, and only the
+   * change set registry knows which Stack such a request operates on.
+   */
+  async createChangeSet(
+    command: SimCreateChangeSetCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimCreateChangeSetCommandOutput> {
+    this.authorization.createChangeSet(
+      command.input.StackName,
+      options?.caller,
+    );
+
+    return await this.changeSetCommands.create(command, options?.caller);
+  }
+
+  /**
+   * Handle a Describe Change Set Command from the SDK.
+   */
+  async describeChangeSet(
+    command: SimDescribeChangeSetCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimDescribeChangeSetCommandOutput> {
+    return await this.changeSetCommands.describe(command, options?.caller);
+  }
+
+  /**
+   * Handle an Execute Change Set Command from the SDK.
+   */
+  async executeChangeSet(
+    command: SimExecuteChangeSetCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimExecuteChangeSetCommandOutput> {
+    return await this.changeSetCommands.execute(command, options?.caller);
+  }
+
+  /**
+   * Handle a Delete Change Set Command from the SDK.
+   */
+  async deleteChangeSet(
+    command: SimDeleteChangeSetCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimDeleteChangeSetCommandOutput> {
+    this.authorization.deleteChangeSet(
+      command.input.StackName,
+      options?.caller,
+    );
+
+    return await this.changeSetCommands.delete(command);
+  }
+
+  /**
+   * Handle a List Change Sets Command from the SDK.
+   */
+  async listChangeSets(
+    command: SimListChangeSetsCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimListChangeSetsCommandOutput> {
+    return await this.changeSetCommands.list(command, options?.caller);
   }
 
   /**
