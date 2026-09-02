@@ -46,5 +46,13 @@ export function simAthenaSqliteValue(
     return Number.isFinite(value) ? value : null;
   }
 
+  // SPIKE: a Parquet TIMESTAMP, DATE or INT96 column arrives as a Date. The
+  // text readers hold a timestamp as the text the object carried, so this holds
+  // one the same way. Without it the value reaches SQLite as quoted JSON and
+  // every comparison against it answers false.
+  if (value instanceof Date) {
+    return value.toISOString().replace("T", " ").replace(/(\.000)?Z$/u, "");
+  }
+
   return typeof value === "bigint" ? value : JSON.stringify(value);
 }

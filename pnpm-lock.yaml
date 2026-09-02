@@ -225,6 +225,12 @@ importers:
       fta-cli:
         specifier: ^3.0.0
         version: 3.0.1
+      hyparquet:
+        specifier: ^1.29.2
+        version: 1.29.2
+      hyparquet-writer:
+        specifier: ^0.16.9
+        version: 0.16.9
       node-sql-parser:
         specifier: ^5.4.0
         version: 5.4.0
@@ -2354,6 +2360,12 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  hyparquet-writer@0.16.9:
+    resolution: {integrity: sha512-VZvH4Vq9lQwZa/+1y4YrEwF9+FAe5pED+mVN4AHflCoFk5LG2RemMHW9iwVlVqug7fO3ATwEMSG68cr3uZAkjQ==}
+
+  hyparquet@1.29.2:
+    resolution: {integrity: sha512-2LxinZ8X0JqToST+9OXcy9t3t5Q7ZneMTkSqUx/36Hv18pCTk/N71IWZc7APTSNG1Me39l/jjEvzZSZ0R+Knbw==}
 
   identifier-regex@1.1.0:
     resolution: {integrity: sha512-SLX4H/vtcYlYnL7XqnuJKHU7Z8517TgsW9nmQiGOgMCjQ8V/deLYu6bEmbGoXe7WMMhc9+EUGyFFneHja8KabA==}
@@ -5917,6 +5929,12 @@ snapshots:
   human-signals@5.0.0: {}
 
   human-signals@8.0.1: {}
+
+  hyparquet-writer@0.16.9:
+    dependencies:
+      hyparquet: 1.29.2
+
+  hyparquet@1.29.2: {}
 
   identifier-regex@1.1.0:
     dependencies:

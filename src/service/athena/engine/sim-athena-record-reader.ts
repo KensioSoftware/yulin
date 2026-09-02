@@ -8,11 +8,30 @@ import {
   simAthenaJsonRows,
   type SimAthenaJsonFormat,
 } from "./sim-athena-json-records.js";
+import { simAthenaParquetRows } from "./sim-athena-parquet-records.js";
 
-/** One object's bytes, read into the rows it holds. */
+/** SPIKE: the SerDe class names that mean Parquet. */
+const parquetSerDes = new Set([
+  "org.apache.hadoop.hive.ql.io.parquet.serde.parquethiveserde",
+  "parquet.hive.serde.parquethiveserde",
+]);
+
+/**
+ * One object's bytes, read into the rows it holds.
+ *
+ * SPIKE: this took `text: string` before. Parquet holds its own schema in
+ * binary and its own compression per column chunk, so a reader for it needs
+ * the bytes. Text readers now decode for themselves, and the reader may be
+ * async because a Parquet reader is.
+ */
 export type SimAthenaRecordReader = (
-  text: string,
-) => readonly SimAthenaEngineRow[];
+  bytes: Uint8Array,
+) => readonly SimAthenaEngineRow[] | Promise<readonly SimAthenaEngineRow[]>;
+
+/** One object's bytes as the text a delimited or JSON reader wants. */
+function decoded(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
+}
 
 /** The SerDe class name that takes `mapping.<column>` parameters. */
 const openXSerDe = "org.openx.data.jsonserde.jsonserde";
@@ -72,10 +91,14 @@ export function simAthenaRecordReader(
     return undefined;
   }
 
+  if (parquetSerDes.has(library)) {
+    return simAthenaParquetRows;
+  }
+
   if (jsonSerDes.has(library)) {
     const format = jsonFormat(table, library);
 
-    return (text) => simAthenaJsonRows(text, format);
+    return (bytes) => simAthenaJsonRows(decoded(bytes), format);
   }
 
   const defaults = delimitedSerDes.get(library);
@@ -87,7 +110,7 @@ export function simAthenaRecordReader(
   const format = delimitedFormat(table, defaults);
   const columns = table.columns.map((column) => column.Name);
 
-  return (text) => simAthenaDelimitedRows(text, format, columns);
+  return (bytes) => simAthenaDelimitedRows(decoded(bytes), format, columns);
 }
 
 /**
