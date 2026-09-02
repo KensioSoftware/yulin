@@ -227,6 +227,24 @@ export class SimCfnStackResourceOperations {
   }
 
   /**
+   * Put this Stack's Resources back on the template it was deployed from, over
+   * whatever a failed update left behind.
+   *
+   * The difference is worked out from the Resources the Stack holds now, not
+   * from either template. A failure part way through is reconciled from where
+   * it stopped. Nothing asserts that there is a change to make. An update that
+   * failed before it touched a Resource has nothing to undo, and that is a
+   * finished rollback.
+   *
+   * A Resource the failed update replaced is created again empty. The deployed
+   * one was deleted to make room for the replacement, and there is nothing left
+   * to put back.
+   */
+  async rollBack(properties: SimCfnStackUpdateProperties): Promise<void> {
+    await this.updater(properties).apply();
+  }
+
+  /**
    * What a teardown of these Resources is to leave behind: the ones it named,
    * and the ones their own DeletionPolicy keeps.
    */

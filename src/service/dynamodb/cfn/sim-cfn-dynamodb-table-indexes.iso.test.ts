@@ -176,7 +176,10 @@ describe("DynamoDB CloudFormation Table secondary indexes", () => {
     const describedStack = await cloudFormation.describeStacks(
       new DescribeStacksCommand({ StackName: "orders-stack" }),
     );
-    assertIdentical(describedStack.Stacks?.[0]?.StackStatus, "UPDATE_FAILED");
+    assertIdentical(
+      describedStack.Stacks?.[0]?.StackStatus,
+      "UPDATE_ROLLBACK_COMPLETE",
+    );
   });
 
   it("describes the indexes a template declares", async () => {

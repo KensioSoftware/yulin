@@ -168,6 +168,10 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * A template that came from a synthesis of its own brings the cloud assembly
    * it was written into with it, so Resources it replaces read the assets that
    * synthesis staged rather than the ones the Stack was deployed with.
+   *
+   * An update that fails is rolled back onto the template the Stack was
+   * deployed from, which the Stack goes on holding for as long as the update
+   * runs.
    */
   async update(
     template: SimCfnTemplate,
@@ -175,10 +179,11 @@ export class SimCfnStack implements SimCfnDeployedStack {
   ): Promise<void> {
     this.updating.assertNotUpdating();
 
+    const deployed = this.cfnTemplate;
     const updater = this.operations.updater({
       background: this.background,
       resources: this.resourceMap,
-      current: this.cfnTemplate,
+      current: deployed,
       updated: template,
     });
 
@@ -191,9 +196,22 @@ export class SimCfnStack implements SimCfnDeployedStack {
 
     this.cfnTemplate = template;
 
-    await this.updating.update(async (): Promise<void> => {
-      await updater.apply();
-      this.resolveOutputs();
+    await this.updating.update({
+      apply: async (): Promise<void> => {
+        await updater.apply();
+        this.resolveOutputs();
+      },
+      rollBack: async (): Promise<void> => {
+        await this.operations.rollBack({
+          background: this.background,
+          resources: this.resourceMap,
+          current: this.cfnTemplate,
+          updated: deployed,
+        });
+
+        this.cfnTemplate = deployed;
+        this.resolveOutputs();
+      },
     });
   }
 

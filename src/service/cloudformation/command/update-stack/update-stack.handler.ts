@@ -12,9 +12,10 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
-import { simCfnCommandTemplate } from "../../template/sim-cfn-command-template.js";
 import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
 import type { SimCfnExports } from "../../export/sim-cfn-exports.js";
+import { assertSimCfnUpdateStackTemplateSource } from "./update-stack-previous-values.js";
+import { simCfnUpdateStackTemplate } from "./update-stack-template.js";
 import type {
   SimUpdateStackCommand,
   SimUpdateStackCommandOutput,
@@ -87,10 +88,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
       command.input.StackName,
       "UpdateStackCommand.input.StackName",
     );
-    assertDefined(
-      command.input.TemplateBody,
-      "UpdateStackCommand.input.TemplateBody",
-    );
+    assertSimCfnUpdateStackTemplateSource(command.input);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
@@ -105,12 +103,10 @@ export class UpdateStackCommandHandler implements CommandHandler<
     }
 
     await stack.update(
-      simCfnCommandTemplate({
+      simCfnUpdateStackTemplate({
         simAws: this.simAws,
         accountRegionScope: this.accountRegionScope,
-        stackName,
-        stackId: stack.stackId,
-        templateBody: command.input.TemplateBody,
+        stack,
         input: command.input,
         exports: this.exports,
       }),

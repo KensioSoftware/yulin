@@ -362,6 +362,78 @@ A template that changes nothing at all is refused with a `ValidationError` readi
 `No updates are to be performed.`, the same answer CloudFormation gives. So is an update asked for
 while another is still running.
 
+### Updating without the whole template
+
+`UsePreviousTemplate: true` updates the stack from the template it already holds. That is how a
+parameter value is changed on its own, when the caller has no copy of the template body to hand.
+Sending a `TemplateBody` alongside it is refused with a `ValidationError`, the way CloudFormation
+refuses it.
+
+A parameter carrying `UsePreviousValue: true` takes the value the stack was deployed with. Sending a
+`ParameterValue` for that same parameter is refused the same way. A parameter the stack was deployed
+without takes its template `Default` again.
+
+```typescript sim-cloudformation-update-previous-template
+/**
+ * Changing one parameter value without resending the template.
+ */
+
+import {
+  CreateStackCommand,
+  UpdateStackCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "reports",
+    TemplateBody: JSON.stringify({
+      Parameters: {
+        Environment: { Type: "String" },
+        Version: { Type: "String" },
+      },
+      Resources: {
+        ReportsBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            // eslint-disable-next-line no-template-curly-in-string
+            BucketName: { "Fn::Sub": "reports-${Environment}-${Version}" },
+          },
+        },
+      },
+    }),
+    Parameters: [
+      { ParameterKey: "Environment", ParameterValue: "staging" },
+      { ParameterKey: "Version", ParameterValue: "one" },
+    ],
+  }),
+);
+await simCfn.waitForStackDeployComplete("reports");
+
+// Only the version moves. The template and the environment stay where the
+// deployment put them.
+await simCfn.updateStack(
+  new UpdateStackCommand({
+    StackName: "reports",
+    UsePreviousTemplate: true,
+    Parameters: [
+      { ParameterKey: "Environment", UsePreviousValue: true },
+      { ParameterKey: "Version", ParameterValue: "two" },
+    ],
+  }),
+);
+await simCfn.waitForStackUpdateComplete("reports");
+
+console.log(simAws.s3().getSimBucketByName("reports-staging-two"));
+```
+
+An update from the held template with the deployed values changes nothing, and is refused with
+`No updates are to be performed.` like any other.
+
 ### Changed resources are replaced
 
 A resource whose template entry changed is deleted and created again from the new template. Real
@@ -369,19 +441,103 @@ CloudFormation updates most properties in place and keeps what the resource hold
 divergence worth knowing about. A bucket that gains a property loses its objects here, where in AWS
 it would keep them. In-place update is the obvious next step, still to be built.
 
-Two things follow from replacement:
+Three things follow from replacement:
 
 - A resource naming a replaced resource is replaced too, all the way up the dependency chain, and
   nothing is left pointing at a resource that has gone. Real CloudFormation hands the dependent the
   new physical name and leaves it standing.
 - A resource declared with `UpdateReplacePolicy: Retain` is kept, and the replacement is created
   beside it. See [`UpdateReplacePolicy`](#updatereplacepolicy) below.
+- A resource a failed update had already replaced comes back empty when the stack is rolled back.
+  The deployed one was deleted to make room for the replacement, and there is nothing left to put
+  back. See [rolling back a failed update](#rolling-back-a-failed-update) below.
 
-A failed update leaves the stack in `UPDATE_FAILED` with the reason on it, and leaves the resources
-where the update got to. There is no rollback to the previous template.
-`waitForStackUpdateComplete(...)` rethrows the error, and `DescribeStacksCommand` reports it as
-`StackStatusReason`. Dealing with the cause and sending `UpdateStackCommand` again applies the rest
-of the change.
+### Rolling back a failed update
+
+A failed update is rolled back onto the template the stack was deployed from. The stack moves to
+`UPDATE_ROLLBACK_IN_PROGRESS`, the previous template is applied over whatever the update left
+behind, and the stack settles in `UPDATE_ROLLBACK_COMPLETE`. `DescribeStacksCommand` reports each of
+those statuses as the stack reaches it, with the reason the update stopped as `StackStatusReason`.
+`waitForStackUpdateComplete(...)` waits for the rollback and then rethrows the update's error.
+
+```typescript sim-cloudformation-update-rollback
+/**
+ * Rolling a failed stack update back to the deployed template.
+ */
+
+import {
+  CreateStackCommand,
+  DescribeStacksCommand,
+  UpdateStackCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "reports",
+    TemplateBody: JSON.stringify({
+      Resources: {
+        ReportsBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "reports-2025" },
+        },
+      },
+    }),
+  }),
+);
+await simCfn.waitForStackDeployComplete("reports");
+
+// This update renames the bucket and asks for one S3 will not create.
+await simCfn.updateStack(
+  new UpdateStackCommand({
+    StackName: "reports",
+    TemplateBody: JSON.stringify({
+      Resources: {
+        ReportsBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "reports-2026" },
+        },
+        ArchiveBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "Invalid_Bucket_Name" },
+        },
+      },
+    }),
+  }),
+);
+
+try {
+  await simCfn.waitForStackUpdateComplete("reports");
+} catch (error) {
+  console.error("Stack update failed", error);
+}
+
+const described = await simCfn.describeStacks(
+  new DescribeStacksCommand({ StackName: "reports" }),
+);
+
+console.log(described.Stacks?.[0]?.StackStatus);
+// "UPDATE_ROLLBACK_COMPLETE"
+
+// The bucket the deployed template describes is back in simulated S3.
+console.log(simAws.s3().getSimBucketByName("reports-2025"));
+```
+
+The difference the rollback applies is worked out from the resources the stack holds when the update
+stops. A failure part way through is reconciled from where it got to, and an update that failed
+before it touched a resource has nothing to undo.
+
+A rollback that cannot finish leaves the stack in `UPDATE_ROLLBACK_FAILED`, with its own failure as
+the reason. `UpdateReplacePolicy: Retain` on a replaced resource is one way to reach that. The kept
+resource still holds the name, and the rollback asks for that name again when it recreates the
+resource the deployed template describes.
+
+Dealing with the cause and sending `UpdateStackCommand` again applies the change to the rolled-back
+stack.
 
 ### `UpdateReplacePolicy`
 
@@ -2101,10 +2257,9 @@ await simAws.cloudFormation().updateTemplateFile({ templatePath });
 The sibling assets manifest is read again with the template. A resource the update replaces reads the
 assets that synthesis staged, not the ones the stack was deployed with.
 
-A file written without being changed is refused with `No updates are to be performed.`, and a failed
-update leaves the stack in `UPDATE_FAILED` holding whatever the update reached. There is no rollback
-to the template it was deployed from. A failure part way through has already deleted, replaced or
-created some of the resources the change asked for.
+A file written without being changed is refused with `No updates are to be performed.`. A failed
+update is rolled back onto the template the stack was deployed from, and settles in
+`UPDATE_ROLLBACK_COMPLETE`. See [rolling back a failed update](#rolling-back-a-failed-update).
 
 ## Watching a template file
 
@@ -4020,6 +4175,10 @@ Sim CloudFormation currently supports:
 
 - `CreateStackCommand`, `DescribeStacksCommand`, `UpdateStackCommand` and `DeleteStackCommand`,
   taking a `TemplateBody` written as JSON or as YAML with short-form intrinsic tags
+- `UsePreviousTemplate` on `UpdateStackCommand`, and `UsePreviousValue` on one of its parameters,
+  for an update that changes a parameter value on its own
+- Rollback of a failed update onto the template the stack was deployed from, through
+  `UPDATE_ROLLBACK_IN_PROGRESS` to `UPDATE_ROLLBACK_COMPLETE` or `UPDATE_ROLLBACK_FAILED`
 - `CreateChangeSetCommand`, `DescribeChangeSetCommand`, `ExecuteChangeSetCommand`,
   `DeleteChangeSetCommand` and `ListChangeSetsCommand`, for both `CREATE` and `UPDATE` change sets
 - Waiting for simulated stack deployment, update and deletion completion
@@ -4135,10 +4294,13 @@ Each service's own docs describe what its resource types support.
   rather than updated in place. `ChangeSetType: IMPORT` is refused, and so is a `CREATE` change set
   naming a stack that is already there, where CloudFormation allows a second one against a stack
   still in review. Drift detection is outside the simulation.
-- A failed stack update is not rolled back to the template the stack was deployed from. The stack is
-  left in `UPDATE_FAILED` holding whatever the update managed.
-- `UpdateStackCommand` reads `StackName`, `TemplateBody` and `Parameters`. `UsePreviousTemplate` and
-  `UsePreviousValue` are not read, so an update has to be given the whole new template.
+- A rolled-back update recreates a resource it had already replaced, and the resource comes back
+  empty. Real CloudFormation puts most properties back on the resource it updated in place, and what
+  the resource holds survives. See
+  [rolling back a failed update](#rolling-back-a-failed-update).
+- `UpdateStackCommand` reads `StackName`, `TemplateBody`, `UsePreviousTemplate` and `Parameters`,
+  including `UsePreviousValue` on a parameter. `DisableRollback` and `RollbackConfiguration` are not
+  read, so a failed update is always rolled back.
 - An update asked for while another is still running is refused, as CloudFormation refuses it. There
   is no queue behind it.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it

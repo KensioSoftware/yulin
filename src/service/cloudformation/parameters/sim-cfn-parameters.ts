@@ -26,11 +26,13 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
 export class SimCfnParameters {
   private readonly definitions: ReadonlyMap<string, SimCfnParameterDefinition>;
   private readonly values: SimCfnParameterValues;
+  private readonly supplied: ReadonlyMap<string, string>;
   private readonly properties: SimCfnParametersProperties;
 
   constructor(properties: SimCfnParametersProperties = {}) {
     this.properties = properties;
     this.definitions = simCfnParameterDefinitions(properties);
+    this.supplied = new Map(Object.entries(properties.values ?? {}));
     this.values = new SimCfnParameterValues({
       definitions: this.definitions,
       supplied: properties.values ?? {},
@@ -90,6 +92,17 @@ export class SimCfnParameters {
    */
   has(parameterName: string): boolean {
     return this.definitions.has(parameterName);
+  }
+
+  /**
+   * The value a command supplied for this Parameter, if it supplied one.
+   *
+   * What `UsePreviousValue` on an UpdateStack Parameter reads off the Stack.
+   * A Parameter the Stack was deployed without has nothing here, and takes the
+   * template Default again as it did the first time.
+   */
+  suppliedValue(parameterName: string): string | undefined {
+    return this.supplied.get(parameterName);
   }
 
   /**
