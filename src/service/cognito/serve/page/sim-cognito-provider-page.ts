@@ -79,7 +79,7 @@ export class SimCognitoProviderPage {
           `${simCognitoClaimFieldPrefix}${claimName}`,
           `${claimName} claim`,
           "text",
-          simCognitoDefaultClaim(claimName),
+          simCognitoDefaultClaim(provider, claimName),
         ),
       )
       .join("");

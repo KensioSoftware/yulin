@@ -1,4 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
+import type { SimCognitoAttributeDataTypeValue } from "../schema/sim-cognito-attribute-data-type.js";
 import type { SimCognitoUserPoolSchema } from "../schema/sim-cognito-user-pool-schema.js";
 import type { SimCognitoAttributeType } from "../user/sim-cognito-user-attributes.js";
 import type { SimCognitoExternalUser } from "./sim-cognito-external-user.js";
@@ -38,6 +39,30 @@ export class SimCognitoAttributeMapping {
    */
   toOutput(): SimCognitoAttributeMappingType {
     return { ...this.mapping };
+  }
+
+  /**
+   * The pool attribute types one provider claim is mapped onto.
+   */
+  dataTypesForClaim(
+    claimName: string,
+  ): readonly SimCognitoAttributeDataTypeValue[] {
+    return Object.entries(this.mapping).flatMap(
+      ([attributeName, mappedClaimName]) => {
+        if (mappedClaimName !== claimName) {
+          return [];
+        }
+
+        const attribute = this.schema.find(attributeName);
+
+        return attribute === undefined
+          ? []
+          : [
+              attribute.toOutput()
+                .AttributeDataType as SimCognitoAttributeDataTypeValue,
+            ];
+      },
+    );
   }
 
   /**

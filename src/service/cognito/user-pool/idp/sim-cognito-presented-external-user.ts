@@ -37,16 +37,37 @@ export function simCognitoMappedClaimNames(
 }
 
 /**
- * What one claim field is pre-filled with, so that the page signs a user in
- * when nobody edits it.
+ * What one claim field is pre-filled with, so the page signs a user in when
+ * nobody edits it.
  *
- * An address has to look like one, because a pool that verifies or aliases by
- * email holds it to that. Everything else is a name as far as this knows.
+ * The pool attribute type decides the shape. A string claim whose name refers
+ * to an email address uses the reserved address.
  */
-export function simCognitoDefaultClaim(claimName: string): string {
-  return claimName.toLowerCase().includes("email")
-    ? defaultAddress
-    : defaultClaimValue;
+export function simCognitoDefaultClaim(
+  provider: SimCognitoUserPoolIdentityProvider,
+  claimName: string,
+): string {
+  const dataType =
+    provider.attributeMapping
+      .dataTypesForClaim(claimName)
+      .find((mappedType) => mappedType !== "String") ?? "String";
+
+  switch (dataType) {
+    case "Boolean": {
+      return "true";
+    }
+    case "DateTime": {
+      return "1970-01-01T00:00:00.000Z";
+    }
+    case "Number": {
+      return "0";
+    }
+    case "String": {
+      return claimName.toLowerCase().includes("email")
+        ? defaultAddress
+        : defaultClaimValue;
+    }
+  }
 }
 
 /**

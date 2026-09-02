@@ -62,6 +62,22 @@ function usernamesIn(setUp: SimCognitoHostedSetUp): readonly string[] {
     .users.map((user) => String(user.username));
 }
 
+/**
+ * The values a browser posts when nobody edits the page's inputs.
+ */
+function formFields(page: string): Record<string, string> {
+  return Object.fromEntries(
+    page
+      .matchAll(/<input [^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/gu)
+      .map(([, name, value]) => {
+        assertNonNullable(name);
+        assertNonNullable(value);
+
+        return [name, value] as const;
+      }),
+  );
+}
+
 describe("The page a sim Cognito domain stands in for an identity provider with", () => {
   it("answers an authorize request naming a provider nobody is signed in at", async () => {
     // Given a pool whose Google provider has nobody signed in at it.
@@ -137,6 +153,40 @@ describe("The page a sim Cognito domain stands in for an identity provider with"
       .requireUser("Google_simulated-google-subject" as never);
     assertIdentical(user.attributeValues.get("email"), "someone@example.com");
     assertIdentical(user.status.value, "EXTERNAL_PROVIDER");
+  });
+
+  it("signs in with pre-filled claims mapped onto every schema type", async () => {
+    // Given a Google provider mapping claims onto each kind of pool attribute.
+    const setUp = await simCognitoHosted({
+      schema: [
+        { Name: "score", AttributeDataType: "Number", Mutable: true },
+        { Name: "joined_at", AttributeDataType: "DateTime", Mutable: true },
+      ],
+      attributeMapping: {
+        email: "email",
+        email_verified: "email_verified",
+        "custom:score": "score",
+        "custom:joined_at": "joined_at",
+      },
+    });
+    const page = await providerPage(setUp);
+    const fields = formFields(page);
+
+    // When the page is posted without editing its pre-filled claims.
+    const posted = await simCognitoPostForm(setUp, "/oauth2/authorize", fields);
+
+    // Then the values satisfy the mapped attributes and the sign-in finishes.
+    assertResponseStatus(posted, 302, await describeResponse(posted));
+    const user = setUp.cognito
+      .userPool(setUp.userPoolId)
+      .requireUser("Google_simulated-google-subject" as never);
+    assertIdentical(user.attributeValues.get("email"), "someone@example.com");
+    assertIdentical(user.attributeValues.get("email_verified"), "true");
+    assertIdentical(user.attributeValues.get("custom:score"), "0");
+    assertIdentical(
+      user.attributeValues.get("custom:joined_at"),
+      "1970-01-01T00:00:00.000Z",
+    );
   });
 
   it("takes an edited address, beside a local user already holding it", async () => {

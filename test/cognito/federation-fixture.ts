@@ -96,6 +96,9 @@ export interface SimCognitoHostedSetUpOptions {
   /** The pool's `Schema`, which is the standard attributes by default. */
   readonly schema?: SchemaAttributeType[];
 
+  /** How the Google provider's claims map onto pool attributes. */
+  readonly attributeMapping?: Record<string, string>;
+
   /**
    * The attributes the pool verifies automatically, none by default. A pool
    * with none has nowhere to send a password reset code.
@@ -178,7 +181,10 @@ export async function simCognitoHosted(
         client_secret: "google-client-secret",
         authorize_scopes: "openid email",
       },
-      AttributeMapping: { email: "email", given_name: "given_name" },
+      AttributeMapping: options.attributeMapping ?? {
+        email: "email",
+        given_name: "given_name",
+      },
     }),
   );
 
