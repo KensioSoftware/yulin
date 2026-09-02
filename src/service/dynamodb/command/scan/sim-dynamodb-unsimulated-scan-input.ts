@@ -10,18 +10,13 @@ import type { SimScanCommandInput } from "./scan.command.js";
  * application reading the page.
  *
  * `ExpressionAttributeNames` and `ExpressionAttributeValues` are not among
- * them. They are the placeholders of the `FilterExpression`, and a request
- * carrying them with no expression to use them in is a ValidationException the
- * way it is on AWS.
+ * them. They are the placeholders of the `FilterExpression` and the
+ * `ProjectionExpression`, and a request carrying them with neither expression
+ * to use them in is a ValidationException the way it is on AWS.
  */
 export function refuseUnsimulatedScanInput(input: SimScanCommandInput): void {
   const unsimulated = new SimDynamoDbUnsimulatedInput("Scan");
 
-  unsimulated.refuse(
-    input.ProjectionExpression !== undefined,
-    "ProjectionExpression",
-    "answering with whole items where part of them was asked for",
-  );
   unsimulated.refuse(
     (input.AttributesToGet ?? []).length > 0,
     "AttributesToGet",

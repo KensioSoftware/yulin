@@ -1,4 +1,5 @@
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import { SimDynamoDbProjectionNode } from "./sim-dynamodb-projection-node.js";
 
@@ -15,13 +16,29 @@ interface SimDynamoDbProjectionProperties {
  */
 export class SimDynamoDbProjection {
   private readonly root: SimDynamoDbProjectionNode;
+  private readonly paths: readonly SimDynamoDbDocumentPath[];
 
   constructor(properties: SimDynamoDbProjectionProperties) {
     this.root = new SimDynamoDbProjectionNode(properties.expressionName);
+    this.paths = properties.paths;
 
     for (const path of properties.paths) {
       this.root.add(path);
     }
+  }
+
+  /**
+   * Refuse a projection naming an attribute the view being read does not carry.
+   *
+   * A global secondary index holds only what it projects, so a path outside
+   * that would leave the attribute out of every item it answers with. An
+   * attribute quietly missing reads as an item that happens not to have it,
+   * which is the answer a projection used as an allow-list must never give. A
+   * local secondary index fetches from the base table, so any path is nameable
+   * there.
+   */
+  assertNamesOnlyCarried(view: SimDynamoDbReadView): void {
+    view.assertCarriesPaths(this.paths);
   }
 
   /**

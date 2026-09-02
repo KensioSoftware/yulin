@@ -1,6 +1,7 @@
 import {
   assertIdentical,
   assertInstanceOf,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -186,5 +187,42 @@ describe("DynamoDB reads of what an index projects", () => {
     // Then the filter runs, keeping the one item it names.
     assertIdentical(page.Count, 1);
     assertIdentical(page.ScannedCount, 2);
+  });
+
+  it("refuses a projection naming an attribute the index does not project", async () => {
+    // Given a table whose index carries only its keys.
+    const simAws = new SimAws();
+    await simDynamoDbIndexedTableFactory.make(
+      { projectionType: "KEYS_ONLY" },
+      simAws,
+    );
+
+    // When a read of it projects an attribute outside the projection.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.dynamoDb().query({
+        input: { ...openOrders, ProjectionExpression: "title" },
+      }),
+    );
+
+    // Then it is refused, the way a filter naming the same attribute is. The
+    // index does not hold it, so it would be missing from every item, and an
+    // attribute quietly missing reads as an item that never had one.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "title is not projected into the global secondary index byStatus",
+    );
+  });
+
+  it("takes a projection naming an attribute the index does project", async () => {
+    // When an index including one attribute is read for that attribute.
+    const item = await firstOpenOrder(
+      { projectionType: "INCLUDE", nonKeyAttributes: ["title"] },
+      { ProjectionExpression: "title" },
+    );
+
+    // Then the projection runs against what the index carries, cutting the
+    // index keys the read walked by out of the answer.
+    assertObjectEquals(item, { title: { S: "Order order-01" } });
   });
 });

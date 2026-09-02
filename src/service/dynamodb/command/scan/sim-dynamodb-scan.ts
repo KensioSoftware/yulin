@@ -1,11 +1,11 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { readSimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter-expression.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
 import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type { SimScanCommand, SimScanCommandOutput } from "./scan.command.js";
+import { readSimDynamoDbScanExpressions } from "./sim-dynamodb-scan-expressions.js";
 import { readSimDynamoDbScanSegment } from "./sim-dynamodb-scan-segment-input.js";
 import { readSimDynamoDbScanStartKey } from "./sim-dynamodb-scan-start-key.js";
 import { refuseUnsimulatedScanInput } from "./sim-dynamodb-unsimulated-scan-input.js";
@@ -53,12 +53,12 @@ export class SimDynamoDbScan {
 
     refuseUnsimulatedScanInput(input);
 
-    // The segment and the filter are read before the table is reached, so
+    // The segment and the expressions are read before the table is reached, so
     // input DynamoDB would refuse is refused whether or not the table is
     // there. A scan narrows nothing, so unlike a query its filter may name any
     // attribute, including a key attribute, and needs no key schema to check.
     const segment = readSimDynamoDbScanSegment(input);
-    const filter = readSimDynamoDbFilter(input);
+    const expressions = readSimDynamoDbScanExpressions(input);
     const table = this.access.required(
       "dynamodb:Scan",
       input.TableName,
@@ -73,7 +73,8 @@ export class SimDynamoDbScan {
     // two index kinds is being read, so it waits for the view.
     assertSimDynamoDbConsistentReadAnswerable(input, view);
     select.assertAnswerableBy(view);
-    filter?.assertNamesOnlyCarried(view);
+    expressions.filter?.assertNamesOnlyCarried(view);
+    expressions.projection?.assertNamesOnlyCarried(view);
 
     // The token names a place in this view's scan order, so it can only be
     // checked once that order is known.
@@ -91,7 +92,13 @@ export class SimDynamoDbScan {
     });
 
     return {
-      ...new SimDynamoDbReadAnswer({ page, filter, select, view }).fields(),
+      ...new SimDynamoDbReadAnswer({
+        page,
+        filter: expressions.filter,
+        projection: expressions.projection,
+        select,
+        view,
+      }).fields(),
       $metadata: {},
     };
   }

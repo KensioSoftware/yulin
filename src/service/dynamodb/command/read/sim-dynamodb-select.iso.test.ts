@@ -1,6 +1,7 @@
 import {
   assertArrayLength,
   assertIdentical,
+  assertObjectEquals,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -12,56 +13,8 @@ import {
   SimDynamoDbUnsupportedOperation,
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import { simDynamoDbStockedTableFactory } from "../../table/sim-dynamodb-stocked-table.factory.js";
-import type {
-  SimQueryCommandInput,
-  SimQueryCommandOutput,
-} from "../query/query.command.js";
-import type { SimScanCommandInput } from "../scan/scan.command.js";
-
-/**
- * The values a query's own key condition needs, whatever the test adds.
- */
-const keyConditionValues = { ":customer": { S: "c-1" } };
-
-/**
- * One way of reading a table, so a rule about `Select` is checked on both of
- * the operations that take it.
- *
- * A query carries a key condition of its own, so what a test writes is added to
- * that rather than replacing it.
- */
-interface SimDynamoDbTableRead {
-  readonly operation: string;
-  readonly read: (
-    simDynamoDb: SimDynamoDb,
-    input: SimQueryCommandInput & SimScanCommandInput,
-  ) => Promise<SimQueryCommandOutput>;
-}
-
-const reads: readonly SimDynamoDbTableRead[] = [
-  {
-    operation: "Query",
-    read: async (simDynamoDb, input) =>
-      simDynamoDb.query({
-        input: {
-          TableName: "OrdersTable",
-          KeyConditionExpression: "customerId = :customer",
-          ...input,
-          ExpressionAttributeValues: {
-            ...keyConditionValues,
-            ...input.ExpressionAttributeValues,
-          },
-        },
-      }),
-  },
-  {
-    operation: "Scan",
-    read: async (simDynamoDb, input) =>
-      simDynamoDb.scan({ input: { TableName: "OrdersTable", ...input } }),
-  },
-];
+import { simDynamoDbTableReads as reads } from "./sim-dynamodb-table-read.fixture.js";
 
 describe("DynamoDB Select", () => {
   it.each(reads)(
@@ -231,7 +184,7 @@ describe("DynamoDB Select", () => {
   );
 
   it.each(reads)(
-    "refuses SPECIFIC_ATTRIBUTES with a projection as unsimulated on $operation",
+    "answers SPECIFIC_ATTRIBUTES with the projected attributes on $operation",
     async ({ read }) => {
       // Given a table holding a customer's orders.
       const simAws = new SimAws();
@@ -243,17 +196,18 @@ describe("DynamoDB Select", () => {
       );
 
       // When a read asks for specific attributes and names them.
-      const error = await assertThrowsErrorAsync(async () =>
-        read(simDynamoDb, {
-          Select: "SPECIFIC_ATTRIBUTES",
-          ProjectionExpression: "orderId",
-        }),
-      );
+      const output = await read(simDynamoDb, {
+        Select: "SPECIFIC_ATTRIBUTES",
+        ProjectionExpression: "orderId",
+      });
 
-      // Then the pair is allowed and the projection itself is what is refused,
-      // since projecting a query or a scan is not simulated yet.
-      assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-      assertStringIncludes(error.message, "ProjectionExpression");
+      // Then every item carries the one attribute the projection named, and
+      // the key it was found by is left out along with everything else.
+      const items = output.Items ?? [];
+
+      assertArrayLength(items, 2);
+      assertObjectEquals(items[0], { orderId: { S: "2026-01" } });
+      assertObjectEquals(items[1], { orderId: { S: "2026-02" } });
     },
   );
 

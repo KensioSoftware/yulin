@@ -1899,6 +1899,84 @@ The key condition and the filter share one set of placeholders. A `#name` or `:v
 uses counts as used, and one that goes unused by both is refused the way an unused placeholder
 always is.
 
+### Projecting a read
+
+`ProjectionExpression` names the attributes a `Query` or a `Scan` answers with, the way it does on
+[a GetItem](#projecting-attributes). Only the paths it names come back. The key attributes the read
+walked by are left out along with everything else. That is what makes a projection usable as an
+allow-list over what leaves the table.
+
+The projection runs after the filter, and an attribute the filter tested can be left out of the
+answer.
+
+```typescript sim-dynamodb-scan-projection
+/**
+ * Scanning a table without reading the attributes the caller has no use for.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  ScanCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "ReadersTable",
+    KeySchema: [{ AttributeName: "readerId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "readerId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "ReadersTable",
+    Item: {
+      readerId: { S: "reader-1" },
+      email: { S: "reader@example.com" },
+      status: { S: "active" },
+      lastReadAt: { S: "2026-01-31" },
+    },
+  }),
+);
+
+const output = await dynamoDb.scan(
+  new ScanCommand({
+    TableName: "ReadersTable",
+    // `status` is a DynamoDB reserved word, so it is named by a placeholder.
+    ProjectionExpression: "#status, lastReadAt",
+    ExpressionAttributeNames: { "#status": "status" },
+  }),
+);
+
+// The key the scan walked by is left out along with the email address.
+console.log(Object.keys(output.Items?.[0] ?? {}));
+// [ "status", "lastReadAt" ]
+
+console.log(output.Items?.[0]?.["lastReadAt"]?.S);
+// 2026-01-31
+```
+
+`Count` and `ScannedCount` count items. A projection cuts each item down and moves neither figure.
+
+`LastEvaluatedKey` names the item a page stopped on by its key, whether or not the projection asked
+for those attributes. A paged read resumes from a token the items it answered with do not carry.
+
+The key condition, the filter and the projection share one set of placeholders. A `#name` or
+`:value` any of them uses counts as used, and one none of them uses is refused the way an unused
+placeholder always is.
+
+On a global secondary index a projection may name only the attributes the index projects. Anything
+else is a `ValidationException`, the refusal a filter naming the same attribute gets. A local
+secondary index fetches from the base table, and any attribute of the item is nameable there.
+
 ### Counting and projecting with Select
 
 `Select` says which attributes a read answers with. A table read defaults to `ALL_ATTRIBUTES`,
@@ -1916,8 +1994,8 @@ The other two values are held to the rules AWS holds them to, each a `Validation
 - `ALL_PROJECTED_ATTRIBUTES` without an `IndexName`. It asks for the attributes an index projects,
   and a table read has no index to project from.
 
-Projecting a `Query` or a `Scan` is absent, so `SPECIFIC_ATTRIBUTES` gets as far as the
-`ProjectionExpression` refusal rather than being accepted with no attribute to project.
+`SPECIFIC_ATTRIBUTES` alongside a `ProjectionExpression` answers with the attributes that
+projection names. See [projecting a read](#projecting-a-read).
 
 ## Reading and writing items in batches
 
@@ -3485,7 +3563,7 @@ is written.
   ARN and authorizes before the lookup.
 - `GetItem`, answering with the item under a primary key, and with no `Item` at all when the key
   holds nothing.
-- `ProjectionExpression` on `GetItem`, with document paths, list indexing and
+- `ProjectionExpression` on `GetItem`, `Query` and `Scan`, with document paths, list indexing and
   `ExpressionAttributeNames` placeholders.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
 - `UpdateItem`, with `SET`, `REMOVE`, `ADD` and `DELETE` update expressions, `if_not_exists`,
@@ -3560,9 +3638,9 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 - A read of a global secondary index answers with the attributes the index projects, and no fetch
   fills in the rest. Real DynamoDB behaves the same way. It never reads the base table for an
   attribute a global secondary index omits. That is why `Select: ALL_ATTRIBUTES` against a partial
-  projection is refused outright. A local secondary index does fetch from the base table, and that
-  is simulated. `ProjectionExpression` is absent on `Query` or `Scan` either way, so naming a
-  non-projected attribute that way never arises.
+  projection is refused outright, and so is a `ProjectionExpression` naming an attribute the index
+  omits. A local secondary index does fetch from the base table, and that is simulated, so a
+  `ProjectionExpression` there may name any attribute of the item.
 - The 10 GB limit on one item collection is left out, along with
   `ItemCollectionSizeLimitExceededException`. A table with a local secondary index can hold as much
   under one partition key here as memory allows. A write real DynamoDB would refuse for the size of
@@ -3705,9 +3783,6 @@ SimDynamoDb()` has no clock control at all. No item there ever expires.
   real DynamoDB accepts it. The shape of a key condition is fixed. There is no sub-expression for
   brackets to group, and being stricter is the direction that fails safely. It is a puzzling refusal
   here rather than a query that means something different on AWS.
-- `ProjectionExpression` is refused on `Query` and on `Scan`, since it changes which parts of an
-  item the operation answers with. `Select` covers the counted and the projected read in the
-  meantime.
 - `UnprocessedItems` and `UnprocessedKeys` are always empty. No request here is throttled and no
   response stops at a size, and the branch of a batch retry loop that resends what did not go
   through is never taken against the simulator.
@@ -3740,8 +3815,8 @@ SimDynamoDb()` has no clock control at all. No item there ever expires.
 - A CloudFormation stack update replaces a changed table rather than updating it in place. The items
   in it are lost where real CloudFormation would keep them for a property it can change without
   replacement.
-- `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. On
-  `Query` and `Scan` it is refused, never ignored.
+- `ProjectionExpression` is simulated on every read that takes one, which is `GetItem`,
+  `BatchGetItem`, `TransactGetItems`, `Query` and `Scan`.
 - The legacy `AttributesToGet` is refused outright, since an item that came back whole where part of
   it was asked for would hide an application reading an attribute it never requested.
   `ProjectionExpression` replaced it, and real DynamoDB has built no feature on it since.

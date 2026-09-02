@@ -1,4 +1,5 @@
 import type { SimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter.js";
+import type { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
@@ -22,6 +23,7 @@ export interface SimDynamoDbReadFields {
 interface SimDynamoDbReadAnswerProperties {
   readonly page: SimDynamoDbItemPage;
   readonly filter: SimDynamoDbFilter | undefined;
+  readonly projection: SimDynamoDbProjection | undefined;
   readonly select: SimDynamoDbSelect;
   readonly view: SimDynamoDbReadView;
 }
@@ -45,6 +47,7 @@ export class SimDynamoDbReadAnswer {
   private readonly lastEvaluatedKey:
     | Record<string, SimDynamoDbAttributeValue>
     | undefined;
+  private readonly projection: SimDynamoDbProjection | undefined;
   private readonly select: SimDynamoDbSelect;
   private readonly view: SimDynamoDbReadView;
 
@@ -54,6 +57,7 @@ export class SimDynamoDbReadAnswer {
     this.scannedCount = evaluated.length;
     this.kept = properties.filter?.applyTo(evaluated) ?? evaluated;
     this.lastEvaluatedKey = properties.page.lastEvaluatedKey;
+    this.projection = properties.projection;
     this.select = properties.select;
     this.view = properties.view;
   }
@@ -86,12 +90,23 @@ export class SimDynamoDbReadAnswer {
   /**
    * One item as the read answers with it.
    *
-   * A read asking for whole items answers with the whole item. Anything else is
-   * cut to what the view carries, so a read of an index answers with the
-   * attributes that index projects rather than with everything. A read of the
-   * table cuts nothing either way.
+   * A `ProjectionExpression` names the attributes it wants, so it is applied to
+   * the whole item and the view is not asked to cut one first. On a global
+   * secondary index that changes nothing, since every path the projection names
+   * has already been checked against what the index projects. On a local
+   * secondary index it is what fetches an unprojected attribute from the base
+   * table, which is what real DynamoDB does for the same read.
+   *
+   * Without a projection, a read asking for whole items answers with the whole
+   * item, and anything else is cut to what the view carries. That is how a read
+   * of an index answers with the attributes that index projects rather than
+   * with everything. A read of the table cuts nothing either way.
    */
   private answered(item: SimDynamoDbItem): SimDynamoDbItem {
+    if (this.projection !== undefined) {
+      return this.projection.apply(item);
+    }
+
     if (this.select.wholeItems) {
       return item;
     }

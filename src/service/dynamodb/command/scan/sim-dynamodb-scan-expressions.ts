@@ -1,49 +1,58 @@
 import { parseSimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter-expression.js";
 import type { SimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter.js";
-import { readSimDynamoDbKeyCondition } from "../../expression/key-condition/sim-dynamodb-key-condition-expression.js";
-import type { SimDynamoDbKeyConditionTerms } from "../../expression/key-condition/sim-dynamodb-key-condition-terms.js";
 import { parseSimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection-expression.js";
 import type { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
 import { SimDynamoDbExpressionParameters } from "../../expression/sim-dynamodb-expression-parameters.js";
-import type { SimQueryCommandInput } from "./query.command.js";
+import type { SimScanCommandInput } from "./scan.command.js";
 
 /**
- * What a query's expressions say, once all three have been read.
+ * What a scan's expressions say, once both have been read.
  */
-export interface SimDynamoDbQueryExpressions {
-  readonly terms: SimDynamoDbKeyConditionTerms;
+export interface SimDynamoDbScanExpressions {
   readonly filter: SimDynamoDbFilter | undefined;
   readonly projection: SimDynamoDbProjection | undefined;
 }
 
 /**
- * Read every expression of a query against one set of placeholders.
+ * Read both expressions of a scan against one set of placeholders.
  *
  * `ExpressionAttributeNames` and `ExpressionAttributeValues` are shared between
- * the key condition, the filter and the projection, so they are checked once
- * all three have been read. A placeholder used by any one of them counts as
- * used, and one used by none is refused.
+ * the filter and the projection, so they are checked once both have been read.
+ * A placeholder used by either counts as used, and one used by neither is
+ * refused.
  *
- * All three are read before the table is reached, so an expression DynamoDB
- * would refuse is refused whether or not the table is there. What is left is
- * the part that needs the key schema, which each of them is held to once the
- * table has been found.
+ * A scan that names neither expression is a different refusal. There is nothing
+ * for a placeholder to be unused in, which is the wording real DynamoDB uses
+ * for a request carrying parameters and no expression at all.
+ *
+ * Both are read before the table is reached, so an expression DynamoDB would
+ * refuse is refused whether or not the table is there. What is left is which
+ * attributes the view being read carries, which each of them is held to once
+ * the table has been found.
  */
-export function readSimDynamoDbQueryExpressions(
-  input: SimQueryCommandInput,
-): SimDynamoDbQueryExpressions {
+export function readSimDynamoDbScanExpressions(
+  input: SimScanCommandInput,
+): SimDynamoDbScanExpressions {
+  if (
+    input.FilterExpression === undefined &&
+    input.ProjectionExpression === undefined
+  ) {
+    SimDynamoDbExpressionParameters.assertNoneWithout(input);
+
+    return { filter: undefined, projection: undefined };
+  }
+
   const parameters = new SimDynamoDbExpressionParameters(input);
-  const terms = readSimDynamoDbKeyCondition(input, parameters);
   const filter = filterIn(input.FilterExpression, parameters);
   const projection = projectionIn(input.ProjectionExpression, parameters);
 
   parameters.assertAllUsed();
 
-  return { terms, filter, projection };
+  return { filter, projection };
 }
 
 /**
- * Read the filter a query drops read items by, if it names one.
+ * Read the filter a scan drops read items by, if it names one.
  */
 function filterIn(
   expression: string | undefined,
@@ -57,7 +66,7 @@ function filterIn(
 }
 
 /**
- * Read the parts of an item a query answers with, if it names them.
+ * Read the parts of an item a scan answers with, if it names them.
  */
 function projectionIn(
   expression: string | undefined,
