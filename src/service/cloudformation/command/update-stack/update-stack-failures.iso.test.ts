@@ -129,15 +129,15 @@ describe("CloudFormation UpdateStackCommand failures", () => {
     assertStringIncludes(error.message, "ReportsBucket");
     assertStringIncludes(error.message, "holds 1 Objects");
 
-    // And the Stack is left in UPDATE_FAILED with the reason on it, rather
-    // than being rolled back to the template it was deployed from.
+    // And the Stack is rolled back onto the template it was deployed from,
+    // with the reason the update stopped still on it.
     const describeOutput = await cloudFormation.describeStacks(
       new DescribeStacksCommand({ StackName: "reports-stack" }),
     );
     const [describedStack] = describeOutput.Stacks ?? [];
 
     assertNonNullable(describedStack);
-    assertIdentical(describedStack.StackStatus, "UPDATE_FAILED");
+    assertIdentical(describedStack.StackStatus, "UPDATE_ROLLBACK_COMPLETE");
     assertStringIncludes(
       describedStack.StackStatusReason ?? "",
       "ReportsBucket",
@@ -202,8 +202,8 @@ describe("CloudFormation UpdateStackCommand failures", () => {
 
     await deployReportsStack(simAws);
 
-    // When UpdateStackCommand is handled without TemplateBody, then it
-    // rejects: sim CloudFormation has no UsePreviousTemplate.
+    // When UpdateStackCommand is handled without TemplateBody and without
+    // UsePreviousTemplate, then it rejects: nothing says what to apply.
     const error = await assertThrowsErrorAsync(async () =>
       simAws
         .cloudFormation()
