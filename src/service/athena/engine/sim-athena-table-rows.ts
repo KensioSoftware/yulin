@@ -12,7 +12,7 @@ import {
   type SimAthenaRecordReader,
 } from "./sim-athena-record-reader.js";
 import {
-  simAthenaObjectText,
+  simAthenaObjectBytes,
   type SimAthenaTableObjects,
 } from "./sim-athena-table-objects.js";
 
@@ -70,7 +70,7 @@ async function objectRows(
   reader: SimAthenaRecordReader,
   one: SimAthenaPartitionedObject,
 ): Promise<readonly SimAthenaEngineRow[]> {
-  const text = await simAthenaObjectText(
+  const bytes = await simAthenaObjectBytes(
     request.objects,
     one.object.bucket,
     one.object.key,
@@ -81,5 +81,7 @@ async function objectRows(
     ...Object.fromEntries(one.values),
   };
 
-  return reader(text).map((row) => ({ ...partition, ...row }));
+  const rows = await reader(bytes);
+
+  return rows.map((row) => ({ ...partition, ...row }));
 }

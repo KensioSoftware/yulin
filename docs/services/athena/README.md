@@ -196,7 +196,8 @@ loads the rows into an in-memory SQLite database, and answers the statement from
 nineteen queries in twenty of the shapes a test writes run this way.
 
 The engine is off until a test turns it on, and it needs `node-sql-parser` in the project. The
-parser is an optional peer dependency, so a project that never runs a query never installs it.
+parser is an optional peer dependency, so a project that never runs a query never installs it. A
+Parquet table needs `hyparquet` on the same terms.
 
 ```bash
 pnpm add -D node-sql-parser
@@ -309,6 +310,8 @@ The SerDe class name in the table's storage descriptor says how its objects are 
   that needs it.
 - `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` reads the delimiter `field.delim` names,
   which defaults to the control character Hive uses.
+- `org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe` reads Parquet. So does the older
+  `parquet.hive.serde.ParquetHiveSerDe` that a Hive table carries.
 
 `separatorChar`, `quoteChar` and `escapeChar` in the SerDe's parameters override those defaults, and
 `skip.header.line.count` on the table drops the first lines of every object. An empty field reads as
@@ -335,6 +338,29 @@ A partition column's value comes from the partition the object sits in. A table 
 partitions takes it from the projection, and a table laid out Hive style under its own location
 takes it from the `key=value` segments of the object's key. Either way the column reads on every
 row, though no object holds it.
+
+### Parquet
+
+A Parquet table needs [`hyparquet`](https://github.com/hyparam/hyparquet) in the project, alongside
+the SQL parser. It is an optional peer dependency as well, and a project querying only JSON and CSV
+tables never installs it. The reader loads the first time a query reaches a Parquet table.
+
+```bash
+npm install --save-dev hyparquet
+```
+
+A Parquet file carries its own schema. The table's Glue columns say only what to call each column
+and what type to report it as. A column the table declares and the file has not got reads null, the
+way a JSON record missing a key does. An `int64` column keeps every digit, past what a double holds
+exactly. A `TIMESTAMP`, `DATE` or `INT96` column reads as an instant, and the Glue column type
+decides whether it renders as a day or as a day and a time. A `BYTE_ARRAY` column reads as text.
+
+Parquet compresses per column chunk inside the file, and an object's key says nothing about it. A
+file written with `SNAPPY`, `GZIP`, `ZSTD`, `BROTLI` or no compression at all reads, which covers
+what Athena, Glue and Firehose write. A file written with `LZO`, `LZ4` or `LZ4_RAW` turns the query
+down, and the declaration a test wrote answers it.
+
+ORC has no reader. A table declaring one falls back to its declared result.
 
 ### What it answers with
 
@@ -958,8 +984,15 @@ Current documented limitations:
 - A declaration that fails the query wins from any tier, the engine included. `failsWith` is a
   statement about the query rather than about its rows, so a workgroup rule or a default carrying
   one fails every query it covers whether or not the engine could have answered.
-- Parquet and ORC are absent. A table declaring either falls back to its declared result, and so
-  does a table declaring no SerDe at all.
+- ORC is absent. A table declaring it falls back to its declared result, and so does a table
+  declaring no SerDe at all. The only ORC reader published for Node is AGPL licensed and builds
+  native bindings, which is more than this package asks a test to install.
+- A Parquet table in a project without `hyparquet` falls back the same way, with nothing said. The
+  engine turns down what it cannot do, and a missing install reaches a test through `answeredBy`
+  reading `declaration`.
+- A Parquet query reports every byte of every object it opens as scanned, whatever columns the
+  statement touched. Real Athena bills a columnar read by the columns alone. A cutoff tuned
+  against a real workload therefore refuses a query here that AWS would allow.
 - A null in a result row reads as an empty string. Real Athena leaves the value out of the row.
 - A computed boolean reads as `1` and `0`. The Glue column type is what makes a boolean column read
   as `true` and `false`, and an expression has no column type behind it.

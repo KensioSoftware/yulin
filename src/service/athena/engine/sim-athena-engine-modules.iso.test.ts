@@ -5,6 +5,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { simAthenaParquetReader } from "./sim-athena-parquet-module.js";
 import { simAthenaSqlParser } from "./sim-athena-parser-module.js";
 import { simAthenaSqliteModule } from "./sim-athena-sqlite-module.js";
 
@@ -31,6 +32,33 @@ describe("loading what the Athena query engine runs on", () => {
 
     // Then it says which module let it down.
     assertStringIncludes(error.message, "node:util carries no Parser");
+  });
+
+  it("says what to add where the Parquet reader is not installed", async () => {
+    // Given a project without hyparquet.
+    // When a query reaches a Parquet table.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAthenaParquetReader("hyparquet-absent-from-this-project"),
+    );
+
+    // Then it names the package to add and the alternative to it.
+    assertIdentical(error.name, "SimAthenaSetUpError");
+    assertStringIncludes(error.message, "hyparquet");
+    assertStringIncludes(error.message, "results()");
+  });
+
+  it("says the same where the package carries no reader", async () => {
+    // Given a module that resolves and is not the reader.
+    // When the engine asks it to read a Parquet file.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAthenaParquetReader("node:util"),
+    );
+
+    // Then it says which module let it down.
+    assertStringIncludes(
+      error.message,
+      "node:util carries no parquetReadObjects",
+    );
   });
 
   it("swallows SQLite's experimental warning and nothing else", async () => {

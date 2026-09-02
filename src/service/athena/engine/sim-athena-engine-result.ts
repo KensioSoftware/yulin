@@ -24,6 +24,12 @@ export function simAthenaEngineResult(
 
   statement.setReturnArrays(true);
 
+  // A whole number comes back as a BigInt, because SQLite holds a 64 bit
+  // integer and reading one past what a double represents exactly raises
+  // otherwise. A Parquet `bigint` column is what carries values that large.
+  // Every one of them renders the same either way.
+  statement.setReadBigInts(true);
+
   const rows = statement.all() as unknown as readonly SQLOutputValue[][];
   const columns = simAthenaResultColumns(statement.columns(), rows, loaded);
 

@@ -1,4 +1,27 @@
-import { simAthenaIsBooleanType } from "./sim-athena-column-types.js";
+import {
+  simAthenaIsBooleanType,
+  simAthenaIsDateType,
+} from "./sim-athena-column-types.js";
+
+/**
+ * One instant, as the text a column of its Glue type reads.
+ *
+ * Athena renders a `date` column as a day and a `timestamp` column as a day and
+ * a time, and the Glue column type is the only thing that says which this is.
+ */
+function simAthenaTimestampText(
+  value: Date,
+  glueType: string | undefined,
+): string {
+  const iso = value.toISOString();
+
+  return simAthenaIsDateType(glueType)
+    ? iso.slice(0, 10)
+    : iso
+        .slice(0, 23)
+        .replace("T", " ")
+        .replace(/\.000$/u, "");
+}
 
 /** What SQLite will take as a bound parameter. */
 export type SimAthenaSqliteValue = string | number | bigint | null;
@@ -23,6 +46,11 @@ const booleanText: ReadonlyMap<string, number> = new Map([
  * delimited text carries it as the word `true`, and a column holding the word
  * would otherwise compare against nothing and read back as `true` whichever
  * value it held.
+ *
+ * A `Date` is what a Parquet `TIMESTAMP`, `DATE` or `INT96` column arrives as.
+ * Text formats carry a timestamp as the text the object held, and this writes
+ * one the same way. Left as an object it would reach SQLite as quoted JSON, and
+ * every comparison against it would answer false while the query succeeded.
  */
 export function simAthenaSqliteValue(
   value: unknown,
@@ -44,6 +72,10 @@ export function simAthenaSqliteValue(
 
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
+  }
+
+  if (value instanceof Date) {
+    return simAthenaTimestampText(value, glueType);
   }
 
   return typeof value === "bigint" ? value : JSON.stringify(value);

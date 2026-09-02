@@ -1,4 +1,17 @@
 import { faker } from "@faker-js/faker";
+import {
+  brotliCompressSync,
+  deflateSync,
+  gzipSync,
+  zstdCompressSync,
+} from "node:zlib";
+
+import {
+  parquetWriteBuffer,
+  type BasicType,
+  type ColumnSource,
+} from "hyparquet-writer";
+import type { CompressionCodec } from "hyparquet";
 
 import type { SimClock } from "../../util/clock/sim-clock.js";
 import type { SimGlueColumn } from "../glue/table/sim-glue-table-schema.js";
@@ -9,6 +22,13 @@ export const jsonSerDe = "org.openx.data.jsonserde.JsonSerDe";
 
 /** The SerDe class name a quoted CSV table declares. */
 export const csvSerDe = "org.apache.hadoop.hive.serde2.OpenCSVSerde";
+
+/** The SerDe class name a Parquet table declares. */
+export const parquetSerDe =
+  "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
+
+/** The SerDe class name an ORC table declares, which nothing here reads. */
+export const orcSerDe = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
 
 /** Where every table in these fixtures keeps its data. */
 export const logsBucket = "rainlytics-logs";
@@ -117,4 +137,50 @@ export async function aSeededJson(
   const lines = records.map((record) => JSON.stringify(record));
 
   await aSeededObject(simAws, key, `${lines.join("\n")}\n`);
+}
+
+/** One column of a Parquet fixture, with the values it holds. */
+export interface SimAthenaParquetColumn {
+  readonly name: string;
+  readonly data: readonly unknown[];
+  readonly type?: BasicType;
+}
+
+/**
+ * What the writer compresses a page with, for the codecs it has not got.
+ *
+ * `hyparquet-writer` compresses snappy alone. These are what let a fixture
+ * produce a file in the codecs the reader takes from `node:zlib`, so those
+ * paths are exercised by a real file rather than by a label.
+ */
+const writeCompressors = {
+  GZIP: (bytes: Uint8Array): Uint8Array => new Uint8Array(gzipSync(bytes)),
+  ZSTD: (bytes: Uint8Array): Uint8Array =>
+    new Uint8Array(zstdCompressSync(bytes)),
+  BROTLI: (bytes: Uint8Array): Uint8Array =>
+    new Uint8Array(brotliCompressSync(bytes)),
+  DEFLATE: (bytes: Uint8Array): Uint8Array =>
+    new Uint8Array(deflateSync(bytes)),
+};
+
+/**
+ * Put one Parquet object under the logs Bucket.
+ *
+ * `hyparquet-writer` is a development dependency of this repository alone. A
+ * project testing against a Parquet table brings its own file, or writes one
+ * however its production pipeline does.
+ */
+export async function aSeededParquet(
+  simAws: SimAws,
+  key: string,
+  columns: readonly SimAthenaParquetColumn[],
+  codec: CompressionCodec = "SNAPPY",
+): Promise<void> {
+  const buffer = parquetWriteBuffer({
+    codec,
+    compressors: writeCompressors,
+    columnData: columns as unknown as ColumnSource[],
+  });
+
+  await aSeededBytes(simAws, key, new Uint8Array(buffer));
 }
