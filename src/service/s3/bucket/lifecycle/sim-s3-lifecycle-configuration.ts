@@ -9,41 +9,14 @@ import {
   simS3UploadAbortInstant,
 } from "./sim-s3-lifecycle-expiry.js";
 import { simS3LifecycleRuleSelects } from "./sim-s3-lifecycle-selection.js";
+import type {
+  SimS3LifecycleNoncurrentVersion,
+  SimS3LifecycleObject,
+  SimS3LifecycleUpload,
+} from "./sim-s3-lifecycle-subject.js";
 
 interface SimS3LifecycleConfigurationProperties {
   readonly rules?: readonly SimS3LifecycleRule[];
-}
-
-/**
- * An Object as a lifecycle rule reads it.
- */
-export interface SimS3LifecycleObject {
-  readonly key: string;
-  readonly size: number;
-  readonly lastModified: Date;
-}
-
-/**
- * A noncurrent version as a lifecycle rule reads it.
- *
- * `newerVersionsAhead` is how many noncurrent versions of the same key are
- * newer than this one, which is what `NewerNoncurrentVersions` counts. The
- * current version is not one of them, since a rule for noncurrent versions
- * never reaches it.
- */
-export interface SimS3LifecycleNoncurrentVersion {
-  readonly key: string;
-  readonly size: number;
-  readonly noncurrentSince: Date | undefined;
-  readonly newerVersionsAhead: number;
-}
-
-/**
- * A multipart upload in progress as a lifecycle rule reads it.
- */
-export interface SimS3LifecycleUpload {
-  readonly key: string;
-  readonly initiated: Date;
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   simS3WriteEncryption,
   simS3WriteStorageClass,
 } from "../../object/s3-write-storage.js";
+import { simS3WriteTags } from "../../object/s3-write-tagging.js";
 import {
   SimS3MultipartAccess,
   type SimS3MultipartAccessProperties,
@@ -54,6 +55,7 @@ export class CreateMultipartUploadCommandHandler implements CommandHandler<
     const upload = bucket.getMultipartUploads().start({
       key: Key,
       metadata: simS3WriteMetadata(command.input),
+      tags: simS3WriteTags(command.input, "CreateMultipartUploadCommand"),
       initiated: this.access.now(),
       ...(storageClass !== undefined && { storageClass }),
       serverSideEncryption: simS3WriteEncryption(

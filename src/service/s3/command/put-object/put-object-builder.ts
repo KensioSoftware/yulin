@@ -6,6 +6,7 @@ import {
   simS3WriteEncryption,
   simS3WriteStorageClass,
 } from "../../object/s3-write-storage.js";
+import { simS3WriteTags } from "../../object/s3-write-tagging.js";
 import type { SimPutObjectCommand } from "./put-object.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
@@ -57,6 +58,7 @@ export class PutObjectBuilder {
       key: command.input.Key,
       body: simS3WriteBodyBuffer(command.input.Body, "PutObjectCommand"),
       metadata: simS3WriteMetadata(command.input),
+      tags: simS3WriteTags(command.input, "PutObjectCommand"),
       lastModified: this.clock.now(),
       ...(storageClass !== undefined && { storageClass }),
       serverSideEncryption: simS3WriteEncryption(

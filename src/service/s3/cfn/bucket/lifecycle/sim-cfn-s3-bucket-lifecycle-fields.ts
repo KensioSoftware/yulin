@@ -10,10 +10,11 @@ import type {
  * timing after it, where the request nests both. It carries the noncurrent
  * expiry both ways, as the nested object the request takes and as the older
  * `NoncurrentVersionExpirationInDays` beside it, which is what CDK's
- * `noncurrentVersionExpiration` synthesises. Everything absent from here,
- * `Status`, `Prefix`, `AbortIncompleteMultipartUpload`, `TagFilters` and the
- * object size bounds among them, is spelled the same way in both and goes
- * through untouched.
+ * `noncurrentVersionExpiration` synthesises. It also puts the tags a rule
+ * filters on beside the rule's `Prefix`, where the request holds both inside a
+ * `Filter`. Everything absent from here, `Status`,
+ * `AbortIncompleteMultipartUpload` and the object size bounds among them, is
+ * spelled the same way in both and goes through untouched.
  */
 export const simCfnS3TranslatedLifecycleFields: ReadonlySet<string> = new Set([
   "Id",
@@ -22,6 +23,7 @@ export const simCfnS3TranslatedLifecycleFields: ReadonlySet<string> = new Set([
   "ExpiredObjectDeleteMarker",
   "NoncurrentVersionExpiration",
   "NoncurrentVersionExpirationInDays",
+  "TagFilters",
   "Transition",
   "Transitions",
 ]);
@@ -69,10 +71,15 @@ export function simCfnS3StatedFields(
 export function simCfnS3CarriedRuleFields(
   rule: SimCfnTemplateValueRecord,
 ): SimCfnTemplateValueRecord {
+  // A rule filtering on tags carries its prefix inside the `Filter` built from
+  // them, and real S3 refuses a rule stating a `Prefix` alongside one.
+  const translated =
+    rule["TagFilters"] === undefined
+      ? simCfnS3TranslatedLifecycleFields
+      : new Set([...simCfnS3TranslatedLifecycleFields, "Prefix"]);
+
   return Object.fromEntries(
-    Object.entries(rule).filter(
-      ([name]) => !simCfnS3TranslatedLifecycleFields.has(name),
-    ),
+    Object.entries(rule).filter(([name]) => !translated.has(name)),
   );
 }
 

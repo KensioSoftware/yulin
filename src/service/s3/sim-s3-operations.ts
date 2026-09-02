@@ -1,6 +1,6 @@
 import type * as simS3Commands from "./command/sim-s3-command.types.js";
 import type { SimS3RequestOptions } from "./command/sim-s3-request-options.js";
-import { SimS3VersionOperations } from "./sim-s3-version-operations.js";
+import { SimS3TaggingOperations } from "./sim-s3-tagging-operations.js";
 
 /**
  * The AWS operations simulated S3 answers. One delegation per SDK Command,
@@ -8,10 +8,11 @@ import { SimS3VersionOperations } from "./sim-s3-version-operations.js";
  *
  * `SimS3` extends this. A caller reaches every operation on the one service
  * object, alongside the simulator-only controls `SimS3` holds itself. The
- * operations that make a Bucket keep what it held are on
- * `SimS3VersionOperations`, which this extends.
+ * operations that tag an Object are on `SimS3TaggingOperations`, and the ones
+ * that make a Bucket keep what it held are on `SimS3VersionOperations` below
+ * it, both of which this extends.
  */
-export abstract class SimS3Operations extends SimS3VersionOperations {
+export abstract class SimS3Operations extends SimS3TaggingOperations {
   /** Handle a Create Bucket Command from the SDK. */
   async createBucket(
     command: simS3Commands.SimCreateBucketCommand,

@@ -181,3 +181,19 @@ export type {
   SimPutObjectLegalHoldCommandInput,
   SimPutObjectLegalHoldCommandOutput,
 } from "./put-object-legal-hold/put-object-legal-hold.command.js";
+export type {
+  SimPutObjectTaggingCommand,
+  SimPutObjectTaggingCommandInput,
+  SimPutObjectTaggingCommandOutput,
+  SimS3TaggingInput,
+} from "./put-object-tagging/put-object-tagging.command.js";
+export type {
+  SimGetObjectTaggingCommand,
+  SimGetObjectTaggingCommandInput,
+  SimGetObjectTaggingCommandOutput,
+} from "./get-object-tagging/get-object-tagging.command.js";
+export type {
+  SimDeleteObjectTaggingCommand,
+  SimDeleteObjectTaggingCommandInput,
+  SimDeleteObjectTaggingCommandOutput,
+} from "./delete-object-tagging/delete-object-tagging.command.js";

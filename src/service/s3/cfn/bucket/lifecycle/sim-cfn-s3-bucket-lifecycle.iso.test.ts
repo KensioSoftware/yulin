@@ -152,33 +152,32 @@ describe("AWS::S3::Bucket LifecycleConfiguration", () => {
   });
 
   it("carries a rule field it has no translation for across unchanged", async () => {
-    // Given a template filtering by tag and object size, neither of which this
-    // simulation reads.
+    // Given a template bounding a rule by object size, which CloudFormation
+    // and the request spell the same way.
     const simAws = new SimAws();
 
     // When the Stack is deployed.
     await deployBucketWithRules(simAws, [
       {
-        Id: "big-tagged-objects",
+        Id: "big-objects",
         Status: "Enabled",
         ExpirationInDays: 30,
         ObjectSizeGreaterThan: 1024,
-        TagFilters: [{ Key: "class", Value: "raw" }],
+        ObjectSizeLessThan: 1_048_576,
       },
     ]);
 
-    // Then both arrive as the template stated them, under the CloudFormation
-    // names. Dropping either would read back as a Bucket configured with less
-    // than the template asked for.
+    // Then both arrive as the template stated them. Dropping either would read
+    // back as a Bucket configured with less than the template asked for.
     const rules = await readRules(simAws);
 
     assertArrayLength(rules, 1);
     assertObjectEquals(rules[0], {
-      ID: "big-tagged-objects",
+      ID: "big-objects",
       Status: "Enabled",
       Expiration: { Days: 30 },
       ObjectSizeGreaterThan: 1024,
-      TagFilters: [{ Key: "class", Value: "raw" }],
+      ObjectSizeLessThan: 1_048_576,
     });
   });
 

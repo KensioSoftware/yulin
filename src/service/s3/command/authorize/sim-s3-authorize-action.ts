@@ -1,3 +1,4 @@
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
@@ -25,8 +26,14 @@ export interface SimS3AuthorizedAction {
  * supplied as the condition keys a Bucket policy is usually written against.
  * An omitted caller is passed through to sim IAM, so Account root fallback
  * stays owned by IAM.
+ *
+ * The resolved caller is answered rather than discarded, because this is the
+ * only point in a request where the principal has been worked out, and an
+ * Object event notification has to say who caused it.
  */
-export function simS3AuthorizeAction(request: SimS3AuthorizedAction): void {
+export function simS3AuthorizeAction(
+  request: SimS3AuthorizedAction,
+): SimAwsResolvedCaller {
   const { iam, action, resource, bucket, options } = request;
 
   const decision = iam.authorize({
@@ -45,4 +52,6 @@ export function simS3AuthorizeAction(request: SimS3AuthorizedAction): void {
       resource,
     });
   }
+
+  return decision.caller;
 }

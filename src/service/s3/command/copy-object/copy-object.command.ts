@@ -1,6 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
 import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
+import type { SimS3ObjectWriteTagging } from "../../object/s3-write-tagging.js";
 
 /**
  * Minimal structural sim S3 CopyObject command.
@@ -17,12 +18,21 @@ export interface SimCopyObjectCommand {
  * the default `COPY` they are ignored, as real S3 ignores them.
  */
 export interface SimCopyObjectCommandInput
-  extends SimS3ObjectWriteMetadata, SimS3ObjectWriteStorage {
+  extends
+    SimS3ObjectWriteMetadata,
+    SimS3ObjectWriteStorage,
+    SimS3ObjectWriteTagging {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   /** The source Object, as `sourceBucket/sourceKey`, URL-encoded. */
   readonly CopySource?: string | undefined;
   readonly MetadataDirective?: string | undefined;
+  /**
+   * Whether the copy carries the source Object's tags or the request's own.
+   * `REPLACE` takes the request's `Tagging`, and anything else leaves the copy
+   * carrying what the source carried.
+   */
+  readonly TaggingDirective?: string | undefined;
 }
 
 /**

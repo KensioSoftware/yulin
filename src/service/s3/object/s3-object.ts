@@ -1,4 +1,5 @@
 import { simS3ObjectETag } from "./s3-object-etag.js";
+import { SimS3ObjectTagSet } from "./s3-object-tags.js";
 import type { SimS3ServerSideEncryption } from "./s3-server-side-encryption.js";
 import {
   simS3DefaultStorageClass,
@@ -57,6 +58,11 @@ interface SimS3ObjectProperties {
    * this says, and it is what a read reports about them.
    */
   readonly serverSideEncryption?: SimS3ServerSideEncryption | undefined;
+  /**
+   * The tags S3 holds against the Object. A write that named none, and an
+   * Object nobody has tagged since, carries an empty set.
+   */
+  readonly tags?: SimS3ObjectTagSet | undefined;
 }
 
 /**
@@ -68,6 +74,7 @@ export class SimS3Object {
   public readonly metadata: SimS3ObjectMetadata;
   public readonly storageClass: SimS3StorageClass;
   public readonly serverSideEncryption: SimS3ServerSideEncryption | undefined;
+  public readonly tags: SimS3ObjectTagSet;
 
   private readonly writtenAt: Date;
   private readonly givenETag: string | undefined;
@@ -79,6 +86,7 @@ export class SimS3Object {
       metadata = new SimS3ObjectMetadata(),
       lastModified = new Date(),
       storageClass = simS3DefaultStorageClass,
+      tags = SimS3ObjectTagSet.empty(),
     } = properties;
 
     this.key = key;
@@ -86,6 +94,7 @@ export class SimS3Object {
     this.metadata = metadata;
     this.storageClass = storageClass;
     this.serverSideEncryption = properties.serverSideEncryption;
+    this.tags = tags;
     this.writtenAt = new Date(lastModified);
     this.givenETag = properties.etag;
   }
@@ -96,18 +105,23 @@ export class SimS3Object {
    *
    * The bytes are shared with the Object this came from. A transition moves
    * where S3 keeps an Object and leaves the Object itself alone, so its ETag,
-   * its metadata and the instant it was last written all carry over.
+   * its metadata, its tags and the instant it was last written all carry over.
    */
   withStorageClass(storageClass: SimS3StorageClass): SimS3Object {
-    return new SimS3Object({
-      key: this.key,
-      body: this.body,
-      metadata: this.metadata,
-      lastModified: this.writtenAt,
-      storageClass,
-      serverSideEncryption: this.serverSideEncryption,
-      ...(this.givenETag !== undefined && { etag: this.givenETag }),
-    });
+    return this.with({ storageClass });
+  }
+
+  /**
+   * The same Object under another tag set, for a tagging request that has
+   * replaced the one it carried.
+   *
+   * Real S3 holds tags against an Object without rewriting it, so nothing else
+   * about it changes: the bytes, the ETag and the instant it was last written
+   * are the ones it already had. A read after tagging reports the same
+   * `LastModified` as a read before it.
+   */
+  withTags(tags: SimS3ObjectTagSet): SimS3Object {
+    return this.with({ tags });
   }
 
   /**
@@ -141,5 +155,26 @@ export class SimS3Object {
    */
   get etag(): string {
     return this.givenETag ?? simS3ObjectETag(this.body);
+  }
+
+  /**
+   * The same Object with one thing about it replaced.
+   *
+   * Everything S3 remembers is carried over by hand rather than by copying the
+   * instance, because an Object holds its write time and its given ETag
+   * privately and a spread would lose both.
+   */
+  private with(changed: SimS3ObjectProperties): SimS3Object {
+    return new SimS3Object({
+      key: this.key,
+      body: this.body,
+      metadata: this.metadata,
+      lastModified: this.writtenAt,
+      storageClass: this.storageClass,
+      serverSideEncryption: this.serverSideEncryption,
+      tags: this.tags,
+      ...(this.givenETag !== undefined && { etag: this.givenETag }),
+      ...changed,
+    });
   }
 }

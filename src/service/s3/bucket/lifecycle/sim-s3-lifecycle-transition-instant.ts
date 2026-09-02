@@ -6,7 +6,7 @@ import {
   simS3StorageClassFrom,
   type SimS3StorageClass,
 } from "../../object/s3-storage-class.js";
-import type { SimS3LifecycleNoncurrentVersion } from "./sim-s3-lifecycle-configuration.js";
+import type { SimS3LifecycleNoncurrentVersion } from "./sim-s3-lifecycle-subject.js";
 import {
   simS3LifecycleAfterDays,
   simS3LifecycleReached,

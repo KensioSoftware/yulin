@@ -1,4 +1,8 @@
-import { xmlDocument, xmlValue } from "../../../../util/xml/xml-writer.js";
+import {
+  xmlDocument,
+  xmlElement,
+  xmlValue,
+} from "../../../../util/xml/xml-writer.js";
 import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-headers.js";
 import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-read.js";
 
@@ -21,6 +25,37 @@ export function simS3CopyObjectXml(output: CopyObjectOutput): string {
     "CopyObjectResult",
     xmlValue("ETag", result.ETag) +
       xmlValue("LastModified", result.LastModified),
+  );
+}
+
+interface TagSetOutput {
+  readonly TagSet?: readonly {
+    readonly Key?: string;
+    readonly Value?: string;
+  }[];
+}
+
+/**
+ * Write the tags on an Object as the document real S3 answers them with.
+ *
+ * An Object nobody has tagged answers with an empty `TagSet` element rather
+ * than none at all, which is what tells a client the Object exists and carries
+ * no tags.
+ */
+export function simS3ObjectTaggingXml(output: TagSetOutput): string {
+  return xmlDocument(
+    "Tagging",
+    xmlElement(
+      "TagSet",
+      (output.TagSet ?? [])
+        .map((tag) =>
+          xmlElement(
+            "Tag",
+            xmlValue("Key", tag.Key) + xmlValue("Value", tag.Value),
+          ),
+        )
+        .join(""),
+    ),
   );
 }
 

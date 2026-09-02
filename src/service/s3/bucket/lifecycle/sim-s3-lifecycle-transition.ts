@@ -3,7 +3,7 @@ import type { SimS3StorageClass } from "../../object/s3-storage-class.js";
 import type {
   SimS3LifecycleNoncurrentVersion,
   SimS3LifecycleObject,
-} from "./sim-s3-lifecycle-configuration.js";
+} from "./sim-s3-lifecycle-subject.js";
 import {
   simS3ReachedNoncurrentTransitionOf,
   simS3ReachedTransitionOf,

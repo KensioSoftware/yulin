@@ -5,20 +5,17 @@ import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketObjects } from "./sim-s3-bucket-objects.js";
 import type { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
+import type { SimS3TaggableObject } from "./tagging/sim-s3-taggable-object.js";
 import type { SimS3BucketObjectLock } from "./lock/sim-s3-bucket-object-lock.js";
 import type { SimS3BucketVersioning } from "./versioning/sim-s3-bucket-versioning.js";
 import type { SimS3BucketVersions } from "./versioning/sim-s3-bucket-versions.js";
 import type { SimS3ObjectVersion } from "./versioning/sim-s3-object-version.js";
-import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
-import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
-import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
-import { SimS3BucketEncryption } from "./encryption/sim-s3-bucket-encryption.js";
 import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-configuration.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
 import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
+import { SimS3BucketConfiguration } from "./sim-s3-bucket-configuration.js";
 import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
 import type { SimS3MultipartUploads } from "../upload/sim-s3-multipart-uploads.js";
 import type { SimS3BucketProperties } from "./sim-s3-bucket-properties.js";
@@ -28,30 +25,22 @@ export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 /**
  * Simulated S3 Bucket.
  */
-export class SimS3Bucket {
+export class SimS3Bucket extends SimS3BucketConfiguration {
   public readonly bucketName: SimS3BucketName;
   public readonly creationDate: Date;
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
   private readonly objects: SimS3BucketObjects;
-  private website: SimS3BucketWebsite;
-  private policy: SimIamPolicyDocument | undefined;
-  private publicAccessBlock: SimS3PublicAccessBlock;
-  private notifications: SimS3NotificationConfiguration;
-  private encryption: SimS3BucketEncryption;
 
   constructor(properties: SimS3BucketProperties) {
+    super(properties);
+
     const {
       bucketName,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       storage = new MemoryS3BucketStorage(),
-      website = new SimS3BucketWebsite(),
-      policy,
-      publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
-      notifications = SimS3NotificationConfiguration.empty(),
       lifecycle = SimS3LifecycleConfiguration.empty(),
-      encryption = SimS3BucketEncryption.default(),
       clock = new SimRealClock(),
       creationDate = clock.now(),
     } = properties;
@@ -61,11 +50,6 @@ export class SimS3Bucket {
     this.bucketName = bucketName;
     this.accountRegionScope = accountRegionScope;
     this.objects = new SimS3BucketObjects({ storage, lifecycle, clock });
-    this.website = website;
-    this.policy = policy;
-    this.publicAccessBlock = publicAccessBlock;
-    this.notifications = notifications;
-    this.encryption = encryption;
     this.creationDate = creationDate;
   }
 
@@ -112,6 +96,19 @@ export class SimS3Bucket {
     return await this.objects.deleteVersion(key, versionId, bypassGovernance);
   }
 
+  /**
+   * The Object a tagging request names, ready to be read or retagged.
+   *
+   * A request naming no version acts on whatever a plain read of the key
+   * answers with, which is what real S3 does.
+   */
+  async taggableObject(
+    key: string,
+    versionId?: string,
+  ): Promise<SimS3TaggableObject> {
+    return await this.objects.taggable(key, versionId);
+  }
+
   /** The versions this Bucket keeps, and whether it keeps any. */
   getVersions(): SimS3BucketVersions {
     return this.objects.sweptVersions();
@@ -156,83 +153,6 @@ export class SimS3Bucket {
   }
 
   /**
-   * Configure static website hosting for this simulated S3 Bucket.
-   */
-  configureWebsite(website: SimS3BucketWebsite): void {
-    this.website = website;
-  }
-
-  /**
-   * Get static website configuration for this simulated S3 Bucket.
-   */
-  getWebsite(): SimS3BucketWebsite {
-    return this.website;
-  }
-
-  /**
-   * Configure the Bucket resource policy.
-   */
-  configurePolicy(policy: SimIamPolicyDocument): void {
-    this.policy = policy;
-  }
-
-  /**
-   * Get the Bucket resource policy.
-   */
-  getPolicy(): SimIamPolicyDocument | undefined {
-    return this.policy;
-  }
-
-  /**
-   * Remove the Bucket resource policy.
-   *
-   * Real S3 DeleteBucketPolicy is idempotent, so this reports nothing about
-   * whether there was a policy to remove.
-   */
-  deletePolicy(): void {
-    this.policy = undefined;
-  }
-
-  /**
-   * Replace this Bucket's Block Public Access settings.
-   */
-  configurePublicAccessBlock(publicAccessBlock: SimS3PublicAccessBlock): void {
-    this.publicAccessBlock = publicAccessBlock;
-  }
-
-  /**
-   * Get this Bucket's Block Public Access settings.
-   */
-  getPublicAccessBlock(): SimS3PublicAccessBlock {
-    return this.publicAccessBlock;
-  }
-
-  /**
-   * Remove this Bucket's Block Public Access settings.
-   *
-   * Removing the configuration returns the Bucket to the all-enabled state a
-   * new Bucket starts in, rather than leaving it unprotected.
-   */
-  deletePublicAccessBlock(): void {
-    this.publicAccessBlock = SimS3PublicAccessBlock.blockingAll();
-  }
-
-  /**
-   * Replace this Bucket's event notification configuration.
-   *
-   * Real S3 holds one configuration per Bucket rather than a list of them, so
-   * this replaces what was there instead of adding to it.
-   */
-  configureNotifications(notifications: SimS3NotificationConfiguration): void {
-    this.notifications = notifications;
-  }
-
-  /** Get this Bucket's event notification configuration. */
-  getNotifications(): SimS3NotificationConfiguration {
-    return this.notifications;
-  }
-
-  /**
    * Replace this Bucket's lifecycle configuration.
    *
    * Real S3 holds one configuration per Bucket rather than a list of them, so
@@ -259,26 +179,6 @@ export class SimS3Bucket {
     this.objects.deleteLifecycle();
   }
 
-  /** Replace this Bucket's default encryption configuration. */
-  configureEncryption(encryption: SimS3BucketEncryption): void {
-    this.encryption = encryption;
-  }
-
-  /** Get this Bucket's default encryption configuration. */
-  getEncryption(): SimS3BucketEncryption {
-    return this.encryption;
-  }
-
-  /**
-   * Put this Bucket back to the encryption every Bucket has.
-   *
-   * Real S3 DeleteBucketEncryption leaves the Bucket SSE-S3 encrypted rather
-   * than unencrypted, because there is no such thing as an unencrypted Bucket.
-   */
-  deleteEncryption(): void {
-    this.encryption = SimS3BucketEncryption.default();
-  }
-
   /**
    * Get the simulated AWS account Region scope for this Bucket.
    */
@@ -293,7 +193,7 @@ export class SimS3Bucket {
     return simS3BucketWebsiteUrl(
       this.bucketName,
       this.accountRegionScope,
-      this.website,
+      this.getWebsite(),
     );
   }
 }

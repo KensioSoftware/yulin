@@ -14,6 +14,7 @@ import {
   simCfnS3RuleNoncurrentExpiration,
   simCfnS3StatedFields,
 } from "./sim-cfn-s3-bucket-lifecycle-fields.js";
+import { readSimCfnS3LifecycleFilter } from "./sim-cfn-s3-bucket-lifecycle-filter.js";
 import { readSimCfnS3LifecycleTransitions } from "./sim-cfn-s3-bucket-lifecycle-transitions.js";
 
 /**
@@ -72,6 +73,11 @@ export class SimCfnS3BucketLifecycleConfiguration {
       ...simCfnS3CarriedRuleFields(rule),
       ...simCfnS3StatedFields({
         ID: rule["Id"],
+        Filter: readSimCfnS3LifecycleFilter({
+          shape: this.shape,
+          rule,
+          path,
+        }),
         Expiration: simCfnS3RuleExpiration(rule),
         NoncurrentVersionExpiration: simCfnS3RuleNoncurrentExpiration(rule),
         Transitions: readSimCfnS3LifecycleTransitions({

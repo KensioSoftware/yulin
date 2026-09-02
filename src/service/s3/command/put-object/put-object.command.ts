@@ -2,6 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type { SimS3WriteBody } from "../../object/s3-write-body.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
 import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
+import type { SimS3ObjectWriteTagging } from "../../object/s3-write-tagging.js";
 
 /**
  * Minimal structural sim S3 PutObject command.
@@ -18,7 +19,10 @@ export interface SimPutObjectCommand {
  * `SimS3ObjectWriteMetadata` and shared with `CreateMultipartUpload`.
  */
 export interface SimPutObjectCommandInput
-  extends SimS3ObjectWriteMetadata, SimS3ObjectWriteStorage {
+  extends
+    SimS3ObjectWriteMetadata,
+    SimS3ObjectWriteStorage,
+    SimS3ObjectWriteTagging {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   readonly Body?: SimPutObjectBody;
