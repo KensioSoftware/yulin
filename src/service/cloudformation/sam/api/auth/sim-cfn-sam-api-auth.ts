@@ -64,14 +64,22 @@ export function samIamAuthorizer(): SamApiAuthorizer {
 
 /**
  * The Resources every authorizer of an API is expanded into.
+ *
+ * They are conditioned the way the API is. An API the template conditioned out
+ * leaves no authorizer behind pointing at an API the Stack never created.
  */
 export function samApiAuthResources(
   auth: SamApiAuth,
+  condition: SimCfnTemplateValueRecord = {},
 ): Record<string, SimCfnTemplateValue> {
   return Object.fromEntries(
     auth.authorizers
       .values()
-      .flatMap((authorizer) => Object.entries(authorizer.resources)),
+      .flatMap((authorizer) => Object.entries(authorizer.resources))
+      .map(([logicalId, resource]) => [
+        logicalId,
+        { ...resource, ...condition },
+      ]),
   );
 }
 

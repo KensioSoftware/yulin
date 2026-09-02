@@ -1,4 +1,7 @@
-import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "../../../template/value/sim-cfn-template-value.js";
 
 /**
  * The API an `Auth` block was read from, for a refusal to name it.
@@ -26,7 +29,7 @@ export interface SamApiAuthorizer {
   /** The scopes the authorizer asks of every method it decides. */
   readonly authorizationScopes: SimCfnTemplateValue | undefined;
   /** The Resources the authorizer is expanded into. */
-  readonly resources: Record<string, SimCfnTemplateValue>;
+  readonly resources: Record<string, SimCfnTemplateValueRecord>;
 }
 
 /**

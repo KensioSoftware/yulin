@@ -4,6 +4,7 @@ import type {
 } from "../../template/value/sim-cfn-template-value.js";
 import {
   samCarriedAttributes,
+  samConditionAttribute,
   samResourceProperties,
 } from "../function/sim-cfn-sam-function-properties.js";
 import { samMergedApiProperties } from "../sim-cfn-sam-globals.js";
@@ -92,7 +93,10 @@ export function samRestApiResources(
       },
     },
     ...samRestApiStageResources({ logicalId, resource, apiProperties }),
-    ...samApiAuthResources(samRestApiAuth(logicalId, apiProperties)),
+    ...samApiAuthResources(
+      samRestApiAuth(logicalId, apiProperties),
+      samConditionAttribute(resource["Condition"]),
+    ),
   };
 }
 

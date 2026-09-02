@@ -4,7 +4,7 @@ import { describe, it } from "vitest";
 import {
   samAuthRefusal,
   samLambdaAuthorizer,
-} from "../../../../../../test/cloudformation/sam-auth-refusal.js";
+} from "../../../../../../test/cloudformation/sam-api-auth.js";
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
 
 /**
