@@ -300,6 +300,96 @@ The engine turns a query down where the parser refuses the statement, where SQLi
 it, where a table declares a format it has no reader for, and where an object it needs cannot be
 opened. Every one of those ends the same way, with the declared result answering.
 
+### Failing a query the engine turns down
+
+A turn-down is quiet. The query succeeds, the declared rows come back, and a test meaning to
+exercise the engine passes either way. Strict mode fails the query instead.
+
+```typescript sim-athena-engine-strict
+/**
+ * A query the engine cannot run, failing rather than falling back to a
+ * declaration nobody meant to use.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-logs" } });
+await simAws.s3().createBucket({ input: { Bucket: "rainlytics-results" } });
+await simAws.athena().createWorkGroup({
+  input: {
+    Name: "rainlytics",
+    Configuration: {
+      ResultConfiguration: { OutputLocation: "s3://rainlytics-results/q/" },
+    },
+  },
+});
+
+simAws.glue().createDatabase({
+  input: { DatabaseInput: { Name: "rainlytics" } },
+});
+simAws.glue().createTable({
+  input: {
+    DatabaseName: "rainlytics",
+    TableInput: {
+      Name: "orders",
+      StorageDescriptor: {
+        Columns: [{ Name: "id", Type: "int" }],
+        Location: "s3://rainlytics-logs/orders/",
+        SerdeInfo: {
+          SerializationLibrary: "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
+        },
+      },
+    },
+  },
+});
+
+// Without this the query below succeeds, answering with the declared rows.
+simAws
+  .athena()
+  .results()
+  .byDefault({ columns: ["id"], rows: [["1"]] });
+
+await simAws.athena().engine().enable({ strict: true });
+
+const started = await simAws.athena().startQueryExecution({
+  input: {
+    QueryString: "SELECT id FROM rainlytics.orders",
+    WorkGroup: "rainlytics",
+  },
+});
+
+await simAws.backgroundTasksComplete();
+
+const described = await simAws.athena().getQueryExecution({
+  input: { QueryExecutionId: started.QueryExecutionId },
+});
+
+// "FAILED", because nothing here reads ORC.
+console.log(described.QueryExecution?.Status?.State);
+
+// The reason names the SerDe, the table declaring it, and what to do instead.
+console.log(described.QueryExecution?.Status?.StateChangeReason);
+```
+
+The query reaches `FAILED`, and `StateChangeReason` names what the engine could not do. Each
+turn-down says something different, so a reader of the failing test learns which one it hit rather
+than only that something went wrong. The Athena grammar refusing a statement, an `UNNEST` with no
+`json_each` to become, a statement SQLite will not run, a table in a format with no reader, and
+nothing in scope holding the objects all read differently. A statement SQLite refuses carries
+SQLite's own message out with it.
+
+```
+The simulated Athena query engine has no reader for
+org.apache.hadoop.hive.ql.io.orc.OrcSerde, which table rainlytics.orders declares. Declare what this
+query answers with through results(), or leave strict mode off to fall back to a declaration.
+```
+
+Strict mode is off unless a test asks for it, and `disable()` takes it off with the engine. A
+declaration written against one exact query text still answers, with no failure, because that is a
+test's own statement about a query the engine gets wrong.
+
 ### The objects it reads
 
 The SerDe class name in the table's storage descriptor says how its objects are decoded.

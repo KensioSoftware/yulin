@@ -19,7 +19,9 @@ interface SimAthenaQueryCompletionRequest {
  * only a query that got past all three goes on to be answered and written.
  *
  * A write that fails leaves the execution `FAILED` rather than raising at a
- * caller who was answered long ago and has gone away to poll.
+ * caller who was answered long ago and has gone away to poll. A strict engine
+ * turning the query down fails it the same way, and the reason names what the
+ * engine could not do.
  */
 export async function simAthenaCompleteQuery(
   request: SimAthenaQueryCompletionRequest,
@@ -59,6 +61,12 @@ export async function simAthenaCompleteQuery(
     caller,
     startedAt: execution.submittedAt,
   });
+
+  if (answer.refusal !== undefined) {
+    execution.fail(answer.refusal, runner.background.now());
+
+    return;
+  }
 
   try {
     await runner.writer.write(execution, answer.result, caller);

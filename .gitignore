@@ -187,6 +187,10 @@ dist
 .junie/*.log
 .junie/
 
+# Codex and other agent tooling that writes into the working tree
+.codex
+.agents
+
 # CMake
 cmake-build-*/
 

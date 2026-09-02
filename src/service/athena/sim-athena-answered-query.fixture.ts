@@ -5,6 +5,9 @@ import type { SimAthenaEngineSimulation } from "./sim-athena-engine.fixture.js";
 export interface SimAthenaEngineQuery {
   readonly state: string | undefined;
   readonly answeredBy: SimAthenaAnswerSource | undefined;
+
+  /** Why a failed query failed, which a refusal is what a test reads. */
+  readonly reason: string | undefined;
   readonly columns: readonly (string | undefined)[];
   readonly rows: readonly (readonly (string | undefined)[])[];
 }
@@ -35,6 +38,7 @@ export async function anAnsweredQuery(
   const answered = {
     state: execution?.state,
     answeredBy: execution?.answeredBy,
+    reason: execution?.stateChangeReason,
   };
 
   if (execution?.state !== "SUCCEEDED") {

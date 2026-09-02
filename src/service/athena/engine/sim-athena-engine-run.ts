@@ -1,15 +1,41 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaPlannedTable } from "../execution/sim-athena-query-refusal.js";
 import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
+import { simAthenaRunFailure } from "./sim-athena-turn-down.js";
 import { simAthenaEngineResult } from "./sim-athena-engine-result.js";
 import type { SimAthenaSqlParser } from "./sim-athena-parser-module.js";
 import { simAthenaSqliteDatabase } from "./sim-athena-sqlite-database.js";
 import type { SimAthenaSqliteModule } from "./sim-athena-sqlite-module.js";
-import {
-  simAthenaTableRows,
-  type SimAthenaLoadedTable,
-} from "./sim-athena-table-rows.js";
+import { simAthenaLoadedTables } from "./sim-athena-loaded-tables.js";
 import type { SimAthenaTableObjects } from "./sim-athena-table-objects.js";
+
+/**
+ * What the engine came to for one query.
+ *
+ * A turn-down carries why, because a strict engine fails the query with it and
+ * a reader of that failing test has to learn which of them it hit.
+ */
+export interface SimAthenaEngineAnswer {
+  /** The rows, where the engine ran the statement. */
+  readonly result: SimAthenaResolvedResult | undefined;
+
+  /** What the engine could not do, where it turned the query down. */
+  readonly turnedDown: string | undefined;
+}
+
+/** One answer the engine ran for real. */
+export function simAthenaEngineAnswered(
+  result: SimAthenaResolvedResult,
+): SimAthenaEngineAnswer {
+  return { result, turnedDown: undefined };
+}
+
+/** One query the engine turned down, and why. */
+export function simAthenaEngineTurnedDown(
+  turnedDown: string,
+): SimAthenaEngineAnswer {
+  return { result: undefined, turnedDown };
+}
 
 /** What one query is run with, once the engine is on and has somewhere to read. */
 export interface SimAthenaEngineRun {
@@ -32,15 +58,18 @@ export interface SimAthenaEngineRun {
  * the parser wrote that SQLite does not have. All three leave the declared
  * result to answer. So does a Parquet table in a project that has not installed
  * the reader, and `hyparquet` is named in the docs for that reason.
+ *
+ * Each of them carries a reason out, which a strict engine fails the query
+ * with.
  */
 export async function simAthenaEngineRun(
   run: SimAthenaEngineRun,
-): Promise<SimAthenaResolvedResult | undefined> {
+): Promise<SimAthenaEngineAnswer> {
   try {
-    const loaded = await loadedTables(run);
+    const loaded = await simAthenaLoadedTables(run);
 
-    if (loaded === undefined) {
-      return undefined;
+    if (typeof loaded === "string") {
+      return simAthenaEngineTurnedDown(loaded);
     }
 
     const database = simAthenaSqliteDatabase({
@@ -51,50 +80,13 @@ export async function simAthenaEngineRun(
     });
 
     try {
-      return simAthenaEngineResult(database, run.sql, loaded);
+      return simAthenaEngineAnswered(
+        simAthenaEngineResult(database, run.sql, loaded),
+      );
     } finally {
       database.close();
     }
-  } catch {
-    return undefined;
+  } catch (error) {
+    return simAthenaEngineTurnedDown(simAthenaRunFailure(error));
   }
-}
-
-/**
- * Every table the query reads, loaded once each.
- *
- * A statement naming one table twice resolves to two entries, and loading each
- * of them would read the objects twice and then fail to create the table.
- */
-async function loadedTables(
-  run: SimAthenaEngineRun,
-): Promise<readonly SimAthenaLoadedTable[] | undefined> {
-  const loaded = await Promise.all(
-    distinctTables(run.tables).map(async (planned) =>
-      simAthenaTableRows({ planned, objects: run.objects, caller: run.caller }),
-    ),
-  );
-
-  return loaded.includes(undefined)
-    ? undefined
-    : (loaded as readonly SimAthenaLoadedTable[]);
-}
-
-function distinctTables(
-  tables: readonly SimAthenaPlannedTable[],
-): readonly SimAthenaPlannedTable[] {
-  const seen = new Set<string>();
-
-  return tables.filter((planned) => {
-    const identity =
-      `${planned.table.databaseName}.${planned.table.name}`.toLowerCase();
-
-    if (seen.has(identity)) {
-      return false;
-    }
-
-    seen.add(identity);
-
-    return true;
-  });
 }
