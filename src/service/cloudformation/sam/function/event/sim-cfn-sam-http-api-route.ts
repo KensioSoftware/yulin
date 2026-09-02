@@ -4,6 +4,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../template/value/sim-cfn-template-value.js";
+import { samEventAuthorization } from "../../api/auth/sim-cfn-sam-event-authorization.js";
 import type { SamFunctionEvent } from "./sim-cfn-sam-function-events.js";
 
 interface SamHttpApiRouteProperties {
@@ -11,14 +12,21 @@ interface SamHttpApiRouteProperties {
   readonly apiId: SimCfnTemplateValue;
   /** The logical ID of the integration the route targets. */
   readonly integrationLogicalId: string;
+  /**
+   * The logical ID of the API the route belongs to, where the API is one this
+   * template declares. An event naming its API with an intrinsic this cannot
+   * read names no `Auth` block either.
+   */
+  readonly apiLogicalId: string | undefined;
   readonly event: SamFunctionEvent;
 }
 
 /**
  * The AWS::ApiGatewayV2::Route the event's path and method are served by.
  *
- * `Auth` on the event is not expanded. The route authorizes nothing, and every
- * request matching it reaches the function.
+ * `Auth` on the event names one of the API's authorizers, and an event naming
+ * none takes the API's `DefaultAuthorizer`. A route neither of them closes
+ * authorizes nothing, and every request matching it reaches the function.
  */
 export function samHttpApiRouteResource(
   route: SamHttpApiRouteProperties,
@@ -29,7 +37,7 @@ export function samHttpApiRouteResource(
     Properties: {
       ApiId: route.apiId,
       ...samHttpApiRouteKey(route.event.properties),
-      AuthorizationType: "NONE",
+      ...samEventAuthorization(route.event, route.apiLogicalId),
       Target: {
         "Fn::Join": [
           "",

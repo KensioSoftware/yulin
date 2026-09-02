@@ -2,7 +2,7 @@ import { MappedFactory } from "@kensio/part-factory";
 
 import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
-import { samFunctionType } from "../function/sim-cfn-sam-function.js";
+import { samFunctionType } from "../function/sim-cfn-sam-function-type.js";
 import { samTransformName } from "../sim-cfn-sam-transform.js";
 import { samRestApiType } from "./sim-cfn-sam-rest-api.js";
 

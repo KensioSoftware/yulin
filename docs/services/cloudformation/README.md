@@ -2432,9 +2432,9 @@ its own `Role` runs as that role, and gets no expanded one.
 ### Function events
 
 `Events` on a SAM function expand into whatever puts the function behind them. `Api`, `HttpApi`,
-`SQS`, `DynamoDB`, `SNS`, `S3`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the types this
-covers. An event of any other type is left where it is, and the function deploys with nothing in
-front of it.
+`SQS`, `DynamoDB`, `SNS`, `S3`, `Cognito`, `Schedule`, `ScheduleV2` and `EventBridgeRule` are the
+types this covers. An event of any other type is left where it is, and the function deploys with
+nothing in front of it.
 
 An `HttpApi` event becomes an `AWS::ApiGatewayV2::Integration`, an `AWS::ApiGatewayV2::Route` and the
 `AWS::Lambda::Permission` the API invokes the function under. `Path` and `Method` become the route
@@ -2506,7 +2506,8 @@ console.log(await response.text());
 await srv.close();
 ```
 
-`Auth` on the event is left out. Every request matching the expanded route reaches the function.
+`Auth` on the event names one of the API's authorizers. A route the event and the API both leave
+open is reached by every request matching it.
 
 An `Api` event is the REST half of the same idea. It becomes an `AWS::ApiGateway::Resource` for each
 segment of `Path`, an `AWS::ApiGateway::Method` on the last of them carrying a proxy `Integration`
@@ -2804,8 +2805,9 @@ reaches an API the template declared, and how an `AWS::ApiGatewayV2::Route` reso
 does. An API naming a `DefinitionUri` is recorded as unsupported, because nothing here reads a
 document off disk or out of S3.
 
-The API is deployed without `Auth` and `Domain`. SAM writes an `Auth` block into the document it
-generates, and deploys a `Domain` as a custom domain name resource, and neither is expanded here.
+An `Auth` block becomes the authorizer resources it declares, covered under
+[API authorizers](#api-authorizers) below. A `Domain` is deployed by SAM as a custom domain name
+resource, and an API declaring one is deployed without it.
 
 ```typescript sim-cloudformation-sam-table-api
 /**
@@ -2876,9 +2878,9 @@ created without, because reading the document is outside this. An API declaring 
 root resource and an empty tree under it. An API naming a `DefinitionUri` is recorded as
 unsupported, because this reads no document off disk or out of S3.
 
-The API is deployed without `Auth`, `Cors`, `Domain`, `GatewayResponses`, `MethodSettings` and
+The API is deployed without `Cors`, `Domain`, `GatewayResponses`, `MethodSettings` and
 `BinaryMediaTypes`. SAM writes each of them into the document it generates, and none is expanded
-here.
+here. `Auth` is expanded, and has [a section of its own](#api-authorizers) below.
 
 ```typescript sim-cloudformation-sam-rest-api
 /**
@@ -2922,6 +2924,162 @@ integrations inside the `Body` of one resource. The expansion here writes the
 something the stack holds, answers `Ref` for and tears down. The APIs, stages and methods come out
 the same either way, and the logical IDs of the path resources have no counterpart in what SAM
 produces.
+
+### API authorizers
+
+`Auth` on an `AWS::Serverless::Api` or an `AWS::Serverless::HttpApi` expands into the authorizers it
+declares. A REST API gets one `AWS::ApiGateway::Authorizer` per entry in `Authorizers`, and an HTTP
+API gets one `AWS::ApiGatewayV2::Authorizer`. Each carries the logical ID of the API with the
+authorizer's name and `Authorizer` after it (`OrdersPoolAuthAuthorizer` for an authorizer called
+`PoolAuth` on an API called `Orders`). A template can `Ref` that name, and the stack tears the
+authorizer down with everything else.
+
+On a REST API, an authorizer naming a `UserPoolArn` verifies Cognito tokens, and one naming a
+`FunctionArn` asks a function of the template. `FunctionPayloadType` picks between the `TOKEN`
+authorizer that is handed one header and the `REQUEST` authorizer that is handed the whole request.
+SAM defaults to `TOKEN`. `Identity` names the parts of the request the authorizer reads (`Header`,
+`Headers`, `QueryStrings`, `StageVariables` and `Context`), and `ReauthorizeEvery` becomes the
+authorizer's result TTL.
+
+On an HTTP API, an authorizer naming a `JwtConfiguration` verifies tokens against the issuer it
+names, and one naming a `FunctionArn` asks a function. The issuer and audience are read under either
+spelling (SAM writes them in lower case and CloudFormation capitalises them).
+`AuthorizerPayloadFormatVersion` defaults to `2.0`. `EnableIamAuthorizer` puts `AWS_IAM` among the
+names a route can take, and a REST API carries that name already.
+
+`DefaultAuthorizer` names the authorizer every method and route takes. An `Api` or `HttpApi` event
+picks another one with `Auth.Authorizer`, and opens its own method with `Auth.Authorizer: NONE`.
+`Auth.AuthorizationScopes` on the event replaces the scopes the authorizer asks for. The implicit
+API a function's events create reads its `Auth` from `Globals.Api` or `Globals.HttpApi`.
+
+An `Auth` property outside that set fails the transform, naming the property. `ApiKeyRequired`,
+`UsagePlan`, `ResourcePolicy`, `InvokeRole`, `AddDefaultAuthorizerToCorsPreflight` and
+`Identity.ValidationExpression` are all refused that way. Dropping one of them would deploy an API
+that authorizes less than the template asked for, and the failure says which property it was.
+
+```typescript sim-cloudformation-sam-api-auth
+/**
+ * A SAM HTTP API closed by the Cognito user pool its Auth block names.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-api-stack",
+  template: {
+    Transform: "AWS::Serverless-2016-10-31",
+    Resources: {
+      Users: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: { UserPoolName: "orders-users" },
+      },
+      WebClient: {
+        Type: "AWS::Cognito::UserPoolClient",
+        Properties: {
+          UserPoolId: { Ref: "Users" },
+          ClientName: "web",
+          ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+        },
+      },
+      Orders: {
+        Type: "AWS::Serverless::HttpApi",
+        Properties: {
+          Auth: {
+            DefaultAuthorizer: "PoolAuth",
+            Authorizers: {
+              PoolAuth: {
+                JwtConfiguration: {
+                  issuer: { "Fn::GetAtt": ["Users", "ProviderURL"] },
+                  audience: [{ Ref: "WebClient" }],
+                },
+              },
+            },
+          },
+        },
+      },
+      Handler: {
+        Type: "AWS::Serverless::Function",
+        Properties: {
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Events: {
+            Get: {
+              Type: "HttpApi",
+              Properties: {
+                ApiId: { Ref: "Orders" },
+                Path: "/orders",
+                Method: "GET",
+              },
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      ApiEndpoint: { Value: { "Fn::GetAtt": ["Orders", "ApiEndpoint"] } },
+      PoolId: { Value: { Ref: "Users" } },
+      ClientId: { Value: { Ref: "WebClient" } },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "Handler",
+      handler: (): { statusCode: number; body: string } => ({
+        statusCode: 200,
+        body: "orders",
+      }),
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+const cognito = simAws.cognitoIdentityProvider();
+const userPoolId = stack.output("PoolId");
+const clientId = stack.output("ClientId");
+
+await cognito.adminCreateUser({
+  input: { UserPoolId: userPoolId, Username: "ada" },
+});
+await cognito.adminSetUserPassword({
+  input: {
+    UserPoolId: userPoolId,
+    Username: "ada",
+    Password: "Correct-horse-1",
+    Permanent: true,
+  },
+});
+const signedIn = await cognito.adminInitiateAuth({
+  input: {
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "ada", PASSWORD: "Correct-horse-1" },
+  },
+});
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${stack.output("ApiEndpoint")}/orders`);
+
+const refused = await fetch(url);
+
+console.log(refused.status);
+// 401
+
+const admitted = await fetch(url, {
+  headers: {
+    authorization: `Bearer ${signedIn.AuthenticationResult?.AccessToken}`,
+  },
+});
+
+console.log(admitted.status);
+// 200
+
+await srv.close();
+```
 
 ## Serving deployed resources on localhost
 
@@ -3682,6 +3840,10 @@ Sim CloudFormation currently supports:
 - The `HttpApi` event of a SAM function, expanded into the API, integration, route, stage and invoke
   permission that serve it, and the `Api` event, expanded into the API, path resources, method,
   deployment, stage and invoke permission that serve it
+- `Auth` on a SAM API, expanded into the Cognito, JWT and Lambda authorizers it declares, with
+  `DefaultAuthorizer` and the `Auth` an event states deciding which one guards each method or route
+- The `Cognito` event of a SAM function, expanded into the pool's `LambdaConfig` entry and the
+  permission the pool invokes the function under
 - `FunctionUrlConfig` on a SAM function, expanded into a Function URL
 - The `Schedule`, `ScheduleV2` and `EventBridgeRule` events of a SAM function, expanded into the
   EventBridge rule or Scheduler schedule that fires the function, and the permission or execution
@@ -3792,9 +3954,10 @@ Each service's own docs describe what its resource types support.
   resolves may still be one CloudFormation rejects.
 - The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable`,
   `AWS::Serverless::HttpApi` and `AWS::Serverless::Api`. Every other `AWS::Serverless::*` resource
-  type is recorded as unsupported. `Api`, `HttpApi`, `SQS`, `DynamoDB`, `SNS`, `S3`, `Schedule`,
-  `ScheduleV2` and `EventBridgeRule` are the event types expanded, and an event of another type,
-  such as `Cognito`, is left where it is. `Auth` on an `Api` or `HttpApi` event, and on the implicit API
-  either of them shares, is left out. `AutoPublishAlias` and `DeploymentPreference` are left out
-  too, because the simulator has one version of a function and nothing to shift traffic between.
+  type is recorded as unsupported. `Api`, `HttpApi`, `SQS`, `DynamoDB`, `SNS`, `S3`, `Cognito`,
+  `Schedule`, `ScheduleV2` and `EventBridgeRule` are the event types expanded, and an event of
+  another type is left where it is. Under `Auth`, `ApiKeyRequired`, `UsagePlan`, `ResourcePolicy`,
+  `InvokeRole` and `AddDefaultAuthorizerToCorsPreflight` fail the transform by name.
+  `AutoPublishAlias` and `DeploymentPreference` are left out, because the simulator has one version
+  of a function and nothing to shift traffic between.
 - Many advanced CloudFormation features are outside the simulation.

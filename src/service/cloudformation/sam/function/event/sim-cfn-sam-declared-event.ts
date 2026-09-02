@@ -2,6 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../template/value/sim-cfn-template-value.js";
+import type { SamTemplateApiAuth } from "../../api/auth/sim-cfn-sam-template-api-auth.js";
 import { isSamTemplateRecord } from "../../sim-cfn-sam-record.js";
 import { samConditionAttribute } from "../sim-cfn-sam-function-properties.js";
 
@@ -18,6 +19,11 @@ export interface SamFunctionEventsProperties {
    * an API of their own.
    */
   readonly apiGlobals: SimCfnTemplateValueRecord;
+  /**
+   * The `Auth` of every API of the template, for the events that put a method
+   * or a route on one.
+   */
+  readonly apiAuth: SamTemplateApiAuth;
   /** The `Condition` the SAM Resource carried, where it carried one. */
   readonly condition: SimCfnTemplateValue | undefined;
 }
@@ -50,6 +56,12 @@ export interface SamFunctionEvent {
    * defaults as one the template declared.
    */
   readonly apiGlobals: SimCfnTemplateValueRecord;
+  /**
+   * The `Auth` of every API of the template, by the logical ID each is expanded
+   * under. An `Api` or `HttpApi` event reads the one belonging to the API it
+   * names, to say how the method or route it expands into is authorized.
+   */
+  readonly apiAuth: SamTemplateApiAuth;
 }
 
 /**
@@ -108,6 +120,7 @@ function declaredEvent(
         properties: isSamTemplateRecord(eventProperties) ? eventProperties : {},
         condition: samConditionAttribute(properties.condition),
         apiGlobals: properties.apiGlobals,
+        apiAuth: properties.apiAuth,
       },
     },
   ];

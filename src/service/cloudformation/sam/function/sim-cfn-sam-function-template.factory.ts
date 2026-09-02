@@ -3,7 +3,7 @@ import { MappedFactory } from "@kensio/part-factory";
 import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
 import { samTransformName } from "../sim-cfn-sam-transform.js";
-import { samFunctionType } from "./sim-cfn-sam-function.js";
+import { samFunctionType } from "./sim-cfn-sam-function-type.js";
 
 /**
  * What a test asks for when it wants a SAM template holding one function.
@@ -24,6 +24,11 @@ export interface SimCfnSamFunctionTemplateInput {
    * `Api` event takes from them. A test stating none gets no section.
    */
   readonly apiGlobals: SimCfnTemplateValueRecord;
+  /**
+   * The `Globals.HttpApi` defaults the template states, for a test about what
+   * an `HttpApi` event takes from them. A test stating none gets no section.
+   */
+  readonly httpApiGlobals: SimCfnTemplateValueRecord;
   /**
    * Resources the template carries beside the function, such as the API an
    * event names or a second function sharing one.
@@ -67,6 +72,7 @@ export const simCfnSamFunctionTemplateFactory = new MappedFactory<
     functionProperties: {},
     globals: {},
     apiGlobals: {},
+    httpApiGlobals: {},
     resources: {},
   }),
   (input) => ({
@@ -91,6 +97,7 @@ function globalsSection(
   const globals = {
     ...section("Function", input.globals),
     ...section("Api", input.apiGlobals),
+    ...section("HttpApi", input.httpApiGlobals),
   };
 
   return Object.keys(globals).length === 0 ? {} : { Globals: globals };
