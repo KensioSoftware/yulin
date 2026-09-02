@@ -3306,7 +3306,8 @@ An upload keeps the metadata headers it was sent. `cache-control`, `content-disp
 `content-encoding`, `content-language`, `content-type` and `expires` are stored, and a read is
 served every one of them, the way it serves an Object written by a `PutObjectCommand`. See
 [Object system metadata](#object-system-metadata). An `x-amz-meta-` header is stored too, and an
-in-process read reports it in `Metadata`.
+in-process read reports it in `Metadata`. An `x-amz-tagging` header puts the tags it names on the
+Object, the same way a `PutObjectCommand` does. See [Object tags](#object-tags).
 
 ```typescript
 await fetch(url, {

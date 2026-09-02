@@ -1,4 +1,8 @@
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  GetObjectTaggingCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   assertIdentical,
@@ -11,6 +15,7 @@ import {
   presignBucketName,
   presignSimulation,
 } from "../../../../test/s3/presign-simulation.js";
+import { tagsByKey } from "../../../../test/s3/object-tagging-fixture.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
 /**
@@ -149,6 +154,33 @@ describe("Uploading through a presigned simulated S3 URL", () => {
     assertDefined(stored.Metadata, "the stored user metadata");
     assertIdentical(stored.Metadata["customer-id"], "cust-4192");
     assertIdentical(stored.Metadata["uploaded-by"], "billing-portal");
+  });
+
+  it("keeps the tags the upload was sent with", async () => {
+    // Given a presigned upload URL
+    const { client, http, simAws } = await presignSimulation();
+    const url = await getSignedUrl(
+      client,
+      new PutObjectCommand({ Bucket: presignBucketName, Key: "quarterly.csv" }),
+      { expiresIn: 900 },
+    );
+
+    // When the upload states a tag set in the header S3 takes one in
+    await http.fetch(url, {
+      method: "PUT",
+      body: "period,total",
+      headers: { "x-amz-tagging": "department=finance&retention=long" },
+    });
+
+    // Then a read of the Object's tags reports them
+    const read = await simAws.s3().getObjectTagging(
+      new GetObjectTaggingCommand({
+        Bucket: presignBucketName,
+        Key: "quarterly.csv",
+      }),
+    );
+    assertIdentical(tagsByKey(read.TagSet)["department"], "finance");
+    assertIdentical(tagsByKey(read.TagSet)["retention"], "long");
   });
 
   it("keeps the content type the upload was sent with", async () => {
