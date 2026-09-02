@@ -161,6 +161,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
       clock: this.background,
+      background: this.background,
       logs: this.logs,
       output: this.output,
       metrics: this.metrics,

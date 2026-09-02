@@ -1,3 +1,4 @@
+import { setTimeout } from "node:timers";
 import type {
   BackgroundCompleter,
   BackgroundDueTaskSource,
@@ -95,6 +96,8 @@ export class SimClockControl implements SimClock {
   async setTo(instant: Date): Promise<void> {
     this.clock.freeze();
 
+    await reachWhatIsWaitedOn();
+
     if (instant.getTime() >= this.now().getTime()) {
       await this.runDueTasksUpTo(instant);
     }
@@ -153,8 +156,7 @@ export class SimClockControl implements SimClock {
     while (due !== undefined) {
       this.clock.setTo(this.laterOfNow(due.dueTime));
 
-      // oxlint-disable-next-line no-await-in-loop
-      await due.task();
+      this.background.runDue(due.task);
 
       // oxlint-disable-next-line no-await-in-loop
       await this.background.complete();
@@ -176,4 +178,25 @@ export class SimClockControl implements SimClock {
 
     return instant;
   }
+}
+
+/**
+ * Let work already under way reach whatever it is waiting for.
+ *
+ * A test that starts something and moves the clock without waiting for it has
+ * a real ordering problem to solve. An invocation asked for on the line above
+ * has not run a line of handler code yet, so the timer the handler is about to
+ * ask for is not on the clock when the clock moves, and moving time past an
+ * instant nothing is waiting on releases nothing.
+ *
+ * One turn of the host event loop settles that. It runs everything already
+ * queued, which carries a promise chain started on the previous line as far as
+ * its first real wait, and the clock then moves past instants that are
+ * actually being waited on. The clock is frozen before this, so the time that
+ * work reads while it gets there is the instant the test moved from.
+ */
+async function reachWhatIsWaitedOn(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
