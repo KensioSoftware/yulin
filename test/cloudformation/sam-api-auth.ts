@@ -62,6 +62,35 @@ export function samAuthRefusal(
 }
 
 /**
+ * Why the SAM transform refused an `HttpApi` event that states the given
+ * `Auth` against an API named by an intrinsic nothing here reads.
+ *
+ * An event naming its API that way reaches no `Auth` block, so an authorizer
+ * it names cannot be resolved to a Resource.
+ */
+export function samUnreadableApiRefusal(
+  eventAuth: SimCfnTemplateValue,
+): string {
+  const body = simCfnSamFunctionTemplateFactory.make({
+    functionProperties: {
+      Events: {
+        Get: {
+          Type: "HttpApi",
+          Properties: {
+            ApiId: { "Fn::ImportValue": "orders-api-id" },
+            Path: "/orders",
+            Method: "GET",
+            Auth: eventAuth,
+          },
+        },
+      },
+    },
+  });
+
+  return assertThrowsError(() => samExpandedTemplate(body)).message;
+}
+
+/**
  * A Lambda authorizer with the given block added to it, for the cases about
  * what an authorizer states beside its function.
  */

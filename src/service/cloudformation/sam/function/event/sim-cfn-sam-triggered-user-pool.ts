@@ -16,6 +16,12 @@ import type { SamFunctionEvent } from "./sim-cfn-sam-declared-event.js";
  * A trigger the pool already names a function for is refused. The pool runs
  * one function per trigger, so the alternative is a template whose two
  * declarations disagree and whose deployment silently picks one.
+ *
+ * The trigger is unconditional even where the function is conditioned. A
+ * `Condition` covers a whole Resource, and there is no conditioning a fragment
+ * of somebody else's property. A template that conditions the function out and
+ * leaves the pool fails on the pool naming a function the Stack never created,
+ * the same answer an `S3` event on a conditioned function gets.
  */
 export function samTriggeredUserPool(
   event: SamFunctionEvent,

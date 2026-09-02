@@ -4,6 +4,7 @@ import { describe, it } from "vitest";
 import {
   samAuthRefusal,
   samLambdaAuthorizer,
+  samUnreadableApiRefusal,
 } from "../../../../../../test/cloudformation/sam-api-auth.js";
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
 
@@ -96,5 +97,17 @@ describe("SAM API Auth refusals", () => {
     for (const [eventAuth, expected] of cases) {
       assertStringIncludes(samAuthRefusal("Api", {}, eventAuth), expected);
     }
+  });
+
+  it("says an API is out of reach where it cannot read the Auth block", () => {
+    // Given an event naming an authorizer on an API named by an import, which
+    // is not a SAM Resource of this template
+    // When it is expanded
+    const refusal = samUnreadableApiRefusal({ Authorizer: "PoolAuth" });
+
+    // Then the refusal says the API's Auth block was never read, and does not
+    // claim the template failed to declare the authorizer
+    assertStringIncludes(refusal, "PoolAuth names an authorizer of an API");
+    assertStringIncludes(refusal, "out of reach");
   });
 });

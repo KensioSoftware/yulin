@@ -1,4 +1,5 @@
 import {
+  assertIdentical,
   assertNonNullable,
   assertResponseStatus,
   assertStringIncludes,
@@ -25,6 +26,7 @@ import { simCognitoSignedInFactory } from "../../../../cognito/user-pool/auth/si
 import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import { simCfnSamFunctionTemplateFactory } from "../../function/sim-cfn-sam-function-template.factory.js";
+import { samAuthorizerLogicalId } from "./sim-cfn-sam-api-auth.js";
 
 describe("SAM REST API Auth expansion", () => {
   /**
@@ -286,47 +288,65 @@ describe("SAM REST API Auth expansion", () => {
     assertResponseStatus(refused, 401, await describeResponse(refused));
   });
 
-  it("leaves out the authorizers of an API the template conditions out", async () => {
+  it("conditions an API's authorizers the way the API is conditioned", async () => {
     // Given a SAM API carrying a Condition, with a Cognito authorizer on it
-    const simAws = new SimAws();
-    const signedIn = await simCognitoSignedInFactory.make({}, simAws);
-    const body = simCfnSamFunctionTemplateFactory.make({
-      functionProperties: { InlineCode: samAuthHandlerSource },
-      resources: {
-        [samAuthApiLogicalId]: {
-          Type: "AWS::Serverless::Api",
-          Condition: "IsProduction",
-          Properties: {
-            StageName: "prod",
-            Auth: {
-              DefaultAuthorizer: "PoolAuth",
-              Authorizers: { PoolAuth: { UserPoolArn: signedIn.userPoolArn } },
+    const authorizerLogicalId = samAuthorizerLogicalId(
+      { resourceType: "AWS::Serverless::Api", logicalId: samAuthApiLogicalId },
+      "PoolAuth",
+    );
+
+    async function deployAt(
+      stage: string,
+    ): Promise<Awaited<ReturnType<typeof deploySamAuthStack>>> {
+      const simAws = new SimAws();
+      const signedIn = await simCognitoSignedInFactory.make({}, simAws);
+      const body = simCfnSamFunctionTemplateFactory.make({
+        functionProperties: { InlineCode: samAuthHandlerSource },
+        resources: {
+          [samAuthApiLogicalId]: {
+            Type: "AWS::Serverless::Api",
+            Condition: "IsProduction",
+            Properties: {
+              StageName: "prod",
+              Auth: {
+                DefaultAuthorizer: "PoolAuth",
+                Authorizers: {
+                  PoolAuth: { UserPoolArn: signedIn.userPoolArn },
+                },
+              },
             },
           },
         },
-      },
-    });
-
-    // When the stack is deployed with that condition false
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "orders-stack",
-      parameters: { Stage: "test" },
-      template: {
-        ...body,
-        Parameters: { Stage: { Type: "String" } },
-        Conditions: {
-          IsProduction: { "Fn::Equals": [{ Ref: "Stage" }, "production"] },
+      });
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        parameters: { Stage: stage },
+        template: {
+          ...body,
+          Parameters: { Stage: { Type: "String" } },
+          Conditions: {
+            IsProduction: { "Fn::Equals": [{ Ref: "Stage" }, "production"] },
+          },
         },
-      },
-    });
-    await stack.waitForDeployComplete();
+      });
+      await stack.waitForDeployComplete();
 
-    // Then the authorizer went with the API, and nothing was left behind
-    // pointing at an API the stack never created
-    assertUndefined(stack.getResource(samAuthApiLogicalId));
-    assertUndefined(
-      stack.getResource(`${samAuthApiLogicalId}PoolAuthAuthorizer`),
+      return stack;
+    }
+
+    // When the stack is deployed with that condition true, and again with it
+    // false
+    const production = await deployAt("production");
+    const test = await deployAt("test");
+
+    // Then the authorizer is created with the API and left out with it, and
+    // never left behind pointing at an API the stack did not create
+    assertIdentical(
+      production.getResource(authorizerLogicalId)?.type,
+      "AWS::ApiGateway::Authorizer",
     );
+    assertUndefined(test.getResource(authorizerLogicalId));
+    assertUndefined(test.getResource(samAuthApiLogicalId));
   });
 
   it("fails the transform for an Auth property it cannot model", async () => {

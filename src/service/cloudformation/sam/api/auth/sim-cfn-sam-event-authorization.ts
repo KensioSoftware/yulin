@@ -105,7 +105,17 @@ function namedAuthorizer(
     );
   }
 
-  const authorizer = apiAuth?.authorizers.get(name);
+  if (apiAuth === undefined) {
+    throw eventAuthError(
+      event,
+      "Auth.Authorizer",
+      `${name} names an authorizer of an API whose Auth block is out of ` +
+        "reach. An event reaches one by naming a SAM API of this template, " +
+        "as the logical ID or as a `Ref` to it",
+    );
+  }
+
+  const authorizer = apiAuth.authorizers.get(name);
 
   if (authorizer === undefined) {
     throw eventAuthError(

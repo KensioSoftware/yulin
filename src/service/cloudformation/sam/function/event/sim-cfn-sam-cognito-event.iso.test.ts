@@ -13,6 +13,7 @@ import type { SimCfnDeployedStack } from "../../../stack/sim-cfn-deployed-stack.
 import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import { simCfnSamFunctionTemplateFactory } from "../sim-cfn-sam-function-template.factory.js";
+import { samTransformName } from "../../sim-cfn-sam-transform.js";
 
 describe("SAM Cognito event expansion", () => {
   /**
@@ -194,6 +195,57 @@ describe("SAM Cognito event expansion", () => {
       error.message,
       "Invalid Events.Signup.UserPool on AWS::Serverless::Function Resource " +
         "Rates",
+    );
+  });
+
+  it("refuses a pool a conditioned function's event would break", async () => {
+    // Given a function the template conditions out, with a Cognito event on a
+    // pool that is not conditioned
+    const simAws = new SimAws();
+
+    // When it is deployed with the condition false
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "myapp-stack",
+        parameters: { Stage: "test" },
+        template: {
+          Transform: samTransformName,
+          Parameters: { Stage: { Type: "String" } },
+          Conditions: {
+            IsProduction: { "Fn::Equals": [{ Ref: "Stage" }, "production"] },
+          },
+          Resources: {
+            ...poolResources(),
+            Trigger: {
+              Type: "AWS::Serverless::Function",
+              Condition: "IsProduction",
+              Properties: {
+                FunctionName: "pre-signup",
+                Handler: "index.handler",
+                Runtime: "nodejs22.x",
+                InlineCode: triggerSource,
+                Events: {
+                  Signup: {
+                    Type: "Cognito",
+                    Properties: {
+                      UserPool: { Ref: "AppPool" },
+                      Trigger: "PreSignUp",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the pool says which function it was left naming. A trigger is a
+    // fragment of the pool's own properties, and there is no conditioning one
+    assertStringIncludes(
+      error.message,
+      "Resource AppPool names Resource Trigger",
     );
   });
 
