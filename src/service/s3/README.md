@@ -506,11 +506,24 @@ never the thing caching holds on to.
 2. looks up the Bucket locally
 3. throws `SimS3NoSuchBucket` if absent
 4. sequences background work
-5. gets the object from Bucket storage
-6. throws `SimS3NoSuchKey` if absent
-7. resolves any stated `Range` against the size of the stored body
-8. returns a readable body stream, metadata, `ETag`, `LastModified`, `ContentLength` and
+5. authorizes `s3:GetObject` against the Object ARN through `GetObjectAuthorizer`
+6. gets the object from Bucket storage
+7. authorizes `s3:ListBucket` against the Bucket ARN if the key holds nothing, and throws
+   `SimS3NoSuchKey` once that passes
+8. resolves any stated `Range` against the size of the stored body
+9. returns a readable body stream, metadata, `ETag`, `LastModified`, `ContentLength` and
    `$metadata`, with a `ContentRange` for a read that asked for part of the Object
+
+The second decision is what real S3 makes for a key that is not there. Admitting the absence tells
+the caller something a listing would have told it. A caller holding no `s3:ListBucket` is answered
+`AccessDenied` for a missing key, and one holding it is answered `NoSuchKey`. `GetObjectLoader`
+answers `undefined` for a key that holds nothing, the way `simS3ReadObjectVersion` answers it, and
+`GetObjectCommandHandler` takes the decision from there. An Object that is there comes back before
+any of that, on `s3:GetObject` alone.
+
+Everything reading an Object through the GetObject command inherits this, including the served REST
+endpoint, the static website endpoint and a CloudFront S3 Origin. `grantPublicObjectRead` in
+`bucket/sim-s3-public-read.fixture.ts` grants the listing alongside the read for that reason.
 
 `simS3ReadObjectRange` in `object/s3-object-range.ts` reads the header. The three forms are
 `bytes=<start>-<end>`, `bytes=<start>-` and `bytes=-<suffix>`, and an end past the last byte is

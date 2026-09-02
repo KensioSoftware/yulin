@@ -2238,6 +2238,111 @@ matching S3's idempotent behaviour.
 A Bucket policy granting `Principal: "*"` is refused by default. See
 [Block Public Access](#block-public-access) below.
 
+### Missing keys and `s3:ListBucket`
+
+What S3 answers for a missing Object depends on a second permission. A caller holding
+`s3:GetObject` alone is answered `403 AccessDenied` for a key the Bucket does not hold, the same
+answer it gets for a key it may not read. `s3:ListBucket` on the Bucket ARN is what buys
+`404 NoSuchKey`.
+
+Which keys a Bucket holds is what a listing tells you, and real S3 admits the absence only to a
+caller that may list. A test written against a simulator that always answered `NoSuchKey` would
+handle the absence on a path the deployed code never reaches.
+
+```typescript sim-s3-missing-key-permission
+/**
+ * What simulated S3 answers for an Object that is not there.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simIam = simAws.iam();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "reports" }));
+
+const readerCreation = await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "ReportReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ReportReader",
+    PolicyName: "ReadReports",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:GetObject",
+        Resource: "arn:aws:s3:::reports/*",
+      },
+    }),
+  }),
+);
+
+const asReader = {
+  caller: { kind: "arn", arn: readerCreation.Role.Arn },
+} as const;
+
+try {
+  await simS3.getObject(
+    new GetObjectCommand({ Bucket: "reports", Key: "q4/report.txt" }),
+    asReader,
+  );
+} catch (error) {
+  // AccessDenied, with a 403 status. This caller may not list the Bucket, and
+  // S3 will not tell it whether the key is there.
+  console.error("Read refused", error);
+}
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ReportReader",
+    PolicyName: "ListReports",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:ListBucket",
+        Resource: "arn:aws:s3:::reports",
+      },
+    }),
+  }),
+);
+
+try {
+  await simS3.getObject(
+    new GetObjectCommand({ Bucket: "reports", Key: "q4/report.txt" }),
+    asReader,
+  );
+} catch (error) {
+  // NoSuchKey, with a 404 status.
+  console.error("Object missing", error);
+}
+```
+
+An Object that is there is served on `s3:GetObject` alone. The listing permission only decides what
+a caller is told about a key the Bucket does not hold.
+
+Everything that reads through GetObject follows the same rule, including the served S3 endpoint, the
+static website endpoint and a CloudFront S3 Origin. A site whose Bucket policy grants only
+`s3:GetObject` answers 403 for a page it does not hold, and serves its custom error document with
+that status. Adding `s3:ListBucket` on the Bucket ARN gives it the 404 an error document is usually
+written for.
+
 ### Where a request came from
 
 A request can say what it is being made for, and a simulated service supplies that when it reaches a

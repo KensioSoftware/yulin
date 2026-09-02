@@ -86,6 +86,12 @@ interface PresignSimulationProperties {
    */
   readonly allowedActions?: string[];
   /**
+   * Whether the signing user may list the Bucket, which is what lets S3 tell
+   * it that a key is missing. A user without it is answered AccessDenied for
+   * an Object that is not there, as real S3 answers one.
+   */
+  readonly allowsBucketListing?: boolean;
+  /**
    * Passed to the S3 client, so a test can build URLs the way a client with a
    * different checksum setting would.
    */
@@ -106,6 +112,7 @@ export async function presignSimulation(
 ): Promise<PresignSimulation> {
   const {
     allowedActions = ["s3:GetObject", "s3:PutObject"],
+    allowsBucketListing = true,
     requestChecksumCalculation = "WHEN_REQUIRED",
     forcePathStyle = false,
   } = properties;
@@ -135,11 +142,22 @@ export async function presignSimulation(
       PolicyName: "PresignedObjectAccess",
       PolicyDocument: JSON.stringify({
         Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: allowedActions,
-          Resource: `arn:aws:s3:::${presignBucketName}/*`,
-        },
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: allowedActions,
+            Resource: `arn:aws:s3:::${presignBucketName}/*`,
+          },
+          ...(allowsBucketListing
+            ? [
+                {
+                  Effect: "Allow",
+                  Action: "s3:ListBucket",
+                  Resource: `arn:aws:s3:::${presignBucketName}`,
+                },
+              ]
+            : []),
+        ],
       }),
     }),
   );
