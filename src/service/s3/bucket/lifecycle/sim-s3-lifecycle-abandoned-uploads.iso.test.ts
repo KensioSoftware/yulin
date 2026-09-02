@@ -18,7 +18,7 @@ import { describe, it } from "vitest";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimFixedClock } from "../../../../util/clock/sim-clock.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimS3NoSuchUpload } from "../../error/sim-s3.error.js";
+import { SimS3NoSuchUpload } from "../../error/sim-s3-upload.error.js";
 
 const startedAt = new Date("2026-08-24T09:00:00.000Z");
 

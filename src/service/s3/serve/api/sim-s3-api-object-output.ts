@@ -46,6 +46,10 @@ export async function simS3GetObjectResponse(
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,
       contentRange,
+      storageClass: output["StorageClass"] as string | undefined,
+      serverSideEncryption: output["ServerSideEncryption"] as
+        | string
+        | undefined,
     }),
   });
 }

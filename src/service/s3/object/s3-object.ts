@@ -1,4 +1,9 @@
 import { simS3ObjectETag } from "./s3-object-etag.js";
+import type { SimS3ServerSideEncryption } from "./s3-server-side-encryption.js";
+import {
+  simS3DefaultStorageClass,
+  type SimS3StorageClass,
+} from "./s3-storage-class.js";
 import {
   simS3SystemMetadataOutput,
   simS3UserDefinedMetadata,
@@ -41,6 +46,17 @@ interface SimS3ObjectProperties {
    * them. Only a multipart upload produces one.
    */
   readonly etag?: string;
+  /**
+   * The storage class the Object is in. An Object nobody asked to store
+   * elsewhere is in the default class.
+   */
+  readonly storageClass?: SimS3StorageClass;
+  /**
+   * The encryption S3 applied when it stored these bytes, from the write or
+   * from the Bucket's default. The bytes are stored as they arrived whatever
+   * this says, and it is what a read reports about them.
+   */
+  readonly serverSideEncryption?: SimS3ServerSideEncryption | undefined;
 }
 
 /**
@@ -50,6 +66,8 @@ export class SimS3Object {
   public readonly key: string;
   public readonly body: Buffer;
   public readonly metadata: SimS3ObjectMetadata;
+  public readonly storageClass: SimS3StorageClass;
+  public readonly serverSideEncryption: SimS3ServerSideEncryption | undefined;
 
   private readonly writtenAt: Date;
   private readonly givenETag: string | undefined;
@@ -60,13 +78,36 @@ export class SimS3Object {
       body = Buffer.alloc(0),
       metadata = new SimS3ObjectMetadata(),
       lastModified = new Date(),
+      storageClass = simS3DefaultStorageClass,
     } = properties;
 
     this.key = key;
     this.body = body;
     this.metadata = metadata;
+    this.storageClass = storageClass;
+    this.serverSideEncryption = properties.serverSideEncryption;
     this.writtenAt = new Date(lastModified);
     this.givenETag = properties.etag;
+  }
+
+  /**
+   * The same Object in another storage class, for a lifecycle rule that has
+   * transitioned it.
+   *
+   * The bytes are shared with the Object this came from. A transition moves
+   * where S3 keeps an Object and leaves the Object itself alone, so its ETag,
+   * its metadata and the instant it was last written all carry over.
+   */
+  withStorageClass(storageClass: SimS3StorageClass): SimS3Object {
+    return new SimS3Object({
+      key: this.key,
+      body: this.body,
+      metadata: this.metadata,
+      lastModified: this.writtenAt,
+      storageClass,
+      serverSideEncryption: this.serverSideEncryption,
+      ...(this.givenETag !== undefined && { etag: this.givenETag }),
+    });
   }
 
   /**

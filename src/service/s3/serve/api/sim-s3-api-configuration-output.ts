@@ -27,6 +27,46 @@ export function publicAccessBlockXml(output: Record<string, unknown>): string {
   );
 }
 
+interface EncryptionRule {
+  readonly ApplyServerSideEncryptionByDefault?:
+    | { readonly SSEAlgorithm?: string; readonly KMSMasterKeyID?: string }
+    | undefined;
+  readonly BucketKeyEnabled?: boolean | undefined;
+}
+
+/**
+ * Write a Bucket's default encryption configuration.
+ */
+export function encryptionConfigurationXml(
+  output: Record<string, unknown>,
+): string {
+  const configuration = (output["ServerSideEncryptionConfiguration"] ?? {}) as {
+    readonly Rules?: readonly EncryptionRule[];
+  };
+
+  return xmlDocument(
+    "ServerSideEncryptionConfiguration",
+    (configuration.Rules ?? [])
+      .map((rule) =>
+        xmlElement(
+          "Rule",
+          xmlElement(
+            "ApplyServerSideEncryptionByDefault",
+            xmlValue(
+              "SSEAlgorithm",
+              rule.ApplyServerSideEncryptionByDefault?.SSEAlgorithm,
+            ) +
+              xmlValue(
+                "KMSMasterKeyID",
+                rule.ApplyServerSideEncryptionByDefault?.KMSMasterKeyID,
+              ),
+          ) + xmlValue("BucketKeyEnabled", rule.BucketKeyEnabled),
+        ),
+      )
+      .join(""),
+  );
+}
+
 interface NotificationEntry {
   readonly Id?: string | undefined;
   readonly Events?: readonly string[] | undefined;

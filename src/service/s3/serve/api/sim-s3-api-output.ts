@@ -1,5 +1,6 @@
 import {
   deleteResultXml,
+  encryptionConfigurationXml,
   notificationConfigurationXml,
   publicAccessBlockXml,
 } from "./sim-s3-api-configuration-output.js";
@@ -58,6 +59,9 @@ export async function simS3ApiResponse(
     }
     case "GetPublicAccessBlockCommand": {
       return xml(publicAccessBlockXml(value));
+    }
+    case "GetBucketEncryptionCommand": {
+      return xml(encryptionConfigurationXml(value));
     }
     case "GetBucketNotificationConfigurationCommand": {
       return xml(notificationConfigurationXml(value));

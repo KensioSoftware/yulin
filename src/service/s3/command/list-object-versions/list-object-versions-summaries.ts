@@ -1,6 +1,5 @@
 import type { SimS3ObjectVersion } from "../../bucket/versioning/sim-s3-object-version.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
-import { simS3DefaultStorageClass } from "../../object/s3-object-summary.js";
 import type {
   SimS3DeleteMarkerSummary,
   SimS3ObjectVersionSummary,
@@ -27,7 +26,7 @@ export function simS3ObjectVersionSummaries(
       LastModified: version.lastModified,
       ETag: simS3QuotedETag(version.object.etag),
       Size: version.object.body.length,
-      StorageClass: simS3DefaultStorageClass,
+      StorageClass: version.object.storageClass,
     }));
 }
 

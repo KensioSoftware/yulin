@@ -1,5 +1,6 @@
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import { SimS3MalformedXml } from "../../error/sim-s3.error.js";
+import { simS3StorageClassFrom } from "../../object/s3-storage-class.js";
 import type {
   SimS3LifecycleConfiguration,
   SimS3LifecycleRule,
@@ -74,6 +75,33 @@ function validateRule(
     throw new SimS3MalformedXml(
       `Lifecycle rule ${named} for S3 Bucket ${bucketName} must state at ` +
         `least one of ${ruleActionNames}`,
+    );
+  }
+
+  validateTransitionClasses(rule, named, bucketName);
+}
+
+/**
+ * Refuse a transition to a storage class S3 has no such class for.
+ *
+ * The class is read here, where the configuration is stored, so a rule that
+ * names one nothing can transition to is refused before it is applied to
+ * anything.
+ */
+function validateTransitionClasses(
+  rule: SimS3LifecycleRule,
+  named: string,
+  bucketName: SimS3BucketName,
+): void {
+  const transitions = [
+    ...(rule.Transitions ?? []),
+    ...(rule.NoncurrentVersionTransitions ?? []),
+  ];
+
+  for (const transition of transitions) {
+    simS3StorageClassFrom(
+      transition.StorageClass,
+      `lifecycle rule ${named} of S3 Bucket ${bucketName}`,
     );
   }
 }

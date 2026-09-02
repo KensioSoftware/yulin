@@ -114,7 +114,7 @@ export class SimS3LifecycleConfiguration {
    * shortest one.
    */
   expires(object: SimS3LifecycleObject, now: Date): boolean {
-    return this.enabledRules().some(
+    return this.enabledRules.some(
       (rule) =>
         rule.Expiration !== undefined &&
         simS3LifecycleRuleSelects(rule, object) &&
@@ -137,7 +137,7 @@ export class SimS3LifecycleConfiguration {
     version: SimS3LifecycleNoncurrentVersion,
     now: Date,
   ): boolean {
-    return this.enabledRules().some((rule) => {
+    return this.enabledRules.some((rule) => {
       const expiration = rule.NoncurrentVersionExpiration;
 
       return (
@@ -162,7 +162,7 @@ export class SimS3LifecycleConfiguration {
    * key in a listing once its last version has gone.
    */
   expiresDeleteMarker(key: string): boolean {
-    return this.enabledRules().some(
+    return this.enabledRules.some(
       (rule) =>
         rule.Expiration?.ExpiredObjectDeleteMarker === true &&
         simS3LifecycleRuleSelects(rule, { key }),
@@ -174,7 +174,7 @@ export class SimS3LifecycleConfiguration {
    * instant.
    */
   abandons(upload: SimS3LifecycleUpload, now: Date): boolean {
-    return this.enabledRules().some(
+    return this.enabledRules.some(
       (rule) =>
         rule.AbortIncompleteMultipartUpload !== undefined &&
         simS3LifecycleRuleSelects(rule, { key: upload.key }) &&
@@ -193,9 +193,10 @@ export class SimS3LifecycleConfiguration {
    *
    * Read from the stored rules rather than from `rules`, because every read of
    * a Bucket asks and cloning the whole configuration each time would be the
-   * cost of having one.
+   * cost of having one. A transition is worked out from these by
+   * `simS3TransitionedObjectClass`.
    */
-  private enabledRules(): readonly SimS3LifecycleRule[] {
+  get enabledRules(): readonly SimS3LifecycleRule[] {
     return this.storedRules.filter((rule) => rule.Status === "Enabled");
   }
 }

@@ -5,6 +5,7 @@ import type {
   SimS3LifecycleConfiguration,
   SimS3LifecycleObject,
 } from "./sim-s3-lifecycle-configuration.js";
+import { simS3TransitionedObjectClass } from "./sim-s3-lifecycle-transition.js";
 
 /**
  * One pass over what a Bucket's lifecycle rules have expired.
@@ -17,6 +18,11 @@ import type {
  * carrying no rules paying one comparison for the check. See
  * `simS3ObjectExpiryInstant` for why the boundary is a pure function of the
  * current time.
+ *
+ * A transition is answered here as well. An Object past the day a
+ * `Transitions` rule names reads back in the class that rule moves it to, and
+ * the bytes stay where they are, which is all a transition does to an Object a
+ * caller can still read.
  *
  * Nothing is announced. Real S3 raises `s3:LifecycleExpiration:Delete` for an
  * expiry, and that event family is among the ones simulated S3 leaves out.
@@ -44,8 +50,12 @@ export class SimS3LifecycleSweep {
   async object(
     object: SimS3Object | undefined,
   ): Promise<SimS3Object | undefined> {
-    if (object === undefined || !this.expires(object)) {
+    if (object === undefined) {
       return object;
+    }
+
+    if (!this.expires(object)) {
+      return this.transitioned(object);
     }
 
     await this.expire(object.key);
@@ -72,7 +82,35 @@ export class SimS3LifecycleSweep {
       }),
     );
 
-    return objects.filter((object) => !expiredKeys.has(object.key));
+    return objects
+      .filter((object) => !expiredKeys.has(object.key))
+      .map((object) => this.transitioned(object));
+  }
+
+  /**
+   * The Object in the class the rules have transitioned it into.
+   *
+   * The class is worked out on each read rather than written back, for the
+   * same reason an expiry is: it is a pure function of the rules and the
+   * current time, and storage that maps Objects onto files has nowhere to
+   * record one. See `simS3ObjectExpiryInstant`.
+   */
+  private transitioned(object: SimS3Object): SimS3Object {
+    if (this.lifecycle.isEmpty) {
+      return object;
+    }
+
+    const storageClass = simS3TransitionedObjectClass(
+      this.lifecycle.enabledRules,
+      lifecycleObject(object),
+      this.now,
+    );
+
+    if (storageClass === undefined || storageClass === object.storageClass) {
+      return object;
+    }
+
+    return object.withStorageClass(storageClass);
   }
 
   /**

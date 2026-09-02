@@ -1,6 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimS3WriteBody } from "../../object/s3-write-body.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
+import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
 
 /**
  * Minimal structural sim S3 PutObject command.
@@ -16,7 +17,8 @@ export interface SimPutObjectCommand {
  * Object carries, which is why they are declared once in
  * `SimS3ObjectWriteMetadata` and shared with `CreateMultipartUpload`.
  */
-export interface SimPutObjectCommandInput extends SimS3ObjectWriteMetadata {
+export interface SimPutObjectCommandInput
+  extends SimS3ObjectWriteMetadata, SimS3ObjectWriteStorage {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   readonly Body?: SimPutObjectBody;
@@ -33,6 +35,8 @@ export interface SimPutObjectCommandInput extends SimS3ObjectWriteMetadata {
 export interface SimPutObjectCommandOutput {
   readonly ETag?: string;
   readonly VersionId?: string | undefined;
+  /** The encryption S3 stamped on the Object it stored. */
+  readonly ServerSideEncryption?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

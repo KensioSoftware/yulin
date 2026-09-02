@@ -58,6 +58,7 @@ export class SimCfnS3BucketConfigurator {
     await this.declared.applyVersioning();
     await this.declared.applyObjectLock();
     await this.declared.applyLifecycle();
+    await this.declared.applyEncryption();
     await this.configureNotifications();
   }
 

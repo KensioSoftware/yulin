@@ -17,6 +17,13 @@ export interface SimS3ObjectResponseDescription {
    * of them rather than all of them.
    */
   readonly contentRange?: string | undefined;
+  /**
+   * The storage class the Object is in, for one outside the default class.
+   * Real S3 leaves the header off a Standard Object.
+   */
+  readonly storageClass?: string | undefined;
+  /** The encryption S3 applied when it stored the Object. */
+  readonly serverSideEncryption?: string | undefined;
 }
 
 /**
@@ -28,6 +35,11 @@ export interface SimS3ObjectResponseDescription {
  * Object stored as brotli and served without its encoding header is bytes no
  * client can decode. `Cache-Control` matters for a different reason, being the
  * only one of these a caller can set per Object rather than per response.
+ *
+ * `x-amz-storage-class` and `x-amz-server-side-encryption` say where and how
+ * S3 keeps the Object. The class is set for an Object outside the default one,
+ * as real S3 sets it, and the encryption is set for every Object S3 stored
+ * itself.
  *
  * `ETag` and `Last-Modified` are not metadata but facts about the stored bytes,
  * and are what makes a conditional request or a content-hash comparison
@@ -64,6 +76,14 @@ export function simS3ObjectResponseHeaders(
 
   if (description.contentRange !== undefined) {
     headers["content-range"] = description.contentRange;
+  }
+
+  if (description.storageClass !== undefined) {
+    headers["x-amz-storage-class"] = description.storageClass;
+  }
+
+  if (description.serverSideEncryption !== undefined) {
+    headers["x-amz-server-side-encryption"] = description.serverSideEncryption;
   }
 
   return headers;

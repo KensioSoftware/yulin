@@ -114,7 +114,12 @@ export class CopyObjectCommandHandler implements CommandHandler<
     );
 
     const stored = await simS3CopySourceObject(source, from.key);
-    const object = this.objectBuilder.build(command.input, key, stored);
+    const object = this.objectBuilder.build(
+      command.input,
+      key,
+      stored,
+      destination.getEncryption().algorithm,
+    );
     const version = await destination.putObject(object);
 
     this.notifications.objectCreated({
@@ -131,6 +136,7 @@ export class CopyObjectCommandHandler implements CommandHandler<
         LastModified: object.lastModified,
       },
       ...(version !== undefined && { VersionId: version.versionId }),
+      ServerSideEncryption: object.serverSideEncryption,
       $metadata: {},
     };
   }

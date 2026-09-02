@@ -2,6 +2,10 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { simS3WriteMetadata } from "../../object/s3-write-metadata.js";
 import {
+  simS3WriteEncryption,
+  simS3WriteStorageClass,
+} from "../../object/s3-write-storage.js";
+import {
   SimS3MultipartAccess,
   type SimS3MultipartAccessProperties,
 } from "../multipart/sim-s3-multipart-access.js";
@@ -42,16 +46,28 @@ export class CreateMultipartUploadCommandHandler implements CommandHandler<
 
     const { bucket } = await this.access.reach(Bucket, Key, options);
 
+    const storageClass = simS3WriteStorageClass(
+      command.input,
+      "CreateMultipartUploadCommand",
+    );
+
     const upload = bucket.getMultipartUploads().start({
       key: Key,
       metadata: simS3WriteMetadata(command.input),
       initiated: this.access.now(),
+      ...(storageClass !== undefined && { storageClass }),
+      serverSideEncryption: simS3WriteEncryption(
+        command.input,
+        bucket.getEncryption().algorithm,
+        "CreateMultipartUploadCommand",
+      ),
     });
 
     return {
       Bucket: bucket.bucketName,
       Key: upload.key,
       UploadId: upload.uploadId,
+      ServerSideEncryption: upload.serverSideEncryption,
       $metadata: {},
     };
   }

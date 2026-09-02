@@ -312,9 +312,12 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 37);
+    assertArrayLength(supported, 40);
     assertArrayIncludes(supported, "CopyObjectCommand");
     assertArrayIncludes(supported, "PutBucketVersioningCommand");
+    assertArrayIncludes(supported, "PutBucketEncryptionCommand");
+    assertArrayIncludes(supported, "GetBucketEncryptionCommand");
+    assertArrayIncludes(supported, "DeleteBucketEncryptionCommand");
     assertArrayIncludes(supported, "GetBucketVersioningCommand");
     assertArrayIncludes(supported, "ListObjectVersionsCommand");
     assertArrayIncludes(supported, "PutObjectLockConfigurationCommand");

@@ -1,8 +1,8 @@
+import { SimS3MalformedXml } from "../error/sim-s3.error.js";
 import {
   SimS3InvalidPart,
   SimS3InvalidPartOrder,
-  SimS3MalformedXml,
-} from "../error/sim-s3.error.js";
+} from "../error/sim-s3-upload.error.js";
 import { SimS3Object } from "../object/s3-object.js";
 import {
   simS3MultipartETag,
@@ -60,6 +60,8 @@ export function simS3CompletedUploadObject(
     metadata: upload.metadata,
     lastModified: properties.completedAt,
     etag: simS3MultipartETag(stored.map((part) => part.etag)),
+    storageClass: upload.storageClass,
+    serverSideEncryption: upload.serverSideEncryption,
   });
 }
 

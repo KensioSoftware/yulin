@@ -1,6 +1,7 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NotFound } from "../../error/sim-s3.error.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
+import { simS3ObjectStorageReport } from "../../object/s3-object-storage-report.js";
 import { simS3ReadObjectVersion } from "../object/sim-s3-read-object-version.js";
 import type { SimHeadObjectCommandOutput } from "./head-object.command.js";
 
@@ -35,6 +36,7 @@ export class HeadObjectLoader {
       ETag: simS3QuotedETag(object.etag),
       LastModified: object.lastModified,
       ...(read.versionId !== undefined && { VersionId: read.versionId }),
+      ...simS3ObjectStorageReport(object),
       ...read.lock?.reported,
       $metadata: {},
     };

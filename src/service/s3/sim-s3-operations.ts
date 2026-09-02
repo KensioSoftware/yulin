@@ -100,6 +100,30 @@ export abstract class SimS3Operations extends SimS3VersionOperations {
     return await this.commands.publicAccessBlocks.delete(command, options);
   }
 
+  /** Handle a Put Bucket Encryption Command from the SDK. */
+  async putBucketEncryption(
+    command: simS3Commands.SimPutBucketEncryptionCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimPutBucketEncryptionCommandOutput> {
+    return await this.commands.encryption.put(command, options);
+  }
+
+  /** Handle a Get Bucket Encryption Command from the SDK. */
+  async getBucketEncryption(
+    command: simS3Commands.SimGetBucketEncryptionCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimGetBucketEncryptionCommandOutput> {
+    return await this.commands.encryption.get(command, options);
+  }
+
+  /** Handle a Delete Bucket Encryption Command from the SDK. */
+  async deleteBucketEncryption(
+    command: simS3Commands.SimDeleteBucketEncryptionCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteBucketEncryptionCommandOutput> {
+    return await this.commands.encryption.delete(command, options);
+  }
+
   /** Handle a Put Bucket Website Command from the SDK. */
   async putBucketWebsite(
     command: simS3Commands.SimPutBucketWebsiteCommand,

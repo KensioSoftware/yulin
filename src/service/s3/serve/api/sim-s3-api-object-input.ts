@@ -75,6 +75,11 @@ export function createMultipartUploadInput(request: SimS3ApiRequest): object {
     ),
     ...optional("ContentEncoding", request.headers.get("content-encoding")),
     ...optional("ContentLanguage", request.headers.get("content-language")),
+    ...optional("StorageClass", request.headers.get("x-amz-storage-class")),
+    ...optional(
+      "ServerSideEncryption",
+      request.headers.get("x-amz-server-side-encryption"),
+    ),
     ...simS3UserMetadata(request.headers),
   };
 }

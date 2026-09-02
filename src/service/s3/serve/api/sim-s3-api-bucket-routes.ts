@@ -1,4 +1,5 @@
 import { readSimS3NotificationConfiguration } from "./sim-s3-api-notification-read.js";
+import { readSimS3EncryptionConfiguration } from "./sim-s3-api-encryption-read.js";
 import {
   readSimS3DeleteRequest,
   readSimS3PublicAccessBlock,
@@ -45,6 +46,13 @@ export const simS3BucketApiRoutes: readonly SimS3ApiRoute[] = [
     target: "bucket",
     subResource: "publicAccessBlock",
     commandName: "GetPublicAccessBlockCommand",
+    input: bucketInput,
+  },
+  {
+    method: "GET",
+    target: "bucket",
+    subResource: "encryption",
+    commandName: "GetBucketEncryptionCommand",
     input: bucketInput,
   },
   {
@@ -109,6 +117,18 @@ export const simS3BucketApiRoutes: readonly SimS3ApiRoute[] = [
   {
     method: "PUT",
     target: "bucket",
+    subResource: "encryption",
+    commandName: "PutBucketEncryptionCommand",
+    input: (request) =>
+      bucketBodyInput(
+        request,
+        "ServerSideEncryptionConfiguration",
+        readSimS3EncryptionConfiguration,
+      ),
+  },
+  {
+    method: "PUT",
+    target: "bucket",
     subResource: "notification",
     commandName: "PutBucketNotificationConfigurationCommand",
     input: (request) =>
@@ -137,6 +157,13 @@ export const simS3BucketApiRoutes: readonly SimS3ApiRoute[] = [
     target: "bucket",
     subResource: "policy",
     commandName: "DeleteBucketPolicyCommand",
+    input: bucketInput,
+  },
+  {
+    method: "DELETE",
+    target: "bucket",
+    subResource: "encryption",
+    commandName: "DeleteBucketEncryptionCommand",
     input: bucketInput,
   },
   {

@@ -24,7 +24,7 @@ export function simS3ObjectExpiryInstant(
   writtenAt: Date,
 ): Date | undefined {
   if (expiration.Days !== undefined) {
-    return afterDays(writtenAt, expiration.Days);
+    return simS3LifecycleAfterDays(writtenAt, expiration.Days);
   }
 
   if (expiration.Date !== undefined) {
@@ -54,7 +54,7 @@ export function simS3NoncurrentExpiryInstant(
     return undefined;
   }
 
-  return afterDays(noncurrentSince, expiration.NoncurrentDays);
+  return simS3LifecycleAfterDays(noncurrentSince, expiration.NoncurrentDays);
 }
 
 /**
@@ -69,7 +69,7 @@ export function simS3UploadAbortInstant(
     return undefined;
   }
 
-  return afterDays(initiated, abort.DaysAfterInitiation);
+  return simS3LifecycleAfterDays(initiated, abort.DaysAfterInitiation);
 }
 
 /**
@@ -82,6 +82,10 @@ export function simS3LifecycleReached(
   return boundary !== undefined && now.getTime() >= boundary.getTime();
 }
 
-function afterDays(from: Date, days: number): Date {
+/**
+ * The instant a number of days after another one, which is how every lifecycle
+ * boundary measured in days is reached.
+ */
+export function simS3LifecycleAfterDays(from: Date, days: number): Date {
   return new Date(from.getTime() + days * millisecondsPerDay);
 }

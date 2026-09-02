@@ -8,6 +8,7 @@ import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3BucketCommands } from "./command/bucket/sim-s3-bucket-commands.js";
 import { SimS3BucketPolicyCommands } from "./command/bucket-policy/sim-s3-bucket-policy-commands.js";
+import { SimS3EncryptionCommands } from "./command/encryption/sim-s3-encryption-commands.js";
 import { SimS3LifecycleCommands } from "./command/lifecycle/sim-s3-lifecycle-commands.js";
 import { SimS3MultipartCommands } from "./command/multipart/sim-s3-multipart-commands.js";
 import { SimS3NotificationCommands } from "./command/notification/sim-s3-notification-commands.js";
@@ -65,6 +66,7 @@ export class SimS3Commands {
   public readonly notifications: SimS3NotificationCommands;
   public readonly lifecycles: SimS3LifecycleCommands;
   public readonly versioning: SimS3VersioningCommands;
+  public readonly encryption: SimS3EncryptionCommands;
   public readonly objectLock: SimS3ObjectLockCommands;
   public readonly objects: SimS3ObjectCommands;
   public readonly multipartUploads: SimS3MultipartCommands;
@@ -105,6 +107,7 @@ export class SimS3Commands {
     this.notifications = new SimS3NotificationCommands(state);
     this.lifecycles = new SimS3LifecycleCommands(state);
     this.versioning = new SimS3VersioningCommands(state);
+    this.encryption = new SimS3EncryptionCommands(state);
     this.objectLock = new SimS3ObjectLockCommands(state);
     this.objects = new SimS3ObjectCommands(state);
     this.multipartUploads = new SimS3MultipartCommands(state);
