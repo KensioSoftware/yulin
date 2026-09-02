@@ -12,6 +12,20 @@ import { SimCdkBucketDeployErrorMessage } from "../error-message/sim-cdk-bucket-
  */
 export class SimCdkBucketDeploySource {
   /**
+   * Find the local source directory for every source object key a deployment
+   * names, in the order it names them.
+   */
+  sourceDirectoryPaths(
+    resource: SimCfnResource,
+    sourceObjectKeys: readonly string[],
+    cdkOutContext: SimCdkOutContext | undefined,
+  ): string[] {
+    return sourceObjectKeys.map((objectKey) =>
+      this.sourceDirectoryPathForObjectKey(resource, objectKey, cdkOutContext),
+    );
+  }
+
+  /**
    * Find the local source directory for a CDK BucketDeployment source object key.
    */
   sourceDirectoryPathForObjectKey(

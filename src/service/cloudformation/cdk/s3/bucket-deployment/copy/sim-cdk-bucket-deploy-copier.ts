@@ -1,5 +1,6 @@
 import type { SimS3Bucket } from "../../../../../s3/bucket/sim-s3-bucket.js";
 import { SimCdkBucketDeployFilter } from "../filter/sim-cdk-bucket-deploy-filter.js";
+import type { SimCdkBucketDeployNotifier } from "../notify/sim-cdk-bucket-deploy-notifier.js";
 import type { SimCdkBucketDeployProperties } from "../property/sim-cdk-bucket-deploy-properties.js";
 import { SimCdkBucketDeployFile } from "./sim-cdk-bucket-deploy-file.js";
 import { simCdkBucketDeployFiles } from "./sim-cdk-bucket-deploy-files.js";
@@ -8,6 +9,7 @@ import { SimCdkBucketDeployPruner } from "./sim-cdk-bucket-deploy-pruner.js";
 interface SimCdkBucketDeployCopierProperties {
   readonly bucket: SimS3Bucket;
   readonly properties: SimCdkBucketDeployProperties;
+  readonly notifier: SimCdkBucketDeployNotifier;
 }
 
 /**
@@ -40,6 +42,7 @@ export class SimCdkBucketDeployCopier {
       bucket: properties.bucket,
       filter: this.filter,
       keyPrefix: this.properties.destinationKeyPrefix,
+      notifier: properties.notifier,
     });
   }
 

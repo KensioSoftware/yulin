@@ -5,14 +5,17 @@ import {
   assertArrayEmpty,
   assertArrayLength,
   assertBufferEqual,
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
+import { DeletingFilesystemS3BucketStorage } from "./s3-filesystem-deleting-storage.js";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
 import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
@@ -274,9 +277,85 @@ describe("Filesystem simulated S3 storage", () => {
       await storage.deleteObject("keep.txt");
     });
 
-    // Then the refusal is reported, and the file is still there
+    // Then the refusal is reported, naming the directory the file is in, and
+    // the file is still there
     assertInstanceOf(error, SimS3NotImplemented);
     assertStringIncludes(error.message, "will not delete keep.txt");
+    assertStringIncludes(error.message, testDirectory.join("public"));
     assertNonNullable(await storage.getObject("keep.txt"));
+  });
+
+  it("deletes an Object by unlinking its file when the mount allows it", async () => {
+    // Given a directory mounted with deletion allowed, backing an Object
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "stale.txt"], "stale");
+
+    const storage = new DeletingFilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When the Object is deleted
+    const removed = await storage.deleteObject("stale.txt");
+
+    // Then the removal is reported and the file has gone with it
+    assertTrue(removed);
+    assertUndefined(await storage.getObject("stale.txt"));
+    assertArrayEmpty(await storage.listObjects());
+  });
+
+  it("reports no removal for a key the directory does not hold", async () => {
+    // Given a directory mounted with deletion allowed, holding one file
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "kept.txt"], "kept");
+
+    const storage = new DeletingFilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When a key that was never there is deleted
+    const removed = await storage.deleteObject("never-there.txt");
+
+    // Then nothing was removed, which is what S3 says of an idempotent delete,
+    // and the file beside it is untouched
+    assertFalse(removed);
+    assertNonNullable(await storage.getObject("kept.txt"));
+  });
+
+  it("refuses to delete through a key climbing out of the directory", async () => {
+    // Given a mount allowing deletion, and a file outside the directory
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "index.html"], "site");
+    await testDirectory.writeFile("outside.txt", "outside");
+
+    const storage = new DeletingFilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When a key pointing above the directory is deleted
+    const error = await assertThrowsErrorAsync(async () => {
+      await storage.deleteObject("../outside.txt");
+    });
+
+    // Then the key is refused by the same check a read goes through
+    assertStringIncludes(error.message, "must not contain '..'");
+  });
+
+  it("refuses to delete a file whose extension it would not serve", async () => {
+    // Given a mount allowing deletion, and a file it does not serve
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "private.pem"], "key material");
+
+    const storage = new DeletingFilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When that file's key is deleted
+    const error = await assertThrowsErrorAsync(async () => {
+      await storage.deleteObject("private.pem");
+    });
+
+    // Then it is refused, because allowing a delete widens what a Bucket may
+    // remove rather than what it may reach
+    assertStringIncludes(error.message, "unsupported file extension");
   });
 });

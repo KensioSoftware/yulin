@@ -2028,6 +2028,11 @@ around it are read the same way:
   the deployment turns it off, as the construct is. Pruning only considers what the filters and the
   key prefix select, and leaves alone any Object the deployment would never have copied.
 
+A Bucket with an event notification configuration hears the deployment. Every file the deployment
+writes raises `s3:ObjectCreated:Put`, and every Object a pruning deployment removes raises
+`s3:ObjectRemoved:Delete`, the two the real provider function's sync raises. See
+[Event notifications](https://yulinsim.dev/services/s3/#event-notifications).
+
 Several deployments can share one Bucket. That is the usual arrangement when the headers differ by
 file type, since a `BucketDeployment` sets them for all of its files at once. A second deployment is
 how the rest of the site gets different ones. Give the second one `prune: false`, or filters that miss

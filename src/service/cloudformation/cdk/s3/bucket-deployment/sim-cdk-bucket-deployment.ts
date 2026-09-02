@@ -7,6 +7,7 @@ import { SimCdkBucketDeploySource } from "./source/sim-cdk-bucket-deploy-source.
 import { SimCdkBucketDeployCopier } from "./copy/sim-cdk-bucket-deploy-copier.js";
 import { SimCdkBucketDeployProperties } from "./property/sim-cdk-bucket-deploy-properties.js";
 import { declareSimCdkBucketDeployMetadata } from "./metadata/sim-cdk-bucket-deploy-metadata.js";
+import { simCdkBucketDeployNotifier } from "./notify/sim-cdk-bucket-deploy-notifier.js";
 import { simCdkBucketDeployDestination } from "./destination/sim-cdk-bucket-deploy-destination.js";
 
 /**
@@ -64,18 +65,19 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
 
     const bucket = simCdkBucketDeployDestination(resource, properties, context);
 
-    const sourceDirectoryPaths = properties.sourceObjectKeys.map(
-      (sourceObjectKey) =>
-        this.sourceResolver.sourceDirectoryPathForObjectKey(
-          resource,
-          sourceObjectKey,
-          context.cdkOutContext,
-        ),
+    const sourceDirectoryPaths = this.sourceResolver.sourceDirectoryPaths(
+      resource,
+      properties.sourceObjectKeys,
+      context.cdkOutContext,
     );
 
+    // The copier writes Objects into the Bucket instead of sending PutObject,
+    // and a Bucket configured to notify still hears about every file it writes
+    // and every Object it prunes.
     const publishedKeys = await new SimCdkBucketDeployCopier({
       bucket,
       properties,
+      notifier: simCdkBucketDeployNotifier(resource, bucket, context),
     }).copy(sourceDirectoryPaths);
 
     // Said as well as set. The Objects above carry these headers themselves,

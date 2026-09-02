@@ -13,6 +13,12 @@ import {
 } from "../../../../../s3/object/s3-object.js";
 import { TemporaryDirectory } from "../../../../../../util/filesystem/temporary-directory.js";
 import { SimCdkBucketDeployProperties } from "../property/sim-cdk-bucket-deploy-properties.js";
+import {
+  type SimCdkBucketDeployNotifier,
+  simCdkBucketDeployNotifier,
+} from "../notify/sim-cdk-bucket-deploy-notifier.js";
+import { SimAws } from "../../../../../aws/sim-aws.js";
+import type { SimCloudFormationResourceCreateContext } from "../../../../resource/sim-cfn-resource.js";
 import { SimCdkBucketDeployCopier } from "./sim-cdk-bucket-deploy-copier.js";
 
 describe("SimCdkBucketDeployCopier", () => {
@@ -45,6 +51,17 @@ describe("SimCdkBucketDeployCopier", () => {
     return await temporaryDirectory.resolvePath();
   }
 
+  /**
+   * The events a deployment into this Bucket raises. Nothing here is
+   * configured to hear them. These tests are about what ends up in the Bucket.
+   */
+  function notifier(bucket: SimS3Bucket): SimCdkBucketDeployNotifier {
+    return simCdkBucketDeployNotifier(resource, bucket, {
+      simAws: new SimAws(),
+      resources: new Map(),
+    } satisfies SimCloudFormationResourceCreateContext);
+  }
+
   async function objectKeys(bucket: SimS3Bucket): Promise<string[]> {
     const objects = await bucket.listObjects();
 
@@ -64,6 +81,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When the deployment is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties(),
     }).copy([sourcePath]);
 
@@ -87,6 +105,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When a deployment with both sources is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({
         SourceObjectKeys: ["abc123.zip", "def456.zip"],
       }),
@@ -106,6 +125,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When it is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({ DestinationBucketKeyPrefix: "assets" }),
     }).copy([sourcePath]);
 
@@ -126,6 +146,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When it is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({ Exclude: ["*"], Include: ["*.txt"] }),
     }).copy([sourcePath]);
 
@@ -143,6 +164,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When it is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({
         SystemMetadata: {
           "content-type": "text/plain",
@@ -173,6 +195,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When it is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties(),
     }).copy([sourcePath]);
 
@@ -200,6 +223,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When a pruning deployment is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties(),
     }).copy([sourcePath]);
 
@@ -227,6 +251,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // turned off, which is what lets two of them share a Bucket.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({ Prune: false }),
     }).copy([sourcePath]);
 
@@ -253,6 +278,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When a pruning deployment into a prefix is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({ DestinationBucketKeyPrefix: "assets" }),
     }).copy([sourcePath]);
 
@@ -281,6 +307,7 @@ describe("SimCdkBucketDeployCopier", () => {
     // When a pruning deployment excluding that directory is copied in.
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties({ Exclude: ["data/*"] }),
     }).copy([sourcePath]);
 
@@ -301,6 +328,7 @@ describe("SimCdkBucketDeployCopier", () => {
 
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties(),
     }).copy([firstPath]);
 
@@ -309,6 +337,7 @@ describe("SimCdkBucketDeployCopier", () => {
 
     await new SimCdkBucketDeployCopier({
       bucket,
+      notifier: notifier(bucket),
       properties: properties(),
     }).copy([secondPath]);
 

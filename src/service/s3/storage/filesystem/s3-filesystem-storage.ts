@@ -10,7 +10,7 @@ import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 import { SimS3DeclaredSystemMetadata } from "../../object/s3-declared-system-metadata.js";
 import { filesystemS3ObjectFile } from "./s3-filesystem-object-file.js";
 
-interface FilesystemS3BucketStorageProperties {
+export interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
   readonly allowedDirectoryNames?: readonly string[];
   readonly additionalFileExtensions?: readonly string[];
@@ -32,9 +32,9 @@ interface FilesystemS3BucketStorageProperties {
  * potential safety issues.
  */
 export class FilesystemS3BucketStorage implements SimS3BucketStorage {
+  protected readonly objectKeys: FilesystemS3ObjectKeys;
   private readonly directoryPath: string;
   private readonly safety: FilesystemS3StorageSafety;
-  private readonly objectKeys: FilesystemS3ObjectKeys;
   private readonly systemMetadata: SimS3DeclaredSystemMetadata;
 
   constructor(properties: FilesystemS3BucketStorageProperties) {
@@ -106,14 +106,16 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
    * a Bucket at an ordinary directory of the user's, and the safety checks here
    * are local-development tooling rather than a sandbox boundary. Unlinking
    * someone's files because a test called DeleteObject is the wrong default, so
-   * filesystem-backed Buckets are read and written but never emptied.
+   * a mount that wants deletes asks for one with `allowDelete` and gets
+   * `DeletingFilesystemS3BucketStorage` in place of this.
    */
   deleteObject(key: string): Promise<boolean> {
     return Promise.reject(
       new SimS3NotImplemented(
         `Simulated S3 will not delete ${key} from filesystem-backed storage ` +
           `at ${this.directoryPath}, because it would remove a real file. ` +
-          `Use the default in-memory Bucket storage to simulate deletion.`,
+          `Mount the directory with { allowDelete: true } to allow it, or use ` +
+          `the default in-memory Bucket storage to simulate deletion.`,
       ),
     );
   }
