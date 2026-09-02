@@ -1,3 +1,5 @@
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { faker } from "@faker-js/faker";
 import {
   assertFalse,
   assertIdentical,
@@ -76,29 +78,72 @@ describe("What a simulated environment answers its functions for", () => {
     assertResponseStatus(response, 200, await describeResponse(response));
   });
 
+  it("answers a signed request to S3's own endpoint from the Bucket", async () => {
+    // Given a simulation holding an Object, and a request signed the way a
+    // bundled SDK signs one inside a function, with credentials nothing in
+    // the simulation would verify.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const bucketName = faker.string.alpha({ length: 10, casing: "lower" });
+    const greeting = faker.lorem.sentence();
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: "greeting.txt",
+        Body: greeting,
+      }),
+    );
+    const outbound = makeSimLambdaOutboundHttp({ simAws });
+
+    // When it arrives.
+    const response = await outbound.fetch(
+      new Request(
+        `https://${bucketName}.s3.eu-west-2.amazonaws.com/greeting.txt`,
+        {
+          headers: {
+            authorization:
+              "AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260818/eu-west-2/" +
+              "s3/aws4_request, SignedHeaders=host, Signature=00",
+          },
+        },
+      ),
+    );
+
+    // Then it was read as the AWS API request it is, and simulated S3
+    // answered it with the Object.
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), greeting);
+  });
+
   it("leaves a signed request to a service endpoint to be routed as a Command", async () => {
-    // Given a simulation, and a signed request to a service whose endpoint it
-    // does serve over HTTP.
+    // Given a simulation, and a signed request to a service whose serialized
+    // requests it cannot read back.
     const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
     const outbound = makeSimLambdaOutboundHttp({ simAws });
 
     // When it arrives.
     const error = await assertThrowsErrorAsync(async () =>
       outbound.fetch(
-        new Request("https://data.s3.eu-west-2.amazonaws.com/greeting.txt", {
-          headers: {
-            authorization:
-              "AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260818/eu-west-2/" +
-              "s3/aws4_request, SignedHeaders=host, Signature=00",
+        new Request(
+          "https://email.eu-west-2.amazonaws.com/v2/email/outbound-emails",
+          {
+            method: "POST",
+            headers: {
+              authorization:
+                "AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/20260818/eu-west-2/" +
+                "ses/aws4_request, SignedHeaders=host, Signature=00",
+            },
           },
-        }),
+        ),
       ),
     );
 
     // Then it was read as the AWS API request it is, and refused as one, so
     // that a bundled SDK is told what to do about the protocol its requests
     // cannot be routed back from.
-    assertStringIncludes(error.message, "request to s3");
+    assertStringIncludes(error.message, "request to ses");
     assertStringIncludes(error.message, "AWS JSON protocol");
   });
 
