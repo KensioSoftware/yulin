@@ -5,6 +5,7 @@ import {
   CreateMultipartUploadCommand,
   DeleteObjectTaggingCommand,
   GetObjectTaggingCommand,
+  HeadObjectCommand,
   PutObjectTaggingCommand,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -110,6 +111,29 @@ describe("Simulated S3 Object tagging", () => {
     assertIdentical(tagsByKey(read.TagSet)["department"], "legal");
   });
 
+  it("gives a tag stated with no value an empty one", async () => {
+    // Given a stored Object.
+    const { simS3, bucketName, key } = await reportBucket();
+
+    // When a tag arrives with a key and no value, which is what a document
+    // leaving the `Value` element out reads as.
+    await simS3.putObjectTagging({
+      input: {
+        Bucket: bucketName,
+        Key: key,
+        Tagging: { TagSet: [{ Key: "reviewed" }] },
+      },
+    });
+
+    // Then the key is held, under the empty value.
+    const read = await simS3.getObjectTagging(
+      new GetObjectTaggingCommand({ Bucket: bucketName, Key: key }),
+    );
+
+    assertArrayLength(read.TagSet, 1);
+    assertIdentical(tagsByKey(read.TagSet)["reviewed"], "");
+  });
+
   it("takes every tag off an Object", async () => {
     // Given a tagged Object.
     const { simS3, bucketName, key } = await reportBucket(
@@ -168,6 +192,56 @@ describe("Simulated S3 Object tagging", () => {
     );
 
     assertIdentical(tagsByKey(read.TagSet)["department"], "finance");
+  });
+
+  it("leaves the ETag of an Object uploaded in parts alone", async () => {
+    // Given an Object assembled from one part, carrying the multipart ETag S3
+    // gave it.
+    const simAws = new SimAws();
+    const bucketName = `archives-${faker.string.uuid()}`;
+    const simS3 = simAws.s3();
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    const started = await simS3.createMultipartUpload(
+      new CreateMultipartUploadCommand({
+        Bucket: bucketName,
+        Key: "archive.zip",
+        Tagging: "department=finance",
+      }),
+    );
+    const part = await simS3.uploadPart(
+      new UploadPartCommand({
+        Bucket: bucketName,
+        Key: "archive.zip",
+        UploadId: started.UploadId,
+        PartNumber: 1,
+        Body: "the whole archive",
+      }),
+    );
+    const completed = await simS3.completeMultipartUpload(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucketName,
+        Key: "archive.zip",
+        UploadId: started.UploadId,
+        MultipartUpload: { Parts: [{ PartNumber: 1, ETag: part.ETag }] },
+      }),
+    );
+
+    // When its tags are replaced.
+    await simS3.putObjectTagging(
+      new PutObjectTaggingCommand({
+        Bucket: bucketName,
+        Key: "archive.zip",
+        Tagging: { TagSet: [{ Key: "department", Value: "legal" }] },
+      }),
+    );
+
+    // Then a read reports the ETag the upload gave it. Real S3 holds tags
+    // against an Object without rewriting the bytes.
+    const head = await simS3.headObject(
+      new HeadObjectCommand({ Bucket: bucketName, Key: "archive.zip" }),
+    );
+
+    assertIdentical(head.ETag, completed.ETag);
   });
 
   it("carries the source Object's tags onto a copy", async () => {

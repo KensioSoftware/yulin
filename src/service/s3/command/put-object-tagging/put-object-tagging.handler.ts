@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3ObjectTagSet } from "../../object/s3-object-tags.js";
 import {
   SimS3ObjectTaggingAccess,
@@ -37,8 +38,11 @@ export class PutObjectTaggingCommandHandler implements CommandHandler<
     command: SimPutObjectTaggingCommand,
     options?: SimS3RequestOptions,
   ): Promise<SimPutObjectTaggingCommandOutput> {
+    const { Tagging } = command.input;
+    assertDefined(Tagging, "PutObjectTaggingCommand.input.Tagging");
+
     const tags = SimS3ObjectTagSet.from(
-      command.input.Tagging?.TagSet ?? [],
+      Tagging.TagSet ?? [],
       "PutObjectTaggingCommand",
     );
 

@@ -16,20 +16,7 @@ import {
 export function readSimS3Tagging(body: string): object {
   return {
     TagSet: xmlChildren(xmlChild(parseXmlDocument(body), "TagSet"), "Tag").map(
-      (tag) => ({
-        ...stated("Key", xmlText(tag, "Key")),
-        ...stated("Value", xmlText(tag, "Value")),
-      }),
+      (tag) => ({ Key: xmlText(tag, "Key"), Value: xmlText(tag, "Value") }),
     ),
   };
-}
-
-/**
- * Include a member only when the document stated it.
- */
-function stated(
-  name: string,
-  value: string | undefined,
-): Record<string, string> {
-  return value === undefined ? {} : { [name]: value };
 }

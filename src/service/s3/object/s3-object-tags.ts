@@ -95,21 +95,6 @@ export class SimS3ObjectTagSet {
   }
 
   /**
-   * Whether this Object carries no tags at all.
-   */
-  get isEmpty(): boolean {
-    return this.held.size === 0;
-  }
-
-  /**
-   * How many tags this Object carries, which is what `x-amz-tagging-count`
-   * reports.
-   */
-  get size(): number {
-    return this.held.size;
-  }
-
-  /**
    * The tags, in the order the request that set them stated.
    */
   get tags(): readonly SimS3ObjectTag[] {

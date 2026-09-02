@@ -123,6 +123,43 @@ describe("Refusing a simulated S3 Object tag set", () => {
     assertInstanceOf(writing, SimS3InvalidTag);
   });
 
+  it("refuses a tag whose key is empty", async () => {
+    // Given a stored Object.
+    const { simS3, bucketName, key } = await reportBucket();
+
+    // When a tag arrives under an empty key.
+    const tagging = await assertThrowsErrorAsync(async () => {
+      await simS3.putObjectTagging(
+        new PutObjectTaggingCommand({
+          Bucket: bucketName,
+          Key: key,
+          Tagging: { TagSet: [{ Key: "", Value: "finance" }] },
+        }),
+      );
+    });
+
+    // Then it is refused, because a tag key is what S3 holds a value under.
+    assertInstanceOf(tagging, SimS3InvalidTag);
+  });
+
+  it("takes an empty tag set as taking every tag off", async () => {
+    // Given a tagged Object.
+    const { simS3, bucketName, key } = await reportBucket("department=finance");
+
+    // When a tagging request states a set holding nothing, which is what an
+    // empty `<TagSet/>` document arrives as.
+    await simS3.putObjectTagging({
+      input: { Bucket: bucketName, Key: key, Tagging: {} },
+    });
+
+    // Then the Object carries no tags.
+    const read = await simS3.getObjectTagging(
+      new GetObjectTaggingCommand({ Bucket: bucketName, Key: key }),
+    );
+
+    assertArrayEmpty(read.TagSet);
+  });
+
   it("refuses to tag a key holding nothing", async () => {
     // Given a Bucket with nothing under the key.
     const simAws = new SimAws();

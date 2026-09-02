@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   DeleteObjectTaggingCommand,
   GetObjectTaggingCommand,
   PutBucketVersioningCommand,
@@ -16,7 +17,10 @@ import { describe, it } from "vitest";
 
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimS3NoSuchVersion } from "../../error/sim-s3.error.js";
+import {
+  SimS3MethodNotAllowed,
+  SimS3NoSuchVersion,
+} from "../../error/sim-s3.error.js";
 import { tagsByKey } from "../../../../../test/s3/object-tagging-fixture.js";
 import type { SimS3 } from "../../sim-s3.js";
 
@@ -142,6 +146,32 @@ describe("Tagging one version of a simulated S3 Object", () => {
     );
 
     assertIdentical(tagsByKey(current.TagSet)["department"], "finance");
+  });
+
+  it("refuses to tag a delete marker", async () => {
+    // Given a key whose current version is the marker a delete wrote.
+    const { simS3, bucketName, key } = await versionedReports(
+      "department=finance",
+      "department=legal",
+    );
+    const deleted = await simS3.deleteObject(
+      new DeleteObjectCommand({ Bucket: bucketName, Key: key }),
+    );
+
+    // When the marker's own version id is tagged.
+    const tagging = await assertThrowsErrorAsync(async () => {
+      await simS3.putObjectTagging(
+        new PutObjectTaggingCommand({
+          Bucket: bucketName,
+          Key: key,
+          VersionId: deleted.VersionId,
+          Tagging: { TagSet: [{ Key: "department", Value: "archive" }] },
+        }),
+      );
+    });
+
+    // Then S3 refuses it. A marker records a deletion and holds no Object.
+    assertInstanceOf(tagging, SimS3MethodNotAllowed);
   });
 
   it("refuses a version id the Bucket never issued", async () => {
