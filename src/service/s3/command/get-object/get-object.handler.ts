@@ -8,7 +8,7 @@ import type {
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
+import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -17,6 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { GetObjectAuthorizer } from "./get-object-authorizer.js";
 import { GetObjectLoader } from "./get-object-loader.js";
@@ -65,6 +66,10 @@ export class GetObjectCommandHandler implements CommandHandler<
    *
    * A stated `Range` reaches the loader with the key, since which bytes of an
    * Object a caller may read is not something IAM decides.
+   *
+   * A key holding nothing goes back to authorization before the absence is
+   * reported. Real S3 tells a caller that a key is missing only where it may
+   * list the Bucket, and answers AccessDenied otherwise.
    */
   async handle(
     command: SimGetObjectCommand,
@@ -73,22 +78,29 @@ export class GetObjectCommandHandler implements CommandHandler<
     assertDefined(command.input.Bucket, "GetObjectCommand.input.Bucket");
     assertDefined(command.input.Key, "GetObjectCommand.input.Key");
 
-    const bucketName = command.input.Bucket as SimS3BucketName;
-    const bucket = this.buckets.get(bucketName);
-    if (bucket === undefined) {
-      throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
-    }
+    const bucket = requireSimS3Bucket(
+      this.buckets,
+      command.input.Bucket as SimS3BucketName,
+    );
 
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
     this.authorizer.authorize(bucket, command.input.Key, options);
 
-    return await this.loader.load(
+    const output = await this.loader.load(
       bucket,
       command.input.Key,
       command.input.Range,
       command.input.VersionId,
     );
+
+    if (output !== undefined) {
+      return output;
+    }
+
+    this.authorizer.authorizeMissingKey(bucket, options);
+
+    throw new SimS3NoSuchKey(`No S3 Object named ${command.input.Key}`);
   }
 }

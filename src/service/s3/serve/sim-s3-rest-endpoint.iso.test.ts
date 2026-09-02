@@ -75,6 +75,27 @@ describe("The simulated S3 REST endpoint", () => {
     expect(await response.text()).toMatch(/<Code>NoSuchKey<\/Code>/);
   });
 
+  it("refuses a missing Object to a signer that may not list the Bucket", async () => {
+    // Given a presigned URL from a user allowed to read Objects and nothing
+    // else, for an Object that is not there
+    const { client, http } = await presignSimulation({
+      allowsBucketListing: false,
+    });
+    const url = await getSignedUrl(
+      client,
+      new GetObjectCommand({ Bucket: presignBucketName, Key: "missing.pdf" }),
+      { expiresIn: 900 },
+    );
+
+    // When it is fetched
+    const response = await http.fetch(url);
+
+    // Then the endpoint refuses rather than admitting the key is absent, which
+    // is what a deployed client holding the same permissions is answered
+    assertResponseStatus(response, 403, await describeResponse(response));
+    expect(await response.text()).toMatch(/<Code>AccessDenied<\/Code>/);
+  });
+
   it("serves a HEAD request without a body", async () => {
     // Given a URL presigned for HEAD, since the method is signed and a URL
     // presigned for GET cannot be used with another

@@ -1,7 +1,6 @@
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
-import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js";
+import { simS3AuthorizeAction } from "../authorize/sim-s3-authorize-action.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 
 interface GetObjectAuthorizerProperties {
@@ -11,17 +10,11 @@ interface GetObjectAuthorizerProperties {
 /**
  * Applies IAM authorization to an S3 GetObject request.
  *
- * GetObject is authorized against the target Object ARN rather than the Bucket
- * ARN. An omitted caller is passed through to sim IAM so Account root fallback
- * behavior remains owned by IAM.
- *
- * The request's source ARN and source Account go in as condition keys, which is
- * what a Bucket policy written for a CloudFront origin access control is
- * conditioned on.
+ * A read is authorized against the target Object ARN. A read that finds
+ * nothing is authorized a second time, against the Bucket ARN, because real S3
+ * decides between AccessDenied and NoSuchKey on `s3:ListBucket`.
  */
 export class GetObjectAuthorizer {
-  private static readonly action = "s3:GetObject";
-
   private readonly iam: SimIamInterServiceAuthZ;
 
   constructor(properties: GetObjectAuthorizerProperties) {
@@ -36,32 +29,32 @@ export class GetObjectAuthorizer {
     key: string,
     options?: SimS3RequestOptions,
   ): void {
-    const resource = `arn:aws:s3:::${bucket.bucketName}/${key}`;
-    const policy = bucket.getPolicy();
-    const decision = this.iam.authorize({
-      action: GetObjectAuthorizer.action,
-      resource,
-      caller: options?.caller,
-      conditionContext: simS3ConditionContext(options),
-      resourcePolicies:
-        policy === undefined
-          ? []
-          : [
-              {
-                document: policy,
-                policyName: "BucketPolicy",
-                resourceArn: `arn:aws:s3:::${bucket.bucketName}`,
-              },
-            ],
+    simS3AuthorizeAction({
+      iam: this.iam,
+      action: "s3:GetObject",
+      resource: `arn:aws:s3:::${bucket.bucketName}/${key}`,
+      bucket,
+      options,
     });
+  }
 
-    if (decision.isDenied) {
-      throw new SimIamAccessDenied({
-        principal: decision.caller.principal,
-        reason: decision.denialReason,
-        action: GetObjectAuthorizer.action,
-        resource,
-      });
-    }
+  /**
+   * Ensure the caller may be told that the Bucket holds no such key.
+   *
+   * Which keys a Bucket holds is what a listing tells you. Real S3 admits the
+   * absence only to a caller holding `s3:ListBucket` on the Bucket. Everyone
+   * else gets the same AccessDenied whether the key is there or not.
+   */
+  authorizeMissingKey(
+    bucket: SimS3Bucket,
+    options?: SimS3RequestOptions,
+  ): void {
+    simS3AuthorizeAction({
+      iam: this.iam,
+      action: "s3:ListBucket",
+      resource: `arn:aws:s3:::${bucket.bucketName}`,
+      bucket,
+      options,
+    });
   }
 }

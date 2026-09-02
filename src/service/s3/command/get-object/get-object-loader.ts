@@ -1,6 +1,5 @@
 import { Readable } from "node:stream";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
-import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
 import { simS3ObjectStorageReport } from "../../object/s3-object-storage-report.js";
 import {
@@ -20,8 +19,8 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  * This class owns both storage lookup and response conversion because the SDK
  * response is a representation of the stored Object:
  *
- * - a missing storage entry becomes the S3 NoSuchKey error, and a `VersionId`
- *   naming a version the Bucket never issued becomes NoSuchVersion;
+ * - a `VersionId` naming a version the Bucket never issued becomes
+ *   NoSuchVersion;
  * - the stored Buffer, or the part of it the read asked for, becomes the
  *   readable response body;
  * - what S3 was told about the Object becomes the response's own fields, and
@@ -35,16 +34,20 @@ export class GetObjectLoader {
   /**
    * Read an Object, or the range of it that was asked for, from the resolved
    * Bucket, and build its SDK command output.
+   *
+   * Answering `undefined` means the key holds nothing. The command handler
+   * turns that into the error the caller's permissions allow, which for a
+   * missing key is a decision of its own.
    */
   async load(
     bucket: SimS3Bucket,
     key: string,
     rangeHeader?: string,
     versionId?: string,
-  ): Promise<SimGetObjectCommandOutput> {
+  ): Promise<SimGetObjectCommandOutput | undefined> {
     const read = await simS3ReadObjectVersion(bucket, key, versionId);
     if (read === undefined) {
-      throw new SimS3NoSuchKey(`No S3 Object named ${key}`);
+      return undefined;
     }
 
     const object = read.object;
