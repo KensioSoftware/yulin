@@ -6,11 +6,16 @@ import {
 import {
   CreateBucketCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayLength,
+  assertIdentical,
+  assertObjectMatches,
+} from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 import { SimAwsLocalServer } from "../../../../serve/index.js";
@@ -124,6 +129,61 @@ describe("Serving what a simulated S3 request says about an Object", () => {
       new GetObjectCommand({ Bucket: "reports", Key: "q3.pdf" }),
     );
     assertIdentical(stored.ContentType, "application/pdf");
+  });
+
+  it("reports the metadata a write attached, however the Object is read", async () => {
+    // Given an Object written with metadata of the caller's own
+    await client.send(new CreateBucketCommand({ Bucket: "annotated" }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: "annotated",
+        Key: "orders.csv",
+        Body: "id,total",
+        ContentType: "text/csv",
+        Metadata: { author: "ada", "review-state": "approved" },
+      }),
+    );
+
+    // When it is read, and asked about without being read
+    const read = await client.send(
+      new GetObjectCommand({ Bucket: "annotated", Key: "orders.csv" }),
+    );
+    const head = await client.send(
+      new HeadObjectCommand({ Bucket: "annotated", Key: "orders.csv" }),
+    );
+
+    // Then both report what the write attached, so a client on the far side of
+    // an endpoint sees the Object it wrote
+    const attached = { author: "ada", "review-state": "approved" };
+    assertObjectMatches(read.Metadata, attached);
+    assertObjectMatches(head.Metadata, attached);
+  });
+
+  it("keeps a metadata key named after a header S3 sets itself out of it", async () => {
+    // Given an Object stored as CSV whose write also attached a content type
+    // of its own
+    await client.send(new CreateBucketCommand({ Bucket: "internal" }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: "internal",
+        Key: "ledger.csv",
+        Body: "id,total",
+        ContentType: "text/csv",
+        Metadata: { "content-type": "application/vnd.internal" },
+      }),
+    );
+
+    // When it is read back over the endpoint
+    const output = await client.send(
+      new GetObjectCommand({ Bucket: "internal", Key: "ledger.csv" }),
+    );
+
+    // Then the x-amz-meta- prefix keeps the two apart on the wire, and the
+    // Object goes on being served as the CSV it was written as
+    assertObjectMatches(output.Metadata, {
+      "content-type": "application/vnd.internal",
+    });
+    assertIdentical(output.ContentType, "text/csv");
   });
 
   it("encodes the keys of a listing that asked for encoded keys", async () => {

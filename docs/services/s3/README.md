@@ -3305,9 +3305,9 @@ const s3Client = new S3Client({
 An upload keeps the metadata headers it was sent. `cache-control`, `content-disposition`,
 `content-encoding`, `content-language`, `content-type` and `expires` are stored, and a read is
 served every one of them, the way it serves an Object written by a `PutObjectCommand`. See
-[Object system metadata](#object-system-metadata). An `x-amz-meta-` header is stored too, and an
-in-process read reports it in `Metadata`. An `x-amz-tagging` header puts the tags it names on the
-Object, the same way a `PutObjectCommand` does. See [Object tags](#object-tags).
+[Object system metadata](#object-system-metadata). An `x-amz-meta-` header is stored too. An
+`x-amz-tagging` header puts the tags it names on the Object, the same way a `PutObjectCommand`
+does. See [Object tags](#object-tags).
 
 ```typescript
 await fetch(url, {
@@ -3818,7 +3818,9 @@ write attached, and nothing else.
 
 Every path that serves an Object goes through the same mapping. The REST endpoint, the
 [website endpoint](#static-website-hosting) and a CloudFront S3 Origin all report the same headers
-for it. `content-encoding` is the one that matters most. Bytes served without it are bytes no client
+for it. User-defined metadata travels alongside them, one `x-amz-meta-` header per entry. An SDK
+client reading over an endpoint reports the same `Metadata` an in-process read does.
+`content-encoding` is the one that matters most. Bytes served without it are bytes no client
 can decode, and an Object stored as brotli is only usable if the header comes back with it.
 
 `PutObjectCommand` sets them, one request field per header. An upload over a
@@ -3994,6 +3996,3 @@ These apply across the page. The sections above each list what is specific to th
   [Deleting the files under a mount](#deleting-the-files-under-a-mount).
 - Multipart upload parts for a mounted Bucket are held in memory, and only the assembled Object
   reaches the directory.
-- User-defined `x-amz-meta-` metadata is stored by every write and reported in `Metadata` by an
-  in-process read. A response served over an endpoint carries the system metadata headers and leaves
-  the user metadata out.

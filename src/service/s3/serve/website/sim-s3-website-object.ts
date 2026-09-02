@@ -3,6 +3,7 @@ import { simS3ObjectResponseHeaders } from "../../object/s3-object-response-head
 interface SimS3WebsiteObjectProperties {
   readonly body: Buffer;
   readonly metadata?: Readonly<Record<string, string>> | undefined;
+  readonly userMetadata?: Readonly<Record<string, string>> | undefined;
   readonly etag?: string | undefined;
   readonly lastModified?: Date | undefined;
 }
@@ -18,12 +19,14 @@ export class SimS3WebsiteObject {
   public readonly body: Buffer;
 
   private readonly metadata: Readonly<Record<string, string>> | undefined;
+  private readonly userMetadata: Readonly<Record<string, string>> | undefined;
   private readonly etag: string | undefined;
   private readonly lastModified: Date | undefined;
 
   constructor(properties: SimS3WebsiteObjectProperties) {
     this.body = properties.body;
     this.metadata = properties.metadata;
+    this.userMetadata = properties.userMetadata;
     this.etag = properties.etag;
     this.lastModified = properties.lastModified;
   }
@@ -34,6 +37,7 @@ export class SimS3WebsiteObject {
   headers(): Record<string, string> {
     return simS3ObjectResponseHeaders({
       metadata: this.metadata,
+      userMetadata: this.userMetadata,
       bodyLength: this.body.length,
       etag: this.etag,
       lastModified: this.lastModified,

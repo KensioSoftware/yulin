@@ -81,6 +81,7 @@ export async function simS3GetObjectResponse(
     status: contentRange === undefined ? 200 : 206,
     headers: simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      userMetadata: output["Metadata"] as Record<string, string> | undefined,
       overrides,
       bodyLength: body.length,
       etag: output["ETag"] as string | undefined,

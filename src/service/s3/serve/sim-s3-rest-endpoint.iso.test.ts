@@ -301,6 +301,47 @@ describe("The simulated S3 REST endpoint", () => {
     );
   });
 
+  it("serves the metadata a caller attached to an Object", async () => {
+    // Given an Object a write attached its own keys to, one of them named
+    // after a header S3 sets itself
+    const { simAws, client, http } = await presignSimulation();
+
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: presignBucketName,
+        Key: "annotated.csv",
+        Body: "id,total",
+        ContentType: "text/csv",
+        Metadata: {
+          author: "ada",
+          "content-type": "application/vnd.internal",
+        },
+      }),
+    );
+
+    // When it is read back over the REST endpoint, as a presigned GET is
+    const response = await http.fetch(
+      await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: presignBucketName,
+          Key: "annotated.csv",
+        }),
+        { expiresIn: 900 },
+      ),
+    );
+
+    // Then each entry travels under the x-amz-meta- prefix, which keeps the
+    // caller's own content type apart from the Object's
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(response.headers.get("x-amz-meta-author"), "ada");
+    assertIdentical(
+      response.headers.get("x-amz-meta-content-type"),
+      "application/vnd.internal",
+    );
+    assertIdentical(response.headers.get("content-type"), "text/csv");
+  });
+
   it("serves a path style request, as a dotted Bucket name needs", async () => {
     // Given a client addressing the Bucket in the path rather than the
     // hostname, which is what the AWS SDK does for itself when a Bucket name

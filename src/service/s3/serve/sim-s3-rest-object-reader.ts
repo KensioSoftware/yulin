@@ -48,6 +48,7 @@ export class SimS3RestObjectReader {
     const body = await bodyBytes(output.Body);
     const headers = simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      userMetadata: output.Metadata,
       overrides: simS3ResponseHeaderOverrides(
         new URL(request.url).searchParams,
       ),

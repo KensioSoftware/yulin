@@ -25,6 +25,7 @@ export function simS3HeadObjectResponse(
     status: 200,
     headers: simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      userMetadata: output["Metadata"] as Record<string, string> | undefined,
       overrides,
       bodyLength: (output["ContentLength"] as number | undefined) ?? 0,
       etag: output["ETag"] as string | undefined,

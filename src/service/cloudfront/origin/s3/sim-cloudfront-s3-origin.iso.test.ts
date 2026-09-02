@@ -81,6 +81,30 @@ describe("sim CloudFront S3 Origin", () => {
     assertIdentical(response.headers.get("content-length"), "10");
   });
 
+  it("serves the metadata a caller attached to an Object", async () => {
+    // Given an Object stored as CSV whose write also attached keys of its own,
+    // one named after a header S3 sets itself.
+    const origin = await originWithObject({
+      "content-type": "text/csv",
+      "x-amz-meta-author": "ada",
+      "x-amz-meta-content-type": "application/vnd.internal",
+    });
+
+    // When CloudFront fetches it from the Origin.
+    const response = await origin.fetch(
+      originRequest(new Request("http://example.test/data/standard.keys")),
+    );
+
+    // Then the Origin serves each entry under its prefix, so a Distribution
+    // sees the same Object an SDK read of the Bucket would.
+    assertIdentical(response.headers.get("x-amz-meta-author"), "ada");
+    assertIdentical(
+      response.headers.get("x-amz-meta-content-type"),
+      "application/vnd.internal",
+    );
+    assertIdentical(response.headers.get("content-type"), "text/csv");
+  });
+
   it("serves the same headers for a HEAD request, without the body", async () => {
     // Given an Object stored as brotli.
     const origin = await originWithObject({ "content-encoding": "br" });
