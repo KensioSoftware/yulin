@@ -53,7 +53,7 @@ export class DescribeChangeSetCommandHandler implements CommandHandler<
     return {
       ChangeSetId: changeSet.changeSetId,
       ChangeSetName: changeSet.changeSetName,
-      StackId: changeSet.stackName,
+      StackId: changeSet.stackId,
       StackName: changeSet.stackName,
       Description: changeSet.description,
       Status: changeSet.status,

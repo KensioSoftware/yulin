@@ -11,6 +11,10 @@ interface SimCfnCommandTemplateProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stackName: SimCloudFormationStackName;
+
+  /** The ID of the Stack the template is for, where the Stack has one yet. */
+  readonly stackId?: string | undefined;
+
   readonly templateBody: string;
 
   /** The command input the template's Parameter values are read from. */
@@ -29,10 +33,12 @@ interface SimCfnCommandTemplateProperties {
 export function simCfnCommandTemplate(
   properties: SimCfnCommandTemplateProperties,
 ): SimCfnTemplate {
-  const { simAws, accountRegionScope, stackName, exports } = properties;
+  const { simAws, accountRegionScope, stackName, stackId, exports } =
+    properties;
 
   return SimCfnTemplate.fromTemplateBody(properties.templateBody, {
     stackName,
+    stackId,
     parameters: SimCfnParameters.fromInput(properties.input, {
       stackName,
       parameterStore: makeSimCfnParameterStore({ simAws, accountRegionScope }),

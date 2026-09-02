@@ -16,6 +16,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -98,7 +99,7 @@ describe("Serving simulated CloudFormation change sets on an endpoint URL", () =
       }),
     );
     assertNonNullable(created.Id, "CreateChangeSet answered with an ARN");
-    assertIdentical(created.StackId, "site");
+    assertStringIncludes(created.StackId, ":stack/site/");
 
     // When it is described over the same endpoint
     const described = await client.send(
@@ -154,7 +155,7 @@ describe("Serving simulated CloudFormation change sets on an endpoint URL", () =
     // Then the executed one and the pending one are both there
     assertArrayLength(listed.Summaries, 2);
     assertIdentical(listed.Summaries[1].ChangeSetName, "site-rename");
-    assertIdentical(listed.Summaries[1].StackId, "site");
+    assertStringIncludes(listed.Summaries[1].StackId, ":stack/site/");
     assertIdentical(listed.Summaries[1].StackName, "site");
     assertIdentical(listed.Summaries[1].ExecutionStatus, "AVAILABLE");
 

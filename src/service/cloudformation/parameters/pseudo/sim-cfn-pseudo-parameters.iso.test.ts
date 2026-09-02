@@ -62,7 +62,7 @@ describe("sim CloudFormation pseudo parameters", () => {
     assertIdentical(resource.properties["Region"], "eu-west-2");
     assertIdentical(resource.properties["Partition"], "aws");
     assertIdentical(resource.properties["StackName"], "PseudoResourceStack");
-    assertIdentical(resource.properties["StackId"], "PseudoResourceStack");
+    assertIdentical(resource.properties["StackId"], stack.stackId);
     assertIdentical(resource.properties["NoValue"], "");
     assertIdentical(resource.properties["URLSuffix"], "sim-aws.localhost");
 
@@ -143,7 +143,7 @@ describe("sim CloudFormation pseudo parameters", () => {
     assertIdentical(stack.outputs.get("Region")?.value, "ap-southeast-2");
     assertIdentical(stack.outputs.get("Partition")?.value, "aws");
     assertIdentical(stack.outputs.get("StackName")?.value, "PseudoOutputStack");
-    assertIdentical(stack.outputs.get("StackId")?.value, "PseudoOutputStack");
+    assertIdentical(stack.outputs.get("StackId")?.value, stack.stackId);
     assertIdentical(stack.outputs.get("NoValue")?.value, "");
     assertIdentical(stack.outputs.get("URLSuffix")?.value, "sim-aws.localhost");
     assertIdentical(

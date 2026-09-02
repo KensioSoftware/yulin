@@ -8,6 +8,7 @@ import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCfnExports } from "../export/sim-cfn-exports.js";
 import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
+import type { SimCfnStackId } from "./sim-cfn-stack-id.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -47,6 +48,13 @@ export interface SimCloudFormationStackProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
+
+  /**
+   * The unique ID this Stack was created with, which is what a deleted Stack
+   * is still described by once its name has gone back into circulation.
+   */
+  readonly stackId: SimCfnStackId;
+
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;

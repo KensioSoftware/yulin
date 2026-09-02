@@ -37,7 +37,7 @@ describe("simulated CloudFormation SDK Command routing", () => {
         }),
       }),
     );
-    assertIdentical(stackCreation.StackId, "intercepted-stack");
+    assertStringIncludes(stackCreation.StackId, ":stack/intercepted-stack/");
 
     // Stack creation returns before resources finish deploying.
     await simSdk.simAws
@@ -164,7 +164,7 @@ describe("simulated CloudFormation SDK Command routing", () => {
         }),
       }),
     );
-    assertIdentical(stackUpdate.StackId, "updatable-stack");
+    assertStringIncludes(stackUpdate.StackId, ":stack/updatable-stack/");
 
     await cloudFormation.waitForStackUpdateComplete("updatable-stack");
 

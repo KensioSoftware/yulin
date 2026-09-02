@@ -132,6 +132,66 @@ console.log(describeOutput.Stacks?.[0]?.StackStatus);
 continues asynchronously, similar to real CloudFormation. Use `waitForStackDeployComplete(...)` when
 you need final stack state.
 
+## Stack IDs
+
+A stack is given a stack ID when it is created, in the ARN shape CloudFormation gives one:
+
+```
+arn:aws:cloudformation:<region>:<account>:stack/<name>/<uuid>
+```
+
+The account and region are the ones the stack was created in. The UUID on the end is generated for
+each stack. Deploying the same name a second time produces a stack with an ID of its own.
+
+`CreateStackCommand` and `UpdateStackCommand` answer with the ID, `DescribeStacksCommand` reports it
+as `StackId`, and a template reading `AWS::StackId` resolves to it. `AWS::StackName` still resolves
+to the name. A `CREATE` change set makes the ID along with the stack it puts into review, and the
+change set commands report it as `StackId` too.
+
+`DescribeStacksCommand` accepts either a stack name or a stack ID in `StackName`, as CloudFormation
+does. A stack ID goes on working once the stack has been deleted (its name does not).
+
+```typescript sim-cloudformation-stack-id
+/**
+ * Describing a deleted simulated CloudFormation Stack by its Stack ID.
+ */
+
+import {
+  CreateStackCommand,
+  DeleteStackCommand,
+  DescribeStacksCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+const created = await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "identified-stack",
+    TemplateBody: JSON.stringify({ Resources: {} }),
+  }),
+);
+
+// arn:aws:cloudformation:<region>:<account>:stack/identified-stack/<uuid>
+console.log(created.StackId);
+
+await simCfn.waitForStackDeployComplete("identified-stack");
+
+await simCfn.deleteStack(
+  new DeleteStackCommand({ StackName: "identified-stack" }),
+);
+await simCfn.waitForStackDeleteComplete("identified-stack");
+
+const described = await simCfn.describeStacks(
+  new DescribeStacksCommand({ StackName: created.StackId }),
+);
+
+// DELETE_COMPLETE
+console.log(described.Stacks?.[0]?.StackStatus);
+```
+
 ## Stack deployment is asynchronous
 
 A stack may be visible before all resources have finished creating.
@@ -502,7 +562,8 @@ Deletion runs in the background, as deployment does. `deleteStack(...)` returns 
 moved to `DELETE_IN_PROGRESS`, and `waitForStackDeleteComplete(...)` waits for the resources to go.
 `DescribeStacksCommand` reports `DELETE_IN_PROGRESS` in between, and then refuses the stack name with
 a `ValidationError` once the deletion has finished. That is how CloudFormation answers a name it no
-longer holds.
+longer holds. The stack itself is still there under its
+[stack ID](#stack-ids), reporting `DELETE_COMPLETE` and the Outputs it finished with.
 
 Deleting a stack name that was never deployed succeeds, as it does in CloudFormation.
 
@@ -3653,6 +3714,8 @@ Sim CloudFormation currently supports:
 - `CreateChangeSetCommand`, `DescribeChangeSetCommand`, `ExecuteChangeSetCommand`,
   `DeleteChangeSetCommand` and `ListChangeSetsCommand`, for both `CREATE` and `UPDATE` change sets
 - Waiting for simulated stack deployment, update and deletion completion
+- Stack IDs in the CloudFormation ARN shape, accepted by `DescribeStacksCommand` in place of a stack
+  name, and still describing a stack once it has been deleted
 - The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
@@ -3774,8 +3837,10 @@ Each service's own docs describe what its resource types support.
 - `DeleteStackCommand` reads only `StackName`. `RetainResources`, `DeletionMode`, `RoleARN` and
   `ClientRequestToken` are not read, so a stack left in `DELETE_FAILED` cannot be forced through the
   way `FORCE_DELETE_STACK` forces it in AWS.
-- A deleted stack cannot be described. Real CloudFormation keeps a deleted stack readable by its
-  unique stack ID, and the simulator identifies a stack by its name alone.
+- A deleted stack stays describable by its stack ID for as long as the simulation lives. Real
+  CloudFormation drops it after 90 days. `DescribeStacks` with no `StackName` lists the live stacks
+  in both, and `ListStacks` is unsupported, so there is no way to find a deleted stack whose ID you
+  have lost.
 - `Fn::FindInMap` arguments are resolved from literals, `Parameters` and pseudo parameters. An
   argument that depends on a created resource, such as a `Ref` to a resource logical ID, fails the
   resource with a "could not find map" error. Real CloudFormation allows only `Ref` and a nested

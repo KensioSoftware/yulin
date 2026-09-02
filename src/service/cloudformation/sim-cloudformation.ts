@@ -59,6 +59,7 @@ import type { SimCloudFormationDeployTemplateFileProperties as SimCloudFormation
 import type { SimCloudFormationDeployCdkOutProperties } from "./deploy/sim-cfn-cdk-out-deployer.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimCfnExports } from "./export/sim-cfn-exports.js";
+import { SimCfnDeletedStacks } from "./stack/sim-cfn-deleted-stacks.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
@@ -89,6 +90,7 @@ export class SimCloudFormation {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
+  private readonly deletedStacks = new SimCfnDeletedStacks();
   private readonly exports = new SimCfnExports();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
   private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
@@ -161,11 +163,11 @@ export class SimCloudFormation {
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimDescribeStacksCommandOutput> {
     this.authorization.describeStacks(command.input.StackName, options?.caller);
-    const handler = new DescribeStacksCommandHandler({
+    return await new DescribeStacksCommandHandler({
       stacks: this.stacks,
+      deleted: this.deletedStacks,
       background: this.background,
-    });
-    return await handler.handle(command);
+    }).handle(command);
   }
 
   /**
@@ -176,14 +178,13 @@ export class SimCloudFormation {
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimUpdateStackCommandOutput> {
     this.authorization.updateStack(command.input.StackName, options?.caller);
-    const handler = new UpdateStackCommandHandler({
+    return await new UpdateStackCommandHandler({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
       exports: this.exports,
-    });
-    return await handler.handle(command);
+    }).handle(command);
   }
 
   /**
@@ -194,11 +195,11 @@ export class SimCloudFormation {
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimDeleteStackCommandOutput> {
     this.authorization.deleteStack(command.input.StackName, options?.caller);
-    const handler = new DeleteStackCommandHandler({
+    return await new DeleteStackCommandHandler({
       stacks: this.stacks,
+      deleted: this.deletedStacks,
       background: this.background,
-    });
-    return await handler.handle(command);
+    }).handle(command);
   }
 
   /**

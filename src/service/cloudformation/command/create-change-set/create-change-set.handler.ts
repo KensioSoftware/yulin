@@ -17,6 +17,7 @@ import type { SimCfnChangeSetName } from "../../changeset/sim-cfn-change-set.typ
 import { simCfnChangeSetPlan } from "../../changeset/sim-cfn-change-set-changes.js";
 import { simCfnChangeSetRequest } from "../../changeset/sim-cfn-change-set-input.js";
 import { simCfnChangeSetStack } from "../../changeset/sim-cfn-change-set-stack.js";
+import { simCfnChangeSetStackId } from "../../changeset/sim-cfn-change-set-stack-id.js";
 import { simCfnChangeSetFailure } from "../../changeset/sim-cfn-change-set-failure.js";
 import type {
   SimCreateChangeSetCommand,
@@ -65,14 +66,20 @@ export class CreateChangeSetCommandHandler implements CommandHandler<
 
     this.assertNameFree(request.stackName, request.changeSetName);
 
+    const stackId = simCfnChangeSetStackId({
+      ...this.properties,
+      ...request,
+    });
     const template = simCfnCommandTemplate({
       ...this.properties,
       ...request,
+      stackId,
       input: command.input,
     });
     const stack = simCfnChangeSetStack({
       ...this.properties,
       ...request,
+      stackId,
       template,
     });
     const changes = simCfnChangeSetPlan({
@@ -85,6 +92,7 @@ export class CreateChangeSetCommandHandler implements CommandHandler<
     const changeSet = new SimCfnChangeSet({
       ...this.properties,
       ...request,
+      stackId,
       template,
       changes,
       plannedFrom: stack.currentTemplate,
@@ -101,7 +109,7 @@ export class CreateChangeSetCommandHandler implements CommandHandler<
 
     return {
       Id: changeSet.changeSetId,
-      StackId: stack.stackName,
+      StackId: stack.stackId,
       $metadata: {},
     };
   }

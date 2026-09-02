@@ -21,6 +21,7 @@ import { SimCfnStackOutputLookup } from "./output/sim-cfn-stack-output-lookup.js
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
 import { SimCfnStackOperationStatus } from "./status/sim-cfn-stack-operation-status.js";
 import { validateSimCfnExecutableResourceBindings } from "../bind/validate/sim-cfn-exec-binding-validator.js";
+import type { SimCfnStackId } from "./sim-cfn-stack-id.js";
 import type {
   SimCloudFormationStackProperties,
   SimCloudFormationStackStatus,
@@ -48,6 +49,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
   public readonly updating: SimCfnStackUpdateLifecycle;
   public readonly deletion: SimCfnStackDeletionLifecycle;
   public readonly stackName: SimCloudFormationStackName;
+  public readonly stackId: SimCfnStackId;
   public readonly resourceMap: Map<string, SimCfnResource>;
   public outputs = new Map<string, SimCfnStackOutput>();
 
@@ -63,6 +65,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
       accountRegionScope,
       background,
       stackName,
+      stackId,
       template,
       cdkOutContext,
       bindings,
@@ -73,6 +76,7 @@ export class SimCfnStack implements SimCfnDeployedStack {
 
     this.background = background;
     this.stackName = stackName;
+    this.stackId = stackId;
     this.stackOutputs = new SimCfnStackOutputs({ stackName, exports });
     this.cfnTemplate = template;
     this.resourceMap = makeSimCfnStackResourceMap({
