@@ -1,7 +1,10 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaPlannedTable } from "../execution/sim-athena-query-refusal.js";
-import type { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
-import { simAthenaEngineRun } from "./sim-athena-engine-run.js";
+import {
+  simAthenaEngineRun,
+  simAthenaEngineTurnedDown,
+  type SimAthenaEngineAnswer,
+} from "./sim-athena-engine-run.js";
 import {
   simAthenaSqlParser,
   type SimAthenaSqlParser,
@@ -12,6 +15,23 @@ import {
 } from "./sim-athena-sqlite-module.js";
 import { simAthenaSqliteSql } from "./sim-athena-sql-translation.js";
 import type { SimAthenaTableObjects } from "./sim-athena-table-objects.js";
+import {
+  simAthenaNoObjects,
+  simAthenaUnreadableStatement,
+} from "./sim-athena-turn-down.js";
+
+/** How one scope's engine is turned on. */
+export interface SimAthenaEngineOptions {
+  /**
+   * Whether a query the engine turns down fails rather than falling back.
+   *
+   * Off by default, which leaves every turn-down answering from a declaration
+   * the way it always has. A test suite meaning to exercise the engine turns
+   * this on, and then a query the engine quietly stopped running shows up as a
+   * failing test rather than as one passing on rows nobody meant to use.
+   */
+  readonly strict?: boolean;
+}
 
 /** What one query is run against. */
 export interface SimAthenaEngineRequest {
@@ -41,15 +61,22 @@ export interface SimAthenaEngineRequest {
  * Everything the engine cannot do, it turns down. A statement Athena's grammar
  * refuses, a table in a format it has no reader for, an object it cannot open
  * and a statement SQLite will not run all end the same way: no result, and the
- * declaration a test wrote answers the query instead.
+ * declaration a test wrote answers the query instead. A strict engine fails the
+ * query instead of falling back, and the reason says which of them it hit.
  */
 export class SimAthenaQueryEngine {
   #parser: SimAthenaSqlParser | undefined;
   #sqlite: SimAthenaSqliteModule | undefined;
+  #strict = false;
 
   /** Whether this scope runs queries rather than answering from declarations. */
   get isEnabled(): boolean {
     return this.#parser !== undefined;
+  }
+
+  /** Whether a query this engine turns down fails rather than falling back. */
+  get isStrict(): boolean {
+    return this.#strict;
   }
 
   /**
@@ -59,30 +86,37 @@ export class SimAthenaQueryEngine {
    * optional peer dependency, so a project that never runs a query never
    * installs it.
    */
-  async enable(): Promise<void> {
+  async enable(options: SimAthenaEngineOptions = {}): Promise<void> {
     const parser = await simAthenaSqlParser();
 
     this.#sqlite = await simAthenaSqliteModule();
     this.#parser = parser;
+    this.#strict = options.strict ?? false;
   }
 
   /** Answer queries from declarations again. */
   disable(): void {
     this.#parser = undefined;
+    this.#strict = false;
   }
 
   /**
-   * What one query answers with, or nothing where the engine turned it down.
+   * What one query answers with, or why the engine turned it down.
+   *
+   * An engine nobody turned on turns nothing down. It has no opinion about the
+   * query, and a scope left alone answers from declarations as it always did.
    */
-  async run(
-    request: SimAthenaEngineRequest,
-  ): Promise<SimAthenaResolvedResult | undefined> {
+  async run(request: SimAthenaEngineRequest): Promise<SimAthenaEngineAnswer> {
     const parser = this.#parser;
     const sqlite = this.#sqlite;
     const { objects } = request;
 
-    if (parser === undefined || sqlite === undefined || objects === undefined) {
-      return undefined;
+    if (parser === undefined || sqlite === undefined) {
+      return { result: undefined, turnedDown: undefined };
+    }
+
+    if (objects === undefined) {
+      return simAthenaEngineTurnedDown(simAthenaNoObjects);
     }
 
     const sql = simAthenaSqliteSql({
@@ -92,7 +126,7 @@ export class SimAthenaQueryEngine {
     });
 
     return sql === undefined
-      ? undefined
+      ? simAthenaEngineTurnedDown(simAthenaUnreadableStatement)
       : simAthenaEngineRun({ ...request, parser, sqlite, objects, sql });
   }
 }

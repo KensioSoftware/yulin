@@ -26,7 +26,10 @@ export {
 export { SimAthenaWorkGroupStore } from "./workgroup/sim-athena-work-group-store.js";
 export { SimAthenaNamedQuery } from "./named-query/sim-athena-named-query.js";
 export { SimAthenaQueryExecution } from "./execution/sim-athena-query-execution.js";
-export { SimAthenaQueryEngine } from "./engine/sim-athena-query-engine.js";
+export {
+  SimAthenaQueryEngine,
+  type SimAthenaEngineOptions,
+} from "./engine/sim-athena-query-engine.js";
 export type {
   SimAthenaAnswerSource,
   SimAthenaQueryAnswer,
