@@ -276,12 +276,16 @@ describe("simulated CloudFormation Stack update rollback", () => {
         }),
       }),
     );
-    await assertThrowsErrorAsync(async () =>
+    const error = await assertThrowsErrorAsync(async () =>
       cloudFormation.waitForStackUpdateComplete("reports-stack"),
     );
 
-    // Then the Stack is left in UPDATE_ROLLBACK_FAILED, saying why it could
-    // not finish.
+    // Then the caller is told what stopped the update, which is the failure
+    // they asked for. The rollback's own failure is on the Stack.
+    assertStringIncludes(error.message, "ArchiveBucket");
+
+    // And the Stack is left in UPDATE_ROLLBACK_FAILED, saying why the rollback
+    // could not finish.
     const described = await cloudFormation.describeStacks(
       new DescribeStacksCommand({ StackName: "reports-stack" }),
     );

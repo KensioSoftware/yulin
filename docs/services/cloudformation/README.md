@@ -2307,9 +2307,10 @@ browser arriving on the new resources finds whatever the callback left ready for
 
 `onFailed` is given the update the changed template failed to survive. It reports the failure and
 nothing else.
-The stack is left holding whatever the update reached, as it is after an update through the command.
-What a failure does keep is the process, and the resources it never got to. A template that no longer
-deploys leaves a working environment where a restart on it would leave none.
+The stack is rolled back onto the template it was deployed from, as it is after an update through the
+command. A resource the update had already replaced comes back empty. What a failure keeps is the
+process. A template that no longer deploys leaves a working environment where a restart on it would
+leave none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
 until they stop arriving. `settleMs` is how long that wait is, and it defaults to the 250ms
@@ -4301,8 +4302,11 @@ Each service's own docs describe what its resource types support.
 - `UpdateStackCommand` reads `StackName`, `TemplateBody`, `UsePreviousTemplate` and `Parameters`,
   including `UsePreviousValue` on a parameter. `DisableRollback` and `RollbackConfiguration` are not
   read, so a failed update is always rolled back.
-- An update asked for while another is still running is refused, as CloudFormation refuses it. There
-  is no queue behind it.
+- An update asked for while another is still running, or while one is being rolled back, is refused,
+  as CloudFormation refuses it. There is no queue behind it.
+- A stack left in `UPDATE_ROLLBACK_FAILED` can be updated again, reconciled from the resources it is
+  holding. Real CloudFormation refuses until `ContinueUpdateRollback` has finished the rollback, and
+  that command is outside the simulation.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it
   creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
   same way an unsupported resource type is on create, and the stack still deletes with that resource

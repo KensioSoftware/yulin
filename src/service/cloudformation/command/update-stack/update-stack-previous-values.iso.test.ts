@@ -171,6 +171,38 @@ describe("CloudFormation UpdateStackCommand previous template and values", () =>
     assertNonNullable(simAws.s3().getSimBucketByName("reports-dev-two"));
   });
 
+  it("takes the deployed value for an empty value alongside UsePreviousValue", async () => {
+    // Given a Stack deployed with a Parameter value, and an SDK that writes an
+    // empty ParameterValue for a Parameter carrying nothing but the flag.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await deployReportsStack(simAws, [
+      { ParameterKey: "Environment", ParameterValue: "staging" },
+      { ParameterKey: "Version", ParameterValue: "one" },
+    ]);
+
+    // When the update carries both.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "reports-stack",
+        UsePreviousTemplate: true,
+        Parameters: [
+          {
+            ParameterKey: "Environment",
+            ParameterValue: "",
+            UsePreviousValue: true,
+          },
+          { ParameterKey: "Version", ParameterValue: "two" },
+        ],
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("reports-stack");
+
+    // Then the empty value counts as none, and the deployed one is taken.
+    assertNonNullable(simAws.s3().getSimBucketByName("reports-staging-two"));
+  });
+
   it("refuses a Parameter carrying UsePreviousValue and a value", async () => {
     // Given a deployed Stack.
     const simAws = new SimAws();

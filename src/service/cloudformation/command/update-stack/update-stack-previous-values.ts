@@ -73,7 +73,12 @@ export function simCfnUpdateStackParameters(
 function assertNoValueAlongsidePrevious(
   parameter: SimUpdateStackParameter,
 ): void {
-  if (parameter.ParameterValue === undefined) {
+  // An empty string is no value, which is what an SDK writes for a Parameter
+  // carrying UsePreviousValue and nothing else.
+  if (
+    parameter.ParameterValue === undefined ||
+    parameter.ParameterValue === ""
+  ) {
     return;
   }
 
