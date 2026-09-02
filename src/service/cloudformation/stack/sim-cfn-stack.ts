@@ -214,14 +214,17 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * the teardown is scheduled. A caller naming one the Stack does not have is
    * refused there, where a check in the background would only fail the
    * deletion.
+   *
+   * The names are copied as the request is accepted. The teardown runs in the
+   * background, and a caller holding the array it passed could otherwise change
+   * which Resources are kept after the Stack agreed to keep them.
    */
   async delete(properties: SimCfnStackDeleteProperties = {}): Promise<void> {
-    this.operations.assertRetainable(
-      this.resourceMap,
-      properties.retainResources,
-    );
+    const retainResources = [...(properties.retainResources ?? [])];
 
-    await this.deletion.delete(properties);
+    this.operations.assertRetainable(this.resourceMap, retainResources);
+
+    await this.deletion.delete({ ...properties, retainResources });
   }
 
   /** Wait for the scheduled Stack deletion to finish. */

@@ -2,10 +2,15 @@ import type { SimCfnResourceRecord } from "../sim-cfn-resource-record.js";
 
 interface SimCfnResourceRetentionProperties {
   /**
-   * The logical IDs this operation is replacing rather than removing, whose
-   * deployed half is kept by UpdateReplacePolicy.
+   * For each logical ID this operation is replacing, whether the definition
+   * taking its place says to keep the deployed Resource.
+   *
+   * The answer comes from the new definition because that is the template
+   * CloudFormation is applying. An update that adds `UpdateReplacePolicy:
+   * Retain` keeps the Resource it replaces, and one that drops the attribute
+   * deletes it.
    */
-  readonly replaced?: ReadonlySet<string> | undefined;
+  readonly replaced?: ReadonlyMap<string, boolean> | undefined;
 
   /**
    * The logical IDs the caller asked for by name, kept whatever their policy
@@ -31,11 +36,11 @@ interface SimCfnResourceRetentionProperties {
  * does.
  */
 export class SimCfnResourceRetention {
-  private readonly replaced: ReadonlySet<string>;
+  private readonly replaced: ReadonlyMap<string, boolean>;
   private readonly named: ReadonlySet<string>;
 
   constructor(properties: SimCfnResourceRetentionProperties = {}) {
-    this.replaced = properties.replaced ?? new Set();
+    this.replaced = properties.replaced ?? new Map();
     this.named = properties.named ?? new Set();
   }
 
@@ -47,8 +52,6 @@ export class SimCfnResourceRetention {
       return true;
     }
 
-    return this.replaced.has(resource.logicalId)
-      ? resource.retainedOnReplace
-      : resource.retainedOnDelete;
+    return this.replaced.get(resource.logicalId) ?? resource.retainedOnDelete;
   }
 }

@@ -42,18 +42,11 @@ export class SimCfnStackUpdatePlan {
 
   public readonly updated: ReadonlyMap<string, SimCfnResource>;
 
-  /**
-   * The logical IDs being replaced rather than removed, which is what decides
-   * whether UpdateReplacePolicy or DeletionPolicy can keep a deleted Resource.
-   */
-  public readonly replaced: ReadonlySet<string>;
-
   constructor(properties: SimCfnStackUpdatePlanProperties) {
     const { current, updated } = properties;
     const replaced = simCfnStackReplacedLogicalIds({ current, updated });
 
     this.updated = updated;
-    this.replaced = replaced;
     this.replacements = replaced
       .values()
       .map((logicalId) => {
@@ -88,6 +81,23 @@ export class SimCfnStackUpdatePlan {
         );
       })
       .toArray();
+  }
+
+  /**
+   * For each logical ID the update is replacing, whether the definition taking
+   * its place says to keep the deployed Resource.
+   *
+   * The new half answers it because CloudFormation reads UpdateReplacePolicy
+   * off the template it is applying. An update that adds the attribute keeps
+   * the Resource it replaces, and one that drops it deletes that Resource.
+   */
+  replacementRetentions(): ReadonlyMap<string, boolean> {
+    return new Map(
+      this.replacements.map(({ current, updated }) => [
+        current.logicalId,
+        updated.retainedOnReplace,
+      ]),
+    );
   }
 
   /**

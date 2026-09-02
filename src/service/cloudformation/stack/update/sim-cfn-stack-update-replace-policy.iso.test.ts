@@ -203,6 +203,73 @@ describe("simulated CloudFormation UpdateReplacePolicy", () => {
     assertNonNullable(simAws.s3().getSimBucketByName("snapshot-second"));
   });
 
+  it("reads the policy the Resource taking the place of the old one carries", async () => {
+    // Given a deployed Bucket carrying no policy attributes.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "adopted-stack",
+        TemplateBody: bucketTemplate({
+          attributes: {},
+          bucketName: "adopted-first",
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackDeployComplete("adopted-stack");
+
+    // When an update replaces it, and the new template asks to keep it.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "adopted-stack",
+        TemplateBody: bucketTemplate({
+          attributes: { UpdateReplacePolicy: "Retain" },
+          bucketName: "adopted-second",
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("adopted-stack");
+
+    // Then the deployed Bucket is kept, because CloudFormation applies the
+    // template it was given rather than the one the Stack was deployed from.
+    assertNonNullable(simAws.s3().getSimBucketByName("adopted-first"));
+    assertNonNullable(simAws.s3().getSimBucketByName("adopted-second"));
+  });
+
+  it("deletes a Resource whose replacement drops the policy that kept it", async () => {
+    // Given a deployed Bucket declared with UpdateReplacePolicy Retain.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "dropped-stack",
+        TemplateBody: bucketTemplate({
+          attributes: { UpdateReplacePolicy: "Retain" },
+          bucketName: "dropped-first",
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackDeployComplete("dropped-stack");
+
+    // When an update replaces it, and the new template drops the attribute.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "dropped-stack",
+        TemplateBody: bucketTemplate({
+          attributes: {},
+          bucketName: "dropped-second",
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("dropped-stack");
+
+    // Then the deployed Bucket has gone, for the same reason.
+    assertUndefined(simAws.s3().getSimBucketByName("dropped-first"));
+    assertNonNullable(simAws.s3().getSimBucketByName("dropped-second"));
+  });
+
   it("replaces a Resource its DeletionPolicy alone would have kept", async () => {
     // Given a deployed Bucket marked to survive a teardown, and nothing more.
     // CloudFormation reads DeletionPolicy for a Resource being removed, never

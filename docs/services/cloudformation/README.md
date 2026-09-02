@@ -444,6 +444,10 @@ const stack = simCfn.getStackByName("reports");
 console.log(stack?.retainedResources.map((resource) => resource.logicalId));
 ```
 
+The attribute is read from the template being applied, which is where CloudFormation reads it. An
+update that adds `UpdateReplacePolicy: Retain` keeps the resource it replaces, and one that drops
+the attribute deletes it.
+
 `DeletionPolicy` has no say in this. CloudFormation reads `DeletionPolicy` for a resource an update
 drops from the template, and `UpdateReplacePolicy` for one it replaces. A bucket marked only with
 `DeletionPolicy: Retain` still goes when its replacement is created. `Snapshot` is treated as

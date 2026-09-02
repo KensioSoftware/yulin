@@ -91,7 +91,7 @@ export class SimCfnStackUpdater {
     await operations.delete(
       resources,
       plan.deletions,
-      new SimCfnResourceRetention({ replaced: plan.replaced }),
+      new SimCfnResourceRetention({ replaced: plan.replacementRetentions() }),
     );
 
     plan.applyTo(resources);

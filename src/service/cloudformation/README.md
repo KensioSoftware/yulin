@@ -516,9 +516,10 @@ resource holds, and it is recorded in the usage docs rather than hidden. Two thi
 - A resource naming a replaced resource is replaced too, all the way up the chain, so nothing is
   left pointing at a resource that has gone. Real CloudFormation hands the dependent the new
   physical name instead.
-- A resource carrying `UpdateReplacePolicy: Retain` is kept. The plan tells the deleter which
-  logical IDs it is replacing, through `SimCfnResourceRetention`, and the replaced half of each one
-  reads that attribute where a dropped resource reads `DeletionPolicy`. The kept resource holds the
+- A resource carrying `UpdateReplacePolicy: Retain` is kept. `SimCfnResourceRetention` carries what
+  the new half of each replacement says about keeping the deployed one, since CloudFormation reads
+  the attribute off the template it is applying, and a resource the template drops instead reads its
+  own `DeletionPolicy`. The kept resource holds the
   name it was created with, and a replacement whose name comes from `SimCfnGeneratedResourceName`
   asks for that same name and fails, since the generated name is a hash of the stack name and the
   logical ID. Real CloudFormation gives the replacement a fresh random name.
