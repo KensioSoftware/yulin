@@ -91,6 +91,44 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
     assertIdentical(await response.text(), "<h1>Root index</h1>");
   });
 
+  it("serves the metadata a caller attached to a page", async () => {
+    // Given a site whose page was written with a build stamp of its own
+    const simS3 = simAws.region("eu-west-2").s3();
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "annotated-site" }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "annotated-site",
+        Key: "index.html",
+        Body: "<h1>Annotated</h1>",
+        ContentType: "text/html; charset=utf-8",
+        Metadata: { "build-id": "2026-09-02.7" },
+      }),
+    );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "annotated-site",
+        WebsiteConfiguration: { IndexDocument: { Suffix: "index.html" } },
+      }),
+    );
+    await grantPublicObjectRead(simS3, "annotated-site");
+
+    // When a visitor loads the page
+    const response = await fetch(
+      `http://annotated-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
+    );
+
+    // Then the website endpoint serves the stamp alongside the page, the way
+    // the REST and API endpoints do
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(
+      response.headers.get("x-amz-meta-build-id"),
+      "2026-09-02.7",
+    );
+  });
+
   it("serves a configured folder index document", async () => {
     const simS3 = simAws.region("eu-west-2").s3();
 

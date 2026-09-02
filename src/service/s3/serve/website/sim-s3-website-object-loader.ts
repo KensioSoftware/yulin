@@ -73,6 +73,7 @@ export class SimS3WebsiteObjectLoader {
       return new SimS3WebsiteObject({
         body: await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
         metadata: simS3SystemMetadataHeadersFrom(output),
+        userMetadata: output.Metadata,
         etag: output.ETag,
         lastModified: output.LastModified,
       });

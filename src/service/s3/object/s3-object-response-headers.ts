@@ -1,4 +1,7 @@
-import { simS3SystemMetadataHeaders } from "./s3-system-metadata.js";
+import {
+  simS3SystemMetadataHeaders,
+  simS3UserMetadataPrefix,
+} from "./s3-system-metadata.js";
 
 /**
  * What an endpoint knows about the Object it is about to serve.
@@ -6,6 +9,11 @@ import { simS3SystemMetadataHeaders } from "./s3-system-metadata.js";
 export interface SimS3ObjectResponseDescription {
   /** The system metadata S3 was told when the Object was written. */
   readonly metadata?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The metadata the caller attached to the Object, under the keys it used
+   * rather than the prefixed names the headers carry.
+   */
+  readonly userMetadata?: Readonly<Record<string, string>> | undefined;
   /**
    * The headers the read asked to be served in place of the Object's own,
    * under the same names, from its `response-` parameters.
@@ -46,6 +54,12 @@ export interface SimS3ObjectResponseDescription {
  * as real S3 sets it, and the encryption is set for every Object S3 stored
  * itself.
  *
+ * User-defined metadata goes back out under the `x-amz-meta-` prefix S3 sends
+ * it with, one header per entry. The prefix is what keeps a caller's own key
+ * apart from a header S3 sets itself, so an Object holding a `content-type`
+ * key is served an `x-amz-meta-content-type` header alongside its own content
+ * type rather than in place of it.
+ *
  * `ETag` and `Last-Modified` are not metadata but facts about the stored bytes,
  * and are what makes a conditional request or a content-hash comparison
  * possible over HTTP. `Content-Range` is a fact about the response rather than
@@ -71,6 +85,12 @@ export function simS3ObjectResponseHeaders(
     if (value !== undefined) {
       headers[header.name] = value;
     }
+  }
+
+  const userDefined = Object.entries(description.userMetadata ?? {});
+
+  for (const [key, value] of userDefined) {
+    headers[`${simS3UserMetadataPrefix}${key}`] = value;
   }
 
   if (description.etag !== undefined) {

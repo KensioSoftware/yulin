@@ -23,6 +23,7 @@ export class SimCfS3OriginResponses {
   foundObject(object: SimS3Object, request: Request): Response {
     const headers = simS3ObjectResponseHeaders({
       metadata: object.metadata.values,
+      userMetadata: object.metadata.userDefined,
       bodyLength: object.body.length,
       etag: simS3QuotedETag(object.etag),
       lastModified: object.lastModified,

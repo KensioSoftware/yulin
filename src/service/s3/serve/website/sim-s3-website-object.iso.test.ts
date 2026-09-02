@@ -31,6 +31,26 @@ describe("SimS3WebsiteObject", () => {
     });
   });
 
+  it("describes an Object by the metadata its caller attached", () => {
+    // Given an Object the website endpoint has read, carrying a key of the
+    // caller's own named after a header S3 sets itself.
+    const object = new SimS3WebsiteObject({
+      body: Buffer.from("<h1>Hello</h1>"),
+      metadata: { "content-type": "text/html" },
+      userMetadata: { "content-type": "application/vnd.internal" },
+    });
+
+    // When the website response headers are built.
+    const headers = object.headers();
+
+    // Then the endpoint serves the attached metadata under its prefix, leaving
+    // the page the content type it is served as.
+    assertObjectMatches(headers, {
+      "content-type": "text/html",
+      "x-amz-meta-content-type": "application/vnd.internal",
+    });
+  });
+
   it("describes an Object stored without metadata by its length alone", () => {
     // Given an Object with no stored metadata.
     const object = new SimS3WebsiteObject({ body: Buffer.from("plain") });

@@ -52,14 +52,11 @@ describe("simS3ObjectResponseHeaders", () => {
     });
   });
 
-  it("leaves out user metadata and anything else S3 does not return as a header", () => {
-    // Given an Object stored with user metadata alongside its content type.
+  it("leaves out anything else S3 does not return as a header", () => {
+    // Given an Object whose stored metadata holds an entity tag under a header
+    // name, alongside its content type.
     const headers = simS3ObjectResponseHeaders({
-      metadata: {
-        "content-type": "text/plain",
-        "x-amz-meta-author": "hg",
-        etag: "abc",
-      },
+      metadata: { "content-type": "text/plain", etag: "abc" },
       bodyLength: 3,
     });
 
@@ -71,6 +68,41 @@ describe("simS3ObjectResponseHeaders", () => {
       "content-length": "3",
     });
     assertArrayLength(Object.keys(headers), 2);
+  });
+
+  it("serves the metadata a caller attached under the x-amz-meta- prefix", () => {
+    // Given an Object the write attached two of its own keys to.
+    // When its response headers are built.
+    const headers = simS3ObjectResponseHeaders({
+      metadata: { "content-type": "text/plain" },
+      userMetadata: { author: "ada", "review-state": "approved" },
+      bodyLength: 3,
+    });
+
+    // Then each entry travels as its own header, which is what the SDK reads
+    // back into Metadata on the far side of an endpoint.
+    assertObjectMatches(headers, {
+      "x-amz-meta-author": "ada",
+      "x-amz-meta-review-state": "approved",
+    });
+  });
+
+  it("keeps a user metadata key named after a header S3 sets itself apart from it", () => {
+    // Given an Object stored as CSV whose caller also attached a content type
+    // of its own.
+    // When its response headers are built.
+    const headers = simS3ObjectResponseHeaders({
+      metadata: { "content-type": "text/csv" },
+      userMetadata: { "content-type": "application/vnd.internal" },
+      bodyLength: 3,
+    });
+
+    // Then the prefix keeps the two apart, and the Object goes on being served
+    // as the CSV it was written as.
+    assertObjectMatches(headers, {
+      "content-type": "text/csv",
+      "x-amz-meta-content-type": "application/vnd.internal",
+    });
   });
 
   it("reports the length it is given rather than one from metadata", () => {
