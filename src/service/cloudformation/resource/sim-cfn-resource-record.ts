@@ -159,8 +159,8 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
    * where it is.
    *
    * UpdateReplacePolicy decides this on its own. CloudFormation does not fall
-   * back to DeletionPolicy for a Resource it is replacing, so a Resource kept
-   * on teardown still goes when its replacement is created, unless it says
+   * back to DeletionPolicy for a Resource it is replacing. A Resource kept on
+   * teardown still goes when its replacement is created, unless it says
    * otherwise here.
    */
   public get retainedOnReplace(): boolean {

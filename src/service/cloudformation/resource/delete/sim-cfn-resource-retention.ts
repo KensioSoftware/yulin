@@ -17,18 +17,18 @@ interface SimCfnResourceRetentionProperties {
 /**
  * Which of the Resources an operation is deleting it has to leave behind.
  *
- * Three things can keep a Resource in simulated AWS, and they are gathered here
- * so one delete has one answer rather than each caller reading a policy of its
- * own: the DeleteStack call naming it, UpdateReplacePolicy on a Resource being
- * replaced, and DeletionPolicy on one being removed.
+ * Three things can keep a Resource in simulated AWS. The DeleteStack call can
+ * name it, UpdateReplacePolicy can keep one a Stack update is replacing, and
+ * DeletionPolicy can keep one being removed. They are gathered here so that one
+ * delete has one answer.
  *
  * Which of the two attributes applies is the part worth stating. CloudFormation
  * reads UpdateReplacePolicy for a replacement and DeletionPolicy for a removal,
- * and neither stands in for the other, so a Resource marked to survive a
- * teardown still goes when an update replaces it.
+ * and neither stands in for the other. A Resource marked to survive a teardown
+ * still goes when an update replaces it.
  *
- * A retention with nothing in it reads DeletionPolicy, which is what a plain
- * teardown does.
+ * A retention with nothing in it reads DeletionPolicy, the way a plain teardown
+ * does.
  */
 export class SimCfnResourceRetention {
   private readonly replaced: ReadonlySet<string>;

@@ -66,12 +66,12 @@ export class SimCfnStackResourceOperations {
   private caller: SimAwsCaller | undefined;
 
   /**
-   * Resources an update left in simulated AWS rather than deleting.
+   * Resources an update kept in simulated AWS.
    *
-   * Kept here rather than on the Stack because the Stack stops holding them as
-   * soon as the update applies: a replaced Resource gives its logical ID up to
-   * the Resource created in its place. A teardown's retained Resources are
-   * still on the Stack, and are read off it.
+   * They are held here because the Stack cannot hold them. A replaced Resource
+   * gives its logical ID up to the Resource created in its place as soon as the
+   * update applies. A teardown's retained Resources are still on the Stack, and
+   * are read off it.
    */
   private readonly retainedByUpdates: SimCfnResource[] = [];
 
@@ -137,7 +137,7 @@ export class SimCfnStackResourceOperations {
     await this.creator(resources).create(creating);
   }
 
-  /** Resources an update left in simulated AWS rather than deleting. */
+  /** Resources an update kept in simulated AWS. */
   public get retainedResources(): readonly SimCfnResource[] {
     return this.retainedByUpdates;
   }

@@ -210,9 +210,10 @@ export class SimCfnStack implements SimCfnDeployedStack {
    * once the teardown has finished successfully, which is when the Stack name
    * becomes free to use again.
    *
-   * Resources named in retainResources are checked against the Stack here
-   * rather than in the background, so a caller naming one the Stack does not
-   * have is refused while it can still be told about it.
+   * Resources named in retainResources are checked against the Stack before
+   * the teardown is scheduled. A caller naming one the Stack does not have is
+   * refused there, where a check in the background would only fail the
+   * deletion.
    */
   async delete(properties: SimCfnStackDeleteProperties = {}): Promise<void> {
     this.operations.assertRetainable(
@@ -285,8 +286,8 @@ export class SimCfnStack implements SimCfnDeployedStack {
   }
 
   /**
-   * Resources left in simulated AWS rather than deleted, whether a teardown
-   * stepped over them or an update replaced them and kept the deployed one.
+   * Resources left in simulated AWS, whether a teardown stepped over them or
+   * an update replaced them and kept the deployed one.
    */
   public get retainedResources(): readonly SimCfnResource[] {
     return [...this.report.retained, ...this.operations.retainedResources];

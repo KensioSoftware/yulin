@@ -13,11 +13,11 @@ interface SimCfnStackRetainedLogicalIdsProperties {
 /**
  * The logical IDs a DeleteStack call asked to keep, resolved against the Stack.
  *
- * An identifier the Stack has no Resource for is refused rather than ignored,
- * as CloudFormation refuses one: a caller who misspells the Resource they meant
- * to keep would otherwise watch it go. CDK construct IDs resolve here too, the
- * same way `getResource(...)` accepts them, so a test written against a
- * synthesized template need not carry the hashed logical ID.
+ * An identifier the Stack has no Resource for is refused, as CloudFormation
+ * refuses one. A caller who misspells the Resource they meant to keep would
+ * otherwise watch it go. CDK construct IDs resolve here as well as logical IDs,
+ * the same way `getResource(...)` takes either. A test written against a
+ * synthesized template then needs no hashed logical ID.
  */
 export function simCfnStackRetainedLogicalIds(
   properties: SimCfnStackRetainedLogicalIdsProperties,

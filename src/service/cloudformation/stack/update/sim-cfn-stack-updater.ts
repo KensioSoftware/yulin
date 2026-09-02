@@ -97,8 +97,8 @@ export class SimCfnStackUpdater {
     plan.applyTo(resources);
 
     // Once the Stack has stopped holding them, and before the replacements are
-    // created, so an update that keeps a Resource and then fails to create the
-    // one taking its place still reports what it kept.
+    // created. An update that keeps a Resource and then fails to create the one
+    // taking its place still reports what it kept.
     operations.recordRetained(
       plan.deletions.filter((resource) => resource.retained),
     );
