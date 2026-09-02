@@ -4,8 +4,15 @@
 # this repository only.
 reviews:
   auto_review:
-    # Review a pull request once, when it is opened.
-    enabled: true
+    # A pull request is not reviewed for being opened. Reviews are rationed, and
+    # a documentation change or a small one spends a review for little.
+    #
+    # The Review workflow decides which pull requests are worth one and labels
+    # those `review-ready`, which is what asks for the review. Anything it
+    # passes over can still be reviewed with an `@coderabbitai review` comment.
+    enabled: false
+    labels:
+      - review-ready
     # Do not review again on every push after that. Ask for another review with
     # an `@coderabbitai review` comment on the pull request.
     auto_incremental_review: false

@@ -1,0 +1,79 @@
+---
+name: Review
+
+# CodeRabbit reviews nothing for being opened (see .coderabbit.yaml). This is
+# what asks it for a review, by labelling the pull requests worth one.
+#
+# A title edit counts as much as a push does, since the title is half of what
+# decides. A pull request that grows past the line count later is labelled then,
+# and one that shrinks keeps the label it already earned.
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+# Below this many changed lines, a pull request is read faster than it is
+# reviewed.
+env:
+  REVIEW_LINES: 500
+
+jobs:
+  review-ready:
+    name: Review ready
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      # There is no checkout here. The API already knows how big the pull
+      # request is, and asking it takes a few seconds against the minute a
+      # checkout and a pnpm install cost.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          case "$PR_TITLE" in
+            docs:* | docs\(*\):*)
+              echo "A documentation pull request is not reviewed." \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
+          read -r additions deletions < <(
+            gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+              --jq '"\(.additions) \(.deletions)"'
+          )
+          lines=$((additions + deletions))
+
+          if [ "$lines" -lt "$REVIEW_LINES" ]; then
+            echo "$lines changed lines, under $REVIEW_LINES: not reviewed." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Created here rather than by hand, so a fork or a fresh clone of this
+          # repository has everything the workflow needs. `--force` leaves an
+          # existing label as it is apart from its colour and description.
+          gh label create review-ready \
+            --repo "$REPOSITORY" \
+            --color 0e8a16 \
+            --description "Large enough to be worth a CodeRabbit review" \
+            --force
+
+          gh pr edit "$PR_NUMBER" --repo "$REPOSITORY" --add-label review-ready
+
+          echo "$lines changed lines: asking for a review." \
+            >> "$GITHUB_STEP_SUMMARY"
