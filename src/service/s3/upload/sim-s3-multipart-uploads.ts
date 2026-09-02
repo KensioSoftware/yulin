@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { SimS3ObjectMetadata } from "../object/s3-object.js";
+import type { SimS3ObjectTagSet } from "../object/s3-object-tags.js";
 import type { SimS3ServerSideEncryption } from "../object/s3-server-side-encryption.js";
 import type { SimS3StorageClass } from "../object/s3-storage-class.js";
 import {
@@ -14,6 +15,7 @@ interface SimS3StartUploadProperties {
   readonly initiated: Date;
   readonly storageClass?: SimS3StorageClass;
   readonly serverSideEncryption?: SimS3ServerSideEncryption | undefined;
+  readonly tags?: SimS3ObjectTagSet | undefined;
 }
 
 /**
@@ -44,6 +46,7 @@ export class SimS3MultipartUploads {
         storageClass: properties.storageClass,
       }),
       serverSideEncryption: properties.serverSideEncryption,
+      tags: properties.tags,
     });
 
     this.uploads.set(upload.uploadId, upload);

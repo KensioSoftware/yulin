@@ -14,6 +14,7 @@ import { SimS3MultipartCommands } from "./command/multipart/sim-s3-multipart-com
 import { SimS3NotificationCommands } from "./command/notification/sim-s3-notification-commands.js";
 import { SimS3ObjectCommands } from "./command/object/sim-s3-object-commands.js";
 import { SimS3ObjectLockCommands } from "./command/object-lock/sim-s3-object-lock-commands.js";
+import { SimS3ObjectTaggingCommands } from "./command/tagging/sim-s3-object-tagging-commands.js";
 import { SimS3PublicAccessBlockCommands } from "./command/public-access-block/sim-s3-public-access-block-commands.js";
 import { SimS3VersioningCommands } from "./command/versioning/sim-s3-versioning-commands.js";
 import type { SimS3BucketCommandState } from "./command/sim-s3-bucket-command-state.js";
@@ -69,6 +70,7 @@ export class SimS3Commands {
   public readonly encryption: SimS3EncryptionCommands;
   public readonly objectLock: SimS3ObjectLockCommands;
   public readonly objects: SimS3ObjectCommands;
+  public readonly objectTagging: SimS3ObjectTaggingCommands;
   public readonly multipartUploads: SimS3MultipartCommands;
   public readonly objectNotifier: SimS3ObjectNotifier;
 
@@ -110,6 +112,7 @@ export class SimS3Commands {
     this.encryption = new SimS3EncryptionCommands(state);
     this.objectLock = new SimS3ObjectLockCommands(state);
     this.objects = new SimS3ObjectCommands(state);
+    this.objectTagging = new SimS3ObjectTaggingCommands(state);
     this.multipartUploads = new SimS3MultipartCommands(state);
   }
 }

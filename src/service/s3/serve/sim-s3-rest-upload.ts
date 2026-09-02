@@ -16,6 +16,9 @@ import { SimS3UploadChecksum } from "./sim-s3-upload-checksum.js";
  * The stated checksum is checked while the request is read, as real S3 checks
  * it before storing anything, so an upload that would be refused there is
  * refused here instead of quietly landing in the Bucket.
+ *
+ * `x-amz-tagging` is read alongside them, being the tags S3 holds against the
+ * Object rather than metadata it hands back on a read.
  */
 export function simS3RestUploadInput(
   route: SimS3RestObjectRoute,
@@ -27,10 +30,13 @@ export function simS3RestUploadInput(
     body,
   );
 
+  const tagging = request.headers.get("x-amz-tagging");
+
   return {
     Bucket: route.bucket.bucketName,
     Key: route.objectKey,
     Body: body ?? new Uint8Array(),
     ...simS3WriteMetadataHeaders(request.headers),
+    ...(tagging !== null && { Tagging: tagging }),
   };
 }

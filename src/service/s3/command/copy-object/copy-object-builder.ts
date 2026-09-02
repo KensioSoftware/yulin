@@ -6,6 +6,7 @@ import {
   simS3WriteEncryption,
   simS3WriteStorageClass,
 } from "../../object/s3-write-storage.js";
+import { simS3WriteTags } from "../../object/s3-write-tagging.js";
 import type { SimCopyObjectCommandInput } from "./copy-object.command.js";
 
 interface CopyObjectBuilderProperties {
@@ -43,6 +44,10 @@ export class CopyObjectBuilder {
    * The storage class and the encryption come from the request and the
    * destination Bucket. Real S3 stores a copy in the default class where the
    * request names none, whatever class the source was in.
+   *
+   * The tags come from the source unless the request asked to replace them,
+   * which is the other way round from the metadata: real S3 copies tags by
+   * default and takes `TaggingDirective: REPLACE` to be told otherwise.
    */
   build(
     input: SimCopyObjectCommandInput,
@@ -59,6 +64,10 @@ export class CopyObjectBuilder {
         input.MetadataDirective === "REPLACE"
           ? simS3WriteMetadata(input)
           : source.metadata,
+      tags:
+        input.TaggingDirective === "REPLACE"
+          ? simS3WriteTags(input, "CopyObjectCommand")
+          : source.tags,
       lastModified: this.clock.now(),
       ...(storageClass !== undefined && { storageClass }),
       serverSideEncryption: simS3WriteEncryption(

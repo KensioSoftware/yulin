@@ -2,19 +2,9 @@ import type {
   SimS3LifecycleRule,
   SimS3LifecycleRuleAndOperator,
   SimS3LifecycleRuleFilter,
+  SimS3LifecycleTag,
 } from "../../command/put-bucket-lifecycle-configuration/put-bucket-lifecycle-configuration.command.js";
-
-/**
- * What a lifecycle rule looks at to decide whether it selects something.
- *
- * An Object states its size and a multipart upload leaves it out. Half an
- * upload has no size for a rule to measure, and real S3 has no size to
- * measure either until the parts are joined.
- */
-export interface SimS3LifecycleSubject {
-  readonly key: string;
-  readonly size?: number | undefined;
-}
+import type { SimS3LifecycleSubject } from "./sim-s3-lifecycle-subject.js";
 
 /**
  * The object size bounds a filter or its `And` operator can state.
@@ -30,9 +20,6 @@ type SimS3LifecycleSizeBounds = Pick<
  * A rule states its scope either as the older top-level `Prefix` or as a
  * `Filter`. A rule with no scope at all covers every key in the Bucket. Real
  * S3 refuses a rule stating both.
- *
- * Simulated S3 has no Object tags. A `Tag` or a `TagFilters` entry names a
- * condition the simulator has no answer for, and selects no key.
  */
 export function simS3LifecycleRuleSelects(
   rule: SimS3LifecycleRule,
@@ -54,7 +41,9 @@ function filterSelects(
   }
 
   if (filter.Tag !== undefined) {
-    return false;
+    // A bare `Tag` filter is scoped by the tag alone. It says nothing about
+    // the key, so every Object carrying the tag is selected wherever it is.
+    return tagsSelect([filter.Tag], subject);
   }
 
   return (
@@ -66,13 +55,27 @@ function conjunctionSelects(
   operator: SimS3LifecycleRuleAndOperator,
   subject: SimS3LifecycleSubject,
 ): boolean {
-  if ((operator.Tags ?? []).length > 0) {
-    return false;
-  }
-
   return (
     subject.key.startsWith(operator.Prefix ?? "") &&
-    sizeWithin(operator, subject)
+    sizeWithin(operator, subject) &&
+    tagsSelect(operator.Tags ?? [], subject)
+  );
+}
+
+/**
+ * Whether the subject carries every tag the filter names.
+ *
+ * Both halves of a tag have to match, because a rule for `archive=true` says
+ * nothing about an Object tagged `archive=false`. A subject carrying no tag
+ * set at all, meaning an upload in progress or a delete marker, matches no
+ * named tag and is selected only by a filter naming none.
+ */
+function tagsSelect(
+  tags: readonly SimS3LifecycleTag[],
+  subject: SimS3LifecycleSubject,
+): boolean {
+  return tags.every(
+    (tag) => subject.tags?.has(tag.Key ?? "", tag.Value ?? "") === true,
   );
 }
 

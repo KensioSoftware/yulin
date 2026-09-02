@@ -1,10 +1,8 @@
 import type { SimS3Object } from "../../object/s3-object.js";
 import type { SimS3BucketStorage } from "../../storage/s3-bucket-storage.js";
 import type { SimS3BucketVersions } from "../versioning/sim-s3-bucket-versions.js";
-import type {
-  SimS3LifecycleConfiguration,
-  SimS3LifecycleObject,
-} from "./sim-s3-lifecycle-configuration.js";
+import type { SimS3LifecycleConfiguration } from "./sim-s3-lifecycle-configuration.js";
+import type { SimS3LifecycleObject } from "./sim-s3-lifecycle-subject.js";
 import { simS3TransitionedObjectClass } from "./sim-s3-lifecycle-transition.js";
 
 /**
@@ -146,5 +144,6 @@ function lifecycleObject(object: SimS3Object): SimS3LifecycleObject {
     key: object.key,
     size: object.body.length,
     lastModified: object.lastModified,
+    tags: object.tags,
   };
 }

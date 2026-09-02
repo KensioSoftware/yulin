@@ -264,3 +264,19 @@ export class SimS3InvalidRequest extends SimS3Error {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated S3 InvalidTag error.
+ *
+ * Real S3 answers this for a tag set it will not hold against an Object: more
+ * than ten tags, or two tags under one key. The write is refused rather than
+ * partly applied, so a caller that sent eleven tags does not find ten of them
+ * on the Object.
+ */
+export class SimS3InvalidTag extends SimS3Error {
+  public override readonly name = "InvalidTag";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

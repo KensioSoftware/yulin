@@ -19,6 +19,7 @@ const servedSubResources: readonly string[] = [
   "uploads",
   "uploadId",
   "encryption",
+  "tagging",
 ];
 
 /**
@@ -51,7 +52,6 @@ const knownSubResources: ReadonlySet<string> = new Set([
   "restore",
   "retention",
   "select",
-  "tagging",
   "torrent",
   "versioning",
   "versions",

@@ -9,21 +9,36 @@ import { simS3EventPrincipalId } from "./sim-s3-event-principal.js";
 import { SimS3ObjectEvent } from "./sim-s3-object-event.js";
 
 /**
- * An Object a command has just stored.
+ * An Object a command has just written, in whatever sense.
+ *
+ * Storing the bytes and retagging them are both writes to an Object that
+ * exists, so both events describe the same thing: the Object as it now stands.
+ * The event name is what tells the two apart.
  */
-export interface SimS3ObjectCreatedInput {
+interface SimS3WrittenObjectInput<Event extends SimS3NotificationEvent> {
   readonly bucket: SimS3Bucket;
   readonly object: SimS3Object;
   readonly caller: SimAwsResolvedCaller;
-  /**
-   * How the Object came to be there, which real S3 distinguishes: an Object
-   * assembled from parts arrives as `s3:ObjectCreated:CompleteMultipartUpload`
-   * rather than as a Put.
-   */
-  readonly eventName: SimS3ObjectCreatedEvent;
+  readonly eventName: Event;
   /** The version the write was given, on a Bucket keeping versions. */
   readonly versionId?: string | undefined;
 }
+
+/**
+ * An Object a command has just stored.
+ *
+ * The event name says how the Object came to be there, which real S3
+ * distinguishes: an Object assembled from parts arrives as
+ * `s3:ObjectCreated:CompleteMultipartUpload` rather than as a Put.
+ */
+export type SimS3ObjectCreatedInput =
+  SimS3WrittenObjectInput<SimS3ObjectCreatedEvent>;
+
+/**
+ * An Object whose tags a command has just replaced.
+ */
+export type SimS3ObjectTaggedInput =
+  SimS3WrittenObjectInput<SimS3ObjectTaggingEvent>;
 
 /**
  * The ways an Object can be created that simulated S3 raises an event for.
@@ -31,6 +46,14 @@ export interface SimS3ObjectCreatedInput {
 export type SimS3ObjectCreatedEvent = Extract<
   SimS3NotificationEvent,
   `s3:ObjectCreated:${string}`
+>;
+
+/**
+ * The ways an Object's tags can change that simulated S3 raises an event for.
+ */
+type SimS3ObjectTaggingEvent = Extract<
+  SimS3NotificationEvent,
+  `s3:ObjectTagging:${string}`
 >;
 
 /**
@@ -97,15 +120,19 @@ export class SimS3ObjectEventBuilder {
    * size and ETag.
    */
   forCreated(input: SimS3ObjectCreatedInput): SimS3ObjectEvent {
-    return this.build({
-      bucket: input.bucket,
-      eventName: input.eventName,
-      key: input.object.key,
-      caller: input.caller,
-      size: input.object.body.length,
-      eTag: input.object.etag,
-      versionId: input.versionId,
-    });
+    return this.forWritten(input);
+  }
+
+  /**
+   * Build the event for an Object whose tags were replaced, which carries the
+   * same size and ETag a creation does.
+   *
+   * Real S3 describes the Object the tags now sit on, and tagging changes
+   * neither of those, so a tagging record and the creation record before it
+   * report the same bytes.
+   */
+  forTagged(input: SimS3ObjectTaggedInput): SimS3ObjectEvent {
+    return this.forWritten(input);
   }
 
   /**
@@ -118,6 +145,20 @@ export class SimS3ObjectEventBuilder {
       eventName: input.eventName,
       key: input.key,
       caller: input.caller,
+      versionId: input.versionId,
+    });
+  }
+
+  private forWritten(
+    input: SimS3WrittenObjectInput<SimS3NotificationEvent>,
+  ): SimS3ObjectEvent {
+    return this.build({
+      bucket: input.bucket,
+      eventName: input.eventName,
+      key: input.object.key,
+      caller: input.caller,
+      size: input.object.body.length,
+      eTag: input.object.etag,
       versionId: input.versionId,
     });
   }

@@ -16,6 +16,7 @@ import { simS3MultipartResponse } from "./sim-s3-api-multipart-output.js";
 import {
   simS3CopyObjectXml,
   simS3GetObjectResponse,
+  simS3ObjectTaggingXml,
 } from "./sim-s3-api-object-output.js";
 import { simS3ResponseHeaderOverrides } from "../../object/s3-object-response-headers.js";
 
@@ -74,6 +75,9 @@ export async function simS3ApiResponse(
     }
     case "GetBucketNotificationConfigurationCommand": {
       return xml(notificationConfigurationXml(value));
+    }
+    case "GetObjectTaggingCommand": {
+      return xml(simS3ObjectTaggingXml(value));
     }
     case "DeleteObjectsCommand": {
       return xml(deleteResultXml(value));

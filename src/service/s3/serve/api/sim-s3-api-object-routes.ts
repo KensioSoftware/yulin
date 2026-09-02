@@ -4,7 +4,9 @@ import {
   getObjectInput,
   objectInput,
   putObjectInput,
+  putObjectTaggingInput,
   simS3CopySourceHeader,
+  versionedObjectInput,
 } from "./sim-s3-api-object-input.js";
 import {
   completeMultipartUploadInput,
@@ -28,6 +30,13 @@ export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
     target: "object",
     commandName: "GetObjectCommand",
     input: getObjectInput,
+  },
+  {
+    method: "GET",
+    target: "object",
+    subResource: "tagging",
+    commandName: "GetObjectTaggingCommand",
+    input: versionedObjectInput,
   },
   {
     method: "GET",
@@ -70,6 +79,13 @@ export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
     input: uploadPartInput,
   },
   {
+    method: "PUT",
+    target: "object",
+    subResource: "tagging",
+    commandName: "PutObjectTaggingCommand",
+    input: putObjectTaggingInput,
+  },
+  {
     // A copy and an upload are both a `PUT` on an Object path, and the copy
     // names its source in a header. Matched first, so an upload carrying no
     // such header still reaches PutObject below.
@@ -84,6 +100,13 @@ export const simS3ObjectApiRoutes: readonly SimS3ApiRoute[] = [
     target: "object",
     commandName: "PutObjectCommand",
     input: putObjectInput,
+  },
+  {
+    method: "DELETE",
+    target: "object",
+    subResource: "tagging",
+    commandName: "DeleteObjectTaggingCommand",
+    input: versionedObjectInput,
   },
   {
     method: "DELETE",

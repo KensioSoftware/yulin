@@ -62,6 +62,7 @@ export function simS3CompletedUploadObject(
     etag: simS3MultipartETag(stored.map((part) => part.etag)),
     storageClass: upload.storageClass,
     serverSideEncryption: upload.serverSideEncryption,
+    tags: upload.tags,
   });
 }
 

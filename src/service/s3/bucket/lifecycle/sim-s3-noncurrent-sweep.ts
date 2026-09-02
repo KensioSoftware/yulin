@@ -109,6 +109,7 @@ export class SimS3NoncurrentSweep {
         size: version.object.body.length,
         noncurrentSince: version.noncurrentSince,
         newerVersionsAhead: ahead,
+        tags: version.object.tags,
       },
       this.now,
     );
@@ -125,6 +126,9 @@ export class SimS3NoncurrentSweep {
         size: version.isDeleteMarker ? 0 : version.object.body.length,
         noncurrentSince: version.noncurrentSince,
         newerVersionsAhead: ahead,
+        // A delete marker holds no Object, so it carries no tags and a rule
+        // filtering on one leaves it alone.
+        tags: version.isDeleteMarker ? undefined : version.object.tags,
       },
       this.now,
     );

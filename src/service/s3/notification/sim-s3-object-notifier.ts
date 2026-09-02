@@ -3,6 +3,7 @@ import type { SimS3NotificationDestinations } from "./destination/sim-s3-notific
 import {
   type SimS3ObjectCreatedInput,
   type SimS3ObjectRemovedInput,
+  type SimS3ObjectTaggedInput,
   SimS3ObjectEventBuilder,
 } from "./event/sim-s3-object-event-builder.js";
 import { SimS3NotificationDispatcher } from "./sim-s3-notification-dispatcher.js";
@@ -56,6 +57,18 @@ export class SimS3ObjectNotifier {
       input.eventName,
       input.object.key,
       () => this.events.forCreated(input),
+    );
+  }
+
+  /**
+   * Raise a change to an Object's tags, as whichever kind of change it was.
+   */
+  objectTagged(input: SimS3ObjectTaggedInput): void {
+    this.schedule.matching(
+      input.bucket,
+      input.eventName,
+      input.object.key,
+      () => this.events.forTagged(input),
     );
   }
 

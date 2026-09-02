@@ -7,6 +7,7 @@ import { SimS3LifecycleConfiguration } from "./lifecycle/sim-s3-lifecycle-config
 import { SimS3NoncurrentSweep } from "./lifecycle/sim-s3-noncurrent-sweep.js";
 import { SimS3LifecycleSweep } from "./lifecycle/sim-s3-lifecycle-sweep.js";
 import { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
+import { SimS3TaggableObject } from "./tagging/sim-s3-taggable-object.js";
 import type { SimS3BucketVersioning } from "./versioning/sim-s3-bucket-versioning.js";
 import { SimS3BucketVersions } from "./versioning/sim-s3-bucket-versions.js";
 import type { SimS3ObjectVersion } from "./versioning/sim-s3-object-version.js";
@@ -116,6 +117,27 @@ export class SimS3BucketObjects {
     );
 
     return await this.versions.deleteVersion(this.storage, key, versionId);
+  }
+
+  /**
+   * The Object a tagging request names, ready to be read or retagged.
+   *
+   * A request naming a version acts on that version, and one naming none acts
+   * on whatever a plain read of the key answers with. The read happens either
+   * way, because it is what applies the Bucket's rules, and a request naming a
+   * version has no more effect on the Bucket than any other read of it.
+   */
+  async taggable(
+    key: string,
+    versionId: string | undefined,
+  ): Promise<SimS3TaggableObject> {
+    return SimS3TaggableObject.named({
+      storage: this.storage,
+      versions: this.sweptVersions(),
+      key,
+      versionId,
+      stored: await this.get(key),
+    });
   }
 
   /**

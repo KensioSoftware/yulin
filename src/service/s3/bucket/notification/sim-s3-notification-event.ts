@@ -17,6 +17,8 @@ export const SIM_S3_NOTIFICATION_EVENTS = [
   "s3:ObjectCreated:CompleteMultipartUpload",
   "s3:ObjectRemoved:Delete",
   "s3:ObjectRemoved:DeleteMarkerCreated",
+  "s3:ObjectTagging:Put",
+  "s3:ObjectTagging:Delete",
 ] as const;
 
 export type SimS3NotificationEvent =
@@ -58,6 +60,9 @@ const eventExpansions = new Map<string, readonly SimS3NotificationEvent[]>([
     "s3:ObjectRemoved:DeleteMarkerCreated",
     ["s3:ObjectRemoved:DeleteMarkerCreated"],
   ],
+  ["s3:ObjectTagging:*", ["s3:ObjectTagging:Put", "s3:ObjectTagging:Delete"]],
+  ["s3:ObjectTagging:Put", ["s3:ObjectTagging:Put"]],
+  ["s3:ObjectTagging:Delete", ["s3:ObjectTagging:Delete"]],
 ]);
 
 /**

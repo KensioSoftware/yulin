@@ -838,8 +838,7 @@ See [Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost) for sett
 - `CopySourceIfMatch`, `CopySourceIfNoneMatch`, `CopySourceIfModifiedSince` and
   `CopySourceIfUnmodifiedSince` are ignored. A conditional copy happens whatever the condition
   says.
-- `TaggingDirective`, `StorageClass`, `ACL` and the server-side encryption members are ignored. Sim
-  S3 models none of what they describe.
+- `ACL` is ignored. Sim S3 models no Object ACL.
 - A `versionId` in `CopySource` is refused with `NotImplemented`.
 - A copy of an Object that was uploaded in parts gets a plain ETag rather than the multipart form.
   Real S3 does the same for a copy under five gigabytes, because it rewrites the bytes as one
@@ -2044,12 +2043,13 @@ writes fall outside it. Without that, the simulation stops after a thousand deli
 - A destination goes where the group it was declared in says, and its ARN has no say. A queue ARN
   under `LambdaFunctionConfigurations` is refused for failing to be a function ARN, and never
   delivered to as a queue.
-- Four event types are raised: `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`,
-  `s3:ObjectCreated:CompleteMultipartUpload` and `s3:ObjectRemoved:Delete`. `Post`,
-  `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`, `LifecycleExpiration:*` and
-  `ObjectTagging:*` families, `LifecycleTransition`, `IntelligentTiering`, `ObjectAcl:Put` and
-  `ReducedRedundancyLostObject` are refused by name. `s3:ObjectCreated:*` expands to the three
-  creations and `s3:ObjectRemoved:*` to the one removal.
+- Six event types are raised: `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`,
+  `s3:ObjectCreated:CompleteMultipartUpload`, `s3:ObjectRemoved:Delete`,
+  `s3:ObjectTagging:Put` and `s3:ObjectTagging:Delete`. `Post`, `DeleteMarkerCreated`, the
+  `ObjectRestore:*`, `Replication:*` and `LifecycleExpiration:*` families, `LifecycleTransition`,
+  `IntelligentTiering`, `ObjectAcl:Put` and `ReducedRedundancyLostObject` are refused by name.
+  `s3:ObjectCreated:*` expands to the three creations, `s3:ObjectRemoved:*` to the one removal and
+  `s3:ObjectTagging:*` to the two tagging events.
 - `userIdentity.principalId` carries the caller's ARN rather than the `AIDA...` unique id real S3
   puts there. Simulated IAM has no unique-id namespace to draw one from, and an ARN is what a test
   would assert on. `requestParameters.sourceIPAddress` is the loopback address, because the request
@@ -2380,6 +2380,95 @@ Where the Object is changes nothing about reading it. Real S3 refuses a read of 
 until `RestoreObject` has brought it back, and sim S3 serves every Object whatever class it is in.
 See [Limitations](#limitations).
 
+## Object tags
+
+An Object carries up to ten tags. `PutObjectTaggingCommand`, `GetObjectTaggingCommand` and
+`DeleteObjectTaggingCommand` read and replace the whole set, and `PutObject`, `CopyObject` and
+`CreateMultipartUpload` take one on the write itself, as the `department=finance&retention=long`
+query string real S3 carries it in.
+
+```typescript sim-s3-object-tagging
+/**
+ * Tagging a simulated S3 Object and reading the tags back.
+ */
+
+import {
+  CreateBucketCommand,
+  GetObjectTaggingCommand,
+  PutObjectCommand,
+  PutObjectTaggingCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.region("eu-west-2").s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "reports" }));
+
+// A write can carry its own tags, as the query string S3 takes them in.
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "reports",
+    Key: "quarterly.csv",
+    Body: "period,total",
+    Tagging: "department=finance&retention=long",
+  }),
+);
+
+// A tagging request replaces the whole set.
+await simS3.putObjectTagging(
+  new PutObjectTaggingCommand({
+    Bucket: "reports",
+    Key: "quarterly.csv",
+    Tagging: { TagSet: [{ Key: "department", Value: "legal" }] },
+  }),
+);
+
+const read = await simS3.getObjectTagging(
+  new GetObjectTaggingCommand({ Bucket: "reports", Key: "quarterly.csv" }),
+);
+
+// [ { Key: "department", Value: "legal" } ]
+console.log(read.TagSet);
+```
+
+A tag set is put whole, as real S3 puts one. The request above leaves the Object carrying
+`department=legal` and nothing else. An Object nobody has tagged reads back with an empty `TagSet`.
+Having no tags is a different thing from having no Object, and only the second is `NoSuchKey`.
+
+A set of more than ten tags is refused with `InvalidTag`, and so is one stating a key twice. Both
+are checked before anything is written, leaving an Object refused eleven tags carrying none of them.
+
+A copy carries the source Object's tags. `TaggingDirective: REPLACE` puts the request's own
+`Tagging` on the copy and drops the source's.
+
+On a Bucket keeping versions, a tag set belongs to the version it was put on. Writing a new version
+leaves the one before it carrying what that version was written with, and a tagging request naming a
+`VersionId` reaches that version alone.
+
+Tagging an Object raises `s3:ObjectTagging:Put`, and removing its tags raises
+`s3:ObjectTagging:Delete`. See [Event notifications](#event-notifications). A lifecycle rule
+filtering on a tag selects the Objects carrying it. See [What a rule selects](#what-a-rule-selects).
+
+Each of the three operations is granted by a permission of its own, `s3:GetObjectTagging`,
+`s3:PutObjectTagging` and `s3:DeleteObjectTagging`. `s3:PutObject` grants none of them. All three are
+served over the S3 REST endpoint under the `?tagging` sub-resource, so the CLI reaches the same
+handlers an SDK caller does.
+
+### Limitations
+
+- Bucket tags are inert. `Tags` on an `AWS::S3::Bucket` is recorded and never read.
+- The `s3:ExistingObjectTag` and `s3:RequestObjectTag` IAM condition keys are left out. A Bucket
+  policy written against either matches no request.
+- `GetObjectAttributes` is left out, and neither `GetObject` nor `HeadObject` reports
+  `x-amz-tagging-count`.
+- Tag keys and values are stored as they arrive. Real S3 bounds a key at 128 characters and a value
+  at 256, and sim S3 accepts a longer one of either.
+- A Bucket mounted on a filesystem directory rebuilds each Object from the file on every read, and a
+  directory holds no tags. Tagging one writes the same bytes back to the file, and the next read
+  reports an untagged Object. Use the default in-memory storage to test tagging. See
+  [Metadata a file cannot carry](#metadata-a-file-cannot-carry).
+
 ## Default encryption
 
 Every Bucket is encrypted, and every Object written into one reports the algorithm it was stored
@@ -2704,8 +2793,73 @@ all covers every key in the Bucket. `Filter.Prefix`, `Filter.And.Prefix`, `Objec
 A multipart upload is selected by its key alone. Half an upload has no size. A rule narrowed by an
 object size bound abandons no upload.
 
-Sim S3 holds no Object tags. A rule narrowed by `Filter.Tag`, `Filter.And.Tags` or a template's
-`TagFilters` selects no Object, and expires none.
+A rule narrowed by `Filter.Tag`, or by the `Filter.And.Tags` beside a prefix, selects the Objects
+carrying every tag it names. Both halves of a tag have to match, so a rule for `archive=true` leaves
+an Object tagged `archive=false` where it is. A template states the same thing as `TagFilters` beside
+the rule's `Prefix`, and it is read into the `Filter` the request takes. See
+[Object tags](#object-tags).
+
+```typescript sim-s3-lifecycle-tag-filter
+/**
+ * Expiring the simulated S3 Objects a tag selects.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutBucketLifecycleConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "reports" }));
+
+await simS3.putBucketLifecycleConfiguration(
+  new PutBucketLifecycleConfigurationCommand({
+    Bucket: "reports",
+    LifecycleConfiguration: {
+      Rules: [
+        {
+          ID: "expire-temporary",
+          Status: "Enabled",
+          Filter: { Tag: { Key: "lifecycle", Value: "temporary" } },
+          Expiration: { Days: 7 },
+        },
+      ],
+    },
+  }),
+);
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "reports",
+    Key: "draft.csv",
+    Body: "period,total",
+    Tagging: "lifecycle=temporary",
+  }),
+);
+await simS3.putObject(
+  new PutObjectCommand({ Bucket: "reports", Key: "final.csv", Body: "a,b" }),
+);
+
+await simAws.clock().advanceBy({ days: 8 });
+
+const listing = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "reports" }),
+);
+
+// Only final.csv. The tagged draft is past its expiry.
+console.log(listing.Contents?.map((entry) => entry.Key));
+```
+
+A tagging request that takes an Object out of a rule's reach takes it out for good. The rule reads
+the tags the Object carries at the moment the Bucket is read.
+
+An Object a rule reaches by tag alone is reached wherever it is in the Bucket. A bare `Filter.Tag`
+says nothing about the key.
 
 ### Reading and replacing the rules
 
@@ -2787,8 +2941,9 @@ CloudFormation spells some rule fields differently from the request. `Id` become
 `TransitionInDays` becomes `Days`. The singular `Transition` a template may state alongside
 `Transitions` joins the list. `NoncurrentVersionExpirationInDays` becomes the `NoncurrentDays` of a
 `NoncurrentVersionExpiration`, which is what CDK's `noncurrentVersionExpiration` synthesises, and a
-template stating the nested object instead is taken as it stands. Everything else, `Status`,
-`Prefix`, `AbortIncompleteMultipartUpload`, `TagFilters` and the object size bounds among them, is
+template stating the nested object instead is taken as it stands. `TagFilters` becomes the `Filter`
+the request holds a rule's tags in, taking the rule's `Prefix` in with it where it states one.
+Everything else, `Status`, `AbortIncompleteMultipartUpload` and the object size bounds among them, is
 carried across as the template stated it.
 
 `LifecycleConfiguration` is one of the properties simulated S3 acts on. It stays out of
@@ -3151,7 +3306,8 @@ An upload keeps the metadata headers it was sent. `cache-control`, `content-disp
 `content-encoding`, `content-language`, `content-type` and `expires` are stored, and a read is
 served every one of them, the way it serves an Object written by a `PutObjectCommand`. See
 [Object system metadata](#object-system-metadata). An `x-amz-meta-` header is stored too, and an
-in-process read reports it in `Metadata`.
+in-process read reports it in `Metadata`. An `x-amz-tagging` header puts the tags it names on the
+Object, the same way a `PutObjectCommand` does. See [Object tags](#object-tags).
 
 ```typescript
 await fetch(url, {
@@ -3802,6 +3958,9 @@ Sim S3 currently supports:
 - `EncodingType` on a listing, encoding the keys, prefixes and markers it answers with
 - Object storage classes, named on a write and moved by a lifecycle rule, reported on a listing and
   on a read
+- Object tags, taken on a write and on a copy, read and replaced by `PutObjectTaggingCommand`,
+  `GetObjectTaggingCommand` and `DeleteObjectTaggingCommand`, filtered on by a lifecycle rule, and
+  raising `s3:ObjectTagging:Put` and `s3:ObjectTagging:Delete`
 - `PutBucketEncryptionCommand`, `GetBucketEncryptionCommand` and `DeleteBucketEncryptionCommand`,
   and the `BucketEncryption` property of an `AWS::S3::Bucket`, deciding the algorithm an Object
   reports
@@ -3827,8 +3986,8 @@ These apply across the page. The sections above each list what is specific to th
   another. See [Storage classes](#storage-classes).
 - `EncodingType` is read on `ListObjects` and `ListObjectsV2`. `ListMultipartUploads` and
   `ListParts` ignore it, and both answer on one page.
-- Object tags, ACLs and replication are left out. Server-side encryption is reported and never
-  applied, and an `aws:kms` Object names no key, because there is no simulated KMS behind it. See
+- ACLs and replication are left out. Server-side encryption is reported and never applied, and an
+  `aws:kms` Object names no key, because there is no simulated KMS behind it. See
   [Default encryption](#default-encryption).
 - A Bucket using filesystem-backed storage refuses a delete unless the mount allowed one, and hears
   nothing about a file something else wrote under the directory. See

@@ -1,6 +1,7 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3ObjectLock } from "../lock/sim-s3-object-lock.js";
 import type { SimS3Object } from "../../object/s3-object.js";
+import type { SimS3ObjectTagSet } from "../../object/s3-object-tags.js";
 import type { SimS3StorageClass } from "../../object/s3-storage-class.js";
 import { simS3NullVersionId } from "./sim-s3-bucket-versioning.js";
 
@@ -73,6 +74,17 @@ export class SimS3ObjectVersion {
    */
   transitionTo(storageClass: SimS3StorageClass): void {
     this.stored = this.stored?.withStorageClass(storageClass);
+  }
+
+  /**
+   * Replace the tags on the Object this version holds.
+   *
+   * Tags belong to the version they were put on, so tagging the current
+   * version leaves an older one carrying whatever it was written with. A
+   * delete marker holds no Object and carries no tags.
+   */
+  tagged(tags: SimS3ObjectTagSet): void {
+    this.stored = this.stored?.withTags(tags);
   }
 
   /**

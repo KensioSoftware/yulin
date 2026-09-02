@@ -1,6 +1,7 @@
 import { simS3WriteMetadataHeaders } from "../../object/s3-write-metadata.js";
-import { optional } from "./sim-s3-api-input.js";
+import { optional, utf8 } from "./sim-s3-api-input.js";
 import type { SimS3ApiRequest } from "./sim-s3-api-request.js";
+import { readSimS3Tagging } from "./sim-s3-api-tagging-read.js";
 
 /**
  * Reading the Object operations' inputs out of a request.
@@ -21,6 +22,29 @@ export const simS3CopySourceHeader = "x-amz-copy-source";
  */
 export function objectInput(request: SimS3ApiRequest): object {
   return { Bucket: request.bucketName, Key: request.objectKey };
+}
+
+/**
+ * The input of an operation naming one Object, or one version of it.
+ *
+ * Real S3 names the version in the query string alongside the sub-resource, so
+ * a request naming none acts on whatever a plain read of the key answers with.
+ */
+export function versionedObjectInput(request: SimS3ApiRequest): object {
+  return {
+    ...objectInput(request),
+    ...optional("VersionId", request.query.get("versionId")),
+  };
+}
+
+/**
+ * The input of a tagging write, which carries its tag set as a document.
+ */
+export function putObjectTaggingInput(request: SimS3ApiRequest): object {
+  return {
+    ...versionedObjectInput(request),
+    Tagging: readSimS3Tagging(utf8(request.body)),
+  };
 }
 
 /**
@@ -57,6 +81,10 @@ export function copyObjectInput(request: SimS3ApiRequest): object {
       "MetadataDirective",
       request.headers.get("x-amz-metadata-directive"),
     ),
+    ...optional(
+      "TaggingDirective",
+      request.headers.get("x-amz-tagging-directive"),
+    ),
   };
 }
 
@@ -75,6 +103,7 @@ export function createMultipartUploadInput(request: SimS3ApiRequest): object {
     Key: request.objectKey,
     ...simS3WriteMetadataHeaders(request.headers),
     ...optional("StorageClass", request.headers.get("x-amz-storage-class")),
+    ...optional("Tagging", request.headers.get("x-amz-tagging")),
     ...optional(
       "ServerSideEncryption",
       request.headers.get("x-amz-server-side-encryption"),

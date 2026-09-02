@@ -6,6 +6,7 @@ import type { SimS3 } from "../sim-s3.js";
 import { simS3SdkBucketRoutes } from "./sim-s3-sdk-bucket-routes.js";
 import { simS3SdkObjectLockRoutes } from "./sim-s3-sdk-object-lock-routes.js";
 import { simS3SdkObjectRoutes } from "./sim-s3-sdk-object-routes.js";
+import { simS3SdkObjectTaggingRoutes } from "./sim-s3-sdk-object-tagging-routes.js";
 
 /**
  * Routes intercepted SDK Commands to one scoped simulated S3 instance.
@@ -18,6 +19,7 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
       ...simS3SdkBucketRoutes(simS3),
       ...simS3SdkObjectRoutes(simS3),
       ...simS3SdkObjectLockRoutes(simS3),
+      ...simS3SdkObjectTaggingRoutes(simS3),
     ]);
   }
 

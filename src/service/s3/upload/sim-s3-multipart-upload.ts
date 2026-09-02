@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimS3ObjectMetadata } from "../object/s3-object.js";
+import { SimS3ObjectTagSet } from "../object/s3-object-tags.js";
 import type { SimS3ServerSideEncryption } from "../object/s3-server-side-encryption.js";
 import {
   simS3DefaultStorageClass,
@@ -43,6 +44,12 @@ interface SimS3MultipartUploadProperties {
    */
   readonly storageClass?: SimS3StorageClass;
   readonly serverSideEncryption?: SimS3ServerSideEncryption | undefined;
+  /**
+   * The tags the completed Object will carry. Real S3 takes these at
+   * `CreateMultipartUpload` too, for the same reason it takes the metadata
+   * there: the request describing the Object arrives before its bytes.
+   */
+  readonly tags?: SimS3ObjectTagSet | undefined;
 }
 
 /**
@@ -65,6 +72,7 @@ export class SimS3MultipartUpload {
   public readonly initiated: Date;
   public readonly storageClass: SimS3StorageClass;
   public readonly serverSideEncryption: SimS3ServerSideEncryption | undefined;
+  public readonly tags: SimS3ObjectTagSet;
 
   private readonly parts = new Map<number, SimS3UploadPart>();
 
@@ -75,6 +83,7 @@ export class SimS3MultipartUpload {
     this.initiated = new Date(properties.initiated);
     this.storageClass = properties.storageClass ?? simS3DefaultStorageClass;
     this.serverSideEncryption = properties.serverSideEncryption;
+    this.tags = properties.tags ?? SimS3ObjectTagSet.empty();
   }
 
   /**
