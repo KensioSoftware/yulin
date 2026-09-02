@@ -1,7 +1,10 @@
 import type { SimS3 } from "../sim-s3.js";
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
 import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
-import { simS3ObjectResponseHeaders } from "../object/s3-object-response-headers.js";
+import {
+  simS3ObjectResponseHeaders,
+  simS3ResponseHeaderOverrides,
+} from "../object/s3-object-response-headers.js";
 import { simS3SystemMetadataHeadersFrom } from "../object/s3-system-metadata-read.js";
 
 /**
@@ -10,6 +13,9 @@ import { simS3SystemMetadataHeadersFrom } from "../object/s3-system-metadata-rea
  * The two share everything but the body, because a `HEAD` is a `GET` whose
  * response real S3 stops short of sending, so they are read the same way here
  * and differ only in what comes back.
+ *
+ * Either can name the headers it wants served in place of the Object's own,
+ * which is what a presigned URL handing a browser a download does.
  *
  * A `GET` may ask for part of the Object, and is answered with that part and
  * `206 Partial Content`. A `HEAD` may not. Simulated S3 describes the whole
@@ -42,6 +48,9 @@ export class SimS3RestObjectReader {
     const body = await bodyBytes(output.Body);
     const headers = simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      overrides: simS3ResponseHeaderOverrides(
+        new URL(request.url).searchParams,
+      ),
       bodyLength: body.length,
       etag: output.ETag,
       lastModified: output.LastModified,

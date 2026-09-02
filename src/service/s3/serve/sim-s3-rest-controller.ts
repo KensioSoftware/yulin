@@ -3,7 +3,7 @@ import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
 import { SimS3RestErrorResponse } from "./sim-s3-rest-error-response.js";
 import { SimS3RestObjectReader } from "./sim-s3-rest-object-reader.js";
-import { SimS3UploadChecksum } from "./sim-s3-upload-checksum.js";
+import { simS3RestUploadInput } from "./sim-s3-rest-upload.js";
 import type { SimS3 } from "../sim-s3.js";
 
 interface SimS3RestControllerProperties {
@@ -80,33 +80,14 @@ export class SimS3RestController {
   }
 
   /**
-   * Store an uploaded Object.
-   *
-   * The stated checksum is checked before anything is stored, as real S3 does,
-   * so an upload that would be refused there is refused here rather than
-   * quietly landing in the Bucket.
+   * Store an uploaded Object, as whatever the request said about it.
    */
   private async putObject(
     route: SimS3RestObjectRoute,
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
-    const { request, body } = serviceRequest;
-
-    SimS3UploadChecksum.stated(new URL(request.url), request.headers)?.check(
-      body,
-    );
-
-    const contentType = request.headers.get("content-type") ?? undefined;
-
     await this.s3For(route).putObject(
-      {
-        input: {
-          Bucket: route.bucket.bucketName,
-          Key: route.objectKey,
-          Body: body ?? new Uint8Array(),
-          ...(contentType !== undefined && { ContentType: contentType }),
-        },
-      },
+      { input: simS3RestUploadInput(route, serviceRequest) },
       { caller: serviceRequest.caller.toCaller() },
     );
 

@@ -418,6 +418,65 @@ for (const object of objectContentItems) {
 The marker is exclusive and lexicographic. A listing resumes after the key it names whether or not
 the Bucket still holds it.
 
+### Asking for encoded keys
+
+An Object key can hold characters an XML document cannot carry, and a listing writes its keys into
+XML. `EncodingType: "url"` asks for them encoded. Simulated S3 encodes every `Key`, the `Prefix` and
+`Delimiter` the request named, each prefix in `CommonPrefixes`, and the marker or `StartAfter` key
+the response carries, as real S3 encodes them. The listing reports `EncodingType` back.
+
+```typescript sim-s3-list-objects-encoded-keys
+/**
+ * Listing a simulated S3 Bucket with its keys encoded.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simS3 = new SimAws().s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "invoices/March 2027 & April.pdf",
+    Body: "invoice bytes",
+  }),
+);
+
+const listed = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "uploads", EncodingType: "url" }),
+);
+
+console.log(listed.EncodingType); // url
+
+const listedObjects = listed.Contents ?? [];
+
+for (const listedObject of listedObjects) {
+  const encodedKey = listedObject.Key ?? "";
+
+  console.log(encodedKey); // invoices/March+2027+%26+April.pdf
+
+  // S3 form-encodes a key, and a plus sign in one stands for a space.
+  console.log(decodeURIComponent(encodedKey.replaceAll("+", " ")));
+}
+```
+
+The encoding is the one an event notification record carries a key in. A space becomes a plus sign,
+and the slashes of a key prefix are left as they are. Continuation tokens are left alone in either
+version of the operation, being opaque already.
+
+A listing that names no `EncodingType` answers with the keys as they were written, and says nothing
+about an encoding. Any other value is refused with `InvalidArgument`.
+
+The `encoding-type` query parameter carries this over a
+[served endpoint](#serve-simulated-s3-on-localhost), and the SDK sets it from `EncodingType`.
+
 ## Object ETags
 
 Every Object has an ETag, the MD5 of its body in hex and quoted, as real S3 gives it for a
@@ -3086,6 +3145,51 @@ const s3Client = new S3Client({
 });
 ```
 
+### What an upload says about the Object
+
+An upload keeps the metadata headers it was sent. `cache-control`, `content-disposition`,
+`content-encoding`, `content-language`, `content-type` and `expires` are stored, and a read is
+served every one of them, the way it serves an Object written by a `PutObjectCommand`. See
+[Object system metadata](#object-system-metadata). An `x-amz-meta-` header is stored too, and an
+in-process read reports it in `Metadata`.
+
+```typescript
+await fetch(url, {
+  method: "PUT",
+  body: styleSheet,
+  headers: {
+    "content-type": "text/css",
+    "cache-control": "public, max-age=31536000, immutable",
+  },
+});
+```
+
+### Headers the URL asks for
+
+A read can name the headers it wants the Object served with. The SDK sets them from
+`ResponseContentType`, `ResponseContentDisposition`, `ResponseCacheControl`,
+`ResponseContentEncoding`, `ResponseContentLanguage` and `ResponseExpires`, and carries them in the
+`response-` query parameters real S3 reads. Simulated S3 serves those values in place of the
+Object's own.
+
+```typescript
+const url = await getSignedUrl(
+  s3Client,
+  new GetObjectCommand({
+    Bucket: "reports",
+    Key: "q3/report.pdf",
+    ResponseContentType: "application/octet-stream",
+    ResponseContentDisposition: 'attachment; filename="q3-report.pdf"',
+  }),
+  { expiresIn: 900 },
+);
+```
+
+The Object keeps the metadata it was written with. One URL can hand a browser a download while
+another shows the same Object in the page. A `HEAD` reads the parameters as a `GET` does, and the
+API endpoint honours them for any read rather than only a presigned one. The website endpoint serves
+none of them, as real S3 serves none there.
+
 ### Limitations
 
 - `GET`, `HEAD`, `PUT` and `DELETE` of an Object are served over a Bucket's own REST endpoint, which
@@ -3561,7 +3665,9 @@ Every path that serves an Object goes through the same mapping. The REST endpoin
 for it. `content-encoding` is the one that matters most. Bytes served without it are bytes no client
 can decode, and an Object stored as brotli is only usable if the header comes back with it.
 
-`PutObjectCommand` sets them, one request field per header.
+`PutObjectCommand` sets them, one request field per header. An upload over a
+[served endpoint](#presigned-urls) sets them in the headers themselves, which is the form the SDK
+sends them in.
 
 ```typescript sim-s3-object-system-metadata
 /**
@@ -3609,6 +3715,10 @@ read of an Object written without one reports `binary/octet-stream`.
 `Expires` is the one field that takes something other than a string. The SDK takes a `Date` on the
 way in. A read hands back the stored HTTP date as `ExpiresString`, alongside the same value parsed
 into a `Date` as `Expires`.
+
+A read can ask for headers of its own in place of these. See
+[Headers the URL asks for](#headers-the-url-asks-for). The Object goes on holding what it was
+written with.
 
 A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
 [CDK S3 BucketDeployment](https://yulinsim.dev/services/cloudformation/#cdk-s3-bucketdeployment). A
@@ -3685,8 +3795,11 @@ Sim S3 currently supports:
 - Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM,
   and the `?uploads` and `?uploadId` sub-resources a multipart upload is made of
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
-- Object system metadata set by a `PutObjectCommand` and returned on a read, over every endpoint
-  that serves an Object
+- Object system metadata set by a `PutObjectCommand`, or by the headers of an upload over a served
+  endpoint, and returned on a read, over every endpoint that serves an Object
+- `response-` parameters on a read, serving the headers the request named in place of the Object's
+  own, which is what a presigned URL offering a download uses
+- `EncodingType` on a listing, encoding the keys, prefixes and markers it answers with
 - Object storage classes, named on a write and moved by a lifecycle rule, reported on a listing and
   on a read
 - `PutBucketEncryptionCommand`, `GetBucketEncryptionCommand` and `DeleteBucketEncryptionCommand`,
@@ -3712,7 +3825,8 @@ These apply across the page. The sections above each list what is specific to th
 - A storage class says where S3 keeps an Object and nothing else. Every Object is readable whatever
   class it is in, `RestoreObject` is left out, and nothing costs or takes longer in one class than
   another. See [Storage classes](#storage-classes).
-- `EncodingType` is ignored on a listing, and keys come back unencoded.
+- `EncodingType` is read on `ListObjects` and `ListObjectsV2`. `ListMultipartUploads` and
+  `ListParts` ignore it, and both answer on one page.
 - Object tags, ACLs and replication are left out. Server-side encryption is reported and never
   applied, and an `aws:kms` Object names no key, because there is no simulated KMS behind it. See
   [Default encryption](#default-encryption).
@@ -3721,8 +3835,6 @@ These apply across the page. The sections above each list what is specific to th
   [Deleting the files under a mount](#deleting-the-files-under-a-mount).
 - Multipart upload parts for a mounted Bucket are held in memory, and only the assembled Object
   reaches the directory.
-- An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, leaving
-  a presigned `PUT` unable to set the rest. A `PutObjectCommand` through the SDK keeps all of them.
-- A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other
-  `response-*` parameters that override a response header in real S3. An Object is served with the
-  system metadata it was written with.
+- User-defined `x-amz-meta-` metadata is stored by every write and reported in `Metadata` by an
+  in-process read. A response served over an endpoint carries the system metadata headers and leaves
+  the user metadata out.

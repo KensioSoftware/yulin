@@ -6,6 +6,11 @@ import { simS3SystemMetadataHeaders } from "./s3-system-metadata.js";
 export interface SimS3ObjectResponseDescription {
   /** The system metadata S3 was told when the Object was written. */
   readonly metadata?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The headers the read asked to be served in place of the Object's own,
+   * under the same names, from its `response-` parameters.
+   */
+  readonly overrides?: Readonly<Record<string, string>> | undefined;
   /** The length of the body being served, in bytes. */
   readonly bodyLength: number;
   /** The Object's ETag, quoted as an HTTP entity tag. */
@@ -59,7 +64,9 @@ export function simS3ObjectResponseHeaders(
   };
 
   for (const header of simS3SystemMetadataHeaders) {
-    const value = description.metadata?.[header.name];
+    const value =
+      description.overrides?.[header.name] ??
+      description.metadata?.[header.name];
 
     if (value !== undefined) {
       headers[header.name] = value;
@@ -87,4 +94,36 @@ export function simS3ObjectResponseHeaders(
   }
 
   return headers;
+}
+
+/**
+ * The prefix a read overrides a response header with.
+ */
+const responseOverridePrefix = "response-";
+
+/**
+ * The response headers a read asked to be served in place of the Object's own.
+ *
+ * Real S3 has one of these per system metadata header, named after it, so they
+ * are read by the same list rather than spelled out again. `Content-Type` and
+ * `Content-Disposition` are the two worth having: a presigned URL naming them
+ * decides whether the browser opens the file or saves it, and under what name,
+ * without anything being written to the Object.
+ *
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html
+ */
+export function simS3ResponseHeaderOverrides(
+  query: URLSearchParams,
+): Record<string, string> {
+  const overrides: Record<string, string> = {};
+
+  for (const header of simS3SystemMetadataHeaders) {
+    const value = query.get(`${responseOverridePrefix}${header.name}`);
+
+    if (value !== null) {
+      overrides[header.name] = value;
+    }
+  }
+
+  return overrides;
 }

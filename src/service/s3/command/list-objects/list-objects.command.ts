@@ -15,7 +15,9 @@ export interface SimListObjectsCommand {
  * Minimal structural sim S3 ListObjects input.
  *
  * `Delimiter` rolls every key holding it after the `Prefix` up into a common
- * prefix, which is how a Bucket is walked one folder at a time.
+ * prefix, which is how a Bucket is walked one folder at a time. `EncodingType`
+ * asks for the keys the listing answers with to be encoded, so that a key
+ * holding a character XML cannot carry survives the response.
  */
 export interface SimListObjectsCommandInput {
   readonly Bucket?: string | undefined;
@@ -23,6 +25,7 @@ export interface SimListObjectsCommandInput {
   readonly Delimiter?: string | undefined;
   readonly Marker?: string | undefined;
   readonly MaxKeys?: number | undefined;
+  readonly EncodingType?: string | undefined;
 }
 
 /**
@@ -38,5 +41,6 @@ export interface SimListObjectsCommandOutput {
   readonly MaxKeys?: number;
   readonly IsTruncated?: boolean;
   readonly NextMarker?: string | undefined;
+  readonly EncodingType?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { simS3EncodedKey } from "../../object/s3-key-encoding.js";
 import type { SimS3Event } from "./sim-s3-event.type.js";
 import type { SimS3ObjectEvent } from "./sim-s3-object-event.js";
 
@@ -95,9 +96,10 @@ export function simS3EventRequestId(): string {
 /**
  * The object key as a record carries it.
  *
- * Real S3 form-URL-encodes the key, so a space becomes a plus sign, while the
- * slashes that make up a key prefix stay as they are.
+ * A record carries the key encoded, the same way a listing asked for one does,
+ * so a function reading a record has to decode it before the key names an
+ * Object.
  */
 export function simS3EventObjectKey(key: string): string {
-  return encodeURIComponent(key).replaceAll("%20", "+").replaceAll("%2F", "/");
+  return simS3EncodedKey(key);
 }

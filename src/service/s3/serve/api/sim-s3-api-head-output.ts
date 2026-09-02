@@ -13,15 +13,19 @@ import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-
  * Answer a HEAD with what a read would have said and none of the Object.
  *
  * The `content-length` describes the Object rather than the response, which is
- * what makes a HEAD worth sending.
+ * what makes a HEAD worth sending. A HEAD reads the same `response-` parameters
+ * a GET does, so a caller can see what a presigned URL would serve without
+ * fetching the Object.
  */
 export function simS3HeadObjectResponse(
   output: Record<string, unknown>,
+  overrides: Readonly<Record<string, string>>,
 ): Response {
   return new Response(undefined, {
     status: 200,
     headers: simS3ObjectResponseHeaders({
       metadata: simS3SystemMetadataHeadersFrom(output),
+      overrides,
       bodyLength: (output["ContentLength"] as number | undefined) ?? 0,
       etag: output["ETag"] as string | undefined,
       lastModified: output["LastModified"] as Date | undefined,

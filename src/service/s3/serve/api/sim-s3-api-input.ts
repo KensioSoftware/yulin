@@ -48,6 +48,7 @@ export function listObjectsV2Input(request: SimS3ApiRequest): object {
     ...optional("ContinuationToken", request.query.get("continuation-token")),
     ...optional("StartAfter", request.query.get("start-after")),
     ...optionalNumber("MaxKeys", request.query.get("max-keys")),
+    ...optional("EncodingType", request.query.get("encoding-type")),
   };
 }
 
@@ -61,25 +62,8 @@ export function listObjectsInput(request: SimS3ApiRequest): object {
     ...optional("Delimiter", request.query.get("delimiter")),
     ...optional("Marker", request.query.get("marker")),
     ...optionalNumber("MaxKeys", request.query.get("max-keys")),
+    ...optional("EncodingType", request.query.get("encoding-type")),
   };
-}
-
-/**
- * The user metadata an upload carried, which S3 sends as `x-amz-meta-` headers.
- */
-export function simS3UserMetadata(headers: Headers): {
-  Metadata?: Record<string, string>;
-} {
-  const prefix = "x-amz-meta-";
-  const metadata: Record<string, string> = {};
-
-  for (const [name, value] of headers) {
-    if (name.toLowerCase().startsWith(prefix)) {
-      metadata[name.slice(prefix.length).toLowerCase()] = value;
-    }
-  }
-
-  return Object.keys(metadata).length === 0 ? {} : { Metadata: metadata };
 }
 
 /**
