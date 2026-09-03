@@ -80,7 +80,7 @@ export function simDynamoDbDocumentSharedNameRoutes(dynamoDb: SimDynamoDb): {
  * so are routed by `simDynamoDbDocumentSharedNameRoutes` instead.
  *
  * An operation with no document route at all, such as a document
- * `TransactWriteCommand`, is refused by name like any other unsupported
+ * `ExecuteStatementCommand`, is refused by name like any other unsupported
  * Command, rather than failing part way through a conversion.
  */
 export function simDynamoDbDocumentRoutes(
@@ -124,6 +124,22 @@ export function simDynamoDbDocumentRoutes(
       paths.batchGet,
       async (input: simDynamoDbCommands.SimBatchGetItemCommandInput, options) =>
         await dynamoDb.batchGetItem({ input }, options),
+    ),
+    namedDocumentRoute(
+      "TransactWriteCommand",
+      paths.transactWrite,
+      async (
+        input: simDynamoDbCommands.SimTransactWriteItemsCommandInput,
+        options,
+      ) => await dynamoDb.transactWriteItems({ input }, options),
+    ),
+    namedDocumentRoute(
+      "TransactGetCommand",
+      paths.transactGet,
+      async (
+        input: simDynamoDbCommands.SimTransactGetItemsCommandInput,
+        options,
+      ) => await dynamoDb.transactGetItems({ input }, options),
     ),
   ];
 }
