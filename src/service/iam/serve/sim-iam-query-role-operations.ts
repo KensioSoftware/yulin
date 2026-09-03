@@ -39,6 +39,7 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           Path: fields.text("Path"),
           AssumeRolePolicyDocument: fields.text("AssumeRolePolicyDocument"),
           Description: fields.text("Description"),
+          PermissionsBoundary: fields.text("PermissionsBoundary"),
         }),
         result: (output): string => iamQueryEntity(output, "Role", roleMembers),
       },

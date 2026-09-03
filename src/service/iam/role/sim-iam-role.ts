@@ -27,6 +27,17 @@ export interface SimIamRole extends SimIamPrincipal {
   readonly creationDate: Date;
 
   /**
+   * ARN of the managed policy attached to this Role as its permissions
+   * boundary, where the request creating it declared one.
+   *
+   * This records what the Role was created with, so that a policy conditioned
+   * on `iam:PermissionsBoundary` can be tested against the Roles a deployment
+   * makes. The boundary is not yet evaluated as a policy source, so it does
+   * not narrow what the Role itself may do.
+   */
+  readonly permissionsBoundaryArn?: SimArn | undefined;
+
+  /**
    * Inline identity-based permissions policies stored directly on this role.
    */
   readonly inlinePolicies: Map<string, JSONString<SimIamPolicyDocument>>;

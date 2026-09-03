@@ -42,6 +42,9 @@ export class CreateRoleRecordFactory {
         | undefined,
       description: cmd.input.Description,
       creationDate,
+      permissionsBoundaryArn: cmd.input.PermissionsBoundary as
+        | SimArn
+        | undefined,
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
     };

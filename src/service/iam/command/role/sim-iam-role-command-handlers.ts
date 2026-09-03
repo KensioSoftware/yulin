@@ -3,6 +3,7 @@ import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-auth
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
+import type { SimIamConditionValue } from "../../policy/sim-iam-policy.js";
 import { CreateRoleCommandHandler } from "./create-role/create-role.handler.js";
 import type {
   SimCreateRoleCommand,
@@ -86,6 +87,7 @@ export class SimIamRoleCommandHandlers {
       "iam:CreateRole",
       this.roleArn(command.input.RoleName),
       options?.caller,
+      permissionsBoundaryCondition(command.input.PermissionsBoundary),
     );
     const handler = new CreateRoleCommandHandler({
       accountId: this.accountId,
@@ -230,4 +232,21 @@ export class SimIamRoleCommandHandlers {
   private roleArn(roleName: string | undefined): string {
     return `arn:aws:iam::${this.accountId}:role/${roleName ?? "*"}`;
   }
+}
+
+/**
+ * What a Role-creating request says about the boundary it declares.
+ *
+ * An account that requires a permissions boundary allows `iam:CreateRole`
+ * only under `StringEquals` on `iam:PermissionsBoundary`, and the CDK
+ * permissions-boundary guard is written that way. A request declaring no
+ * boundary leaves the key out, which is what refuses it: a positive operator
+ * over an absent key matches nothing.
+ */
+function permissionsBoundaryCondition(
+  permissionsBoundary: string | undefined,
+): Readonly<Record<string, SimIamConditionValue>> | undefined {
+  return permissionsBoundary === undefined
+    ? undefined
+    : { "iam:PermissionsBoundary": permissionsBoundary };
 }

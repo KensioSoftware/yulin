@@ -5,6 +5,15 @@ export interface SimCreateRoleCommandInput {
   readonly Path?: string | undefined;
   readonly AssumeRolePolicyDocument?: string | undefined;
   readonly Description?: string | undefined;
+
+  /**
+   * ARN of the managed policy to attach to the new Role as its permissions
+   * boundary.
+   *
+   * The request carries this ARN as `iam:PermissionsBoundary`, which is the
+   * key an account requiring a boundary conditions `iam:CreateRole` on.
+   */
+  readonly PermissionsBoundary?: string | undefined;
 }
 
 export interface SimCreateRoleCommand {

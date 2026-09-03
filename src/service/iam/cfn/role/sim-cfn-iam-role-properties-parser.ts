@@ -1,7 +1,13 @@
+/* oxlint-disable security/detect-object-injection -- each lookup here reads a
+   template property under the name this parser asks for by literal. */
+
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
-import { simCfnIamOptionalString } from "../sim-cfn-iam-optional-string.js";
+import {
+  simCfnIamJsonObject,
+  simCfnIamOptionalString,
+} from "../sim-cfn-iam-property.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,
@@ -12,9 +18,12 @@ export interface SimCfnIamRoleProperties {
   readonly path: string | undefined;
   readonly description: string | undefined;
   readonly assumeRolePolicyDocument: string;
+  readonly permissionsBoundary: string | undefined;
   readonly inlinePolicies: readonly SimCfnIamInlinePolicy[];
   readonly managedPolicyArns: readonly string[];
 }
+
+const resourceType = "AWS::IAM::Role";
 
 /**
  * Parses and validates AWS::IAM::Role CloudFormation properties into the shape
@@ -25,7 +34,7 @@ export interface SimCfnIamRoleProperties {
  */
 export class SimCfnIamRolePropertiesParser {
   private readonly policiesParser = new SimCfnIamPoliciesParser({
-    resourceType: "AWS::IAM::Role",
+    resourceType,
   });
 
   /**
@@ -37,18 +46,15 @@ export class SimCfnIamRolePropertiesParser {
   ): SimCfnIamRoleProperties {
     return {
       roleName:
-        this.optionalString(resource, properties["RoleName"], "RoleName") ??
+        this.optionalString(resource, properties, "RoleName") ??
         simCfnIamPrincipalGeneratedName(resource),
-      path: this.optionalString(resource, properties["Path"], "Path"),
-      description: this.optionalString(
+      path: this.optionalString(resource, properties, "Path"),
+      description: this.optionalString(resource, properties, "Description"),
+      assumeRolePolicyDocument: this.jsonObject(resource, properties),
+      permissionsBoundary: this.optionalString(
         resource,
-        properties["Description"],
-        "Description",
-      ),
-      assumeRolePolicyDocument: this.jsonObject(
-        resource,
-        properties["AssumeRolePolicyDocument"],
-        "AssumeRolePolicyDocument",
+        properties,
+        "PermissionsBoundary",
       ),
       inlinePolicies: this.policiesParser.inlinePolicies(resource, properties),
       managedPolicyArns: this.policiesParser.managedPolicyArns(
@@ -60,28 +66,28 @@ export class SimCfnIamRolePropertiesParser {
 
   private optionalString(
     resource: SimCfnResource,
-    value: SimCfnTemplateValueRecord[string] | undefined,
+    properties: SimCfnTemplateValueRecord,
     label: string,
   ): string | undefined {
     return simCfnIamOptionalString({
-      resourceType: "AWS::IAM::Role",
+      resourceType,
       resource,
-      value,
+      value: properties[label],
       label,
     });
   }
 
   private jsonObject(
     resource: SimCfnResource,
-    value: SimCfnTemplateValueRecord[string] | undefined,
-    label: string,
+    properties: SimCfnTemplateValueRecord,
   ): string {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      throw new TypeError(
-        `Invalid AWS::IAM::Role ${resource.logicalId}: ${label} must be an object`,
-      );
-    }
+    const label = "AssumeRolePolicyDocument";
 
-    return JSON.stringify(value);
+    return simCfnIamJsonObject({
+      resourceType,
+      resource,
+      value: properties[label],
+      label,
+    });
   }
 }
