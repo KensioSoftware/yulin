@@ -3781,6 +3781,110 @@ A CDK stack needs no hand-editing.
 other store. Handing back an empty store would let a Function that lost its association run to
 completion and quietly take every default.
 
+## Permissions
+
+Every CloudFront command goes through simulated IAM. So does every CloudFront Resource a
+CloudFormation Stack creates, decided as the principal the deployment runs as. Stand a project's own
+execution policy up as a deploy Role and the Stack finds out what the policy leaves out. A
+deployment naming no principal is decided as the Account root.
+
+The action is the `cloudfront:` name of the operation. A Distribution action is decided against
+`arn:aws:cloudfront::<account>:distribution/<id>`, a Function action against `function/<name>` and a
+key value store action against `key-value-store/<id>`. A create action has nothing to name until it
+succeeds and is decided against `*`. A policy granting one has to write the wildcard.
+
+These are the actions the simulation asks about:
+
+- `CreateDistribution`, `GetDistribution`, `UpdateDistribution` and `DeleteDistribution`
+- `CreateFunction`, `ListFunctions`, `DescribeFunction`, `GetFunction` and `DeleteFunction`
+- `CreateInvalidation`, `GetInvalidation` and `ListInvalidations`
+- `CreateKeyValueStore`, `ListKeyValueStores`, `DescribeKeyValueStore`, `UpdateKeyValueStore` and
+  `DeleteKeyValueStore`, alongside the data API's own `cloudfront-keyvaluestore:` actions on the
+  keys inside a store
+- `CreateCachePolicy` and `DeleteCachePolicy`
+- `CreateOriginRequestPolicy` and `DeleteOriginRequestPolicy`
+- `CreateResponseHeadersPolicy` and `DeleteResponseHeadersPolicy`
+- `CreateOriginAccessControl` and `DeleteOriginAccessControl`
+
+The last four pairs reach IAM through CloudFormation alone, since a template is the only way to make
+one of those four here. Each delete is decided against the ARN of the thing it names, such as
+`arn:aws:cloudfront::<account>:cache-policy/<id>`.
+
+```typescript sim-cloudfront-deploy-permissions
+/**
+ * A deploy Role refused the cache policy its Stack declares.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// A deploy Role allowed CloudFormation and S3, and no CloudFront action.
+const { Role } = await simAws.iam().createRole({
+  input: {
+    RoleName: "DeployRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "cloudformation.amazonaws.com" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "DeployRole",
+    PolicyName: "DeployPolicy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: ["cloudformation:*", "s3:*"],
+          Resource: "*",
+        },
+      ],
+    }),
+  },
+});
+
+try {
+  await simAws.cloudFormation().deployTemplate({
+    stackName: "site-stack",
+    caller: { kind: "arn", arn: Role.Arn },
+    template: {
+      Resources: {
+        SiteCachePolicy: {
+          Type: "AWS::CloudFront::CachePolicy",
+          Properties: {
+            CachePolicyConfig: {
+              Name: "site-caching",
+              MinTTL: 0,
+              ParametersInCacheKeyAndForwardedToOrigin: {
+                EnableAcceptEncodingGzip: false,
+                CookiesConfig: { CookieBehavior: "none" },
+                HeadersConfig: { HeaderBehavior: "none" },
+                QueryStringsConfig: { QueryStringBehavior: "none" },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+} catch (error) {
+  // Sim CloudFormation Resource SiteCachePolicy creation failed: User:
+  // arn:aws:iam::...:role/DeployRole is not authorized to perform:
+  // cloudfront:CreateCachePolicy on resource: *
+  console.log((error as Error).message);
+}
+```
+
 ## Available functionality
 
 Sim CloudFront currently supports:

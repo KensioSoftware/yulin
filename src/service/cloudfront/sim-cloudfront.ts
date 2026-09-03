@@ -7,6 +7,7 @@ import type {
   SimCloudFrontFunction,
   SimCloudFrontFunctionName,
 } from "./cff/sim-cloudfront-function.js";
+import type { SimCfnCfAuthorizer } from "./cfn/sim-cfn-cf-authorizer.js";
 import { SimCloudFrontCloudFormationResourceFactory } from "./cfn/sim-cfn-cloudfront-resource-factory.js";
 import type {
   SimCreateDistributionCommand,
@@ -261,6 +262,14 @@ export class SimCloudFront extends SimCloudFrontDistributions {
     return this.cloudFrontFunctions.get(
       cloudFrontFunctionName as SimCloudFrontFunctionName,
     );
+  }
+
+  /**
+   * How the CloudFormation Resource factory authorizes a deployment's caller
+   * for the Resources it creates without a command of their own.
+   */
+  cfnAuthorizer(): SimCfnCfAuthorizer {
+    return this.commands.cfnAuthorizer;
   }
 
   /**

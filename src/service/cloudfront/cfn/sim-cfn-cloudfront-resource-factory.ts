@@ -9,10 +9,7 @@ import { simCfnResourceCallerOptions } from "../../cloudformation/resource/calle
 import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
-import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
-import { SimCfnCfCachePolicyCreator } from "./cache-policy/sim-cfn-cf-cache-policy-creator.js";
-import { SimCfnCfOriginRequestPolicyCreator } from "./origin-request-policy/sim-cfn-cf-orp-creator.js";
-import { SimCfnCfOriginAccessControlCreator } from "./origin-access-control/sim-cfn-cf-oac-creator.js";
+import { SimCfnCfPolicyCreators } from "./policy/sim-cfn-cf-policy-creators.js";
 import { SimCfnCfKeyValueStoreCreator } from "./key-value-store/sim-cfn-cf-kvs-creator.js";
 
 /**
@@ -22,25 +19,14 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly distroCreator: SimCfnCfDistroCreator;
   private readonly functionCreator: SimCfnCffCreator;
   private readonly distroDeleter: SimCfnCfDistroDeleter;
-  private readonly responseHeadersPolicyCreator: SimCfnCfResponseHeadersPolicyCreator;
-  private readonly cachePolicyCreator: SimCfnCfCachePolicyCreator;
-  private readonly originRequestPolicyCreator: SimCfnCfOriginRequestPolicyCreator;
-  private readonly originAccessControlCreator: SimCfnCfOriginAccessControlCreator;
+  private readonly policyCreators: SimCfnCfPolicyCreators;
   private readonly keyValueStoreCreator: SimCfnCfKeyValueStoreCreator;
 
   constructor(cloudFront: SimCloudFront) {
     this.distroCreator = new SimCfnCfDistroCreator({ cloudFront });
     this.functionCreator = new SimCfnCffCreator({ cloudFront });
     this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
-    this.responseHeadersPolicyCreator =
-      new SimCfnCfResponseHeadersPolicyCreator({ cloudFront });
-    this.cachePolicyCreator = new SimCfnCfCachePolicyCreator({ cloudFront });
-    this.originRequestPolicyCreator = new SimCfnCfOriginRequestPolicyCreator({
-      cloudFront,
-    });
-    this.originAccessControlCreator = new SimCfnCfOriginAccessControlCreator({
-      cloudFront,
-    });
+    this.policyCreators = new SimCfnCfPolicyCreators(cloudFront);
     this.keyValueStoreCreator = new SimCfnCfKeyValueStoreCreator({
       cloudFront,
     });
@@ -55,6 +41,12 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const properties = context.resolvedProperties ?? resource.properties;
+    const options = simCfnResourceCallerOptions(context.caller);
+    const policyCreator = this.policyCreators.creatorFor(resourceTypeName);
+
+    if (policyCreator !== undefined) {
+      return policyCreator.create(resource, properties, options);
+    }
 
     switch (resourceTypeName) {
       case "Distribution": {
@@ -63,23 +55,11 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       case "Function": {
         return await this.functionCreator.create(resource, properties, context);
       }
-      case "ResponseHeadersPolicy": {
-        return this.responseHeadersPolicyCreator.create(resource, properties);
-      }
-      case "CachePolicy": {
-        return this.cachePolicyCreator.create(resource, properties);
-      }
-      case "OriginRequestPolicy": {
-        return this.originRequestPolicyCreator.create(resource, properties);
-      }
-      case "OriginAccessControl": {
-        return this.originAccessControlCreator.create(resource, properties);
-      }
       case "KeyValueStore": {
         return await this.keyValueStoreCreator.create(
           resource,
           properties,
-          simCfnResourceCallerOptions(context.caller),
+          options,
         );
       }
       default: {
@@ -100,6 +80,12 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
     const options = simCfnResourceCallerOptions(context.caller);
+    const policyCreator = this.policyCreators.creatorFor(resourceTypeName);
+
+    if (policyCreator !== undefined) {
+      policyCreator.delete(resource, options);
+      return;
+    }
 
     switch (resourceTypeName) {
       case "Distribution": {
@@ -108,22 +94,6 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "Function": {
         await this.functionCreator.delete(resource, options);
-        return;
-      }
-      case "ResponseHeadersPolicy": {
-        this.responseHeadersPolicyCreator.delete(resource);
-        return;
-      }
-      case "CachePolicy": {
-        this.cachePolicyCreator.delete(resource);
-        return;
-      }
-      case "OriginRequestPolicy": {
-        this.originRequestPolicyCreator.delete(resource);
-        return;
-      }
-      case "OriginAccessControl": {
-        this.originAccessControlCreator.delete(resource);
         return;
       }
       case "KeyValueStore": {
