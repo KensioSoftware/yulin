@@ -259,6 +259,11 @@ with a 200 for a URL the Bucket has no object for. It is one of the same error c
 CloudFront allows. Where the response page is itself missing, the viewer gets the status from
 fetching it, as in CloudFront.
 
+Behind an origin access control, a response page the Bucket does not hold answers 403 where a public
+Bucket answers 404. The Bucket policy an origin access control is written with grants `s3:GetObject`
+and no `s3:ListBucket`, and S3 refuses a key whose absence it may not report. A test whose Bucket
+was never loaded with the site's error page sees that refusal in place of the page.
+
 A viewer-response function never sees a custom error page. CloudFront runs no viewer-response
 function once the Origin has answered 400 or higher, and simulated CloudFront does the same, for a
 CloudFront Function and a Lambda@Edge function alike. The status the Origin returned is what decides

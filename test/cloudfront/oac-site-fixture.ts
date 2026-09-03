@@ -76,6 +76,17 @@ export interface SimCfOacSiteStackProperties {
    * access control does not.
    */
   readonly publicPolicyAllowed?: boolean;
+
+  /**
+   * The Distribution's custom error responses, for a test about the page one
+   * serves.
+   */
+  readonly customErrorResponses?: SimCfnTemplateValue;
+
+  /**
+   * Objects the Bucket holds besides its home page, keyed by object key.
+   */
+  readonly additionalObjects?: Readonly<Record<string, string>>;
 }
 
 export interface SimCfOacSite {
@@ -142,6 +153,9 @@ export async function simCfOacSiteStack(
                 TargetOriginId: "SiteOrigin",
                 ViewerProtocolPolicy: "allow-all",
               },
+              ...(properties.customErrorResponses !== undefined && {
+                CustomErrorResponses: properties.customErrorResponses,
+              }),
             },
           },
         },
@@ -169,6 +183,20 @@ export async function simCfOacSiteStack(
       ContentType: "text/html",
       Body: simCfOacSitePage,
     }),
+  );
+
+  await Promise.all(
+    Object.entries(properties.additionalObjects ?? {}).map(
+      async ([key, body]) =>
+        await simAws.s3().putObject(
+          new PutObjectCommand({
+            Bucket: simCfOacSiteBucketName,
+            Key: key,
+            ContentType: "text/html",
+            Body: body,
+          }),
+        ),
+    ),
   );
 
   const distributionId = stack.outputs.get("DistributionId")?.value;
