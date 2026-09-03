@@ -9,7 +9,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimRoute53NoSuchHostedZone } from "../../error/sim-route53.error.js";
+import {
+  SimRoute53InvalidInput,
+  SimRoute53NoSuchHostedZone,
+} from "../../error/sim-route53.error.js";
 import { makeSimRoute53HostedZoneId } from "../create-hosted-zone/sim-route53-zone-id.js";
 import {
   ChangeResourceRecordSetsCommand,
@@ -126,5 +129,31 @@ describe("Route53 GetHostedZoneCommand", () => {
     // Then Route53 reports that the Hosted Zone does not exist.
     assertInstanceOf(error, SimRoute53NoSuchHostedZone);
     assertStringIncludes(error.message, "No sim Route53 Hosted Zone with ID");
+  });
+
+  it("points at the synth when CDK's lookup stand-in is used as an ID", async () => {
+    // Given an empty simulated Route53 service.
+    const simAws = new SimAws();
+    const simRoute53 = simAws.route53();
+
+    // When a Hosted Zone is requested under the ID CDK synthesizes for an
+    // unresolved HostedZone.fromLookup.
+    const error = await assertThrowsErrorAsync(async () =>
+      simRoute53.getHostedZone(
+        new GetHostedZoneCommand({
+          Id: "DUMMY",
+        }),
+      ),
+    );
+
+    // Then Route53 names the stand-in and how to resolve the lookup.
+    assertInstanceOf(error, SimRoute53InvalidInput);
+    assertIdentical(
+      error.message,
+      "Invalid Route53 Hosted Zone ID: DUMMY. CDK fills an unresolved " +
+        "`HostedZone.fromLookup` with this stand-in. Run `cdk synth` with " +
+        "credentials for the account holding the zone, or commit the " +
+        "`cdk.context.json` a resolved lookup writes.",
+    );
   });
 });

@@ -48,11 +48,42 @@ export function normalizeSimRoute53HostedZoneId(
 
   if (!isSimRoute53HostedZoneId(hostedZoneId)) {
     throw new SimRoute53InvalidInput(
-      `Invalid Route53 Hosted Zone ID: ${value ?? "(missing)"}`,
+      rejectedSimRoute53HostedZoneId(value, hostedZoneId),
     );
   }
 
   return hostedZoneId;
+}
+
+/**
+ * The literal CDK writes into a synthesized template when
+ * `HostedZone.fromLookup` runs against no credentials and no cached context.
+ */
+const cdkUnresolvedLookupHostedZoneId = "DUMMY";
+
+/**
+ * The message for a Hosted Zone ID that fails the shape check.
+ *
+ * CDK writes its unresolved lookup stand-in into every RecordSet of the
+ * synthesized template, and that value arrives here looking like any other
+ * malformed ID. Reporting it as one sends the reader to check an ID they never
+ * wrote, so the stand-in is named and the synth that produced it is pointed at.
+ */
+function rejectedSimRoute53HostedZoneId(
+  value: string | undefined,
+  hostedZoneId: string | undefined,
+): string {
+  const reported = `Invalid Route53 Hosted Zone ID: ${value ?? "(missing)"}`;
+
+  if (hostedZoneId !== cdkUnresolvedLookupHostedZoneId) {
+    return reported;
+  }
+
+  return (
+    `${reported}. CDK fills an unresolved \`HostedZone.fromLookup\` with this ` +
+    "stand-in. Run `cdk synth` with credentials for the account holding the " +
+    "zone, or commit the `cdk.context.json` a resolved lookup writes."
+  );
 }
 
 /**

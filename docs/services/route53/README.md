@@ -139,6 +139,17 @@ Register the zone yourself when a test depends on its name, such as one listing 
 when its name is a suffix of no record the stack holds. A registered zone keeps the name it was
 given, and its records are stored under the name you chose.
 
+### A lookup that never resolved
+
+`HostedZone.fromLookup` needs credentials for the account holding the zone, or a `cdk.context.json`
+holding a previous lookup's answer. With neither, CDK synthesizes the literal `DUMMY` as the Hosted
+Zone ID and writes it into every `AWS::Route53::RecordSet` in the template. Deploying that template
+gives `InvalidInput`, naming `DUMMY` as the stand-in and pointing back at the synth.
+
+Run `cdk synth` with credentials for that account, or commit the `cdk.context.json` a resolved
+lookup writes. Either one puts the real Hosted Zone ID in the template, and the zone is then
+registered on demand like any other looked-up zone.
+
 ## Creating records
 
 Use `ChangeResourceRecordSetsCommand` to add records to a Hosted Zone.
