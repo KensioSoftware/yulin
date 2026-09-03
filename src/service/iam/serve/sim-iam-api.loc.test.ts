@@ -25,6 +25,7 @@ import {
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
+  assertUndefined,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
@@ -129,13 +130,16 @@ describe("Serving simulated IAM on an endpoint URL", () => {
   });
 
   it("makes a Role, reads it back and lists it", async () => {
-    // Given a Role created over the endpoint with a trust policy
+    // Given a Role created over the endpoint with a trust policy and a
+    // permissions boundary
+    const boundaryArn = `arn:aws:iam::${simAws.defaultAccountId}:policy/Boundary`;
     const created = await client.send(
       new CreateRoleCommand({
         RoleName: "Checkout",
         Path: "/service-role/",
         AssumeRolePolicyDocument: lambdaTrustPolicy,
         Description: "The checkout function's Role",
+        PermissionsBoundary: boundaryArn,
       }),
     );
     const role = created.Role;
@@ -164,6 +168,26 @@ describe("Serving simulated IAM on an endpoint URL", () => {
     assertArrayIncludes(
       (listed.Roles ?? []).map((listedRole) => listedRole.RoleName),
       "Checkout",
+    );
+
+    // And the boundary travelled as the structure IAM answers with, on the
+    // create and the get, while the listing left it out as IAM does
+    const attachedBoundary = role.PermissionsBoundary;
+
+    assertNonNullable(attachedBoundary, "CreateRole described the boundary");
+    assertIdentical(
+      attachedBoundary.PermissionsBoundaryType,
+      "PermissionsBoundaryPolicy",
+    );
+    assertIdentical(attachedBoundary.PermissionsBoundaryArn, boundaryArn);
+    assertIdentical(
+      read.PermissionsBoundary?.PermissionsBoundaryArn,
+      boundaryArn,
+    );
+    assertUndefined(
+      (listed.Roles ?? []).find(
+        (listedRole) => listedRole.RoleName === "Checkout",
+      )?.PermissionsBoundary,
     );
   });
 

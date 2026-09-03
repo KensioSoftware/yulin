@@ -41,6 +41,7 @@ export class SimCfnIamRoleCreator {
           Path: roleProperties.path,
           Description: roleProperties.description,
           AssumeRolePolicyDocument: roleProperties.assumeRolePolicyDocument,
+          PermissionsBoundary: roleProperties.permissionsBoundary,
         },
       },
       options,

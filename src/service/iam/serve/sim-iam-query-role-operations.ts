@@ -2,7 +2,10 @@ import type { SimQueryOperations } from "../../../serve/http/api/query/sim-query
 import {
   queryList,
   queryMembers,
+  queryStructure,
 } from "../../../serve/http/api/query/sim-query-result.js";
+import type { SimQueryOutput } from "../../../serve/http/api/query/sim-query-result.js";
+import { simIamAttachedBoundaryMembers } from "../role/sim-iam-role-boundary.js";
 import { iamQueryEntity } from "./sim-iam-query-entity.js";
 import {
   iamQueryListingInput,
@@ -23,6 +26,19 @@ const roleMembers = [
 ];
 
 /**
+ * Write the permissions boundary a Role carries, where it carries one.
+ *
+ * A boundary is a structure of its own, and `queryMembers` would write it as
+ * the JSON text of an object. `ListRoles` leaves the field out altogether, as
+ * IAM does, so only the create and the get pass this.
+ */
+function roleBoundary(role: SimQueryOutput): string {
+  return queryStructure(role, "PermissionsBoundary", (boundary) =>
+    queryMembers(boundary, simIamAttachedBoundaryMembers),
+  );
+}
+
+/**
  * The Role operations simulated IAM serves over the Query protocol.
  *
  * The policy operations that name a Role are here rather than with the managed
@@ -39,8 +55,10 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           Path: fields.text("Path"),
           AssumeRolePolicyDocument: fields.text("AssumeRolePolicyDocument"),
           Description: fields.text("Description"),
+          PermissionsBoundary: fields.text("PermissionsBoundary"),
         }),
-        result: (output): string => iamQueryEntity(output, "Role", roleMembers),
+        result: (output): string =>
+          iamQueryEntity(output, "Role", roleMembers, roleBoundary),
       },
     ],
     [
@@ -49,7 +67,8 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
         input: (fields): Record<string, unknown> => ({
           RoleName: fields.text("RoleName"),
         }),
-        result: (output): string => iamQueryEntity(output, "Role", roleMembers),
+        result: (output): string =>
+          iamQueryEntity(output, "Role", roleMembers, roleBoundary),
       },
     ],
     [

@@ -1,7 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
-import { simCfnIamOptionalString } from "../sim-cfn-iam-optional-string.js";
+import { simCfnIamOptionalString } from "../sim-cfn-iam-property.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,

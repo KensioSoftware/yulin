@@ -15,15 +15,26 @@ import { xmlElement } from "../../../util/xml/xml-writer.js";
  * same structures are what a listing repeats. The Query layer writes the
  * members of a structure and the items of a list, and this is the one shape
  * left between them.
+ *
+ * An entity carrying a member of its own that is a structure passes `nested`,
+ * which writes whatever a scalar member cannot. A Role's permissions boundary
+ * is the case that exists for, and a listing that leaves it out passes
+ * nothing.
  */
 export function iamQueryEntity(
   output: SimQueryOutput,
   name: string,
   members: readonly string[],
+  nested?: (entity: SimQueryOutput) => string,
 ): string {
   const entity = output[name];
 
-  return isRecord(entity)
-    ? xmlElement(name, queryMembers(entity, members))
-    : "";
+  if (!isRecord(entity)) {
+    return "";
+  }
+
+  return xmlElement(
+    name,
+    queryMembers(entity, members) + (nested?.(entity) ?? ""),
+  );
 }
