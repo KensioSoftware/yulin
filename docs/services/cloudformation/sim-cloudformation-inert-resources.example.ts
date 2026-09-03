@@ -16,8 +16,11 @@ const stack = await simAws.cloudFormation().deployTemplate({
           Description: "/opt/awscli/aws",
         },
       },
-      AlarmRule: {
-        Type: "AWS::CloudWatch::Alarm",
+      SearchApi: {
+        Type: "AWS::AppSync::GraphQLApi",
+        Properties: {
+          Name: "search",
+        },
       },
     },
   },
@@ -26,7 +29,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 console.log(stack.skippedResources.map((resource) => resource.logicalId));
-// ["AlarmRule"]
+// ["SearchApi"]
 
 console.log(stack.inertResources.map((resource) => resource.logicalId));
 // ["AwsCliLayer"]
