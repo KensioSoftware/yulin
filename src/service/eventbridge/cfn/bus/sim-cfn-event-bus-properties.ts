@@ -25,8 +25,24 @@ const unsimulatedProperties: readonly (readonly [string, string])[] = [
   ["EventSourceName", "partner event buses are not simulated"],
   ["KmsKeyIdentifier", "events are not encrypted with a customer managed key"],
   ["LogConfig", "event bus logging is not simulated"],
-  ["Tags", "event bus tags are not simulated"],
 ];
+
+/**
+ * What a template can say about an event bus that this simulation has nothing
+ * to act on, and why.
+ *
+ * `Tags` is the whole list, and it is recorded rather than refused. A bus
+ * behaves the same way with a tag and without one, and a CDK app calling
+ * `Tags.of(app).add(...)` tags every bus in it.
+ */
+const ignoredPropertyReasons: ReadonlyMap<string, string> = new Map([
+  [
+    "Tags",
+    `${eventBusResourceType} property Tags is not simulated, so the bus is ` +
+      "created without them. Nothing reads them back and nothing is grouped " +
+      "or billed by them.",
+  ],
+]);
 
 interface SimCfnEventBusPropertiesProperties {
   readonly resource: SimCfnResource;
@@ -91,6 +107,17 @@ export class SimCfnEventBusProperties {
           `${property} is not simulated, so the Resource is refused rather ` +
             `than deployed without it: ${reason}`,
         );
+      }
+    }
+  }
+
+  /**
+   * Record the properties the bus is created without acting on.
+   */
+  recordIgnoredProperties(): void {
+    for (const [property, reason] of ignoredPropertyReasons) {
+      if (this.properties.has(property)) {
+        this.resource.ignoreProperty(property, reason);
       }
     }
   }

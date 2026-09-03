@@ -40,6 +40,8 @@ export class SimCfnSnsTopicCreator {
       resource,
       properties,
     });
+    topicProperties.recordIgnoredProperties();
+
     const name = topicProperties.name();
     const attributes = topicProperties.attributes();
     const inline = topicProperties.inlineSubscriptions();

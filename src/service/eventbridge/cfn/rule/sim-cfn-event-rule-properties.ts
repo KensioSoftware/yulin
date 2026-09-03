@@ -122,32 +122,6 @@ export class SimCfnEventRuleProperties {
     );
   }
 
-  /**
-   * Refuse what this simulation does not model, naming the property.
-   *
-   * Both are asked by key rather than by value, so a template writing `null`
-   * for one is refused rather than read as having left it out.
-   */
-  refuseUnsimulated(): void {
-    if (this.properties.has("RoleArn")) {
-      throw this.propertyError(
-        "RoleArn is not simulated, so the Resource is refused rather than " +
-          "deployed without it: a rule reaches its target as the EventBridge " +
-          "service principal, admitted by the target's own resource policy",
-      );
-    }
-
-    // Rule tags never reach PutRule, which is the one place that would
-    // otherwise refuse them, so a tagged rule would deploy and quietly lose
-    // its tags.
-    if (this.properties.has("Tags")) {
-      throw this.propertyError(
-        "Tags are not simulated, so the Resource is refused rather than " +
-          "deployed without them",
-      );
-    }
-  }
-
   private stringProperty(name: string): string | undefined {
     const value = this.properties.get(name);
 

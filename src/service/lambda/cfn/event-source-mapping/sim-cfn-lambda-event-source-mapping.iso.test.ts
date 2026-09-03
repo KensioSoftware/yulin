@@ -209,6 +209,34 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
     assertIdentical(events[0].Records[0]?.body, "order-1");
   });
 
+  it("records mapping tags rather than failing the stack over them", async () => {
+    // Given a tagged mapping, as a CDK app tagging its whole app deploys.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: consumerTemplate({
+        ...mappingProperties,
+        Tags: [{ Key: "team", Value: "orders" }],
+      }),
+      bindings: [
+        { logicalId: "ConsumerFunction", handler: (): undefined => undefined },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the mapping is there, and the tags it lost are recorded against it.
+    const resource = stack.getResource("OrderConsumerMapping");
+
+    assertNonNullable(resource);
+    assertInstanceOf(resource.simResource, SimLambdaEventSourceMapping);
+
+    assertArrayLength(resource.ignoredProperties, 1);
+    assertIdentical(resource.ignoredProperties[0].path, "Tags");
+    assertStringIncludes(resource.ignoredProperties[0].reason, "not simulated");
+  });
+
   it("refuses an attribute AWS::Lambda::EventSourceMapping does not have", () => {
     // Given the CloudFormation-facing adapter for a mapping.
     const adapter = new SimLambdaEventSourceMappingCfn({
