@@ -7,10 +7,8 @@ import {
 } from "../cdk/sim-cdk-assembly-manifest.js";
 import { orderCdkAssemblyStacks } from "../cdk/sim-cdk-assembly-order.js";
 import { selectCdkAssemblyStacks } from "../cdk/sim-cdk-assembly-selection.js";
-import {
-  assertCdkOutOptionsAreDeployed,
-  type SimCfnCdkOutStackOptionsByName,
-} from "./sim-cfn-cdk-out-stack-options.js";
+import type { SimCfnCdkOutStackOptionsByName } from "./sim-cfn-cdk-out-stack-options.js";
+import { assertCdkOutOptionsAreDeployed } from "./sim-cfn-cdk-out-options-deployed.js";
 import type { SimCfnResourceOrder } from "../stack/deploy/sim-cfn-resource-order.js";
 
 export interface SimCloudFormationDeployCdkOutProperties {
@@ -37,6 +35,16 @@ export interface SimCloudFormationDeployCdkOutProperties {
   readonly caller?: SimAwsCaller | undefined;
 
   /**
+   * The principal every Stack in the assembly publishes its CDK file assets
+   * as, which one named in `stackOptions` overrides for its own Stack.
+   *
+   * A real `cdk deploy` publishes assets as the file publishing Role and
+   * processes each template as the execution Role. Left out, an assembly
+   * publishes its assets as `caller`.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
+  /**
    * The order every Stack in the assembly creates Resources with no dependency
    * between them in, which one named in `stackOptions` overrides for its own
    * Stack. `reversed` deploys each Stack the other way round from the one its
@@ -59,6 +67,7 @@ export interface SimCfnCdkOutPlannedStack extends SimCdkAssemblyStack {
 export interface SimCfnCdkOutPlan {
   readonly stacks: readonly SimCfnCdkOutPlannedStack[];
   readonly caller?: SimAwsCaller | undefined;
+  readonly assetsCaller?: SimAwsCaller | undefined;
   readonly resourceOrder?: SimCfnResourceOrder | undefined;
   readonly stackOptions?: SimCfnCdkOutStackOptionsByName | undefined;
 }
@@ -73,8 +82,14 @@ export async function planCdkOutDeployment(properties: {
   readonly request: SimCloudFormationDeployCdkOutProperties | string;
   readonly defaultRegionName: AwsRegionName;
 }): Promise<SimCfnCdkOutPlan> {
-  const { directoryPath, stackNames, caller, resourceOrder, stackOptions } =
-    cdkOutDeployment(properties.request);
+  const {
+    directoryPath,
+    stackNames,
+    caller,
+    assetsCaller,
+    resourceOrder,
+    stackOptions,
+  } = cdkOutDeployment(properties.request);
 
   const selected = selectCdkAssemblyStacks({
     stacks: await loadCdkAssemblyStacks(directoryPath),
@@ -90,6 +105,7 @@ export async function planCdkOutDeployment(properties: {
       regionName: stack.regionName ?? properties.defaultRegionName,
     })),
     caller,
+    assetsCaller,
     resourceOrder,
     stackOptions,
   };

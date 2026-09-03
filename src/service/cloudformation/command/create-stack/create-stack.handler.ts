@@ -34,6 +34,9 @@ interface CreateStackCommandHandlerProperties {
   /** The principal the Stack's Resources are created as. */
   readonly caller?: SimAwsCaller | undefined;
 
+  /** The principal the Stack's CDK file assets are published as. */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
   /** The order Resources with no dependency between them are started in. */
   readonly resourceOrder?: SimCfnResourceOrder | undefined;
 
@@ -56,6 +59,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
   private readonly caller: SimAwsCaller | undefined;
+  private readonly assetsCaller: SimAwsCaller | undefined;
   private readonly resourceOrder: SimCfnResourceOrder | undefined;
   private readonly exports: SimCfnExports | undefined;
 
@@ -68,6 +72,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       cdkOutContext,
       bindings,
       caller,
+      assetsCaller,
       resourceOrder,
       exports,
     } = properties;
@@ -79,6 +84,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
     this.caller = caller;
+    this.assetsCaller = assetsCaller;
     this.resourceOrder = resourceOrder;
     this.exports = exports;
   }
@@ -133,6 +139,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       cdkOutContext: this.cdkOutContext,
       bindings: this.bindings,
       caller: this.caller,
+      assetsCaller: this.assetsCaller,
       resourceOrder: this.resourceOrder,
       exports: this.exports,
     });

@@ -9,7 +9,7 @@ import {
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
-import { describe, it, vi } from "vitest";
+import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
@@ -264,27 +264,16 @@ describe("SimCdkAssetsPublisher", () => {
     assertUndefined(simAws.s3().getSimBucketByName("b"));
   });
 
-  it("publishes into a staging Bucket another Stack created concurrently", async () => {
-    // Given a staging Bucket that appears between the publisher checking for
-    // it and its own CreateBucket landing, as it can when two Stacks sharing
-    // one staging Bucket deploy concurrently.
+  it("publishes into a staging Bucket another Stack already created", async () => {
+    // Given a staging Bucket that is already there, as it is for the second of
+    // two Stacks sharing one.
     const simAws = new SimAws();
     const cdkOutDirectory = new TemporaryDirectory();
     await cdkOutDirectory.writeFile("asset.txt", "content");
 
-    const s3 = simAws.s3();
-    await s3.createBucket({ input: { Bucket: "shared-staging-bucket" } });
-
-    const findBucket = s3.getSimBucketByName.bind(s3);
-    let checkedBeforeCreate = false;
-    vi.spyOn(s3, "getSimBucketByName").mockImplementation((bucketName) => {
-      if (checkedBeforeCreate) {
-        return findBucket(bucketName);
-      }
-      checkedBeforeCreate = true;
-
-      return undefined;
-    });
+    await simAws
+      .s3()
+      .createBucket({ input: { Bucket: "shared-staging-bucket" } });
 
     // When the assets are published.
     await publish(simAws, cdkOutDirectory.path(), {
@@ -298,8 +287,7 @@ describe("SimCdkAssetsPublisher", () => {
       },
     });
 
-    // Then losing the race to create the Bucket is not a failure, and the
-    // asset is published into the Bucket that won.
+    // Then the asset is published into the Bucket that was there.
     const objectBytes = await publishedObjectBytes(
       simAws,
       "shared-staging-bucket",

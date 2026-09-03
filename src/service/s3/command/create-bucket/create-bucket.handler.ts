@@ -3,7 +3,10 @@ import type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
 } from "./create-bucket.command.js";
-import { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import type {
+  SimS3Bucket,
+  SimS3BucketName,
+} from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
@@ -11,7 +14,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
-import { SimS3BucketNameAvailability } from "../../bucket/name-availability/sim-s3-bucket-name-availability.js";
+import { SimS3BucketMaker } from "../../bucket/sim-s3-bucket-maker.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
 import {
   SimIamAllowAllAuth,
@@ -23,7 +26,7 @@ import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js"
 
 interface CreateBucketCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly buckets: Map<string, SimS3Bucket>;
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -39,7 +42,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
   SimCreateBucketCommandOutput
 > {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly buckets: Map<string, SimS3Bucket>;
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
@@ -94,20 +97,12 @@ export class CreateBucketCommandHandler implements CommandHandler<
       });
     }
 
-    const simS3BucketNameAvailability = new SimS3BucketNameAvailability({
+    new SimS3BucketMaker({
       accountRegionScope: this.accountRegionScope,
       buckets: this.buckets,
       s3GlobalRegistry: this.s3GlobalRegistry,
-    });
-    simS3BucketNameAvailability.ensureCanCreateBucketNamed(bucketName);
-
-    const bucket = new SimS3Bucket({
-      bucketName,
-      accountRegionScope: this.accountRegionScope,
-      clock: this.background,
-    });
-    this.buckets.set(bucketName, bucket);
-    this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
+      background: this.background,
+    }).make(bucketName);
 
     return {
       BucketArn: resource,

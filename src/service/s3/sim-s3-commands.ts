@@ -74,11 +74,20 @@ export class SimS3Commands {
   public readonly multipartUploads: SimS3MultipartCommands;
   public readonly objectNotifier: SimS3ObjectNotifier;
 
+  /**
+   * The scheduler and clock every command area here shares, which a
+   * simulator-only control on the service facade needs to hand a Bucket it
+   * makes outside the commands.
+   */
+  public readonly background: BackgroundScheduler;
+
   constructor(properties: SimS3CommandsProperties) {
     const {
       background = new BackgroundTasks(),
       notificationDestinations = new SimS3NoNotificationDestinations(),
     } = properties;
+
+    this.background = background;
 
     const iam = simIamInRegion(
       properties.iam,

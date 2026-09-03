@@ -44,6 +44,12 @@ export interface SimCfnStackUpdateProperties {
    * The Stack goes on using it, as it does the cloud assembly.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The principal to publish the re-synthesized file assets as, for an update
+   * that names one. The Stack goes on using it too.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
 }
 
 export interface SimCloudFormationStackProperties {
@@ -68,6 +74,16 @@ export interface SimCloudFormationStackProperties {
    * simulation.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The principal the CDK file assets staged beside the template are published
+   * as.
+   *
+   * A real `cdk deploy` publishes them as the file publishing Role and only
+   * then processes the template as the execution Role, which is why the two
+   * are named apart. Left out, assets are published as `caller`.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
 
   /**
    * The order this Stack starts Resources with no dependency between them in.

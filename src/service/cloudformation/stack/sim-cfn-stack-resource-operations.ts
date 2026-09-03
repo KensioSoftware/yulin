@@ -4,6 +4,10 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnBinding } from "../bind/sim-cfn-binding.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
+import {
+  SimCfnStackDeployContext,
+  type SimCfnStackUpdateContext,
+} from "./sim-cfn-stack-deploy-context.js";
 import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js";
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
 import { SimCfnResourceRetention } from "../resource/delete/sim-cfn-resource-retention.js";
@@ -38,6 +42,12 @@ interface SimCfnStackResourceOperationsProperties {
   readonly caller?: SimAwsCaller | undefined;
 
   /**
+   * The principal the Stack's CDK file assets are published as, where that is
+   * somebody other than the caller its Resources are created as.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
+  /**
    * The order Resources with no dependency between them are started in.
    */
   readonly resourceOrder?: SimCfnResourceOrder | undefined;
@@ -62,8 +72,7 @@ export class SimCfnStackResourceOperations {
   private readonly stackName: SimCloudFormationStackName;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
   private readonly resourceOrder: SimCfnResourceOrder | undefined;
-  private cdkOutContext: SimCdkOutContext | undefined;
-  private caller: SimAwsCaller | undefined;
+  private readonly context: SimCfnStackDeployContext;
 
   /**
    * Resources an update kept in simulated AWS.
@@ -76,44 +85,20 @@ export class SimCfnStackResourceOperations {
   private readonly retainedByUpdates: SimCfnResource[] = [];
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {
-    const {
-      simAws,
-      accountRegionScope,
-      stackName,
-      cdkOutContext,
-      bindings,
-      caller,
-      resourceOrder,
-    } = properties;
+    const { simAws, accountRegionScope, stackName, bindings, resourceOrder } =
+      properties;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
     this.stackName = stackName;
-    this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
-    this.caller = caller;
     this.resourceOrder = resourceOrder;
+    this.context = new SimCfnStackDeployContext(properties);
   }
 
-  /**
-   * Take on what an update brings with it, for this and every later operation.
-   *
-   * A synthesis writes the template and the assets manifest beside it together,
-   * so a Stack updated from a re-synthesized template needs the manifest that
-   * came with it. Keeping the one the Stack was deployed from would look up the
-   * asset a replaced Resource names in a manifest written before it existed.
-   *
-   * An update naming a caller runs as that one, and the Stack is torn down as
-   * it afterwards. An update that names none keeps the deployment's caller, so
-   * a Stack updated from a plain template path goes on running as whoever
-   * deployed it.
-   */
-  useUpdate(properties: {
-    readonly cdkOutContext?: SimCdkOutContext | undefined;
-    readonly caller?: SimAwsCaller | undefined;
-  }): void {
-    this.cdkOutContext = properties.cdkOutContext ?? this.cdkOutContext;
-    this.caller = properties.caller ?? this.caller;
+  /** Take on what an update brings with it, for every later operation. */
+  useUpdate(properties: SimCfnStackUpdateContext): void {
+    this.context.useUpdate(properties);
   }
 
   /**
@@ -204,7 +189,7 @@ export class SimCfnStackResourceOperations {
           simAws: this.simAws,
           currentResources,
           updatedResources,
-          caller: this.caller,
+          caller: this.context.caller,
         });
       }),
     );
@@ -266,8 +251,8 @@ export class SimCfnStackResourceOperations {
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       stackName: this.stackName,
-      cdkOutContext: this.cdkOutContext,
-      caller: this.caller,
+      cdkOutContext: this.context.cdkOutContext,
+      assetsCaller: this.context.publishingCaller(),
     }).publish();
   }
 
@@ -278,9 +263,9 @@ export class SimCfnStackResourceOperations {
       simAws: this.simAws,
       resources,
       stackName: this.stackName,
-      cdkOutContext: this.cdkOutContext,
+      cdkOutContext: this.context.cdkOutContext,
       bindings: this.bindings,
-      caller: this.caller,
+      caller: this.context.caller,
       resourceOrder: this.resourceOrder,
     });
   }
@@ -293,7 +278,7 @@ export class SimCfnStackResourceOperations {
       simAws: this.simAws,
       resources,
       stackName: this.stackName,
-      caller: this.caller,
+      caller: this.context.caller,
       retention,
     });
   }

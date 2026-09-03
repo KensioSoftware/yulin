@@ -39,6 +39,12 @@ interface UpdateStackCommandHandlerProperties {
    */
   readonly caller?: SimAwsCaller | undefined;
 
+  /**
+   * The principal to publish the re-synthesized CDK file assets as, for an
+   * update that names one. Left out, they are published as `caller`.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
   /** The export names published in this Account and Region. */
   readonly exports?: SimCfnExports | undefined;
 }
@@ -58,6 +64,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly caller: SimAwsCaller | undefined;
+  private readonly assetsCaller: SimAwsCaller | undefined;
   private readonly exports: SimCfnExports | undefined;
 
   constructor(properties: UpdateStackCommandHandlerProperties) {
@@ -67,6 +74,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
     this.background = properties.background;
     this.cdkOutContext = properties.cdkOutContext;
     this.caller = properties.caller;
+    this.assetsCaller = properties.assetsCaller;
     this.exports = properties.exports;
   }
 
@@ -110,7 +118,11 @@ export class UpdateStackCommandHandler implements CommandHandler<
         input: command.input,
         exports: this.exports,
       }),
-      { cdkOutContext: this.cdkOutContext, caller: this.caller },
+      {
+        cdkOutContext: this.cdkOutContext,
+        caller: this.caller,
+        assetsCaller: this.assetsCaller,
+      },
     );
 
     return {

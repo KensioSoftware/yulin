@@ -59,10 +59,8 @@ export class SimCfnCdkOutDeployer {
     deployed: ReadonlyMap<string, SimCfnDeployedStack>,
   ): Promise<SimCfnDeployedStack> {
     const { simAws, accountRegionScope } = this.scope;
-    const { transform, caller, resourceOrder, ...options } = cdkOutOptionsFor(
-      stack,
-      plan.stackOptions,
-    );
+    const { transform, caller, assetsCaller, resourceOrder, ...options } =
+      cdkOutOptionsFor(stack, plan.stackOptions);
 
     return await simAws
       .accountRegionScope(accountRegionScope.accountId, stack.regionName)
@@ -72,6 +70,7 @@ export class SimCfnCdkOutDeployer {
         stackName: stack.stackName,
         ...options,
         caller: caller ?? plan.caller,
+        assetsCaller: assetsCaller ?? plan.assetsCaller,
         resourceOrder: resourceOrder ?? plan.resourceOrder,
         transform: cdkOutBoundTransform(transform, deployed),
       });
