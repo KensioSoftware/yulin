@@ -21,7 +21,7 @@ simSdk.intercept(documents);
 for (const [tableName, keyName] of [
   ["OrdersTable", "orderId"],
   ["ClaimsTable", "code"],
-]) {
+] as const) {
   await documents.send(
     new CreateTableCommand({
       TableName: tableName,

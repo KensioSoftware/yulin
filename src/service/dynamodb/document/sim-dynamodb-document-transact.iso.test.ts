@@ -21,10 +21,10 @@ import { SimDynamoDbTransactionCanceledException } from "../error/dynamodb.error
 import { simDynamoDbCreatedTableFactory } from "../table/sim-dynamodb-created-table.factory.js";
 
 /**
- * An intercepted document client, and the two tables one transaction spans.
+ * An intercepted document client, and the two tables these transactions span.
  *
- * A transaction is worth showing across two tables, since that is the thing a
- * batch cannot do.
+ * A transaction is usually reached for when two items have to agree with each
+ * other, and those two items are often in different tables.
  */
 async function interceptedDocuments(
   simSdk: SimSdk,
