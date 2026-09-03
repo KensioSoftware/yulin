@@ -50,5 +50,21 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
     "DeliveryStatusLogging",
     "delivery status logging writes to CloudWatch Logs, which is not simulated",
   ],
-  ["Tags", "no simulated service reads a topic tag"],
+]);
+
+/**
+ * The real AWS::SNS::Topic properties this simulation has nothing to act on
+ * and no reason to fail a stack over.
+ *
+ * `Tags` is the whole list. The topic is created without them and the omission
+ * is recorded against the Resource. A topic behaves the same way with a tag
+ * and without one, and a CDK app calling `Tags.of(app).add(...)` tags every
+ * topic in it.
+ */
+export const ignoredPropertyReasons: ReadonlyMap<string, string> = new Map([
+  [
+    "Tags",
+    "AWS::SNS::Topic property Tags is not simulated, so the topic is created " +
+      "without them. No simulated service reads a topic tag.",
+  ],
 ]);

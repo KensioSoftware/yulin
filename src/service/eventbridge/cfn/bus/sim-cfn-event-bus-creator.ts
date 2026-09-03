@@ -41,6 +41,7 @@ export class SimCfnEventBusCreator {
     });
 
     busProperties.refuseUnsimulated();
+    busProperties.recordIgnoredProperties();
 
     const name = busProperties.name();
     const description = busProperties.description();

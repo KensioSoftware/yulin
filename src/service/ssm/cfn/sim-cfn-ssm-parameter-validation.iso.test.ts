@@ -169,17 +169,44 @@ describe("SSM CloudFormation Parameter validation", () => {
       allowedPattern.message,
       "PutParameter AllowedPattern is not simulated",
     );
+  });
 
-    const parameterTags = await createParameterResource({
-      Name: "/myapp/prod/db-host",
-      Type: "String",
-      Value: "db.internal",
-      Tags: { component: "database" },
+  it("records parameter tags rather than failing the stack over them", async () => {
+    // Given a tagged parameter, as a CDK app tagging its whole app deploys.
+    const simAws = new SimAws();
+
+    // When the stack is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "myapp",
+      template: {
+        Resources: {
+          DbHost: {
+            Type: "AWS::SSM::Parameter",
+            Properties: {
+              Name: "/myapp/prod/db-host",
+              Type: "String",
+              Value: "db.internal",
+              Tags: { component: "database" },
+            },
+          },
+        },
+      },
     });
-    assertStringIncludes(
-      parameterTags.message,
-      "PutParameter Tags is not simulated",
+
+    await stack.waitForDeployComplete();
+
+    // Then the parameter holds its value, and the tags it lost are recorded.
+    assertIdentical(
+      simAws.ssm().findParameter("/myapp/prod/db-host")?.currentVersion.value
+        .value,
+      "db.internal",
     );
+
+    const ignored = stack.getResource("DbHost")?.ignoredProperties ?? [];
+
+    assertArrayLength(ignored, 1);
+    assertIdentical(ignored[0].path, "Tags");
+    assertStringIncludes(ignored[0].reason, "not simulated");
   });
 
   it("refuses a name another stack already used", async () => {

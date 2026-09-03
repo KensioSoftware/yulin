@@ -1,4 +1,10 @@
-import { assertStringIncludes, assertThrowsErrorAsync } from "@kensio/smartass";
+import {
+  assertArrayLength,
+  assertIdentical,
+  assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
@@ -88,19 +94,36 @@ describe("AWS::SNS::Topic validation", () => {
     );
   });
 
-  it("fails a topic carrying tags", async () => {
-    // Given a template tagging the topic.
-    const error = await deployTopic({
-      TopicName: "orders",
-      Tags: [{ Key: "team", Value: "orders" }],
+  it("records topic tags rather than failing the stack over them", async () => {
+    // Given a tagged topic, as a CDK app tagging its whole app deploys.
+    const simAws = new SimAws();
+
+    // When the stack is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: {
+        Resources: {
+          OrdersTopic: {
+            Type: "AWS::SNS::Topic",
+            Properties: {
+              TopicName: "orders",
+              Tags: [{ Key: "team", Value: "orders" }],
+            },
+          },
+        },
+      },
     });
 
-    // Then it fails, since a dropped tag would leave the topic looking tagged
-    // to the template that wrote it.
-    assertStringIncludes(
-      error.message,
-      "Tags is a real AWS::SNS::Topic property simulated SNS does not act on",
-    );
+    await stack.waitForDeployComplete();
+
+    // Then the topic is there, and the tags it lost are recorded against it.
+    assertNonNullable(simAws.sns().findTopic("orders"));
+
+    const ignored = stack.getResource("OrdersTopic")?.ignoredProperties ?? [];
+
+    assertArrayLength(ignored, 1);
+    assertIdentical(ignored[0].path, "Tags");
+    assertStringIncludes(ignored[0].reason, "not simulated");
   });
 
   it("fails a topic asking for delivery status logging", async () => {

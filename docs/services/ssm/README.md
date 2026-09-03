@@ -1039,7 +1039,8 @@ Current documented limitations:
 - Parameter policies (expiration and notification) are left out. `Policies` is refused, and
   `DescribeParameters` always reports an empty `Policies` list.
 - Tags are left out. `Tags` on `PutParameter` is refused, and `AddTagsToResource`,
-  `RemoveTagsFromResource` and `ListTagsForResource` are absent.
+  `RemoveTagsFromResource` and `ListTagsForResource` are absent. An `AWS::SSM::Parameter` carrying
+  `Tags` deploys with the tags dropped and the property recorded.
 - `AllowedPattern` is refused outright. Ignoring it would store a value it was meant to reject,
   without complaint.
 - `KeyId` on a `String` or `StringList` parameter is refused, since nothing would encrypt a value
@@ -1060,9 +1061,10 @@ Current documented limitations:
 - Deletion is immediate. Real Parameter Store asks for thirty seconds before a deleted name is
   reused, where here the name is free straight away.
 - `AWS::SSM::Parameter` supports `Name`, `Type`, `Value`, `Description` and `Tier`. `AllowedPattern`,
-  `DataType`, `Policies` and `Tags` reach `PutParameter`, which refuses them for the reasons above.
-  `Type: SecureString` is refused, as real CloudFormation refuses it for this resource type. The
-  plaintext value would sit in the template.
+  `DataType` and `Policies` reach `PutParameter`, which refuses them for the reasons above. `Tags`
+  is the one difference from the command, and is recorded as an ignored property so a stack that
+  tags every Resource in it still deploys. `Type: SecureString` is refused, as real CloudFormation
+  refuses it for this resource type. The plaintext value would sit in the template.
 - The other `AWS::SSM::*` resource types (`Document`, `Association`, `MaintenanceWindow`,
   `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped.
 - Every deployment of an `AWS::SSM::Parameter` is a create. A name another stack already used is

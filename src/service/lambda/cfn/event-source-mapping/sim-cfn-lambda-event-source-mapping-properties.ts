@@ -49,10 +49,7 @@ export class SimCfnLambdaEventSourceMappingProperties {
       "EventSourceArn",
     );
 
-    assertSimulatedEventSourceMappingProperties(
-      this.resource.logicalId,
-      this.properties,
-    );
+    assertSimulatedEventSourceMappingProperties(this.resource, this.properties);
 
     return {
       EventSourceArn: eventSourceArn,

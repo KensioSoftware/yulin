@@ -1702,6 +1702,10 @@ Reporting individual failures can be tested against a made event too. The handle
 a template naming one is refused. The same Resource deploys a
 [stream mapping](#stream-mappings-in-templates), which has to have one.
 
+`Tags` is the one property recorded rather than refused. A template's tags are usually the whole
+stack's (a CDK app calling `Tags.of(app).add(...)` tags every mapping in it), and a mapping delivers
+the same records whether it carries them or not. The deploy stands and nothing reads them back.
+
 ## Triggering a function from a DynamoDB stream
 
 An event source mapping also connects a [simulated table's stream](https://yulinsim.dev/services/dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs")
@@ -4268,7 +4272,9 @@ Current documented limitations:
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
   Kinesis enhanced fan-out consumers are refused outright, and so are `FilterCriteria`,
   `ScalingConfig`, `DestinationConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
-  `TumblingWindowInSeconds` and the other mapping inputs this simulation has no behaviour for.
+  `TumblingWindowInSeconds` and the other mapping inputs this simulation has no behaviour for. An
+  `AWS::Lambda::EventSourceMapping` carrying `Tags` is the exception, and deploys with the tags
+  dropped and the property recorded.
 - A failed stream batch waits 1, 2, 4, 8 and 16 seconds between attempts, where AWS documents no
   delay. That is deliberate. A delay of zero falls due at the instant the clock already reads, and a
   handler that always throws would leave `advanceBy` with work falling due forever. A mapping that

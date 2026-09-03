@@ -246,32 +246,37 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     assertStringIncludes(error.message, "OrdersRule");
   });
 
-  it("refuses rule tags rather than deploying without them", async () => {
-    // Given a tagged rule. Tags reach no EventBridge command, so nothing else
-    // would notice them going missing.
+  it("records rule tags rather than failing the stack over them", async () => {
+    // Given a tagged rule, as a CDK app tagging its whole app deploys.
     const simAws = new SimAws();
 
-    const error = await assertThrowsErrorAsync(async () => {
-      const stack = await simAws.cloudFormation().deployTemplate({
-        stackName: "orders-stack",
-        template: {
-          Resources: {
-            OrdersRule: {
-              Type: "AWS::Events::Rule",
-              Properties: {
-                Name: "orders",
-                EventPattern: orderPattern,
-                Tags: [{ Key: "team", Value: "orders" }],
-              },
+    // When the stack is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: {
+        Resources: {
+          OrdersRule: {
+            Type: "AWS::Events::Rule",
+            Properties: {
+              Name: "orders",
+              EventPattern: orderPattern,
+              Tags: [{ Key: "team", Value: "orders" }],
             },
           },
         },
-      });
-
-      await stack.waitForDeployComplete();
+      },
     });
 
-    assertStringIncludes(error.message, "Tags");
+    await stack.waitForDeployComplete();
+
+    // Then the rule is there, and the tags it lost are recorded against it.
+    assertNonNullable(simAws.eventBridge().findRule("orders"));
+
+    const ignored = stack.getResource("OrdersRule")?.ignoredProperties ?? [];
+
+    assertArrayLength(ignored, 1);
+    assertIdentical(ignored[0].path, "Tags");
+    assertStringIncludes(ignored[0].reason, "not simulated");
   });
 
   it("refuses a bus property written as null", async () => {
@@ -297,6 +302,38 @@ describe("EventBridge CloudFormation Rule deployment", () => {
 
     // Then it is refused, rather than read as having left the policy out.
     assertStringIncludes(error.message, "Policy");
+  });
+
+  it("records bus tags rather than failing the stack over them", async () => {
+    // Given a tagged bus, as a CDK app tagging its whole app deploys.
+    const simAws = new SimAws();
+
+    // When the stack is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: {
+        Resources: {
+          OrdersBus: {
+            Type: "AWS::Events::EventBus",
+            Properties: {
+              Name: "orders",
+              Tags: [{ Key: "team", Value: "orders" }],
+            },
+          },
+        },
+      },
+    });
+
+    await stack.waitForDeployComplete();
+
+    // Then the bus is there, and the tags it lost are recorded against it.
+    assertNonNullable(simAws.eventBridge().findEventBus("orders"));
+
+    const ignored = stack.getResource("OrdersBus")?.ignoredProperties ?? [];
+
+    assertArrayLength(ignored, 1);
+    assertIdentical(ignored[0].path, "Tags");
+    assertStringIncludes(ignored[0].reason, "not simulated");
   });
 
   it("removes the rules and targets a stack created", async () => {

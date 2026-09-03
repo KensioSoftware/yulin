@@ -1742,15 +1742,20 @@ ARNs, and `Ref` on an `AWS::SNS::Topic` gives one.
 
 A property with no simulated behaviour fails the resource rather than being dropped. That covers
 `FifoTopic`, `ContentBasedDeduplication`, `FifoThroughputScope`, `KmsMasterKeyId`,
-`SignatureVersion`, `TracingConfig`, `ArchivePolicy`, `DeliveryStatusLogging`, `DataProtectionPolicy`
-and `Tags` on a topic, and `DeliveryPolicy`, `RedrivePolicy`, `ReplayPolicy`, `SubscriptionRoleArn`
-and `Region` on a subscription. Most of them are refused by simulated SNS itself, since they are
-topic or subscription attributes of the same name, and the reason is the same one an SDK caller gets.
-A property the resource type never had is refused too. The failure is worded as an invalid resource,
-which fails the resource where an unsupported one would be
+`SignatureVersion`, `TracingConfig`, `ArchivePolicy`, `DeliveryStatusLogging` and
+`DataProtectionPolicy` on a topic, and `DeliveryPolicy`, `RedrivePolicy`, `ReplayPolicy`,
+`SubscriptionRoleArn` and `Region` on a subscription. Most of them are refused by simulated SNS
+itself, since they are topic or subscription attributes of the same name, and the reason is the same
+one an SDK caller gets. A property the resource type never had is refused too. The failure is worded
+as an invalid resource, which fails the resource where an unsupported one would be
 [skipped](https://yulinsim.dev/services/cloudformation/#values-from-a-skipped-resource). A topic that cannot be created
 as the template asked for it would otherwise leave a stack that looks deployed with no publisher
 behind it.
+
+`Tags` is the one difference from `CreateTopic`, which refuses it outright. A template's tags are
+usually the whole stack's (a CDK app calling `Tags.of(app).add(...)` tags every topic in it), and a
+topic delivers the same messages whether it carries them or not. They are recorded as an ignored
+property and the deploy stands. Nothing reads them back either.
 
 CDK works without hand-editing. `topic.addSubscription(new subscriptions.SqsSubscription(queue))`
 synthesises an `AWS::SNS::Subscription` alongside the `AWS::SQS::QueuePolicy` that authorizes the
@@ -1880,7 +1885,8 @@ Current documented limitations:
 - Encryption is left out. `KmsMasterKeyId` is refused, and message bodies are held in process memory
   as they were published. Anything sharing the process can read them.
 - Tags are left out. `TagResource`, `UntagResource` and `ListTagsForResource` are absent, and
-  `CreateTopic` refuses a `Tags` parameter rather than dropping it.
+  `CreateTopic` refuses a `Tags` parameter rather than dropping it. An `AWS::SNS::Topic` carrying
+  `Tags` deploys with the tags dropped and the property recorded.
 - Data protection policies are left out. `PutDataProtectionPolicy` and `GetDataProtectionPolicy` are
   absent, and `CreateTopic` refuses a `DataProtectionPolicy` rather than creating a topic that
   redacts nothing.

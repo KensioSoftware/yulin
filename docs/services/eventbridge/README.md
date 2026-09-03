@@ -919,6 +919,12 @@ at deploy time naming the property and the Resource. The alternative is a rule t
 event where one field was asked for. Tearing the stack down removes the buses, rules and targets it
 created.
 
+`Tags` is the one difference from the commands, which refuse it outright. A template's tags are
+usually the whole stack's (a CDK app calling `Tags.of(app).add(...)` tags every rule and bus in it),
+and a rule routes the same events whether it carries them or not. They are recorded as an ignored
+property and the deploy stands. Nothing reads them back. A rule or a bus deployed with tags behaves
+as though the template had never named them.
+
 ## Reading back a failed delivery
 
 Real EventBridge tells the caller nothing about a failed delivery. A `PutEvents` that matched a rule
@@ -1101,7 +1107,8 @@ no permission for.
 - EventBridge Scheduler is a separate service, simulated separately. See
   [simulated Scheduler](https://yulinsim.dev/services/scheduler/).
 - Rule tags, a rule `RoleArn`, managed rules and the `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`
-  state are all refused.
+  state are all refused at `PutRule`. An `AWS::Events::Rule` carrying `Tags` deploys with the tags
+  dropped and the property recorded.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge
   refuses to delete either while it still has what hangs off it.
 - `AWS::Events::EventBusPolicy`, `AWS::Events::Archive`, `AWS::Events::Connection` and
@@ -1113,6 +1120,7 @@ no permission for.
   stricter than real AWS.
 - Putting an event onto another account's or region's bus is refused.
 - Partner event buses and partner event sources are refused, as are event bus tags, encryption with
-  a customer managed key, dead letter queues, logging configuration and global endpoints.
+  a customer managed key, dead letter queues, logging configuration and global endpoints. An
+  `AWS::Events::EventBus` carrying `Tags` deploys with the tags dropped and the property recorded.
 - Archives, replay, schema registry and discovery, API destinations and connections are not
   simulated.

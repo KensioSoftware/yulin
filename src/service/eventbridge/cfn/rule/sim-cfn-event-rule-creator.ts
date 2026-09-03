@@ -6,6 +6,10 @@ import type { SimEventBridge } from "../../sim-event-bridge.js";
 import { simCfnEventBridgeResourceCreation } from "../sim-cfn-event-bridge-resource-error.js";
 import { eventRuleResourceType } from "../sim-cfn-event-bridge-resource-types.js";
 import { SimCfnEventRuleProperties } from "./sim-cfn-event-rule-properties.js";
+import {
+  recordIgnoredEventRuleProperties,
+  refuseUnsimulatedEventRuleProperties,
+} from "./sim-cfn-event-rule-unsimulated-properties.js";
 import type { SimCfnEventRuleTarget } from "./sim-cfn-event-rule-targets.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -45,7 +49,8 @@ export class SimCfnEventRuleCreator {
       properties,
     });
 
-    ruleProperties.refuseUnsimulated();
+    refuseUnsimulatedEventRuleProperties(resource, properties);
+    recordIgnoredEventRuleProperties(resource, properties);
 
     const name = ruleProperties.name();
     const busName = ruleProperties.busName();

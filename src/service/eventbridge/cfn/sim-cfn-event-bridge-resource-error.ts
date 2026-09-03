@@ -27,7 +27,7 @@ export function simCfnEventBridgeResourceError(
  * Every Resource type here goes through the ordinary EventBridge commands, so
  * what a template may ask for is decided once, by simulated EventBridge, rather
  * than again in the CloudFormation layer. What that leaves out is where the
- * request came from: a deployment failing with `Rule tags are not simulated`
+ * request came from: a deployment failing with `Rule pattern is not valid`
  * says nothing about which Resource asked for it. Only EventBridge's own errors
  * are renamed, so a refusal the CloudFormation layer decided keeps the wording
  * it was written with.

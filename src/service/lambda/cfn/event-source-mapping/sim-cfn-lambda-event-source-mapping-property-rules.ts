@@ -1,3 +1,4 @@
+import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
@@ -47,9 +48,26 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "SelfManagedEventSource",
   "SelfManagedKafkaEventSourceConfig",
   "SourceAccessConfigurations",
-  "Tags",
   "Topics",
   "TumblingWindowInSeconds",
+]);
+
+/**
+ * Real AWS::Lambda::EventSourceMapping properties this simulation has nothing
+ * to act on and no reason to fail a stack over.
+ *
+ * `Tags` is the whole list. The mapping is created without them and the
+ * omission is recorded against the Resource. A mapping delivers the same
+ * records with a tag and without one, and a CDK app calling
+ * `Tags.of(app).add(...)` tags every mapping in it.
+ */
+const ignoredPropertyReasons: ReadonlyMap<string, string> = new Map([
+  [
+    "Tags",
+    "AWS::Lambda::EventSourceMapping property Tags is not simulated, so the " +
+      "mapping is created without them. Nothing reads them back and nothing " +
+      "is grouped or billed by them.",
+  ],
 ]);
 
 /**
@@ -72,13 +90,23 @@ export function eventSourceMappingPropertyError(
 
 /**
  * Refuse everything about an AWS::Lambda::EventSourceMapping Resource that is
- * not simulated.
+ * not simulated, and record what the mapping is created without.
  */
 export function assertSimulatedEventSourceMappingProperties(
-  logicalId: string,
+  resource: SimCfnResource,
   properties: SimCfnTemplateValueRecord,
 ): void {
+  const logicalId = resource.logicalId;
+
   for (const name of Object.keys(properties)) {
+    const ignoredReason = ignoredPropertyReasons.get(name);
+
+    if (ignoredReason !== undefined) {
+      resource.ignoreProperty(name, ignoredReason);
+
+      continue;
+    }
+
     if (unsimulatedPropertyNames.has(name)) {
       throw eventSourceMappingPropertyError(
         logicalId,
