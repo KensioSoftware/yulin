@@ -2443,6 +2443,123 @@ console.log(output.Responses[1]); // {}
 That is the difference from `BatchGetItem`, which leaves a missing item out of its answer
 altogether. Here the answers stay lined up with the Gets that asked for them.
 
+### Transactions through the document client
+
+`TransactWriteCommand` and `TransactGetCommand` from `@aws-sdk/lib-dynamodb` reach the same two
+operations. Every action's `Item`, `Key` and `ExpressionAttributeValues` are converted on the way in,
+and the `Item` of each `Responses` entry on the way out.
+
+```typescript sim-dynamodb-document-transactions
+/**
+ * Writing an order and the claim on its code together, in plain JavaScript.
+ */
+
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  TransactGetCommand,
+  TransactWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+
+const documents = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "eu-west-2" }),
+);
+simSdk.intercept(documents);
+
+for (const [tableName, keyName] of [
+  ["OrdersTable", "orderId"],
+  ["ClaimsTable", "code"],
+] as const) {
+  await documents.send(
+    new CreateTableCommand({
+      TableName: tableName,
+      KeySchema: [{ AttributeName: keyName, KeyType: "HASH" }],
+      AttributeDefinitions: [{ AttributeName: keyName, AttributeType: "S" }],
+      BillingMode: "PAY_PER_REQUEST",
+    }),
+  );
+}
+await simSdk.simAws.backgroundTasksComplete();
+
+const claim = {
+  TableName: "ClaimsTable",
+  ConditionExpression: "attribute_not_exists(code)",
+};
+
+// The order and the claim on its code go in together.
+await documents.send(
+  new TransactWriteCommand({
+    TransactItems: [
+      {
+        Put: {
+          TableName: "OrdersTable",
+          Item: { orderId: "order-1", total: 42, lines: [{ sku: "widget" }] },
+        },
+      },
+      { Put: { ...claim, Item: { code: "ABC123", orderId: "order-1" } } },
+    ],
+  }),
+);
+
+const read = await documents.send(
+  new TransactGetCommand({
+    TransactItems: [
+      { Get: { TableName: "OrdersTable", Key: { orderId: "order-1" } } },
+      { Get: { TableName: "ClaimsTable", Key: { code: "ABC123" } } },
+    ],
+  }),
+);
+
+const lines = read.Responses?.[0]?.Item?.["lines"] as { sku: string }[];
+console.log(lines[0]?.sku); // widget
+console.log(read.Responses?.[1]?.Item?.["orderId"]); // order-1
+
+// A second order wanting the same code loses the claim, and loses the order
+// with it.
+try {
+  await documents.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName: "OrdersTable",
+            Item: { orderId: "order-2", total: 7 },
+          },
+        },
+        { Put: { ...claim, Item: { code: "ABC123", orderId: "order-2" } } },
+      ],
+    }),
+  );
+} catch (error) {
+  const cancelled = error as {
+    name: string;
+    CancellationReasons?: { Code: string }[];
+  };
+
+  console.log(cancelled.name); // "TransactionCanceledException"
+  console.log(cancelled.CancellationReasons?.map((reason) => reason.Code));
+  // ["None", "ConditionalCheckFailed"]
+}
+
+const second = await documents.send(
+  new TransactGetCommand({
+    TransactItems: [
+      { Get: { TableName: "OrdersTable", Key: { orderId: "order-2" } } },
+    ],
+  }),
+);
+
+console.log(second.Responses?.[0]); // {}
+```
+
+`CancellationReasons` arrive as the low-level Command reports them. There is one per action, in
+`TransactItems` order. A reason's `Item` holds AttributeValues, because a cancelled transaction is
+thrown, and the real document client converts nothing on the way out of a transactional write.
+
 ## Expiring items with time to live
 
 `UpdateTimeToLive` names the attribute a table expires items by, and `DescribeTimeToLive` reports
@@ -2930,8 +3047,11 @@ console.log(tags.has("priority")); // true
 ```
 
 `PutCommand`, `GetCommand`, `DeleteCommand`, `UpdateCommand`, `QueryCommand`, `ScanCommand`,
-`BatchWriteCommand` and `BatchGetCommand` are converted. A document Command with no route here, such
-as `TransactWriteCommand`, is refused by name before anything tries to convert its values.
+`BatchWriteCommand`, `BatchGetCommand`, `TransactWriteCommand` and `TransactGetCommand` are
+converted. The two transactional ones have
+[a section of their own](#transactions-through-the-document-client). A document Command with no route
+here, such as the PartiQL `ExecuteStatementCommand`, is refused by name before anything tries to
+convert its values.
 
 Intercept the document client itself. `DynamoDBDocumentClient.from(client)` builds a separate object
 outside the `DynamoDBClient` class, so intercepting the base client leaves Commands sent through the
@@ -3621,15 +3741,15 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 - SDK interception, and an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
   simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
-  `UpdateCommand`, `QueryCommand`, `ScanCommand`, `BatchWriteCommand` and `BatchGetCommand`
-  converting native JavaScript values on the way in and out, and `paginateQuery` and `paginateScan`
-  paging through a simulated table.
+  `UpdateCommand`, `QueryCommand`, `ScanCommand`, `BatchWriteCommand`, `BatchGetCommand`,
+  `TransactWriteCommand` and `TransactGetCommand` converting native JavaScript values on the way in
+  and out, and `paginateQuery` and `paginateScan` paging through a simulated table.
 
 ## Limitations
 
-- The document client's transaction and PartiQL Commands go unconverted. PartiQL is an operation
-  this simulation lacks yet. The transactions are simulated as operations, so only the document form
-  of them is missing. Both are refused by name, never half converted.
+- The document client's PartiQL Commands go unconverted, because PartiQL is an operation this
+  simulation lacks yet. `ExecuteStatementCommand`, `BatchExecuteStatementCommand` and
+  `ExecuteTransactionCommand` are refused by name, never half converted.
 - A document client's translate config goes unread. The marshalling options it was built with do not
   apply. See [the SDK docs](https://yulinsim.dev/sdk/#limitations).
 - `Expected`, `ConditionalOperator`, `AttributeUpdates`, `KeyConditions`, `QueryFilter` and

@@ -1111,8 +1111,8 @@ intercepted send never runs it and the conversion happens at the interception bo
   `-routes.ts` builds one per Command for the SDK router to merge in.
 
 Most document Commands are named differently to the Command they stand for, so `PutCommand` and
-`PutItemCommand` route separately. One with no route, such as `TransactWriteCommand`, is refused by
-name before anything tries to convert its values.
+`PutItemCommand` route separately. One with no route, such as the PartiQL `ExecuteStatementCommand`,
+is refused by name before anything tries to convert its values.
 
 `QueryCommand` and `ScanCommand` are named the same in both packages, so the SDK router cannot key on
 the name alone. `sim-dynamodb-document-shared-name-route.ts` holds the document route and the client

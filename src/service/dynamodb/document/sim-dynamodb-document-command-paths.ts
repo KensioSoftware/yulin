@@ -73,6 +73,68 @@ const batchGetKeys = simDynamoDbDocumentEach(
 );
 
 /**
+ * One action of a transactional write that names an item by its key, which a
+ * ConditionCheck, a Delete and an Update all do.
+ */
+const transactWriteKeyed = simDynamoDbDocumentFields({
+  Key: simDynamoDbDocumentValues(),
+  ExpressionAttributeValues: simDynamoDbDocumentValues(),
+});
+
+/**
+ * The Put of a transactional write, which carries a whole item.
+ */
+const transactWritePut = simDynamoDbDocumentFields({
+  Item: simDynamoDbDocumentValues(),
+  ExpressionAttributeValues: simDynamoDbDocumentValues(),
+});
+
+/**
+ * The actions a transactional write applies.
+ *
+ * An entry carries exactly one of the four, so each is named here and the
+ * three the entry left out are left out of the conversion with it. Every
+ * action carries its own condition, so its expression values are converted
+ * alongside the item they compare against.
+ */
+const transactWriteActions = simDynamoDbDocumentEach(
+  simDynamoDbDocumentFields({
+    ConditionCheck: transactWriteKeyed,
+    Put: transactWritePut,
+    Delete: transactWriteKeyed,
+    Update: transactWriteKeyed,
+  }),
+);
+
+/**
+ * One Get of a transactional read, which names an item by its key.
+ */
+const transactGet = simDynamoDbDocumentFields({
+  Get: simDynamoDbDocumentFields({ Key: simDynamoDbDocumentValues() }),
+});
+
+/**
+ * What a transactional read answers with, one entry per Get.
+ */
+const transactGetResponses = simDynamoDbDocumentEach(
+  simDynamoDbDocumentFields({ Item: simDynamoDbDocumentValues() }),
+);
+
+/**
+ * What a transactional write answers with, which is nothing to convert.
+ *
+ * `ItemCollectionMetrics` is the one place the real document client converts
+ * this output, and it is only reported when a request asks for it with
+ * `ReturnItemCollectionMetrics`, which simulated DynamoDB refuses.
+ *
+ * A cancelled transaction is not converted either. `CancellationReasons` reach
+ * a caller on a thrown `TransactionCanceledException` rather than in an
+ * answer, and the real document client leaves the `Item` of a reason as the
+ * descriptors the low-level Command reports.
+ */
+const transactWritten = simDynamoDbDocumentFields({});
+
+/**
  * Where each supported document Command carries native values.
  *
  * These mirror the key nodes the real document client declares on its own
@@ -132,5 +194,15 @@ export const simDynamoDbDocumentCommandPaths = {
       Responses: simDynamoDbDocumentEach(valueRecords),
       UnprocessedKeys: batchGetKeys,
     }),
+  },
+  transactWrite: {
+    input: simDynamoDbDocumentFields({ TransactItems: transactWriteActions }),
+    output: transactWritten,
+  },
+  transactGet: {
+    input: simDynamoDbDocumentFields({
+      TransactItems: simDynamoDbDocumentEach(transactGet),
+    }),
+    output: simDynamoDbDocumentFields({ Responses: transactGetResponses }),
   },
 } as const satisfies Readonly<Record<string, SimDynamoDbDocumentCommandPaths>>;

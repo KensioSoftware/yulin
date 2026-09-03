@@ -5,10 +5,10 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
+  ExecuteStatementCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
-  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
   assertArrayEquals,
@@ -119,22 +119,15 @@ describe("simulated DynamoDB document client interception", () => {
     // When a document Command with no route is sent.
     const error = await assertThrowsErrorAsync(async () => {
       await documents.send(
-        new TransactWriteCommand({
-          TransactItems: [
-            {
-              Put: {
-                TableName: "OrdersTable",
-                Item: { orderId: "order-1" },
-              },
-            },
-          ],
+        new ExecuteStatementCommand({
+          Statement: `SELECT * FROM "OrdersTable"`,
         }),
       );
     });
 
     // Then it is refused by name, before anything tries to convert its values.
     assertInstanceOf(error, SimSdkUnsupportedCommandError);
-    assertStringIncludes(error.message, "TransactWriteCommand");
+    assertStringIncludes(error.message, "ExecuteStatementCommand");
     assertStringIncludes(error.message, "PutCommand");
   });
 
