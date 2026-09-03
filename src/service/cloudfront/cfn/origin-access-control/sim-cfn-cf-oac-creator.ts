@@ -1,3 +1,4 @@
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
@@ -13,6 +14,9 @@ interface SimCfnCfOriginAccessControlCreatorProperties {
  * AWS::CloudFront::OriginAccessControl Resources.
  */
 export class SimCfnCfOriginAccessControlCreator {
+  private static readonly createAction = "cloudfront:CreateOriginAccessControl";
+  private static readonly deleteAction = "cloudfront:DeleteOriginAccessControl";
+
   private readonly cloudFront: SimCloudFront;
 
   constructor(properties: SimCfnCfOriginAccessControlCreatorProperties) {
@@ -25,7 +29,12 @@ export class SimCfnCfOriginAccessControlCreator {
   create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): SimCloudFrontOriginAccessControl {
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeAny(SimCfnCfOriginAccessControlCreator.createAction, options);
+
     const originAccessControl = new SimCfnCfOriginAccessControlConfig({
       resource,
       properties,
@@ -39,7 +48,10 @@ export class SimCfnCfOriginAccessControlCreator {
   /**
    * Remove an origin access control created from a Resource.
    */
-  delete(resource: SimCfnResource): void {
+  delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): void {
     const originAccessControl = resource.simResource as
       | SimCloudFrontOriginAccessControl
       | undefined;
@@ -47,6 +59,14 @@ export class SimCfnCfOriginAccessControlCreator {
     if (originAccessControl === undefined) {
       return;
     }
+
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeResource(
+        SimCfnCfOriginAccessControlCreator.deleteAction,
+        `origin-access-control/${originAccessControl.id}`,
+        options,
+      );
 
     this.cloudFront.removeOriginAccessControl(originAccessControl.id);
   }

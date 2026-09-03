@@ -56,6 +56,7 @@ import { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.
 import { SimCffKeyValueStoreUsers } from "./cff/kvs/sim-cff-key-value-store-users.js";
 import { SimCfFunctionCommands } from "./cff/sim-cf-function-commands.js";
 import { SimCfInvalidationCommands } from "./command/invalidation/sim-cf-invalidation-commands.js";
+import { SimCfnCfAuthorizer } from "./cfn/sim-cfn-cf-authorizer.js";
 
 /**
  * How one simulated CloudFront is put together.
@@ -153,6 +154,12 @@ export class SimCloudFrontCommands {
    */
   public readonly invalidations: SimCfInvalidationCommands;
 
+  /**
+   * How the CloudFormation Resource factory authorizes the Resources it
+   * creates without a command of their own.
+   */
+  public readonly cfnAuthorizer: SimCfnCfAuthorizer;
+
   private readonly distributionState: SimCloudFrontDistributionState;
   private readonly configurationState: SimCfDistributionConfigurationState;
 
@@ -196,6 +203,7 @@ export class SimCloudFrontCommands {
       iam,
       background,
     });
+    this.cfnAuthorizer = new SimCfnCfAuthorizer({ accountId, iam });
     this.configurationState = {
       s3OriginResolver,
       customOriginDispatcher,

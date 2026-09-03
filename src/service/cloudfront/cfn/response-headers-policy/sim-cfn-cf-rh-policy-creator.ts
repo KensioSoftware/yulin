@@ -1,3 +1,4 @@
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
@@ -13,6 +14,11 @@ interface SimCfnCfResponseHeadersPolicyCreatorProperties {
  * AWS::CloudFront::ResponseHeadersPolicy Resources.
  */
 export class SimCfnCfResponseHeadersPolicyCreator {
+  private static readonly createAction =
+    "cloudfront:CreateResponseHeadersPolicy";
+  private static readonly deleteAction =
+    "cloudfront:DeleteResponseHeadersPolicy";
+
   private readonly cloudFront: SimCloudFront;
 
   constructor(properties: SimCfnCfResponseHeadersPolicyCreatorProperties) {
@@ -25,7 +31,12 @@ export class SimCfnCfResponseHeadersPolicyCreator {
   create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): SimCloudFrontResponseHeadersPolicy {
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeAny(SimCfnCfResponseHeadersPolicyCreator.createAction, options);
+
     const policy = new SimCfnCfResponseHeadersPolicyConfig({
       resource,
       properties,
@@ -39,7 +50,10 @@ export class SimCfnCfResponseHeadersPolicyCreator {
   /**
    * Remove a policy created from a Resource.
    */
-  delete(resource: SimCfnResource): void {
+  delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): void {
     const policy = resource.simResource as
       | SimCloudFrontResponseHeadersPolicy
       | undefined;
@@ -47,6 +61,14 @@ export class SimCfnCfResponseHeadersPolicyCreator {
     if (policy === undefined) {
       return;
     }
+
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeResource(
+        SimCfnCfResponseHeadersPolicyCreator.deleteAction,
+        `response-headers-policy/${policy.id}`,
+        options,
+      );
 
     this.cloudFront.removeResponseHeadersPolicy(policy.id);
   }

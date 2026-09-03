@@ -1,3 +1,4 @@
+import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
@@ -13,6 +14,9 @@ interface SimCfnCfOriginRequestPolicyCreatorProperties {
  * AWS::CloudFront::OriginRequestPolicy Resources.
  */
 export class SimCfnCfOriginRequestPolicyCreator {
+  private static readonly createAction = "cloudfront:CreateOriginRequestPolicy";
+  private static readonly deleteAction = "cloudfront:DeleteOriginRequestPolicy";
+
   private readonly cloudFront: SimCloudFront;
 
   constructor(properties: SimCfnCfOriginRequestPolicyCreatorProperties) {
@@ -25,7 +29,12 @@ export class SimCfnCfOriginRequestPolicyCreator {
   create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
+    options?: SimCfnResourceCallerOptions,
   ): SimCloudFrontOriginRequestPolicy {
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeAny(SimCfnCfOriginRequestPolicyCreator.createAction, options);
+
     const policy = new SimCfnCfOriginRequestPolicyConfig({
       resource,
       properties,
@@ -39,7 +48,10 @@ export class SimCfnCfOriginRequestPolicyCreator {
   /**
    * Remove a policy created from a Resource.
    */
-  delete(resource: SimCfnResource): void {
+  delete(
+    resource: SimCfnResource,
+    options?: SimCfnResourceCallerOptions,
+  ): void {
     const policy = resource.simResource as
       | SimCloudFrontOriginRequestPolicy
       | undefined;
@@ -47,6 +59,14 @@ export class SimCfnCfOriginRequestPolicyCreator {
     if (policy === undefined) {
       return;
     }
+
+    this.cloudFront
+      .cfnAuthorizer()
+      .authorizeResource(
+        SimCfnCfOriginRequestPolicyCreator.deleteAction,
+        `origin-request-policy/${policy.id}`,
+        options,
+      );
 
     this.cloudFront.removeOriginRequestPolicy(policy.id);
   }
