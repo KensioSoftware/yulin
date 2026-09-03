@@ -1,7 +1,36 @@
-# Simulated AWS usage documentation
+# Yulin documentation
 
-This directory contains area-specific documentation for Yulin. Each page explains the simulated
-behaviour and includes example code that can be copied into tests or local development scripts.
+Yulin runs simulated AWS services inside a Node.js process. Tests can use AWS SDK clients,
+CloudFormation templates, or direct service calls without connecting to AWS. Each `SimAws` instance
+holds its own state in memory.
+
+Yulin implements selected AWS behaviour. The service pages describe what each simulation supports
+and where it differs from AWS.
+
+## Install Yulin
+
+```bash
+npm install --save-dev @kensio/yulin
+```
+
+## Choose how to use Yulin
+
+Start with [AWS SDK interception](https://yulinsim.dev/sdk/) when the code under test already uses an
+AWS SDK client. Yulin intercepts the client's `send` calls and returns responses from a simulated
+service. The application code continues to use the AWS SDK normally.
+
+Use [event factories](https://yulinsim.dev/factories/) when a test calls a handler directly and only
+needs an AWS event object. The factories fill in fields that the test does not care about.
+
+Use [CloudFormation](https://yulinsim.dev/services/cloudformation/) to build a simulation from a
+template. This also works with templates synthesized by AWS CDK and AWS SAM.
+
+Use the [localhost server](https://yulinsim.dev/serve/) when the code runs in another process or
+sends HTTP requests. The [AWS CLI guide](https://yulinsim.dev/cli/) explains how to point AWS CLI
+commands at the same endpoint.
+
+Read [simulated time](https://yulinsim.dev/time/) when a test needs to advance a schedule, expire a
+credential, or run other work that depends on time passing.
 
 ## Service documentation
 
@@ -42,7 +71,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [STS](https://yulinsim.dev/services/sts/ "Simulated STS usage docs")
 - [WAFv2](https://yulinsim.dev/services/wafv2/ "Simulated WAFv2 usage docs")
 
-## Feature documentation
+## Feature guides
 
 - [AI skill](https://yulinsim.dev/ai-skill/ "Yulin AI skill usage docs")
 - [The AWS CLI](https://yulinsim.dev/cli/ "The AWS CLI against simulated AWS usage docs")

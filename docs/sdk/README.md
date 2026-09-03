@@ -1,27 +1,11 @@
-# Simulated AWS SDK
+# AWS SDK interception
 
-Yulin can intercept AWS SDK clients and route their Commands to simulated AWS services. The code
-under test uses the AWS SDK as it would in production, and needs no knowledge of the simulator.
+`SimSdk` routes AWS SDK for JavaScript v3 commands to Yulin. Use it to test code that already sends
+commands through AWS SDK clients.
 
-This is the recommended way to test implementation code that already uses the AWS SDK. Direct
-interaction with `SimAws` remains useful for seeding and inspecting simulated state from within
-tests.
+## Intercept a client
 
-## How it works
-
-`SimSdk` replaces the `send` method of an intercepted SDK client. Each sent Command is routed by
-name to the matching operation of a simulated AWS service, and the result comes back to the caller
-as a normal SDK response. Every Command is served in process.
-
-Every `SimSdk` owns a simulated AWS environment. You can let it create its own, or give it an
-existing one to share:
-
-- `new SimSdk()` creates an isolated `SimAws` internally, available as `simSdk.simAws`.
-- `new SimSdk({ simAws })` wraps a `SimAws` you already have.
-
-## Basic usage
-
-Intercept an SDK client class, then use the SDK as normal:
+Create a `SimSdk`, intercept a client class, and run the code under test:
 
 ```typescript sim-sdk-intercept-s3
 /**
@@ -58,36 +42,33 @@ console.log(await output.Body?.transformToString()); // "Hello, world!"
 simSdk.restoreAll();
 ```
 
-You can intercept a client class or a client instance:
+Intercepting a class affects every instance of that class. This includes clients created after the
+call to `intercept`. Intercepting an object affects that client only.
 
-- **A class** (`simSdk.intercept(S3Client)`) intercepts every instance of it, including instances
-  the code under test constructs later. This is the most common choice.
-- **An instance** (`simSdk.intercept(s3Client)`) intercepts only that instance. Use it when one
-  client should hit the simulator and the others are handled some other way.
+`SimSdk` replaces the intercepted client's `send` method. It routes each command to the matching
+Yulin service and returns an SDK-shaped response. The request stays inside the process.
 
-A client can only have one interception at a time. Intercepting an already-intercepted client
-throws a diagnostic error, and the existing interception stays in place.
+A client can have one active interception. A second interception throws
+`SimSdkAlreadyInterceptedError` and leaves the first one in place.
 
-## Account and Region scope
+## Access simulated state
 
-Each sent Command resolves its own simulated Account and Region scope:
+`new SimSdk()` creates a `SimAws` instance and exposes it as `simSdk.simAws`. Use that instance to
+prepare state before running the application, or to inspect state afterwards.
 
-1. The **Region** comes from the sending client's own configuration, such as
-   `new S3Client({ region: "eu-west-2" })`, falling back to the simulation default.
-2. The **Account** comes from the ambient `simAws.runAs(...)` caller when one is set, falling back
-   to the simulation default Account.
+Pass an existing instance as `new SimSdk({ simAws })` when several parts of a test need to share the
+same simulation.
 
-The resolved caller reaches the simulated service, and simulated [IAM](https://yulinsim.dev/services/iam/)
-authorization applies to it exactly as it does for direct sim service use. A caller without
-permission for a Command is denied, as on real AWS. Where no caller can be identified, Commands run
-as the simulation's `defaultCaller`, and as the default Account root where the simulation was given
-none. See
-[Name the caller a simulation uses by default](https://yulinsim.dev/services/iam/#name-the-caller-a-simulation-uses-by-default).
+## Account and region
 
-`runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent during
-the run are attributed to that caller, with no changes to the client or the code under test. A
-direct sim service call inside the run is attributed to it too, covered in
-[Run a block of calls as one caller](https://yulinsim.dev/services/iam/#run-a-block-of-calls-as-one-caller):
+Yulin resolves the account and region for every `send` call. The client's `region` configuration
+selects the simulated region. Yulin uses its default region when the client has none.
+
+The current `simAws.runAs(...)` caller selects the account. Without a `runAs` caller, Yulin uses the
+simulation's default account and caller. Simulated [IAM](https://yulinsim.dev/services/iam/)
+authorization applies to intercepted commands.
+
+Use `runAs` to send commands as a role without changing the client or the application code:
 
 ```typescript sim-sdk-run-as
 /**
@@ -155,31 +136,31 @@ await simAws.runAs(
 simSdk.restoreAll();
 ```
 
-The ambient caller belongs to its own `SimAws` instance. Separate simulations in the same process
-each keep their own.
+`runAs` applies only to the `SimAws` instance on which it was called. A caller set on another
+simulation does not affect these commands.
 
-## Restoring interception
+## Restore the client
 
-Restoring puts back the client's real SDK `send`:
+Restore an interception before later code needs the client's original `send` method:
 
-- `interception.restore()` restores one interception. `simSdk.intercept(...)` returns the handle.
-- `simSdk.restoreAll()` restores everything intercepted through that `SimSdk`.
-- `SimSdk` and interception handles are disposable. `using simSdk = new SimSdk();` restores
-  automatically at the end of the scope.
+- Save the result of `simSdk.intercept(...)` and call its `restore()` method to restore one client.
+- Call `simSdk.restoreAll()` to restore every client intercepted by that `SimSdk`.
+- Declare `SimSdk` or an interception handle with `using` to restore it when the scope ends.
 
-## Choosing Commands to intercept
+## Limit the intercepted commands
 
-By default every Command sent through an intercepted client is routed to the simulator. To
-intercept only specific Commands, pass an allow list of Command classes or names:
-`simSdk.intercept(s3Client, { commands: [GetObjectCommand] })`. Commands outside the allow list
-throw a diagnostic error.
+An interception handles every command by default. Pass an allow list when a test should accept only
+specific commands:
 
-## The DynamoDB document client
+`simSdk.intercept(s3Client, { commands: [GetObjectCommand] })`
 
-`@aws-sdk/lib-dynamodb` takes plain JavaScript values. Application code writes
-`{ id: "a", count: 1 }` where the base client wants `{ id: { S: "a" }, count: { N: "1" } }`.
-Intercept the document client and its Commands reach simulated DynamoDB with the values already
-converted. Code written against the document client runs against the simulator unchanged.
+The list accepts command classes or command names. Sending another command throws
+`SimSdkCommandNotInterceptedError`.
+
+## Intercept the DynamoDB document client
+
+The DynamoDB document client accepts plain JavaScript values. Intercept the document client object,
+then send `@aws-sdk/lib-dynamodb` commands through it:
 
 ```typescript sim-sdk-document-client
 /**
@@ -232,43 +213,61 @@ console.log(read.Item?.["total"]); // 42
 console.log(read.Item?.["paid"]); // true
 ```
 
-`DynamoDBDocumentClient.from(client)` builds a separate object of its own class. Intercepting the
-base client therefore leaves Commands sent through the document client alone. Intercept the
-document client. Both can be intercepted at once, and they reach
-the same simulated tables, since the document client shares the base client's config and so
-resolves the same Account and Region.
+`DynamoDBDocumentClient.from(client)` returns a separate client object. Intercept that object, not
+the base `DynamoDBClient`. You may intercept both clients. They use the same simulated tables when
+their account and region match.
 
-The real document client converts values in middleware, which runs inside the `send` that
-interception replaces. So the conversion happens at the interception boundary instead, using the
-option defaults `lib-dynamodb` sets (not the `util-dynamodb` ones). Which native types map to which
-descriptors is in [the sim DynamoDB docs](https://yulinsim.dev/services/dynamodb/#the-document-client).
+Yulin converts document values at the interception boundary. It uses the default translation
+options from `@aws-sdk/lib-dynamodb`. The [DynamoDB documentation](https://yulinsim.dev/services/dynamodb/#the-document-client)
+lists the supported value conversions.
 
-## Supported services and Commands
+## Available functionality
 
-These simulated services support SDK interception: ACM, API Gateway v2, CloudFormation, CloudFront,
-CloudWatch, CloudWatch Logs, Cognito, DynamoDB, DynamoDB Streams, ECS, Elastic Load Balancing v2,
-EventBridge, EventBridge Scheduler, IAM, KMS, Lambda, Rekognition, Route53, S3, Secrets Manager,
-SES, SNS, SQS, SSM, STS and WAFv2. Each service's own docs list the Commands it
-simulates.
+SDK interception supports these service clients:
 
-A gap in that coverage is refused on send, with a different error for each kind:
+- ACM
+- API Gateway REST APIs and HTTP APIs
+- Athena
+- AWS Backup
+- Bedrock Runtime
+- CloudFormation
+- CloudFront and CloudFront KeyValueStore
+- CloudWatch metrics and CloudWatch Logs
+- Cognito Identity Provider
+- DynamoDB and DynamoDB Streams
+- ECS and Elastic Load Balancing v2
+- EventBridge and EventBridge Scheduler
+- Glue
+- IAM
+- Kinesis Data Firehose and Kinesis Data Streams
+- KMS
+- Lambda
+- Personalize, Personalize Events, and Personalize Runtime
+- Rekognition
+- Route 53
+- S3
+- Secrets Manager
+- SESv2
+- SNS and SQS
+- SSM
+- Step Functions
+- STS
+- WAFv2
 
-- A Command the simulated service doesn't support throws `SimSdkUnsupportedCommandError`, naming the
-  Command and listing the Commands that service does support.
-- A client for an AWS service Yulin doesn't simulate at all throws `SimSdkUnknownServiceError`,
-  naming the service. There is no Command list to report, since no simulated service was resolved.
+Each service page lists the commands that service accepts. An unsupported command throws
+`SimSdkUnsupportedCommandError` and includes the supported command names. A client for an unknown
+service throws `SimSdkUnknownServiceError`.
 
 ## Limitations
 
-- Only `client.send(command)` is intercepted. SDK utilities that bypass `send`, such as
-  `getSignedUrl`, run against real AWS. Paginators and waiters go through `send`, so they work. Presigning works without interception. Point the client at the simulated endpoint, as
-  [the sim S3 presigned URL docs](https://yulinsim.dev/services/s3/#presigned-urls) show.
-- Simulated errors carry SDK-shaped `name` and `$metadata`, but are not instances of the real SDK
-  exception classes. Match an error by its `error.name`. An `instanceof` check against the SDK class
-  fails.
+- Yulin intercepts `client.send(command)`. SDK utilities that bypass `send`, including
+  `getSignedUrl`, bypass interception. Paginators and waiters use `send` and can be intercepted. To
+  use a presigned URL with Yulin, point the client at a served endpoint as shown in the
+  [S3 documentation](https://yulinsim.dev/services/s3/#presigned-urls).
+- Simulated errors have SDK-shaped `name` and `$metadata` fields. They are separate classes from the
+  SDK exceptions, so match them by `error.name` instead of `instanceof`.
 - The callback form of `send(command, callback)` is not supported. Use the promise form.
-- The translate config a document client is built with,
-  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`, is ignored. The
-  conversion always uses the defaults. `removeUndefinedValues: true` in particular has no effect
-  here, and an `undefined` attribute is refused where AWS would have dropped it. The refusal names
-  the attribute and says so.
+- Yulin ignores the translation options in
+  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`. The conversion uses
+  the defaults. `removeUndefinedValues: true` has no effect. Yulin refuses an `undefined` attribute
+  that the configured document client would otherwise remove.

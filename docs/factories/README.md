@@ -1,36 +1,11 @@
 # Event factories
 
-A handler is invoked with an event, and a test of a handler has to produce one. The events AWS
-delivers are large, most of each one is fields the handler never reads, and the two or three the
-test is about are buried in them. Written out by hand, that literal is copied between files and
-drifts.
+Yulin's event factories create complete AWS event objects for tests that call a handler directly.
+They use [`@kensio/part-factory`](https://partfactory.dev/) and do not need a `SimAws` instance.
 
-Yulin exports [`@kensio/part-factory`](https://partfactory.dev/) factories for those event shapes. A
-test made with one says what the request or the message was and leaves the rest of the event alone.
-They are ordinary factories, made in-process, and they need no `SimAws` instance and no simulated
-service running. A handler test that runs without a simulator is who they are for. A test that does want
-one (a Function URL served over HTTP, a queue with a real event source mapping) gets its events from
-the simulator, and these factories make the same shapes that simulator delivers.
+## Make a record or an event
 
-## What is exported
-
-| Factory                                                                       | Import                       | Event                               |
-| ----------------------------------------------------------------------------- | ---------------------------- | ----------------------------------- |
-| `lambdaFunctionUrlEventFactory`                                               | `@kensio/yulin/lambda`       | A Lambda Function URL invocation    |
-| `lambdaSqsEventFactory`, `lambdaSqsEventRecordFactory`                        | `@kensio/yulin/lambda`       | An SQS event source mapping's batch |
-| `lambdaDynamoDbStreamEventFactory`, `lambdaDynamoDbStreamEventRecordFactory`  | `@kensio/yulin/lambda`       | A DynamoDB stream mapping's batch   |
-| `httpApiProxyEventFactory`                                                    | `@kensio/yulin/apigatewayv2` | An HTTP API `AWS_PROXY` invocation  |
-| `s3NotificationEventFactory`, `s3NotificationEventRecordFactory`              | `@kensio/yulin/s3`           | An S3 event notification            |
-| `cloudFrontViewerRequestEventFactory`, `cloudFrontViewerResponseEventFactory` | `@kensio/yulin/cloudfront`   | A CloudFront Functions event        |
-
-Each service's own documentation covers what its events mean. This page is about how the factories
-are shaped and what they have in common.
-
-## One factory per shape, and one per record
-
-An event that carries a list of records has two factories, one for a record and one for the event
-around it. The record factory makes one record, and the event factory completes as many records as
-the test asks for.
+Pass the fields that matter to the test. The factory supplies the remaining fields:
 
 ```typescript factories-records-and-events
 /**
@@ -68,17 +43,14 @@ const event = lambdaSqsEventFactory.make({
 console.log(ordersHandler(event));
 ```
 
-The event factory exists so a test can pass partial records like that. A `DynamicFactory` whose
-defaults hold one record would not manage it. Overrides are merged onto defaults, and merging
-replaces a list whole rather than element by element. A partial record passed that way would reach
-the handler as the only thing in those records, typed as a complete one and missing every field the
-handler reads.
+Factories whose names end in `RecordFactory` create one record. Their matching event factories
+create the object that contains a `Records` array. The event factory makes one record by default and
+completes every partial record passed in `Records`.
 
-## Named variations
+## Reuse a named event shape
 
-Every factory here is an `ItemFactory`. A variation with a name is a `VariantFactory` around it, the
-same as for any other `part-factory` factory. That is usually the tidiest way to describe the kind
-of request or message one application receives:
+Every exported event factory implements `ItemFactory`. Wrap one in a `VariantFactory` to keep a
+common event shape in one place:
 
 ```typescript factories-variants
 /**
@@ -118,23 +90,39 @@ console.log(
 );
 ```
 
-## Events that agree with themselves
+## Keep related fields consistent
 
-A real AWS event says the same thing in more than one field, and those copies are where a
-hand-written literal goes wrong. It asks for `/user/status` and leaves the request context saying
-`/`, or gives an SQS record the digest of some other body, or reports a DynamoDB insert on a record
-that carries an old image.
+AWS events often repeat the same value in several fields. The factories calculate those fields from
+the overrides. For example, an SQS record's `md5OfBody` follows its `body`, and an S3 notification's
+bucket ARN follows its bucket name.
 
-Each factory's defaults are computed from the overrides, so supplying either copy settles the other.
-What that covers is listed in each factory's own documentation, and in outline it is:
+The factories keep these groups consistent:
 
-- **Function URL and HTTP API events** — the path, the query, the route key, the endpoint's id,
-  hostname and `host` header, the caller's user agent and address, and the invocation time
-- **SQS records** — the digest of the body, and the Region of the queue ARN
-- **DynamoDB stream records** — the images the reported change would carry, the view type naming
-  the images that are there, and the Region of the stream ARN
-- **S3 notification records** — the ARN of the Bucket named, and whether the Object still exists to
-  have a size and an eTag
+- Function URL and HTTP API request paths, route keys, query strings, endpoint details, caller
+  details, and invocation times
+- SQS message bodies, body digests, queue ARNs, and regions
+- DynamoDB stream images, event names, view types, stream ARNs, and regions
+- S3 bucket names, bucket ARNs, event names, and object metadata
 
-Overriding both copies of one of those with different values is still allowed. A test that wants an
-event no real invocation would produce is entitled to one. It just has to ask for it twice.
+You can still override both copies with different values. The factory preserves explicit overrides,
+even when AWS would not produce that combination.
+
+## Available factories
+
+| Factory                                                                       | Import                       | Event                               |
+| ----------------------------------------------------------------------------- | ---------------------------- | ----------------------------------- |
+| `lambdaFunctionUrlEventFactory`                                               | `@kensio/yulin/lambda`       | A Lambda Function URL invocation    |
+| `lambdaSqsEventFactory`, `lambdaSqsEventRecordFactory`                        | `@kensio/yulin/lambda`       | An SQS event source mapping's batch |
+| `lambdaDynamoDbStreamEventFactory`, `lambdaDynamoDbStreamEventRecordFactory`  | `@kensio/yulin/lambda`       | A DynamoDB stream mapping's batch   |
+| `httpApiProxyEventFactory`                                                    | `@kensio/yulin/apigatewayv2` | An HTTP API `AWS_PROXY` invocation  |
+| `s3NotificationEventFactory`, `s3NotificationEventRecordFactory`              | `@kensio/yulin/s3`           | An S3 event notification            |
+| `cloudFrontViewerRequestEventFactory`, `cloudFrontViewerResponseEventFactory` | `@kensio/yulin/cloudfront`   | A CloudFront Functions event        |
+
+Each service page describes the fields and defaults for its own factories.
+
+## Limitations
+
+- Event factories create data only. They do not invoke a Lambda function, apply IAM permissions, or
+  run another simulated service.
+- A factory accepts explicit overrides that disagree with each other. It does not validate that the
+  final event could have come from AWS.
