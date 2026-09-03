@@ -4035,8 +4035,11 @@ const stack = await simAws.cloudFormation().deployTemplate({
           BucketName: "skipped-site-bucket",
         },
       },
-      AlarmRule: {
-        Type: "AWS::CloudWatch::Alarm",
+      SearchApi: {
+        Type: "AWS::AppSync::GraphQLApi",
+        Properties: {
+          Name: "search",
+        },
       },
     },
   },
@@ -4045,10 +4048,10 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 console.log(stack.skippedResources.map((resource) => resource.logicalId));
-// ["AlarmRule"]
+// ["SearchApi"]
 
-console.log(stack.getResource("AlarmRule")?.skippedReason);
-// "Unsupported sim CloudFormation Resource service CloudWatch"
+console.log(stack.getResource("SearchApi")?.skippedReason);
+// "Unsupported sim CloudFormation Resource service AppSync"
 ```
 
 A skipped Resource is still there for `stack.getResource(...)`, and still answers `Ref` and `Fn::GetAtt` with
@@ -4092,8 +4095,11 @@ const stack = await simAws.cloudFormation().deployTemplate({
           Description: "/opt/awscli/aws",
         },
       },
-      AlarmRule: {
-        Type: "AWS::CloudWatch::Alarm",
+      SearchApi: {
+        Type: "AWS::AppSync::GraphQLApi",
+        Properties: {
+          Name: "search",
+        },
       },
     },
   },
@@ -4102,7 +4108,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 console.log(stack.skippedResources.map((resource) => resource.logicalId));
-// ["AlarmRule"]
+// ["SearchApi"]
 
 console.log(stack.inertResources.map((resource) => resource.logicalId));
 // ["AwsCliLayer"]
