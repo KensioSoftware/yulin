@@ -1,26 +1,17 @@
 # Simulated Glue
 
-Yulin includes a simulated Glue Data Catalog for tests and local development. It holds databases,
-tables and the partitions registered against them, deploys databases and tables from
-`AWS::Glue::Database` and `AWS::Glue::Table`, and hands them back through `GetDatabase` and
-`GetTable`. A test can assert that a stack declared the table definition it meant to, including the
-Athena partition projection its parameters configure.
+Yulin simulates Glue Data Catalog databases, tables and partitions. The catalog stores metadata. It
+does not read the data in S3.
 
-A table here is a definition. The data it describes stays in S3, unread, and the catalog answers
-with what it was told to hold.
-
-Simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads this
-catalog. A query naming a table no database here holds fails the way real Athena fails it, and a
-table's partition projection is evaluated when a query runs against it. All four projection types
-are covered, `enum`, `integer`, `date` and `injected`. A projection with a mistake in its parameters
-fails the query that reads it.
+Simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") reads the
+catalog and evaluates partition projection when it runs a query.
 
 Glue-specific types are imported from the `@kensio/yulin/glue` subpath.
 
 ## Deploying a database and a table
 
-A stack declares the database, and the table names it through `Ref`. Both read back through the SDK
-once the deploy finishes.
+Simulated CloudFormation deploys `AWS::Glue::Database` and `AWS::Glue::Table`. A table can name its
+database through `Ref`.
 
 ```typescript sim-glue-cloudformation
 /**
@@ -84,18 +75,15 @@ const { Table } = simAws
 console.log(Table.Parameters["projection.enabled"]);
 ```
 
-Partition projection lives entirely in `TableInput.Parameters`. Those parameters are read into the
-table, and never recorded as ignored. A table whose parameters were dropped on the way in deploys
-green while projecting none of them. Simulated Athena reads those same parameters when a query runs.
-A broken projection fails that query.
+Partition projection configuration is stored in `TableInput.Parameters`. Athena reads these
+parameters when a query runs and rejects invalid projection configuration.
 
 `Ref` answers with the database name and with the table name.
 
 ## Names are folded to lower case
 
-A database name and a table name are both folded to lower case when they are stored. Real Glue folds
-them the same way, for compatibility with Apache Hive. A database created as `Rainlytics` is stored,
-reported and queried as `rainlytics`.
+Database and table names are stored in lower case. A database created as `Rainlytics` is reported as
+`rainlytics`.
 
 ```typescript sim-glue-name-folding
 /**
@@ -123,36 +111,27 @@ const { Database } = glue.getDatabase(
 console.log(Database.Name);
 ```
 
-Two names differing only by case are one name. A second `CreateDatabase` for `Rainlytics` after one
-for `rainlytics` is an `AlreadyExistsException`, and a `GetTable` finds the table under whichever
-spelling it is asked for.
+Names that differ only by case refer to the same database or table. Creating the second one raises
+`AlreadyExistsException`.
 
-Column names keep the case they were given, including partition keys. Real Glue leaves those alone,
-and simulated [Athena](https://yulinsim.dev/services/athena/ "Simulated Athena usage docs") folds a
-column name only when it runs a query.
+Column and partition key names keep their original case.
 
-A database or a table the template leaves unnamed is named from the stack name, the logical ID and a
-tail derived from both, folded the same way. A `LogTable` in `analytics-stack` becomes
-`analytics-stack-logtable-` and twelve more characters, where real CloudFormation ends the name in
-twelve random ones. The name is trimmed to the 255 bytes the catalog allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
-cover how the stack name and the logical ID share what is left.
+CloudFormation generates a lower-case name when the template omits one. See
+[generated resource names](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates").
 
 ## Reading the catalog back
 
-`GetDatabase`, `GetDatabases`, `GetTable` and `GetTables` answer through the SDK. A `SimGlue` also
-carries `findDatabase`, `findTable`, `allDatabases`, `tablesInDatabase`, `findPartition` and
-`partitionsInTable`. Those read the same state without going through a Command or its
-authorization.
+Use the SDK commands to read the catalog through IAM authorization. The `findDatabase`, `findTable`,
+`allDatabases`, `tablesInDatabase`, `findPartition` and `partitionsInTable` accessors read the same
+state directly.
 
-The storage descriptor keeps its columns in the order they were declared, and the partition keys
-keep theirs. The two stay apart, the way real Glue keeps them. A partition key repeated among the
-storage descriptor's columns gives a table Athena refuses to query.
+Storage descriptor columns and partition keys keep their declared order. Athena rejects a table
+that repeats a partition key in the storage descriptor columns.
 
 ## Registering partitions
 
-A crawler, `MSCK REPAIR TABLE` or `ALTER TABLE ADD PARTITION` fills a real catalog's partition list.
-Here the six partition commands do it. A partition is keyed by its values in the order the table's
-`PartitionKeys` declares them, and carries a storage descriptor saying where its own data sits.
+Register partitions with the Glue partition commands. Values follow the order of the table's
+`PartitionKeys`. Each partition may provide its own storage descriptor.
 
 ```typescript sim-glue-partitions
 /**
@@ -219,24 +198,19 @@ console.log(Errors.length);
 console.log(Partitions[1]?.StorageDescriptor?.Location);
 ```
 
-`CreatePartition` registers one partition and `BatchCreatePartition` registers a list of them.
-`GetPartition` reads one back by its values, and `GetPartitions` answers with a table's partitions in
-registration order. `DeletePartition` and `BatchDeletePartition` remove them.
+`CreatePartition` and `BatchCreatePartition` register partitions. `GetPartition` reads one by its
+values. `GetPartitions` returns them in registration order. The delete commands remove them.
 
-A batch reports what it could not do in `Errors` and carries on with the rest, the way real Glue
-does. Each entry there carries the values it was given and an `ErrorCode` naming the refusal, so a
-job re-run over a week of days learns which days were already registered and registers the others.
+A batch continues after an individual partition fails. Its `Errors` list contains the supplied
+values and an `ErrorCode` for each failure.
 
-Values are positional. A `Values` list of a different length from the table's `PartitionKeys` lines
-up with the wrong keys, and is refused with `InvalidInputException` naming both counts. Registering
-one day twice is an `AlreadyExistsException`, since registration is not idempotent on real Glue.
-Deleting a table removes the partitions registered against it, the way deleting a database removes
-its tables.
+The number of values must match the number of partition keys. A mismatch raises
+`InvalidInputException`. Registering the same values twice raises `AlreadyExistsException`. Deleting
+a table removes its partitions, and deleting a database removes its tables.
 
 ## Filtering partitions
 
-`GetPartitions` takes an `Expression` and answers with the partitions it matches. A request carrying
-none reads them all.
+Pass `Expression` to `GetPartitions` to filter the result. Omitting it returns every partition.
 
 ```typescript sim-glue-partition-expressions
 /**
@@ -295,28 +269,19 @@ const { Partitions } = glue.getPartitions(
 console.log(JSON.stringify(Partitions.map((partition) => partition.Values)));
 ```
 
-A term names a partition key, an operator, and whatever the operator takes. The operators are `=`,
-`<>` and `!=`, `>`, `<`, `>=`, `<=`, `LIKE`, `IN` and `BETWEEN`, and `BETWEEN` takes both of its
-ends. `AND`, `OR` and `NOT` combine terms and brackets group them, with the precedence SQL gives
-them (`NOT` binds tightest, then `AND`, then `OR`). `NOT` also sits in front of `LIKE`, `IN` and
-`BETWEEN` to reverse that one term.
+Expressions support `=`, `<>`, `!=`, `>`, `<`, `>=`, `<=`, `LIKE`, `IN` and `BETWEEN`. Combine terms
+with `AND`, `OR`, `NOT` and parentheses. Operator precedence is `NOT`, then `AND`, then `OR`.
 
-Comparison follows the type the table declares for the key. `tinyint`, `smallint`, `int`, `integer`,
-`bigint`, `float`, `double` and `decimal` compare as numbers, so `10` sorts above `9` rather than
-below it. Every other declared type compares as text, which is the order a date written the ISO way
-already has. A key declared as a number is held to a numeric literal, and `hour = 'noon'` is refused
-rather than matching nothing.
+Numeric partition key types use numeric comparison. Other types use text comparison. A numeric key
+requires a numeric literal.
 
-`LIKE` matches the value's text whatever type the key is declared with, since that is what `LIKE`
-does. `%` stands for any run of characters and `_` for exactly one.
+`LIKE` treats the value as text. `%` matches any sequence and `_` matches one character.
 
-An expression naming a column the table does not partition by is refused, naming the column and the
-keys the table does have. So is one that cannot be read, and the message says where reading stopped.
+An unknown partition key or invalid expression is rejected with a position-aware error.
 
 ## Intercepting a GlueClient
 
-An intercepted `GlueClient` reaches the simulated catalog, so code under test builds its own client
-and sends its own Commands.
+Intercept a `GlueClient` when application code constructs the client itself.
 
 ```typescript sim-glue-sdk-interception
 /**
@@ -357,11 +322,9 @@ console.log(TableList?.[0]?.Name);
 
 ## Permissions
 
-Every Command authorizes through simulated IAM. Data Catalog resources are a hierarchy with the
-catalog at the root, and an operation on one needs permission on that resource and on every ancestor
-of it. Reading a table needs the table, the database and the catalog, and a policy naming only the
-table ARN is denied. Deleting a database needs permission on every table in it as well, since the
-tables go with it.
+Every command uses simulated IAM. Catalog resources form a hierarchy. A table operation needs
+permission on the table, database and catalog. Deleting a database also needs permission on its
+tables.
 
 ```typescript sim-glue-permissions
 /**
@@ -441,7 +404,7 @@ const { Table } = glue.getTable(
 console.log(Table.Name);
 ```
 
-A policy listing only the table ARN is refused here, and refused by real Glue for the same reason.
+A policy that grants only the table ARN is insufficient.
 
 ## Available functionality
 

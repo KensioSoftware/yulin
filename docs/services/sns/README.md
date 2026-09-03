@@ -1,14 +1,11 @@
 # Simulated SNS
 
-Yulin includes a simulated Amazon SNS for tests and local development. Topics are held in memory and
-every operation is authorized by simulated IAM.
+Yulin simulates Amazon SNS standard topics for tests and local development. A published message can
+reach simulated SQS queues, invoke simulated Lambda functions or create SMS records that tests can
+inspect. Direct SMS publishes are recorded in the same way.
 
-Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
-
-A message published to a topic is delivered to every queue subscribed to it, invokes every Lambda
-function subscribed to it, and is recorded as an SMS for every phone number subscribed to it. Only
-those three protocols are simulated. A message published straight to a phone number is recorded
-as an SMS a test can assert on.
+Topics are stored in memory, and simulated IAM authorizes every operation. FIFO topics and other
+subscription protocols are not simulated. Import SNS-specific types from `@kensio/yulin/sns`.
 
 ## Creating a topic and publishing to it
 
@@ -103,11 +100,10 @@ console.log(read.Attributes?.["SubscriptionsConfirmed"]); // "0"
 reports it. The three subscription counts are reported as zero, the counts a topic with no
 subscriptions has.
 
-An attribute real SNS has and this simulation gives no behaviour to is refused by name rather than
-taken and ignored. That covers `FifoTopic`, `KmsMasterKeyId`, `SignatureVersion`, `TracingConfig`,
-`ArchivePolicy`, `DeliveryPolicy`, `ContentBasedDeduplication` and the delivery status logging
-attributes such as `SQSSuccessFeedbackRoleArn`. A topic that appeared to accept `KmsMasterKeyId`
-would look encrypted to the request that set it and be plain to everything else.
+Unsupported topic attributes are rejected instead of being stored without effect. These include
+`FifoTopic`, `KmsMasterKeyId`, `SignatureVersion`, `TracingConfig`, `ArchivePolicy`, `DeliveryPolicy`,
+`ContentBasedDeduplication` and delivery status logging attributes such as
+`SQSSuccessFeedbackRoleArn`.
 
 ## Publishing
 
@@ -148,12 +144,11 @@ const published = await sns.publish(
 console.log(published.MessageId !== undefined); // true
 ```
 
-The name and data type rules are the real ones. A data type is `String`, `String.Array`, `Number` or
-`Binary`, and each takes a custom label after a dot, so `Number.int` is a number as far as the rules
-go. A reserved `AWS.` or `Amazon.` prefix on a name, a data type built on none of the four, or a
-value that disagrees with its data type is refused. A test finds any of those without going near AWS. The two reserved names real
-SNS defines for SMS, `AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType`, are the exception.
-[Sending an SMS](#sending-an-sms) covers those.
+Message attributes use the AWS name and type rules. A type starts with `String`, `String.Array`,
+`Number` or `Binary` and may add a custom label after a dot, such as `Number.int`. SNS rejects
+reserved `AWS.` and `Amazon.` name prefixes, unknown base types and values that do not match their
+type. The SMS attributes `AWS.SNS.SMS.SenderID` and `AWS.SNS.SMS.SMSType` are exceptions. See
+[Sending an SMS](#sending-an-sms).
 
 A `Subject` is UTF-8 text with no line breaks or control characters, of fewer than 100 characters.
 That is the contract real SNS states. A subject of exactly 100 characters is already too long. A
@@ -164,9 +159,8 @@ publish with no `Message`, or with one over the size limit, is refused with
 the rest of the batch goes through, as real SNS reports it. An empty batch, more than ten entries, a
 malformed entry id or two entries sharing an id fail the whole request.
 
-The size limit is the one thing a batch is held to as a whole. Ten entries each just inside it are
-one batch far outside it, and a single entry over it fails the whole batch with
-`BatchRequestTooLongException`. The response singles out no entry.
+The size limit applies to the whole batch. A batch over the limit fails with
+`BatchRequestTooLongException`, without identifying one entry as the cause.
 
 ```typescript sim-sns-publish-batch
 /**
@@ -1762,9 +1756,9 @@ synthesises an `AWS::SNS::Subscription` alongside the `AWS::SQS::QueuePolicy` th
 delivery, and both deploy. `new subscriptions.LambdaSubscription(fn)` does the same with the
 `AWS::Lambda::Permission` beside it.
 
-## Available functionality
+## Supported operations
 
-Sim SNS currently supports:
+Simulated SNS supports:
 
 - `CreateTopicCommand`, idempotent for a name already taken, and `DeleteTopicCommand`
 - `ListTopicsCommand`, paged at a hundred topics with a `NextToken`
@@ -1806,8 +1800,6 @@ Sim SNS currently supports:
   `Subscription` property on a topic and `Ref` and `Fn::GetAtt` over the deployed resources
 
 ## Limitations
-
-Current documented limitations:
 
 - Only the `sqs`, `lambda` and `sms` subscription protocols are simulated. A queue, a function and a
   phone number are the only things a topic can deliver to. `http`, `https`, `email`, `email-json`,

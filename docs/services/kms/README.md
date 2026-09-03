@@ -1,17 +1,15 @@
 # Simulated KMS
 
-Yulin includes a simulated AWS Key Management Service (KMS) for tests and local development.
-
-Encryption is real. Each simulated key holds AES-256 key material and the operations run through
-Node.js's own `crypto`. A ciphertext can only be read with its key, and a decryption with the wrong
-encryption context fails.
+Yulin simulates AWS Key Management Service (KMS) in memory. Symmetric keys use AES-256 key material,
+and asymmetric keys use real key pairs. Cryptographic operations run through Node.js `crypto`, so
+the wrong key or encryption context cannot decrypt a ciphertext.
 
 KMS-specific types are imported from the `@kensio/yulin/kms` subpath.
 
 ## Encrypting and decrypting
 
-Create a key and use it. `Decrypt` needs no `KeyId` for a symmetric key, because the ciphertext
-already names the key that produced it.
+Create a key, encrypt a value, then decrypt it. `Decrypt` does not need a `KeyId` for symmetric
+ciphertext because the ciphertext identifies its key.
 
 ```typescript sim-kms-encrypt-decrypt
 /**
@@ -52,8 +50,8 @@ any second `SimAws` instance both reject it.
 
 ## Encryption context
 
-An encryption context is non-secret key/value data bound to a ciphertext. Decryption with a
-different context fails. That ties a ciphertext to the thing it belongs to.
+An encryption context binds non-secret key/value data to a ciphertext. Decryption requires the same
+context.
 
 ```typescript sim-kms-encryption-context
 /**
@@ -100,9 +98,8 @@ The context is an unordered map. The same pairs written in a different order sti
 
 ## Envelope encryption
 
-`Encrypt` takes at most 4096 bytes. That limit is what makes envelope encryption necessary.
-`GenerateDataKey` returns a data key twice, once in the clear to encrypt your data with, and once
-encrypted under the KMS key to store alongside it.
+`Encrypt` accepts at most 4,096 bytes. For larger values, use `GenerateDataKey`. It returns a
+plaintext data key for encryption and an encrypted copy to store with the data.
 
 ```typescript sim-kms-generate-data-key
 /**
@@ -141,8 +138,8 @@ console.log(recovered.Plaintext?.length); // 32
 
 ## Signing and verifying
 
-A key created with `KeyUsage: SIGN_VERIFY` holds a real key pair, and the signatures are real
-signatures. A key spec is required, because the default `SYMMETRIC_DEFAULT` spec cannot sign.
+A key with `KeyUsage: SIGN_VERIFY` holds a real key pair. Set a signing key spec because the default
+`SYMMETRIC_DEFAULT` key cannot sign.
 
 ```typescript sim-kms-sign-verify
 /**
@@ -261,9 +258,8 @@ both matching what KMS produces. `GetPublicKey` against a symmetric key is
 
 ## Key policies and IAM
 
-Every KMS key has a policy, and it cannot be removed. An IAM policy granting `kms:Decrypt` only
-takes effect where the key's own policy admits the caller. How it admits them decides what else is
-needed:
+Every key has a key policy. An identity policy granting `kms:Decrypt` works only when the key policy
+also permits the caller:
 
 - A statement naming the caller grants access outright. A role with no permissions of its own can
   still use the key.
@@ -342,16 +338,15 @@ on real KMS.
 
 ## AWS managed keys and `kms:ViaService`
 
-An alias beginning `alias/aws/` names an AWS managed key, and the key is created the first time
-something references it. Such a key gets the policy real AWS gives it, which differs from the
-customer default:
+An alias beginning with `alias/aws/` names an AWS managed key. Yulin creates that key when it is
+first referenced and applies AWS-managed-key policy behavior:
 
 - Use of the key is allowed to any principal in the owning account, but only when `kms:ViaService`
   names the service that owns the key, such as `ssm.us-east-1.amazonaws.com` for `aws/ssm`.
-- The account root is allowed to read the key's metadata. That is the whole of what this policy
-  delegates to IAM.
+- The account root can read the key's metadata.
 
-That is why a role holding `kms:Decrypt` on such a key cannot use it by calling KMS itself.
+A role cannot use an AWS managed key by calling KMS directly, even when its identity policy grants
+`kms:Decrypt`.
 
 `kms:ViaService` is set by the service making the call on the caller's behalf. Sim SSM does this for
 `SecureString` parameters. Code calling simulated KMS directly sets it with the `viaService` request
@@ -417,8 +412,7 @@ and a condition on it stays unmatched.
 
 ## Naming a key
 
-Every operation takes its target as a `KeyId`, in any of the four forms real KMS accepts. Those are
-a key ID, a key ARN, an alias name such as `alias/app-key`, and an alias ARN.
+`KeyId` accepts a key ID, key ARN, alias name such as `alias/app-key`, or alias ARN.
 
 A key ARN or alias ARN naming another account or region resolves to no key at all. Its identifier is
 never read out and looked up locally. A foreign ARN cannot reach a key that happens to share an
@@ -473,8 +467,8 @@ console.log(managed.KeyMetadata?.KeyManager); // "AWS"
 
 A key can be disabled and re-enabled later. A disabled key stays present, and refuses to be used.
 
-Deletion is never immediate. `ScheduleKeyDeletion` sets a recovery window of 7 to 30 days, defaulting
-to 30. During that window the key refuses to be used but can still be recovered with
+`ScheduleKeyDeletion` sets a recovery window from 7 to 30 days, defaulting to 30. During that window
+the key cannot be used but can be recovered with
 `CancelKeyDeletion`. Cancelling leaves the key disabled. Re-enabling it is a separate step.
 
 A disabled key fails cryptographic operations with `DisabledException`. A key pending deletion fails
@@ -600,9 +594,7 @@ the function's execution role as the caller. A handler that decrypts a value the
 allowed to, by both the key policy and the role's identity policy, the same as on real AWS. See
 [simulated Lambda](https://yulinsim.dev/services/lambda/) for how function code and execution roles work.
 
-## Available functionality
-
-Sim KMS currently supports:
+## Supported operations
 
 - `CreateKeyCommand`, for symmetric encryption keys and asymmetric signing keys
 - `DescribeKeyCommand` and `ListKeysCommand`
@@ -618,8 +610,6 @@ Sim KMS currently supports:
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 ## Limitations
-
-Current documented limitations:
 
 - Only encryption with a symmetric key and signing with an asymmetric key are simulated. Left out
   are asymmetric encryption (`RSAES_OAEP_SHA_1` and `RSAES_OAEP_SHA_256`), HMAC keys and

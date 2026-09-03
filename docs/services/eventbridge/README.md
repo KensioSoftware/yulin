@@ -1,12 +1,12 @@
 # Simulated EventBridge
 
-Yulin includes a simulated Amazon EventBridge for tests and local development. Event buses are held
-in memory and every operation is authorized by simulated IAM.
+Yulin simulates Amazon EventBridge event buses, rules, targets and `PutEvents` for tests and local
+development. Rules can match events, run on a simulated schedule, and deliver to simulated Lambda,
+SQS, SNS or ECS. Event buses and rules are stored in memory, and simulated IAM authorizes every
+operation.
 
-Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
-function, SQS queue or SNS topic, run a simulated ECS task, or fire on a schedule when a test
-advances simulated time. [EventBridge Scheduler](https://yulinsim.dev/services/scheduler/) is a separate service with its own
-docs. EventBridge-specific types are imported from the `@kensio/yulin/eventbridge` subpath.
+[EventBridge Scheduler](https://yulinsim.dev/services/scheduler/) is simulated separately. Import
+EventBridge-specific types from `@kensio/yulin/eventbridge`.
 
 ## Putting an event onto a bus
 
@@ -142,10 +142,8 @@ console.log(output.FailedEntryCount); // 0
 console.log(output.Entries?.[0]?.EventId !== undefined); // true
 ```
 
-This is real EventBridge behaviour, and not a gap here. AWS answers 200, finds no rule to match the
-event against, and drops it, without counting the entry as failed. A mistyped bus name therefore
-looks exactly like a working call. That is worth knowing before it costs an afternoon, and the
-simulation reproduces it faithfully.
+AWS also accepts and drops an event sent to a bus that does not exist. The entry is not counted as a
+failure, so check the bus name when `PutEvents` succeeds but no rule runs.
 
 ## Inspecting what a bus received
 
@@ -250,9 +248,8 @@ within the account. A rule ARN on the default bus is
 `arn:aws:events:<region>:<account>:rule/<name>`, and a rule on a custom bus carries the bus as well,
 as `rule/<bus>/<name>`.
 
-`PutRule` creates and updates alike, and an update **replaces** the rule rather than merging into
-it. A second request that leaves out the description clears the description. That is real behaviour
-and a common surprise.
+`PutRule` creates or updates a rule. An update replaces the stored rule instead of merging fields,
+so omitting the description clears it.
 
 `DisableRule` stops a rule matching, and `EnableRule` starts it again. A rule that was off picks up
 from the next event and leaves what it missed behind. `DeleteRule` on a rule that was never there
@@ -285,10 +282,9 @@ field, the pattern matches when the two lists overlap, and a pattern naming one 
 event whose `resources` names several. `exists` is about the field and not its members, and a field
 carrying an empty list still exists.
 
-Anything else is refused at `PutRule`. The `cidr`, `equals-ignore-case`, `wildcard` and `$or`
-operators are all refused by name, as are the nested forms of `anything-but` and the
-case-insensitive forms of `prefix` and `suffix`. A pattern that silently matched nothing would look
-like a pattern that was simply too specific, and the rule would go unnoticed until the deployment.
+`PutRule` rejects unsupported operators instead of storing a pattern that can never match. These
+include `cidr`, `equals-ignore-case`, `wildcard`, `$or`, nested `anything-but`, and the
+case-insensitive forms of `prefix` and `suffix`.
 
 ## Testing a pattern without a rule
 
@@ -1049,7 +1045,7 @@ events across accounts that way, but nothing here can reach another simulation's
 treating a foreign ARN as local would let a test pass while the real call crossed a boundary it has
 no permission for.
 
-## Available functionality
+## Supported operations
 
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
 - `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and

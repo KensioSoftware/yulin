@@ -1,9 +1,11 @@
 # Simulated SQS
 
-Yulin includes a simulated Amazon SQS for tests and local development. Messages are held in memory,
-hidden and released on the simulation's own clock, and every operation is authorized by simulated IAM.
+Yulin simulates Amazon SQS standard queues for tests and local development. You can create queues,
+send and receive messages, test visibility timeouts and redrive messages to dead-letter queues.
+Messages are stored in memory, time-based behavior uses the simulation's clock, and simulated IAM
+authorizes every operation.
 
-Standard queues only. SQS-specific types are imported from the `@kensio/yulin/sqs` subpath.
+FIFO queues are not simulated. Import SQS-specific types from `@kensio/yulin/sqs`.
 
 ## Creating a queue and sending a message
 
@@ -57,10 +59,9 @@ differ. A request naming no attributes always matches.
 
 ## Visibility timeouts
 
-A received message is hidden from other consumers for the queue's visibility timeout, 30 seconds by
-default. The message records the instant it is hidden until. It becomes receivable again once
-simulated time reaches that instant. Advancing the clock is all a test needs to watch an undeleted
-message come back.
+A received message is hidden from other consumers for the queue's visibility timeout, which is 30
+seconds by default. If the consumer does not delete it, the message becomes available again when the
+simulated clock reaches the end of that timeout.
 
 ```typescript sim-sqs-visibility-timeout
 /**
@@ -127,8 +128,8 @@ Every receive issues a fresh receipt handle, and a delete has to use the handle 
 receive of that message. A handle from an earlier receive is accepted and deletes nothing. Real SQS
 accepts one too, and promises only that the message might not be deleted.
 
-That is the failure a consumer slower than its visibility timeout hits. Its message went back on the
-queue, someone else took it, and its own delete quietly does nothing.
+This can happen when a consumer runs past the visibility timeout and another consumer receives the
+same message. The first consumer's later delete succeeds without deleting the message.
 
 ```typescript sim-sqs-stale-receipt-handle
 /**
@@ -187,10 +188,9 @@ still the most recent one, so deleting with it works. A handle the queue never i
 
 ## Dead-letter queues
 
-A `RedrivePolicy` says where a message goes once a consumer has had enough attempts at it. Once a
-message has been received `maxReceiveCount` times without being deleted, the next lapse of its
-visibility timeout moves it to the queue named by `deadLetterTargetArn`. Advancing the clock drives
-the move, as it drives the timeout itself.
+A `RedrivePolicy` sends repeatedly received messages to a dead-letter queue. After a message reaches
+`maxReceiveCount` without being deleted, the next visibility timeout moves it to the queue named by
+`deadLetterTargetArn`. Advance the simulated clock to trigger the timeout and move.
 
 ```typescript sim-sqs-dead-letter-queue
 /**
@@ -1137,7 +1137,7 @@ that deploys here, with the queue URL reaching the function through its environm
 policy naming the queue by the ARN `Fn::GetAtt` gives. A grant to a service principal synthesises an
 `AWS::SQS::QueuePolicy` alongside it, which deploys too.
 
-## Available functionality
+## Supported operations
 
 Sim SQS currently supports:
 

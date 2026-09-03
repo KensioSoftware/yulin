@@ -1,18 +1,18 @@
 # Simulated Step Functions
 
-Simulated Step Functions interprets Amazon States Language and runs a state machine in the same
-process as the code under test. A workflow held in a template as data becomes something a test can
-run and assert on.
+Yulin interprets Amazon States Language and runs Step Functions state machines in the same process
+as the code under test. Tests can start executions, invoke simulated services, advance waits and
+inspect execution history without deploying a workflow.
 
-Types for simulated Step Functions are imported from the `@kensio/yulin/stepfunctions` subpath.
+Import Step Functions-specific types from `@kensio/yulin/stepfunctions`.
 
-## What runs today
+## Supported state machine features
 
-Every state type Amazon States Language defines runs. `Pass`, `Task`, `Succeed`, `Fail`, `Choice`,
-`Wait`, `Parallel` and `Map`.
+All eight state types are supported: `Pass`, `Task`, `Succeed`, `Fail`, `Choice`, `Wait`, `Parallel`
+and `Map`.
 
-The data-flow fields run in full. `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and
-`OutputPath` apply in that order, reading Reference Paths and the intrinsic functions.
+The data-flow fields `InputPath`, `Parameters`, `ResultSelector`, `ResultPath` and `OutputPath` run in
+that order. They support Reference Paths and intrinsic functions.
 
 A `Task` state invokes a simulated Lambda function, calls an operation on any other simulated
 service, or starts another state machine. A `Resource` this simulator has no answer for is refused
@@ -114,23 +114,21 @@ console.log(described.status); // FAILED
 console.log(described.error); // NotEligible
 ```
 
-A failing execution is recorded on the execution, and the call returns as it would for one that
-succeeded. Simulated EventBridge treats an undeliverable event the same way. An execution failing is
-as often the thing under test as it is a fault, and raising it would fail an unrelated `advanceBy`
-elsewhere in the same test.
+A failed execution records its status and error instead of throwing from `StartExecution`. Read it
+with `DescribeExecution` or the inspection API. This keeps workflow failure available for
+assertions.
 
 ## Invoking a Lambda function
 
 A `Task` state invokes a simulated Lambda function, through either of the two `Resource` forms CDK's
 `LambdaInvoke` emits.
 
-`arn:aws:states:::lambda:invoke` is the integration Step Functions optimises. The state is talking to
-the Lambda API, so its `Parameters` are an `Invoke` request (`FunctionName` names the function and
-`Payload` carries what it is sent) and its result is an `Invoke` response, with the handler's answer
-under `Payload`.
+With `arn:aws:states:::lambda:invoke`, `Parameters` has the shape of a Lambda `Invoke` request.
+`FunctionName` selects the function, `Payload` contains its input, and the handler result appears
+under `Payload` in the task output.
 
-A function ARN sends the state's own input to the handler and answers with what the handler
-returned. CDK writes this form for `payloadResponseOnly`.
+A function ARN sends the state input directly to the handler and uses the handler result as the task
+output. CDK emits this form when `payloadResponseOnly` is enabled.
 
 ```typescript sim-step-functions-task
 /**
@@ -1334,7 +1332,7 @@ reference contradicts itself here, listing a differing role ARN under `StateMach
 while the operation's own note says the difference is ignored. The note is the more specific of the
 two and is what this follows.
 
-## Still to come
+## Limitations
 
 - Distributed Map, with `ItemReader`, `ResultWriter` and the `ToleratedFailure` fields.
 - The `.sync` pattern, task tokens and activities.

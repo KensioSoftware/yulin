@@ -1,11 +1,11 @@
 # Simulated IAM
 
-Yulin includes a simulated IAM service for tests and local development.
+Yulin simulates IAM users, roles, policies and authorization decisions for tests and local
+development. Other simulated services use IAM to authorize requests, simulated STS uses it to issue
+temporary role sessions, and simulated CloudFormation can create IAM resources from templates.
 
-Sim IAM stores simulated Roles, Users and Policies, and evaluates allow/deny authorization decisions
-for them. Other simulated services use it to authorize their own actions, simulated STS uses it to
-issue temporary Role sessions, and sim CloudFormation can create IAM resources from templates. It can
-also be instantiated on its own as `SimIam` with isolated state.
+Use IAM through `SimAws` when it should share state with other services. Use `SimIam` directly when
+you need an isolated policy evaluator.
 
 ## Basic usage
 
@@ -70,9 +70,8 @@ denied for every action.
 
 ## Authorization decisions
 
-`authorize(...)` returns a decision object. A denied request comes back as a decision too, and a
-test can assert on exactly why it was allowed or denied. The decision models the common IAM
-evaluation rules:
+`authorize(...)` returns an authorization decision without throwing when access is denied. Tests
+can inspect why the request was allowed or denied. The evaluator applies these rules:
 
 - A matching explicit `Deny` statement in any evaluated policy wins
 - Otherwise, within one Account, a matching `Allow` in an identity policy or resource policy allows
@@ -81,12 +80,11 @@ evaluation rules:
   [Cross-Account requests](#cross-account-requests)
 - Otherwise the request is implicitly denied
 
-The decision exposes `value` (`"Allow"`, `"ExplicitDeny"`, or `"ImplicitDeny"`), the convenience
-flags `isAllowed`, `isDenied`, `isExplicitDeny`, and `isImplicitDeny`, the matching
-`allowStatements` and `explicitDenyStatements`, and the resolved `caller` for diagnostics. The
-matching Allows are also available per side as `identityAllowStatements` and
-`resourceAllowStatements`. A cross-Account denial is best read from those. Statements the simulator
-could not evaluate are reported by `unevaluatedStatements`, covered under
+The decision's `value` is `"Allow"`, `"ExplicitDeny"` or `"ImplicitDeny"`. Convenience flags expose
+the same result as `isAllowed`, `isDenied`, `isExplicitDeny` and `isImplicitDeny`. The decision also
+contains the resolved `caller` and the matching allow and deny statements. For cross-account
+requests, inspect `identityAllowStatements` and `resourceAllowStatements` to see which side did not
+grant access. Unsupported statements appear in `unevaluatedStatements`, covered under
 [Statements left unevaluated](#statements-left-unevaluated).
 
 If the caller is omitted, authorization defaults to the simulation's own
@@ -1634,7 +1632,7 @@ stands apart from any wider `SimAws` environment. Other services instantiated st
 `new SimRoute53()`, fall back to allow-all authorization. Connect services through a shared `SimAws`
 instance when a test should exercise real IAM enforcement.
 
-## Available functionality
+## Supported operations
 
 Sim IAM currently supports:
 

@@ -1,14 +1,12 @@
 # Simulated EventBridge Scheduler
 
-Yulin includes a simulated Amazon EventBridge Scheduler for tests and local development. Schedules
-are held in memory and every operation is authorized by simulated IAM. Scheduler-specific types are
-imported from the `@kensio/yulin/scheduler` subpath.
+Yulin simulates Amazon EventBridge Scheduler in memory. Schedules run when simulated time advances,
+and every management operation is authorized by simulated IAM. Import Scheduler-specific types from
+`@kensio/yulin/scheduler`.
 
-Scheduler is a separate service from [EventBridge](https://yulinsim.dev/services/eventbridge/), not a corner of it. It has its
-own SDK client, its own ARN shape, and its own way of reaching a target. A schedule assumes an IAM
-execution role, where an EventBridge rule relies on a resource policy admitting a service principal.
-A project using Scheduler cannot be tested against simulated EventBridge rules. That is why this
-exists separately.
+Scheduler is separate from [EventBridge](https://yulinsim.dev/services/eventbridge/). It uses its own
+SDK client and ARN format. It also assumes an execution role to invoke a target, while EventBridge
+rules use the target's resource policy.
 
 ## Creating a schedule
 
@@ -56,8 +54,7 @@ IAM policy naming a schedule needs the group in it, or it matches no schedule.
 
 ## Writing the schedule expression
 
-Three forms, and the same parser as an [EventBridge scheduled
-rule](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule) with two differences:
+Scheduler accepts three expression forms:
 
 - `at(yyyy-mm-ddThh:mm:ss)` runs once, at that instant. The timezone is a separate setting on the
   schedule, outside the expression, and a trailing `Z` is refused.
@@ -71,9 +68,7 @@ rule](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule) 
 
 ## Firing a schedule
 
-A schedule fires on the simulation's clock. Advancing simulated time past a due
-instant invokes the target. Leave time alone and the target is never invoked. A nightly job takes no
-time at all to test.
+A schedule fires on the simulation's clock. Advance time past a due instant to invoke the target.
 
 ```typescript sim-scheduler-firing
 /**
@@ -163,12 +158,11 @@ own to describe.
 
 ### The execution role
 
-This is the part that differs most from an [EventBridge rule](https://yulinsim.dev/services/eventbridge/), and the part that
-most often goes wrong in a real account. A rule reaches its target as the `events.amazonaws.com`
-service principal, and the target's own resource policy decides. A schedule assumes the `RoleArn` on
-its target, and that role's policies decide. No resource policy on the target is involved at all.
+A schedule assumes the target's `RoleArn`, and that role's policies authorize delivery. An
+[EventBridge rule](https://yulinsim.dev/services/eventbridge/) instead invokes as
+`events.amazonaws.com` and depends on the target's resource policy.
 
-Two things therefore have to be right, and they are fixed in different places:
+The execution role needs both:
 
 - The role's **trust policy** has to let `scheduler.amazonaws.com` assume it. A role copied from an
   EventBridge rule trusts `events.amazonaws.com` and fails here.
@@ -176,14 +170,13 @@ Two things therefore have to be right, and they are fixed in different places:
   `sqs:SendMessage`, `sns:Publish` or `ecs:RunTask`.
 
 A trust policy may also carry the condition AWS recommends against the confused deputy problem. The
-schedule's group ARN is supplied as `aws:SourceArn`, and the Account the schedule is in as
-`aws:SourceAccount`. A role scoped to one schedule group is assumable by schedules in that group and
-by nothing else. CDK writes that condition into the execution roles it generates for a schedule
-target, so a role taken from a synthesized template works here unchanged.
+schedule's group ARN is supplied as `aws:SourceArn`, and the account is supplied as
+`aws:SourceAccount`. A role scoped to one schedule group is assumable only by schedules in that
+group. CDK writes that condition into the execution roles it generates for a schedule target, so a
+role from a synthesized template works unchanged.
 
-When either is missing the target goes uninvoked and no error is thrown, exactly as on AWS, where the
-failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally. A
-test asserting on a failed invocation reads `deliveryFailures`:
+If either permission is missing, `advanceBy(...)` still returns normally and the target is not
+invoked. Read `deliveryFailures` to assert on the failed delivery:
 
 ```typescript sim-scheduler-delivery-failures
 /**
@@ -256,9 +249,8 @@ following delay doubles to 2, 4, 8 seconds and so on. A retry does not run while
 still. `advanceBy(...)` runs every retry that becomes due in the interval and settles their work
 before it returns.
 
-Scheduler does not retry a failure that cannot clear by trying the same request. A missing target,
-a missing execution role, an execution role that does not trust Scheduler and an IAM denial are
-permanent failures. They are abandoned after the initial attempt.
+Scheduler retries only failures that may clear. A missing target, missing execution role, invalid
+trust policy, or IAM denial is permanent and is abandoned after the initial attempt.
 
 Set `Target.DeadLetterConfig.Arn` to a standard SQS queue ARN to keep an input that Scheduler abandons.
 The execution role needs `sqs:SendMessage` on this queue as well as permission to invoke the target.
@@ -267,19 +259,17 @@ shape and include the error, schedule ARN, target ARN, scheduled time and retry 
 `EXHAUSTED_RETRY_CONDITION` is `MaximumRetryAttempts` or `MaximumEventAgeInSeconds` for an exhausted
 retryable failure. A permanent failure leaves that attribute out.
 
-A successful DLQ send does not add an entry to `deliveryFailures`, since the configured destination
-received the input. A missing queue or denied `sqs:SendMessage` is recorded there instead. This keeps
-a misconfigured DLQ visible to a test.
+A successful DLQ send leaves `deliveryFailures` empty because the configured destination received the
+input. A missing queue or denied `sqs:SendMessage` is recorded there instead.
 
 ### One-time schedules and what happens after
 
-An `at(...)` schedule fires once and then stops. By default it stays in the Account afterwards, which
-surprises people who expected it to clean up. It keeps counting against the schedule quota and keeps
-turning up in listings. `ActionAfterCompletion: "DELETE"` is what removes it, and after that
-`GetSchedule` reports it gone.
+An `at(...)` schedule fires once. It remains in the account unless
+`ActionAfterCompletion: "DELETE"` removes it. A retained schedule continues to appear in listings
+and count against the schedule quota.
 
-A schedule that is disabled when its only instant passes has not completed, since nothing was
-invoked. It is still there afterwards whatever `ActionAfterCompletion` says.
+A disabled schedule remains incomplete when its only instant passes. It stays in the account
+regardless of `ActionAfterCompletion`.
 
 `State: "DISABLED"` stops a recurring schedule firing while it is off, and an `UpdateSchedule`
 enabling it picks up from the next due instant. What it missed is never replayed. An update that
@@ -287,9 +277,8 @@ changes the expression reschedules from the new one.
 
 ## Running an ECS task on a schedule
 
-A target whose ARN names an ECS cluster runs a [simulated ECS](https://yulinsim.dev/services/ecs/) task, in place of being
-invoked with a payload. That is the shape a nightly batch job usually has. A container runs, does
-its work and stops.
+A target whose ARN names an ECS cluster runs a [simulated ECS](https://yulinsim.dev/services/ecs/)
+task. Use `EcsParameters` to select the task definition and use `Input` for task overrides.
 
 ```typescript sim-scheduler-ecs-target
 /**
@@ -404,8 +393,8 @@ target with no `Input` runs the task with no overrides.
 
 [Simulated ECS](https://yulinsim.dev/services/ecs/) decides which containers actually run. A container
 with a binding runs its handler, and a container without one is recorded as not simulated.
-A target naming a task definition with nothing bound therefore records a task that never started,
-and the schedule counts as invoked.
+A target naming a task definition without a bound container records a task that never started, and
+the schedule counts as invoked.
 
 ## Updating and deleting
 
@@ -457,8 +446,8 @@ console.log(described.ScheduleExpression); // "rate(30 minutes)"
 console.log(described.Description); // undefined, and not by accident
 ```
 
-`UpdateSchedule` carries the whole of a schedule, and anything an earlier request set and this one
-leaves out is gone. That is real behaviour and a common surprise. The schedule has to exist.
+`UpdateSchedule` replaces the full schedule definition. Any optional value omitted from the update
+is removed. The schedule must already exist.
 Updating one that is absent raises `ResourceNotFoundException`. EventBridge's `PutRule` creates it.
 
 `CreateSchedule` for a name that already exists raises `ConflictException`. A deployment running it
@@ -618,10 +607,10 @@ against the `RoleArn` on the target.
 
 ## Deploying from a CloudFormation template
 
-`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](https://yulinsim.dev/services/cloudformation/). A stack
-that declares its schedules can be exercised end to end, with no SDK calls of its own. Everything the
-Resource carries lines up with `CreateSchedule`, and a target ARN or execution role resolved by
-`Fn::GetAtt` from the same template works as it would in a real deployment.
+`AWS::Scheduler::Schedule` deploys through [simulated
+CloudFormation](https://yulinsim.dev/services/cloudformation/). Its properties follow
+`CreateSchedule`, and the target ARN or execution role can use `Fn::GetAtt` references to resources
+in the same template.
 
 ```typescript sim-scheduler-cloudformation
 /**
@@ -786,7 +775,7 @@ anyway. Read the record back from `stack.getResource("<logicalId>")?.ignoredProp
 Tearing the stack down removes the group. Its schedules go with it, whether or not they are
 Resources of the same stack.
 
-## Available functionality
+## Supported operations
 
 - `CreateSchedule`, `GetSchedule`, `UpdateSchedule`, `DeleteSchedule` and `ListSchedules`.
 - `at(...)`, `rate(...)` and six-field `cron(...)` expressions, fired by advancing the simulation's
@@ -839,7 +828,7 @@ Resources of the same stack.
 - A target `EventBridgeParameters`, `KinesisParameters`, `SageMakerPipelineParameters` and
   `SqsParameters` are refused outright, as is `EcsParameters` on a target whose ARN names something
   other than an ECS cluster. A `DeadLetterConfig` must name a standard SQS queue because simulated
-  SQS does not support FIFO queues.
+  SQS supports only standard queues.
 - An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
   `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
   there is no placement and no network here for them to apply to. Anything else it can carry, such
@@ -849,5 +838,5 @@ Resources of the same stack.
   on an ECS target, where every other target type takes any text.
 - A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
   for each of them, in this process and one after another.
-- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Schedule management requests
-  are not retried, so the token has no request to make idempotent.
+- `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored. Yulin makes each schedule
+  management request once, so the token has no retry to make idempotent.

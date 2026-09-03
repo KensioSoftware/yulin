@@ -1,8 +1,8 @@
 # Simulated Rekognition
 
-Simulated Rekognition answers detection calls from results declared against images. A test can say
-which image fails moderation or holds a cat, with no image analysis happening. The bytes are never
-looked at.
+Yulin simulates Rekognition by returning results declared for an image name or content hash. It does
+not analyze the image. Tests can define labels, moderation results, faces, and face matches while
+application code uses the normal Rekognition commands.
 
 Rekognition-specific types are imported from the `@kensio/yulin/rekognition` subpath.
 
@@ -67,9 +67,8 @@ const detected = await simAws
 
 ## Detecting labels in an image
 
-`DetectLabels` answers with the objects, scenes and concepts an image is declared to hold. Each
-label carries the parents, aliases, categories and instances it was declared with, and no more. A
-label is reported as written.
+`DetectLabels` returns the objects, scenes, and concepts declared for an image. Each label contains
+only the parents, aliases, categories, and instances in its declaration.
 
 ```typescript sim-rekognition-detect-labels
 /**
@@ -131,19 +130,16 @@ console.log(detected.LabelModelVersion); // "3.0"
 Labels come back in descending order of confidence, which is the order real Rekognition reports them
 in. A declared instance with no confidence of its own takes its label's.
 
-An image no rule matches gets the built-in default result. That is the one `Mobile Phone` label from
-the example response in the AWS `DetectLabels` documentation, with the parent, alias, category and
-bounding box AWS documents it with. It is a real Rekognition response, though which labels an
-unconfigured image gets is a simulator convention rather than what AWS would return for it.
+An image that matches no rule gets a built-in `Mobile Phone` result based on the AWS
+`DetectLabels` example response. This default is a Yulin convention. AWS results depend on the image.
 
-A label name fills in nothing of its own. Declaring `Cat` with no parents reports `Cat` with no
-parents, and declaring a `Pizza` nobody has heard of reports `Pizza`. Yulin ships no general label
-ontology to check a name against or to expand one from.
+Yulin does not validate or expand general detection labels. Declaring `Cat` without parents returns
+`Cat` without parents.
 
 ## Detecting faces in an image
 
-`DetectFaces` answers with the faces an image is declared to hold. A face says where it is and what
-it looks like, and the response carries the attributes the request asked for.
+`DetectFaces` returns the faces declared for an image, including their positions and requested
+attributes.
 
 ```typescript sim-rekognition-detect-faces
 /**
@@ -204,8 +200,7 @@ Faces come back in the order they were declared. An attribute with no confidence
 the face's, and a face detected at 99.4 is reported as smiling at 99.4. A face declared with no
 confidence at all is detected at the built-in one.
 
-An image with nobody in it is `{ faces: [] }`. Two built-in results cover the counting a test
-usually does:
+Use `{ faces: [] }` for an image with no faces. Two built-in results cover common face-count tests:
 
 ```typescript
 import {
@@ -219,10 +214,8 @@ faces.onName("incoming/landscape.png", simRekognitionNoFaces);
 faces.onName("incoming/crowd.png", simRekognitionSeveralFaces);
 ```
 
-An image no rule matches gets the built-in default result. That is the one face from the example
-response in the AWS `DetectFaces` documentation, with the attributes and all thirty landmarks AWS
-documents it with. It is a real Rekognition response, though which face an unconfigured image gets is
-a simulator convention rather than what AWS would return for it.
+An image that matches no rule gets the face from the AWS `DetectFaces` example response, including
+its attributes and 30 landmarks. This default is a Yulin convention.
 
 ## Choosing the facial attributes
 
@@ -305,11 +298,10 @@ excludes the chin.
 
 ## Declaring results
 
-Results are declared per operation. `moderation()` holds the rules `DetectModerationLabels` answers
-from, `labels()` holds the rules `DetectLabels` answers from, `faces()` holds the rules
-`DetectFaces` answers from, and `faceMatches()` holds the rules `SearchFacesByImage` answers from.
-All four take the same three kinds of rule, being an exact S3 object name, an exact content hash, or
-anything at all.
+Declare results separately for each operation. Use `moderation()` for `DetectModerationLabels`,
+`labels()` for `DetectLabels`, `faces()` for `DetectFaces`, and `faceMatches()` for
+`SearchFacesByImage`. Each API accepts rules for an exact S3 object name, an exact content hash, or a
+default result.
 
 ```typescript sim-rekognition-moderation-rules
 /**
@@ -340,8 +332,8 @@ moderation.onHash(simRekognitionImageHash(fixture), {
 });
 ```
 
-A hash rule wins, then a name rule, then the default. Matching is exact, with no pattern syntax.
-Which rule applies never depends on how specific a pattern looks.
+Rules use exact matching. Hash rules take precedence over name rules, which take precedence over the
+default.
 
 A name is the `Name` in the request, the S3 object key. It is matched on its own, with the Bucket
 left out, so a rule for a key applies to that key in whichever Bucket the request names. An image
@@ -412,9 +404,8 @@ refused where the rule is written.
 
 ## Sample images
 
-Simulated Rekognition ships with five images whose hashes are already declared. A test uploads one
-through its own code and gets a known answer without registering anything. That is what makes an
-application generating its own object keys testable, since the test never has to know the key.
+Yulin includes five small images with predeclared hash rules. Application code can upload one under
+any object key and receive a known result without registering another rule.
 
 | Image                                              | Format | Detected as                                       |
 | -------------------------------------------------- | ------ | ------------------------------------------------- |
@@ -477,9 +468,8 @@ simAws
   .onHash(simRekognitionImageHash(sample), { labels: [] });
 ```
 
-The images are real 16 by 16 PNG and JPEG files, 1,909 bytes in total. The format check reads their
-magic bytes as it does for any other image. What they are pictures of decides nothing, since no
-image is looked at.
+The images are valid 16 by 16 PNG and JPEG files. Rekognition checks their file signatures but does
+not inspect their visual content.
 
 ## Moderation labels come back with their parents
 
@@ -772,7 +762,7 @@ ever. Filter the notification configuration by prefix or suffix, as this one doe
 
 ## Face collections
 
-A collection is what lets an application recognise the same person twice, where a detection answers what is in one image.
+A collection stores indexed faces so an application can search for the same person later.
 
 ```typescript sim-rekognition-collections
 /**
@@ -970,9 +960,7 @@ An image is read from a Bucket in another Account when that Bucket's policy allo
 real Rekognition reads across Accounts. A Bucket in another Region is refused, as real Rekognition
 reads only Buckets in its own Region.
 
-## Available functionality
-
-Simulated Rekognition currently supports:
+## Supported operations
 
 - `DetectModerationLabelsCommand`, `DetectLabelsCommand` and `DetectFacesCommand`, for an image
   supplied as `Image.Bytes` or as `Image.S3Object`

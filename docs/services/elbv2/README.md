@@ -1,24 +1,16 @@
 # Simulated Elastic Load Balancing
 
-Yulin includes a simulated Application Load Balancer for tests and local development. Load
-balancers, target groups, listeners and listener rules are held in memory and every operation is
-authorized by simulated IAM. ELBv2-specific types are imported from the `@kensio/yulin/elbv2`
-subpath.
+Yulin simulates Application Load Balancers, target groups, listeners and listener rules for tests
+and local development. Requests pass through the listener and rule configuration before reaching a
+registered Lambda function or simulated ECS service. Simulated IAM authorizes every operation.
 
-A load balancer created here has a DNS name of the shape real ELB issues, and a
-[Route53](https://yulinsim.dev/services/route53/) record pointing at that name resolves to it. A request made to your own
-hostname reaches the load balancer as it would deployed. A request is matched to a listener by port
-and then to one of that listener's rules, and a `forward` action sends it to a target group, where a
-registered [Lambda](https://yulinsim.dev/services/lambda/) function is invoked with the request and its response becomes the
-HTTP response.
+Each load balancer receives an AWS-shaped DNS name. A simulated
+[Route 53](https://yulinsim.dev/services/route53/) record can point a local hostname at that name, so
+an HTTP request follows the same routing path as the deployed application.
 
-Only the application load balancer is simulated. A network or gateway load balancer routes below
-HTTP, which nothing here speaks, and `Type: "network"` is refused outright.
-
-No TLS is performed anywhere in this. An HTTPS listener holds a certificate and is checked against
-simulated ACM, and everything travels in the clear. See
-[HTTPS listeners and certificates](#https-listeners-and-certificates) for what that leaves a test
-able to conclude.
+Network and Gateway Load Balancers are not simulated. HTTPS listeners validate their certificates
+against simulated ACM, but Yulin does not perform TLS. Import ELBv2-specific types from
+`@kensio/yulin/elbv2`.
 
 ## Creating a load balancer
 
@@ -73,9 +65,8 @@ why a load balancer cannot be named starting with `internal-`.
 
 ## Target groups hold functions or addresses
 
-A target group names what it holds through its `TargetType`, and that decides the rest. It sets how
-many targets the group takes, what a target's `Id` has to look like, and whether the group carries a
-protocol and port at all.
+`TargetType` determines what a target group can contain. It controls the number and shape of target
+IDs, and whether the group requires a protocol and port.
 
 ```typescript sim-elbv2-lambda-target-group
 /**
@@ -178,15 +169,14 @@ console.log(health.TargetHealthDescriptions?.length); // 1
 console.log(health.TargetHealthDescriptions?.[0]?.Target.Port); // 8080
 ```
 
-`TargetType: "instance"` is refused outright, because there are no EC2 instances here for it to mean
-anything about. A group created as one would look configured and route nowhere. A request naming no
-target type at all is refused for the same reason, since real ELB defaults it to `instance`.
+`TargetType: "instance"` is unsupported because Yulin does not simulate EC2 instances. Omitting
+`TargetType` is also rejected because AWS would default it to `instance`.
 
 ## Listeners and the rules on them
 
-A listener answers on a port and holds the default actions for a request no rule claims. Rules carry
-a priority, and that is what decides which of several matching rules claims a request. Two rules on
-one listener cannot hold the same priority.
+A listener handles one port and provides the default action when no rule matches. When several
+rules match, the lowest priority number wins. Two rules on the same listener cannot use the same
+priority.
 
 ```typescript sim-elbv2-listener-rules
 /**
@@ -1761,7 +1751,7 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 // "shop-alb-0000000001.eu-west-2.elb.amazonaws.com"
 ```
 
-## Available functionality
+## Supported operations
 
 - `CreateLoadBalancer`, `DescribeLoadBalancers` and `DeleteLoadBalancer`, with a DNS name, ARN,
   canonical hosted zone id, scheme and state on every load balancer.

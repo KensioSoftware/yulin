@@ -1,22 +1,15 @@
 # Simulated Athena
 
-Yulin includes a simulated Amazon Athena for tests and local development. It holds workgroups and
-named queries, and hands both back through the SDK.
+Yulin simulates Amazon Athena workgroups, named queries and query execution for tests and local
+development. Tests can supply a result for a particular SQL statement, or enable the optional
+[query engine](#running-a-query-for-real) to run SQL against objects in simulated S3.
 
-A query is answered one of two ways. A test declares what it answers with, and the simulation
-matches that declaration on the query text. Or the
-[query engine](#running-a-query-for-real) runs the SQL for real over the objects a test seeded into
-simulated S3. The engine is off until a test turns it on, and it needs one package added to the
-project.
+Both paths use the same query lifecycle. Athena checks tables in the simulated
+[Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), applies the
+workgroup's bytes-scanned limit and writes results to the configured S3 location. This lets client
+code start a query, poll its status and read its results through the AWS SDK.
 
-Either way the lifecycle around the query is real. A test can prove its bytes-scanned cutoff
-refuses a query, that results land where the workgroup says, and that a client polls the lifecycle
-correctly. The tables a query names are looked for in the simulated
-[Glue Data Catalog](https://yulinsim.dev/services/glue/ "Simulated Glue usage docs"), and a query
-naming one that is absent fails the way real Athena fails it. The
-[Limitations](#limitations) at the end say what this leaves out.
-
-Athena-specific types are imported from the `@kensio/yulin/athena` subpath.
+Import Athena-specific types from `@kensio/yulin/athena`.
 
 ## Workgroups from a template
 
@@ -177,23 +170,21 @@ const results = await simAws.athena().getQueryResults({
 console.log(results.ResultSet?.Rows?.[1]?.Data?.[1]?.VarCharValue);
 ```
 
-A rule for an exact query wins, then a rule for a workgroup, then the default. `onWorkGroup` covers
-every query a stack's rollups run, and `byDefault` covers everything else. Matching is exact, on the
-query text as it was sent, so two queries differing only in whitespace are two different keys.
+A result declared for an exact query takes precedence over a workgroup result, which takes
+precedence over the default result. Use `onWorkGroup` to cover every query in one workgroup and
+`byDefault` as the fallback. Exact matching includes whitespace.
 
 The query engine sits between the two tiers. A rule for an exact query is ahead of it and the
 workgroup rule and the default are behind it.
 
-`failsWith` fails a query instead of answering it. Nothing here reads SQL, so a query that should
-fail cannot be discovered on its own. Saying so is what makes a client's failure handling
-reachable.
+Use `failsWith` to declare a failed query and test the client's error handling. Declared results do
+not parse the SQL, so failures must be configured explicitly.
 
 ## Running a query for real
 
-The query engine answers a `SELECT` from the objects a test seeded into simulated S3. It reads the
-table's schema out of the Glue Data Catalog, decodes each object with the SerDe the table declares,
-loads the rows into an in-memory SQLite database, and answers the statement from them. Roughly
-nineteen queries in twenty of the shapes a test writes run this way.
+The query engine runs a `SELECT` against objects seeded into simulated S3. It reads the table schema
+from the Glue Data Catalog, decodes each object with the table's SerDe, loads the rows into an
+in-memory SQLite database and executes the statement.
 
 The engine is off until a test turns it on, and it needs `node-sql-parser` in the project. The
 parser is an optional peer dependency, so a project that never runs a query never installs it. A
@@ -965,7 +956,7 @@ Every command is authorized against the workgroup ARN,
 own and authorizes work on one against the workgroup it belongs to. This asks the same question.
 `ListWorkGroups` names no workgroup, so IAM evaluates it against `*`.
 
-## Available functionality
+## Supported operations
 
 - Query executions, moving through `QUEUED` and `RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`

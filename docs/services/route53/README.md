@@ -1,11 +1,12 @@
 # Simulated Route53
 
-Yulin includes a simulated Route53 service for tests and local development.
+Yulin simulates Amazon Route 53 hosted zones, records and DNSSEC configuration for tests and local
+development. You can manage them through the AWS SDK or deploy them from CloudFormation and CDK
+templates. When Yulin serves the simulation on localhost, Route 53 records can route local hostnames
+to simulated services such as CloudFront distributions and S3 bucket websites.
 
-Sim Route53 can be used directly through `SimAws`, instantiated on its own as `SimRoute53`, and used
-by sim CloudFormation when deploying Route53 resources from CloudFormation or CDK templates. When
-served on localhost, Route53 records can route custom local hostnames to other simulated AWS
-services, such as simulated CloudFront distributions or simulated S3 bucket websites.
+Use Route 53 through `SimAws` when it should share state with other services. Use `SimRoute53`
+directly when you need an isolated Route 53 simulation.
 
 ## Basic Hosted Zone usage
 
@@ -54,8 +55,8 @@ console.log(hostedZoneOut.HostedZone?.ResourceRecordSetCount);
 Hosted Zone names are normalised with a trailing dot in Route53-style outputs, so `example.test`
 becomes `example.test.`.
 
-Hosted Zone creation uses background tasks to move the zone to `INSYNC`. If your test needs final
-state, call `await simAws.backgroundTasksComplete()` before continuing.
+Hosted zone creation moves the zone to `INSYNC` in a background task. Call
+`await simAws.backgroundTasksComplete()` before asserting on the final state.
 
 Hosted Zone IDs are accepted in any real Route53 shape, being a `Z` prefix followed by uppercase
 alphanumerics, up to 32 characters. A real Hosted Zone ID copied out of an AWS account, such as
@@ -65,14 +66,12 @@ alphanumerics, up to 32 characters. A real Hosted Zone ID copied out of an AWS a
 
 ## Registering a Hosted Zone with a chosen ID
 
-`CreateHostedZoneCommand` allocates its own Hosted Zone ID, as real Route53 does, and takes none
-from you. When something else already decided the ID, register the Hosted Zone as part of your test
-setup instead.
+`CreateHostedZoneCommand` allocates the hosted zone ID. When a synthesized template already contains
+an ID, register that hosted zone during test setup instead.
 
-The usual reason is a CDK app that looks its zone up with `HostedZone.fromLookup` instead of
-creating it. That bakes the real Hosted Zone ID into the synthesized template, and every
-`AWS::Route53::RecordSet` in the template names that ID. Registering the zone first lets the
-template deploy as it is, with no rewriting.
+For example, `HostedZone.fromLookup` writes the resolved hosted zone ID into the synthesized
+template. Registering that ID before deployment lets its `AWS::Route53::RecordSet` resources deploy
+without changing the template.
 
 ```typescript sim-route53-register-hosted-zone
 /**
@@ -1732,7 +1731,7 @@ console.log(hostedZoneCreation.HostedZone?.Id);
 A standalone `SimRoute53` instance has its own isolated state, standing apart from any wider
 `SimAws` environment. Use `SimAws` when Route53 needs to resolve names to other simulated services.
 
-## Available functionality
+## Supported operations
 
 Sim Route53 currently supports:
 

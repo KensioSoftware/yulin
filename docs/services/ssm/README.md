@@ -1,12 +1,11 @@
 # Simulated SSM Parameter Store
 
-Yulin includes a simulated AWS Systems Manager Parameter Store for tests and local development.
-Parameters are stored in memory, versioned on every write, and every operation is authorized by
-simulated IAM.
+Yulin simulates AWS Systems Manager Parameter Store for tests and local development. You can create,
+read, update and delete parameters through the AWS SDK or a CloudFormation template. Parameters are
+stored in memory, each write creates a version, and simulated IAM authorizes every operation.
 
-Only Parameter Store is simulated.
-
-SSM-specific types are imported from the `@kensio/yulin/ssm` subpath.
+Other Systems Manager features, such as Run Command and Session Manager, are not simulated. Import
+SSM-specific types from `@kensio/yulin/ssm`.
 
 ## Writing and reading a parameter
 
@@ -292,8 +291,7 @@ console.log(origins.length); // 2
 
 ## Parameter names
 
-Name validation matches real Parameter Store, because a name it accepts and AWS refuses is a
-deployment failure a passing test would have hidden. A name:
+Parameter names use the same validation rules as AWS. A name:
 
 - may contain letters, digits, `_`, `.`, `-` and `/`
 - must start with `/` if it contains a hierarchy at all
@@ -302,8 +300,8 @@ deployment failure a passing test would have hidden. A name:
 - may not contain spaces between characters, though surrounding spaces are stripped
 - may not make an ARN longer than 1011 characters, counting the ARN prefix for the account and region
 
-A `String` or `StringList` value holds at most 4KB, the standard tier limit. This is the one people
-hit, usually by putting a whole JSON configuration blob in one parameter.
+A `String` or `StringList` value holds at most 4 KB, the standard tier limit. Larger configuration
+documents must be split across parameters or stored elsewhere.
 
 ## Deploying a parameter from CloudFormation
 
@@ -455,9 +453,9 @@ covers that one.
 
 ### A reference the simulation cannot answer
 
-Simulated CloudFormation deploys what it can. A reference naming a parameter that was never created
-resolves to `dummy-value-for-<name>`, and the stack carries on deploying. A template reading
-configuration a test does not care about is still worth deploying for everything else in it.
+When a reference names a parameter that does not exist, simulated CloudFormation substitutes
+`dummy-value-for-<name>` and continues the deployment. This lets a test deploy the rest of a
+template without setting up unrelated configuration.
 
 The substitution is recorded on
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
@@ -998,9 +996,9 @@ console.log(read.Parameter?.Value); // "hunter2"
 
 `DescribeParameters` reports the key each `SecureString` is encrypted under as `KeyId`.
 
-## Available functionality
+## Supported operations
 
-Sim SSM currently supports:
+Simulated Parameter Store supports:
 
 - `PutParameterCommand`, creating a parameter or overwriting one
 - `GetParameterCommand`, by name, by `name:version` or by `name:label`
@@ -1025,8 +1023,6 @@ Sim SSM currently supports:
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 ## Limitations
-
-Current documented limitations:
 
 - Only standard tier `SecureString` encryption is simulated, which encrypts under the KMS key
   directly. The advanced tier's envelope encryption through the AWS Encryption SDK is left out, and

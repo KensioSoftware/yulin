@@ -1,17 +1,15 @@
 # Simulated Personalize
 
-Simulated Personalize holds the resources a recommendation is served from. No model is trained and
-no data is read, in the way simulated ACM issues certificates without producing real TLS
-certificates. A dataset group, a solution, a solution version and a campaign all exist, carry what
-the request gave them, and reach `ACTIVE` straight away.
+Yulin simulates the Personalize resources and API calls used to serve recommendations. It does not
+train a model or derive results from datasets. Tests declare the recommendations that a campaign or
+recommender should return. Created resources become `ACTIVE` immediately.
 
 Personalize-specific types are imported from the `@kensio/yulin/personalize` subpath.
 
 ## Building the chain to a campaign
 
-Every runtime recommendation names a campaign, and a campaign is the far end of a chain. The dataset
-group holds the data, the solution picks a recipe, the solution version is the trained model, and
-the campaign serves it.
+A campaign is built from a resource chain. A dataset group contains the datasets, a solution selects
+a recipe, a solution version represents the trained model, and a campaign serves that version.
 
 ```typescript sim-personalize-campaign-chain
 /**
@@ -73,9 +71,8 @@ expects.
 
 ## Recommendations from a campaign
 
-A campaign answers the runtime API from results declared against it. No model is fitted and no
-interaction history is held. A test says what one campaign recommends for one item, and the code
-under test makes the calls it would make against AWS.
+A campaign returns results declared during test setup. Application code still sends the same
+Personalize Runtime commands it sends to AWS.
 
 The two runtime operations live on `simAws.personalizeRuntime()`, and an intercepted
 `PersonalizeRuntimeClient` reaches the same place. They arrive from a separate SDK package
@@ -140,9 +137,8 @@ const recommended = await simAws.personalizeRuntime().getRecommendations(
 console.log(recommended.itemList?.map((item) => item.itemId).join(" "));
 ```
 
-Results are declared per campaign, through `recommendations()` and `rankings()`. A campaign serves
-one solution version trained on one recipe, and two campaigns in a dataset group answer the same
-entry differently.
+Declare results per campaign through `recommendations()` and `rankings()`. Two campaigns in the same
+dataset group can return different results for the same input.
 
 An item rule is read first where the request carries an item, then a user rule, then the default.
 That order follows the recipes. `aws-similar-items` requires an `itemId` and looks at no user, and
@@ -152,9 +148,8 @@ would have used. Matching is exact, with no pattern syntax.
 `numResults` cuts a declared list to length. A request no rule matches gets the campaign's default,
 and an empty `itemList` where no default is declared.
 
-An item is declared as an id on its own, or as an id with a score for a test to assert on. The
-number comes from the declaration, and a rule that leaves it out answers with an item carrying no
-score.
+Declare an item as an ID or as an ID with a score. An item declared without a score is returned
+without one.
 
 ```typescript sim-personalize-recommendation-scores
 /**
@@ -228,10 +223,8 @@ Runtime does.
 
 ## Datasets and schemas
 
-A dataset belongs to a dataset group and has one of five types. The dataset ARN carries the group
-and the type rather than the name the request gave, which is how real Personalize builds it. One
-dataset group therefore holds one dataset of each type, and two dataset groups can each hold an
-`INTERACTIONS` dataset without colliding.
+A dataset belongs to a dataset group and has one of five types. Its ARN contains the group and type,
+not the requested name. Each group can contain one dataset of each type.
 
 ```typescript sim-personalize-dataset
 /**
@@ -289,8 +282,8 @@ domain dataset group refuses them here too.
 
 ## Recording events
 
-An event tracker is where `PutEvents` sends item interactions. It is created against a dataset
-group and reports a tracking ID back, and every `PutEvents` names that ID.
+An event tracker records the item interactions sent through `PutEvents`. Create it for a dataset
+group, then pass its tracking ID to each request.
 
 ```typescript sim-personalize-event-tracker
 /**
@@ -464,10 +457,9 @@ console.log(group.domain);
 
 ## Recommenders and their use cases
 
-A recommender goes straight onto a Domain dataset group, for one of the ten use cases AWS trained.
-There is no solution and no solution version in between. `GetRecommendations` then names a
-`recommenderArn` where the custom path names a `campaignArn`, and results are declared against it
-through the same `recommendations()` rules.
+A recommender belongs directly to a domain dataset group and selects one of ten AWS use cases. It
+does not use a solution or solution version. Pass its ARN to `GetRecommendations` and declare its
+results with the same `recommendations()` API used for campaigns.
 
 ```typescript sim-personalize-recommender
 /**
@@ -525,9 +517,8 @@ Real Personalize trains for hours and retrains every seven days.
 
 ### The ten use cases
 
-The recipe ARN picks the use case, and the use case decides what a request has to carry. A request
-leaving out a parameter its use case requires is refused, which is what real Personalize does with
-it. That refusal is the part of the domain path worth simulating, and everything else here is state.
+The recipe ARN selects the use case. Each use case defines whether `itemId` and `userId` are
+required, optional, or unused. Requests missing a required parameter are rejected.
 
 | Use case                           | Recipe ARN suffix                              | `itemId` | `userId` |
 | ---------------------------------- | ---------------------------------------------- | -------- | -------- |
@@ -554,9 +545,6 @@ already watched or bought and that filtering is keyed on the user. `Trending now
 A parameter marked unused is ignored rather than matched on. A `Top picks for you` request carrying
 an `itemId` as well as its `userId` is answered from the user rule, since that is the tier real
 Personalize would have used. An optional one is matched where the request carries it.
-
-These are the requirements AWS documents against each use case. Both pages are worth reading before
-writing a request, since two of them differ from the e-commerce use case they otherwise mirror.
 
 ### Starting and stopping
 
@@ -602,8 +590,7 @@ and solutions gone. A group still holding one is reported as `ResourceInUseExcep
 
 `AWS::Personalize::DatasetGroup`, `AWS::Personalize::Schema`, `AWS::Personalize::Dataset`,
 `AWS::Personalize::Solution` and `AWS::Personalize::EventTracker` deploy into simulated Personalize.
-A project that declares them in CDK or CloudFormation can deploy the same template its application
-deploys, with no hand-written test setup.
+A project can deploy its synthesized template without hand-written Personalize setup.
 
 Each one goes through the ordinary create command. A template and an SDK caller get the same
 validation, the same refusals and the same ARN.
@@ -710,19 +697,16 @@ wiring one resource into another reads `Fn::GetAtt`. An event tracker publishes 
 does not publish fails the deploy, since answering one would let a template deploy here and fail on
 AWS.
 
-### A stack stops at the solution
+### Resources without CloudFormation types
 
-CloudFormation has no `AWS::Personalize::Campaign` type and no `AWS::Personalize::Recommender` type.
-A campaign is what every runtime call names, and it is always created out of band through the SDK,
-the CLI or the console. A deployed stack gets as far as a solution and stops there. A test creates
-the solution version and the campaign itself, as the example above does. This is real Personalize
-behaviour and worth knowing before reading it as a gap in the simulation.
+CloudFormation has no `AWS::Personalize::Campaign` or `AWS::Personalize::Recommender` type. Create
+these resources through the SDK after deploying the stack, as the example above does.
 
 The domain path stops in the same place. `Domain` is a property of `AWS::Personalize::DatasetGroup`,
 and a template can declare a Domain dataset group. No `AWS::Personalize::Recommender` type exists to
 put a recommender on it.
 
-### Types a stack steps over
+### Skipped resource types
 
 `AWS::Personalize::BatchInferenceJob`, `AWS::Personalize::BatchSegmentJob`,
 `AWS::Personalize::DataDeletionJob`, `AWS::Personalize::MetricAttribution` and
@@ -763,9 +747,9 @@ console.log(group?.name, group?.status);
 
 ## Deleting resources
 
-Deletion follows real Personalize. A dataset group holding datasets, solutions or an event tracker
-is reported as `ResourceInUseException`, and so is a solution a campaign still deploys. Tear a chain
-down from the campaign end.
+Delete resources from the campaign end of the chain. A dataset group that still contains datasets,
+solutions, or an event tracker raises `ResourceInUseException`. A solution still used by a campaign
+raises the same error.
 
 Deleting an event tracker leaves the events it accepted recorded, as real Personalize leaves the
 interactions it wrote in the dataset behind it.
