@@ -814,7 +814,9 @@ Adapters allow simulated service objects to stay focused on service behaviour wh
 controls how those objects appear inside template expressions.
 
 If no specialized adapter exists, the default adapter provides fallback behaviour suitable for
-generic tests and diagnostics.
+generic tests and diagnostics. Its `refValue` answers with the physical name a service worked out
+before refusing to create the resource, where the refusal carried one, and with the logical ID
+otherwise. A service carries a name through by raising `SimCfnNamedSkip`.
 
 ## Property resolution during creation
 

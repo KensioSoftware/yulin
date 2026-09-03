@@ -211,6 +211,7 @@ export class SimCfnResource<
    */
   markCreateInProgress(): void {
     this.clearIgnoredProperties();
+    this.clearUncreatedPhysicalName();
     this.creationState.markCreateInProgress();
   }
 

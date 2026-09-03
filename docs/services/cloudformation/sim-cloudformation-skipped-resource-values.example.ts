@@ -10,26 +10,29 @@ const stack = await simAws.cloudFormation().deployTemplate({
   stackName: "stand-in-stack",
   template: {
     Resources: {
-      AlarmRule: {
-        Type: "AWS::CloudWatch::Alarm",
+      SearchApi: {
+        Type: "AWS::AppSync::GraphQLApi",
+        Properties: {
+          Name: "search",
+        },
       },
     },
     Outputs: {
-      AlarmRef: { Value: { Ref: "AlarmRule" } },
-      AlarmArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
+      SearchApiRef: { Value: { Ref: "SearchApi" } },
+      SearchApiArn: { Value: { "Fn::GetAtt": ["SearchApi", "Arn"] } },
     },
   },
 });
 
 await stack.waitForDeployComplete();
 
-console.log(stack.output("AlarmRef"));
-// "AlarmRule"
+console.log(stack.output("SearchApiRef"));
+// "SearchApi"
 
-console.log(stack.output("AlarmArn"));
-// "AlarmRule.Arn"
+console.log(stack.output("SearchApiArn"));
+// "SearchApi.Arn"
 
 for (const skipped of stack.skippedResources) {
   console.log(skipped.logicalId, skipped.skippedReason);
-  // "AlarmRule Unsupported sim CloudFormation Resource service CloudWatch"
+  // "SearchApi Unsupported sim CloudFormation Resource service AppSync"
 }

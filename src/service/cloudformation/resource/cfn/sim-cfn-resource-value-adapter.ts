@@ -12,6 +12,12 @@ export interface SimCfnResourceValueAdapterProperties {
   readonly logicalId: string;
   readonly type: string | undefined;
   readonly simResource: object | undefined;
+
+  /**
+   * The name real CloudFormation would have given the Resource, where the
+   * service knew it before deciding not to create it.
+   */
+  readonly uncreatedPhysicalName?: string | undefined;
 }
 
 /**
@@ -30,7 +36,7 @@ export type SimCfnServiceValueAdapter = SimCfnResourceValueAdapter | undefined;
  * Each service matches its own Resource types, beside that service's adapters,
  * so this registry stays a list of services. A Resource no service claims
  * falls through to the default adapter, which answers a Ref with the logical
- * ID.
+ * ID, or with the name a service worked out before refusing the Resource.
  */
 export function simCfnResourceValueAdapter(
   properties: SimCfnResourceValueAdapterProperties,
@@ -45,5 +51,6 @@ export function simCfnResourceValueAdapter(
 
   return new SimCfnDefaultResourceValueAdapter({
     logicalId: properties.logicalId,
+    uncreatedPhysicalName: properties.uncreatedPhysicalName,
   });
 }

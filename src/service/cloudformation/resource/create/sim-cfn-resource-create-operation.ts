@@ -7,6 +7,7 @@ import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-f
 import { SimCfnResourceCreator } from "./sim-cfn-resource-creator.js";
 import { simCfnInertResourceReason } from "../inert/sim-cfn-inert-resource.js";
 import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
+import { simCfnSkippedPhysicalName } from "../unsupported/sim-cfn-named-skip.js";
 
 interface SimCfnResourceCreateOperationProperties<T extends object> {
   readonly background: BackgroundScheduler;
@@ -83,11 +84,17 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
    * a gap and is skipped, unless nothing this simulator models could have told
    * it apart from one that was created, in which case saying it is missing
    * sends a reader after something that is not lost.
+   *
+   * Either way the Resource keeps whatever name the refusal carried. A
+   * template reading a Ref of it then gets the name real CloudFormation would
+   * have produced.
    */
   private recordUncreated(
     error: unknown,
     context: SimCloudFormationResourceCreateContext,
   ): void {
+    this.resource.recordUncreatedPhysicalName(simCfnSkippedPhysicalName(error));
+
     const inertReason = simCfnInertResourceReason(
       this.resource,
       context.resources,

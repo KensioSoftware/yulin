@@ -1,3 +1,4 @@
+import { SimCfnNamedSkip } from "../../../cloudformation/resource/unsupported/sim-cfn-named-skip.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-properties-parser.js";
 
@@ -33,6 +34,12 @@ const nodeJsRuntimePrefix = "nodejs";
  * CloudFormation carries out itself is recorded as inert instead, because this
  * message would otherwise tell a reader to bind a handler to a function that
  * has nothing left to do.
+ *
+ * The refusal carries the function's name, which the properties parser has
+ * already worked out by the time this gate is asked. CDK writes a function's
+ * log group name as `/aws/lambda/` joined to a Ref of the function. A refusal
+ * carrying no name puts the log group under `/aws/lambda/` and a logical ID,
+ * a name no account would hold.
  */
 export class SimCfnLambdaRuntimeSkip {
   /**
@@ -54,11 +61,12 @@ export class SimCfnLambdaRuntimeSkip {
       return undefined;
     }
 
-    return new Error(
+    return new SimCfnNamedSkip(
       `Unsupported sim Lambda CloudFormation Resource ${resource.logicalId}: ` +
         `sim Lambda simulates Node.js runtimes, and this function declares ` +
         `Runtime ${runtimeName}. Bind a real in-process handler to this ` +
         `function to simulate it.`,
+      functionProperties.functionName,
     );
   }
 }
