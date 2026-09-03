@@ -1,18 +1,14 @@
 # Simulated Organizations
 
-Yulin simulates AWS Organizations service control policies. A test can find out that the
-organization around an account forbids something before a deployment does.
+Yulin simulates AWS Organizations service control policies (SCPs) and organization structure.
 
-A service control policy filters what an account's principals may do and grants nothing. Policies
-attach to the organization root, to an organizational unit, or to one account, and an account
-inherits every policy on the path down to it. Sim IAM evaluates them ahead of that account's
-identity and resource policies. An SCP therefore applies to a CloudFormation deployment, an
-intercepted SDK client, and a direct service call alike.
+An SCP limits permissions granted by identity and resource policies. Attach one to the organization
+root, an organizational unit or an account. An account inherits policies from every node on its path
+from the root. Simulated IAM applies them to direct calls, intercepted clients and CloudFormation.
 
 ## Attach a policy to an organizational unit
 
-A policy is usually attached to an organizational unit rather than to one account, and every account
-under that unit inherits it. Units nest, and the root sits above all of them.
+Create an organizational unit and attach an SCP to it. Accounts below the unit inherit the policy.
 
 ```typescript sim-organizations-organizational-unit
 /**
@@ -44,16 +40,13 @@ const decision = simAws.account("123456789012").iam().authorize({
 console.log(decision.value); // "ExplicitDeny"
 ```
 
-The policy hangs two levels above the account and still reaches it. `createOrganizationalUnit` takes
-a parent unit as its second argument, and leaves the unit under the root without one.
-`organizations.root()` is the node above everything, and a policy attached there covers every
-account in the organization.
+Pass a parent as the second argument to `createOrganizationalUnit` to nest units. With no parent, the
+new unit sits below `organizations.root()`.
 
 ## Every level has to allow the action
 
-An account is filtered by each node on the path from the root down to it, and each one has to allow
-an action on its own. A root allowing S3 and a unit allowing DynamoDB leave an account beneath them
-able to do neither.
+Every node on the path must allow the action. An allow at one level cannot supply an allow missing
+at another. A deny at any level rejects the request.
 
 ```typescript sim-organizations-every-level-allows
 /**
@@ -89,15 +82,12 @@ console.log(decision.value); // "ImplicitDeny"
 console.log(decision.serviceControlPolicy.unallowedLevels); // [ "Workloads" ]
 ```
 
-`unallowedLevels` names the nodes that allowed nothing matching. That is the part of a real SCP
-denial that takes longest to track down.
-
-A `Deny` at any level ends the request whatever another level allows.
+`unallowedLevels` identifies the nodes with no matching allow.
 
 ## The management account
 
-`setManagementAccount` names the account AWS exempts from every service control policy. That account
-is decided by its identity and resource policies alone, whatever is attached above it.
+Use `setManagementAccount` to exempt one account from SCP evaluation. Its identity and resource
+policies still apply.
 
 ```typescript sim-organizations-management-account
 /**
@@ -126,9 +116,8 @@ console.log(decision.serviceControlPolicy.isApplied); // false
 
 ## Attach a service control policy to an Account
 
-A policy attached straight to an account applies to that account alone. An organization spans
-accounts, so it belongs to the whole simulated environment and is reached as
-`simAws.organizations()`, not from an account scope.
+An SCP attached directly to an account applies only to that account. Organization state belongs to
+the whole `SimAws` instance and is available through `simAws.organizations()`.
 
 ```typescript sim-organizations-attach-scp
 /**
@@ -159,17 +148,15 @@ console.log(decision.serviceControlPolicy.isDenied); // true
 console.log(decision.serviceControlPolicy.denyStatements[0]?.Sid); // "DenyBucketCreation"
 ```
 
-The account also gets AWS's own `FullAWSAccess` policy, as it would in a real organization. One
-`Deny` statement therefore denies that one action and leaves the rest of the account working.
+New organization nodes receive the AWS-managed `FullAWSAccess` policy. A deny-list SCP can then
+block one action while leaving other actions allowed.
 
-An account with no policy attached to it stays outside the organization's reach, and its identity
-and resource policies decide its requests as they did before.
+An account outside the organization is unaffected by SCPs.
 
 ## Catch a deployment the policy denies
 
-Sim CloudFormation creates each resource through the owning service's command handler, and that
-handler authorizes. A deployment that names no principal is decided as the account root. An SCP
-applies to a member account's root the same way AWS does.
+CloudFormation creates resources through each service's authorized command path. A deployment with
+no caller runs as the account root, and SCPs apply to that root.
 
 ```typescript sim-organizations-scp-deployment
 /**
@@ -213,14 +200,13 @@ const failed = simAws
 console.log(failed?.status); // "CREATE_FAILED"
 ```
 
-The resource is left `CREATE_FAILED` and the deployment rejects. A test asserting that a stack
-deploys then fails on the policy, with the policy named in the message.
+When an SCP denies creation, the resource enters `CREATE_FAILED` and the deployment rejects. The
+error names the policy.
 
 ## Name the principal a deployment runs as
 
-An organization that denies its accounts' root principals is ordinary, and a deployment decided as
-the root fails under one. `caller` says which principal the resources are created as, and a
-statement conditioned on `aws:PrincipalArn` then has a deploy role to match against.
+Pass `caller` when the deployment should run as a role. SCP conditions on `aws:PrincipalArn` then
+evaluate against that role.
 
 ```typescript sim-organizations-scp-deploy-role
 /**
@@ -285,17 +271,15 @@ const stack = await simAws.cloudFormation().deployTemplate({
 console.log(stack.getResource("ReportsBucket")?.status); // "CREATE_COMPLETE"
 ```
 
-The Role is created before the policy is attached. Creating it afterwards is a call the policy
-denies the root, and the account root is who a bare `createRole` runs as.
+Create the role before attaching a policy that would deny the setup call.
 
 ## Name the caller the rest of a test reads as
 
-A deployment names its own principal. Every other call in the test still names none, and each one is
-the account root. Under a policy denying that root, a test reading back what a stack made is denied
-on every read.
+A deployment caller applies only to that deployment. Other calls still use the account root unless
+the simulation has a default caller.
 
-`defaultCaller` on `SimAws` says who those calls are. A test then reads the account as the person or
-role that would really be looking at it, and an explicit `caller` still wins wherever one is given.
+Set `defaultCaller` on `SimAws` to choose the principal for unattributed calls. An explicit `caller`
+still takes precedence.
 
 ```typescript sim-organizations-scp-default-caller
 /**
@@ -369,17 +353,13 @@ console.log(read.Parameter?.Value); // "reports-bucket"
 console.log(identity.Arn); // "arn:aws:iam::123456789012:role/Administrator"
 ```
 
-Setup runs before the policy is attached, for the same reason the deploy Role above does. The Role a
-simulation reads as has to exist and hold a policy, and creating it is itself a call.
-
-Naming a default caller says who an unattributed call comes from, and leaves the root's own identity
-access where it was. A test about root behaviour names `simAws.account().rootPrincipal` and gets the
-root. Under the policy above that call is denied, which is what the statement is written to do.
+Create and configure the default caller before attaching policies that would deny those setup calls.
+Pass `simAws.account().rootPrincipal` explicitly when a test needs to make a request as root.
 
 ## Write an allow list instead of a deny list
 
-`detachFullAwsAccess` takes AWS's own policy off an account. What remains has to allow an action
-for the account to be allowed it. That is an organization run as an allow list.
+Call `detachFullAwsAccess` to use an allow-list SCP. The remaining policies must explicitly allow an
+action.
 
 ```typescript sim-organizations-scp-allow-list
 /**
@@ -407,16 +387,13 @@ console.log(decision.denialReason);
 // "because no service control policy allows the s3:GetObject action"
 ```
 
-An account root holds unrestricted access in sim IAM, and this denies it anyway. That is what an
-SCP does in AWS, and it is why an allow list is worth writing in a test at all.
-
-Detaching `FullAWSAccess` on its own leaves the account holding no policy, and every action is then
-denied. AWS behaves the same way, and warns about it.
+SCPs still limit an account root. Removing `FullAWSAccess` without adding another allow policy denies
+every action.
 
 ## Deploy an organization from CloudFormation
 
-A template's `AWS::Organizations::*` resources build the organization they describe, so a stack
-already managing the org chart is the same one a test deploys.
+Simulated CloudFormation supports the organization, organizational unit, account and policy
+resource types.
 
 ```typescript sim-organizations-cloudformation
 /**
@@ -470,17 +447,13 @@ const decision = simAws.account("123456789012").iam().authorize({
 console.log(decision.value); // "ExplicitDeny"
 ```
 
-`Content` takes the policy document inline or as JSON text. `TargetIds` takes a list or a single
-value, and each entry names the root, a unit, or an Account. A policy reaches every target it names
-or none of them. A target this organization has never heard of fails the resource before anything is
-attached.
+`Content` accepts an object or JSON text. `TargetIds` accepts one target or a list of roots, units and
+accounts. An unknown target fails the resource before the policy is attached anywhere.
 
-A simulated environment has one organization from the start, so
-`AWS::Organizations::Organization` records the one already there rather than making another. It is
-worth declaring for `RootId`, which is what a unit hangs off.
+A `SimAws` instance starts with one organization. `AWS::Organizations::Organization` adopts it and
+exposes its `RootId`.
 
-`AWS::Organizations::Account` creates an Account with an id nobody chose, as AWS does. Read that id
-back with `Ref` or `Fn::GetAtt AccountId`.
+`AWS::Organizations::Account` generates an account ID. Read it with `Ref` or `Fn::GetAtt AccountId`.
 
 These are the properties read from each resource:
 
@@ -491,10 +464,8 @@ These are the properties read from each resource:
 | `AWS::Organizations::Account`            | `AccountName`, `Email`, `ParentIds`    | `Tags`, `RoleName`    |
 | `AWS::Organizations::Policy`             | `Name`, `Type`, `Content`, `TargetIds` | `Tags`, `Description` |
 
-Tearing the stack down takes its own policies off the nodes they were attached to, removes the
-units, and takes any Account the stack created back out of the organization. A node holding
-policies from more than one stack keeps the others. A unit that still holds something when it goes
-hands what it holds to its parent, so every Account keeps a path to the root.
+Stack teardown removes resources created by that stack. Policies from other stacks remain attached.
+Accounts and child units move to the deleted unit's parent.
 
 ## Reading a denial
 
@@ -510,21 +481,16 @@ sides, through `decision.serviceControlPolicy`:
 | `denyStatements`  | The matching `Deny` statements.                             |
 | `allowStatements` | The matching `Allow` statements.                            |
 
-`decision.denialReason` carries the wording AWS puts on the `AccessDenied` message, and every
-simulated service passes it through to the error it throws.
+`decision.denialReason` contains the text used by service access-denied errors.
 
-`simAws.organizations().serviceControlPoliciesFor(accountId)` returns the policies in force for an
-account, in the order they were evaluated, including `FullAWSAccess` where it is still attached.
+`serviceControlPoliciesFor(accountId)` returns the policies in evaluation order.
 
-`serviceControlPolicySetFor(accountId).levels` keeps the policies grouped by the node they hang on,
-root first. That grouping is what sim IAM evaluates.
+`serviceControlPolicySetFor(accountId).levels` groups policies by node, starting at the root.
 
-The flattened list is empty in three cases that behave differently. An account that was never named
-sits outside the organization and stays unrestricted. The management account is exempt and equally
-unrestricted. An account left holding no policy is denied everything. `applies` separates the last
-of those from the other two.
-`serviceControlPolicySetFor(accountId).applies` tells the two apart, and so does
-`decision.serviceControlPolicy.isApplied`.
+An empty policy list can mean that the account is outside the organization, is the management
+account or has no policies. The first two are exempt. The last is denied every action. Check
+`serviceControlPolicySetFor(accountId).applies` or `decision.serviceControlPolicy.isApplied` to
+distinguish them.
 
 ## Available functionality
 
@@ -567,7 +533,6 @@ Simulated Organizations supports:
 | Service-linked roles        | Evaluated like any other principal. AWS exempts a service-linked role from SCPs.                                                    |
 | Other policy types          | Resource control policies, declarative policies, tag policies, backup policies and AI services opt-out policies are not simulated.  |
 | The Organizations SDK       | `CreatePolicy`, `AttachPolicy`, `ListAccounts` and the rest of the API are not handled. Policies are attached through the accessor. |
-| CloudFormation              | `AWS::Organizations::Organization`, `::OrganizationalUnit`, `::Account` and `::Policy` are not created from a template.             |
 | Organization condition keys | `aws:PrincipalOrgID` and `aws:PrincipalOrgPaths` are not populated. A condition naming either fails to match.                       |
 | Service principals          | A request whose caller is a service principal or anonymous belongs to no Account and is subject to no policy.                       |
 | Condition operator coverage | The operators above are evaluated. Anything else fails closed and the statement holding it matches nothing.                         |

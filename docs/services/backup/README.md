@@ -1,12 +1,12 @@
 # Simulated AWS Backup
 
-Yulin includes simulated AWS Backup vaults, plans, selections, backup jobs and recovery points for
-tests and local development. AWS Backup types are imported from the `@kensio/yulin/backup` subpath.
+Yulin simulates AWS Backup vaults, plans, selections, jobs and recovery points. Import Backup types
+from `@kensio/yulin/backup`.
 
 ## Creating a vault, plan and selection
 
-`simAws.backup()` gives the AWS Backup service for the default account and Region. A plan rule names
-an existing vault. A selection belongs to one plan and records the resource ARNs assigned to it.
+Use `simAws.backup()` for the default account and Region. Each plan rule names an existing vault. A
+selection assigns resource ARNs to a plan.
 
 ```typescript sim-backup-create-plan-selection
 /**
@@ -78,19 +78,17 @@ console.log(selection.BackupSelection?.Resources);
 // ["arn:aws:dynamodb:us-east-1:888888888888:table/orders"]
 ```
 
-A plan needs at least one rule. Every rule needs a name and a target vault. An omitted schedule uses
-`cron(0 5 ? * * *)`, the AWS Backup default. Six-field AWS cron expressions and rate expressions
-are validated when the plan is created. A one-time `at(...)` expression is refused.
+A plan needs at least one named rule and target vault. The default schedule is
+`cron(0 5 ? * * *)`. Yulin accepts six-field AWS cron expressions and rate expressions. It rejects
+`at(...)` expressions.
 
-`MoveToColdStorageAfterDays` can be combined with `DeleteAfterDays`. The deletion must be at least
-90 days after the move to cold storage. A shorter lifecycle raises
-`InvalidParameterValueException`. Set both values to `-1` to retain recovery points indefinitely.
+When both lifecycle values are set, `DeleteAfterDays` must be at least 90 days after
+`MoveToColdStorageAfterDays`. Use `-1` for both values to keep recovery points indefinitely.
 
 ## Running scheduled backups
 
-Each plan rule runs on the simulated clock. A due rule creates one recovery point for each distinct
-resource ARN in the plan's selections. The recovery point records the rule, resource ARN, lifecycle
-and creation time. The simulation completes backup jobs at the scheduled instant.
+Plan rules run on the simulated clock. A due rule creates one completed job and recovery point for
+each distinct resource ARN in its selections.
 
 ```typescript sim-backup-run-schedule
 /**
@@ -161,19 +159,16 @@ console.log(points.RecoveryPoints?.[0]?.ResourceArn);
 console.log(jobs.BackupJobs?.[0]?.State); // "COMPLETED"
 ```
 
-`DeleteAfterDays` removes a recovery point when the clock reaches its deletion time. Vault reads,
-`ListRecoveryPointsByBackupVault` and `DescribeRecoveryPoint` apply the expiry before returning.
-Repeated schedules keep every unexpired recovery point.
+`DeleteAfterDays` removes a recovery point when simulated time reaches its expiry. Recovery point
+reads apply expiry before returning.
 
-Vault Lock bounds apply when a backup starts. A lifecycle shorter than `MinRetentionDays`, longer
-than `MaxRetentionDays` or indefinite under a finite maximum produces a `FAILED` backup job. The
-vault receives no recovery point for that job. Use `ListBackupJobs` or `DescribeBackupJob` to read
-the failure and its `StatusMessage`.
+Vault Lock bounds are checked when a backup starts. An invalid lifecycle produces a `FAILED` job and
+no recovery point. Read the reason from the job's `StatusMessage`.
 
 ## Starting an on-demand backup
 
-`StartBackupJob` completes an on-demand job at the current simulated time. It applies the same
-lifecycle validation and Vault Lock bounds as a scheduled rule.
+`StartBackupJob` completes at the current simulated time. It applies the same lifecycle and Vault
+Lock checks as a scheduled job.
 
 ```typescript sim-backup-start-job
 /**
@@ -219,9 +214,8 @@ console.log(point.CreationDate?.toISOString());
 
 ## Vault Lock
 
-`PutBackupVaultLockConfiguration` records minimum and maximum retention periods on a vault. Adding
-`ChangeableForDays` creates a compliance lock. The configuration stays changeable until the grace
-period ends, then becomes immutable.
+`PutBackupVaultLockConfiguration` sets minimum and maximum retention. `ChangeableForDays` adds a
+grace period. The configuration becomes immutable when that period ends.
 
 ```typescript sim-backup-vault-lock
 /**
@@ -284,8 +278,7 @@ exceed the maximum, and the maximum cannot exceed 36,500 days. A lock without
 ## Deploying from CloudFormation
 
 Simulated CloudFormation deploys `AWS::Backup::BackupVault`, `AWS::Backup::BackupPlan` and
-`AWS::Backup::BackupSelection`. References between the resources resolve before AWS Backup creates
-them.
+`AWS::Backup::BackupSelection`.
 
 ```typescript sim-backup-cloudformation
 /**
@@ -376,10 +369,9 @@ Stack teardown removes all three resource types from the simulation.
 
 ## Permissions
 
-Every supported operation is authorized by simulated IAM. Vault operations use the vault ARN. Plan
-and selection operations use the plan ARN. `ListBackupVaults` has no resource in its request and is
-authorized against `*`. `StartBackupJob` and `ListRecoveryPointsByBackupVault` use the vault ARN.
-`DescribeRecoveryPoint` uses the recovery point ARN. Backup job reads use `*`.
+Every supported operation uses simulated IAM. Vault operations authorize against the vault ARN.
+Plan and selection operations use the plan ARN. `DescribeRecoveryPoint` uses the recovery point ARN.
+List and backup job read operations that name no resource use `*`.
 
 ```typescript sim-backup-iam-policy
 /**
@@ -432,13 +424,12 @@ const created = await simAws.backup().createBackupVault(
 console.log(created.BackupVaultName); // "application-backups"
 ```
 
-Authorization runs before resource lookup. An unauthorized request for a missing vault or plan
-raises `AccessDeniedException`, without revealing whether the resource exists.
+Authorization runs before resource lookup. An unauthorized request for a missing resource raises
+`AccessDeniedException`.
 
 ## SDK interception
 
-`SimSdk` routes commands from an AWS `BackupClient` to the simulation. Intercept the client instance
-when a test owns it, or intercept the class when application code creates the client.
+Intercept a `BackupClient` instance or the client class to route SDK commands to Yulin.
 
 ```typescript sim-backup-sdk-interception
 /**
@@ -466,13 +457,12 @@ console.log(listed.BackupVaultList?.[0]?.BackupVaultName);
 // "application-backups"
 ```
 
-The client's configured Region selects the simulated Region. Credentials select the account and
-caller when the intercepted client has them. See the [SDK interception docs](https://yulinsim.dev/sdk/)
-for class interception and credential handling.
+Client Region and credentials select the simulated scope and caller. See
+[SDK interception](https://yulinsim.dev/sdk/) for details.
 
 ## Account and Region scoping
 
-AWS Backup state belongs to one account and Region. The same vault name can exist in another scope.
+Backup state is scoped by account and Region. The same vault name can exist in another scope.
 
 ```typescript sim-backup-account-region-scoping
 /**

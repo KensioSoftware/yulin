@@ -1,20 +1,15 @@
 # Simulated CloudWatch Logs
 
-Yulin includes a simulated Amazon CloudWatch Logs for tests and local development. It holds log
-groups, the streams inside them and the events written to those streams. A test can put log events
-and read them back with `GetLogEvents`, or search them with `FilterLogEvents`, without an AWS
-account.
-
-The point of it is to make log data addressable. Code that writes to CloudWatch Logs is code teams
-already have, and the alternative for a test is capturing process output.
+Yulin simulates CloudWatch Logs in memory. It stores log groups, streams, and events. Application
+code can write events through the normal SDK commands, and tests can read one stream with
+`GetLogEvents` or search a group with `FilterLogEvents`.
 
 CloudWatch Logs specific types are imported from the `@kensio/yulin/logs` subpath.
 
 ## Writing and searching log events
 
-A log group holds streams, a stream holds events, and `FilterLogEvents` searches across every
-stream in a group. A test can therefore name the group and leave the stream out, without knowing
-which execution environment wrote the line.
+`FilterLogEvents` searches every stream in a group. A test can find an event without knowing which
+execution environment wrote it.
 
 ```typescript sim-logs-write-and-search
 /**
@@ -86,11 +81,9 @@ set of alternatives, and a quoted phrase matches with its spaces intact.
 
 An omitted or empty pattern matches everything.
 
-The structured pattern syntaxes are refused. A JSON property pattern (`{ $.level = "ERROR" }`), a
+Yulin refuses structured pattern syntaxes. A JSON property pattern (`{ $.level = "ERROR" }`), a
 space delimited field pattern (`[level=ERROR, message]`) and a regular expression term
-(`%ERROR|WARN%`) each raise `SimLogsUnsupportedOperationException`. Approximating one would be
-worse. A pattern quietly treated as matching everything would turn an assertion about one log line
-into an assertion about any log line at all, and the test would keep passing while testing nothing.
+(`%ERROR|WARN%`) each raise `SimLogsUnsupportedOperationException`.
 
 ## Reading one stream
 
@@ -166,10 +159,8 @@ console.log(read);
 
 ## Retention
 
-Retention is held as a property to assert on. Events stay where they are, and seeing one go would
-mean moving the clock by months. What teams get wrong about retention is the value they deployed,
-ahead of the deletion that eventually follows from it. A log group with no retention keeps its
-events forever, the AWS default.
+Retention is stored and reported but leaves events in place. A log group without a retention setting
+keeps events forever, matching the AWS default.
 
 The accepted values are a fixed set. A reasonable-looking `retentionInDays: 10` is refused here
 exactly as it is by an account.
@@ -210,9 +201,8 @@ console.log(
 
 ## Lambda handler output
 
-A Lambda function's output is recorded into `/aws/lambda/<function name>` as it runs, whether its
-code is a zip archive or a real in-process handler. A test can then assert on what a handler logged
-by searching its log group.
+A simulated Lambda function writes its output to `/aws/lambda/<function name>`, whether it runs from
+a zip archive or an in-process handler. Search that group to assert on handler output.
 
 ```typescript sim-logs-lambda-output
 /**
@@ -256,11 +246,9 @@ const found = await simAws.logs().filterLogEvents(
 console.log(found.events?.[0]?.message);
 ```
 
-The output still reaches the terminal as well. Real Lambda sends it to CloudWatch Logs and nowhere
-else, but a test tool that swallowed it would make a failing test harder to debug. Recording is a
-tee.
+Output also remains visible in the terminal to help diagnose failing tests.
 
-An invocation that ends in an error nothing caught leaves an `ERROR Invoke Error` line in the group
+An invocation that ends in an uncaught error leaves an `ERROR Invoke Error` line in the group
 after whatever it printed, carrying the error's type, its message and its stack. The
 [simulated Lambda docs](https://yulinsim.dev/services/lambda/ "Simulated Lambda usage docs") show
 one.
@@ -272,8 +260,8 @@ shape in a test, and leave the value alone.
 
 Writing on this path is unconditional. A real function needs `logs:CreateLogGroup` and
 `logs:PutLogEvents` on its execution Role, and one without them produces no logs at all, in silence.
-Simulating that would leave nearly every function in a test logging nothing, with no failure to
-explain why.
+Yulin always captures this output so missing log permissions do not hide diagnostic messages in
+tests.
 
 ## Declaring a log group in a template
 
@@ -308,12 +296,11 @@ Two divergences to know about:
 
 ## Delivering logs from another service
 
-CloudWatch Logs delivery carries the logs of another service somewhere. CloudFront standard logging
-v2 is the clearest case. A distribution has no logging property of its own, and turning logging on
-means three CloudWatch Logs resources.
+CloudWatch Logs delivery connects a service's log source to a destination. CloudFront standard
+logging v2 uses a delivery source, a delivery destination, and a delivery.
 
-A delivery source names what is being logged and which of its logs. A delivery destination names
-where they land and in what form. A delivery joins one to the other.
+The source identifies the resource and log type. The destination identifies where logs would go and
+their output format. The delivery joins them.
 
 ```typescript sim-logs-delivery
 /**
@@ -418,7 +405,7 @@ rules from real AWS are modelled here, each of them a deploy that looks fine unt
 - **A delivery holds both its ends.** Deleting the source or the destination while a delivery joins
   them fails with `ConflictException`. The delivery goes first, and CloudFormation orders that
   itself when a stack is deleted.
-- **CloudFront delivers `ACCESS_LOGS` and nothing else.** Any other `logType` over a distribution is
+- **CloudFront supports only `ACCESS_LOGS`.** Any other `logType` over a distribution is
   refused.
 - **CloudFront delivery is set up from `us-east-1`**, whatever region the destination bucket is in.
   A CloudFront delivery source put from anywhere else is refused.
@@ -441,10 +428,9 @@ bare variables and let delivery name them.
 
 ### Declaring delivery in a template
 
-The same three resources in a template, which is the whole of what a CDK construct for CloudFront
-logging synthesises, alongside the distribution they are for. The source's `ResourceArn` is built
-around a `Ref` to that distribution, the way CDK builds it. A pinned distribution id fails the
-deploy (see [the rules above](#delivering-logs-from-another-service)).
+A CloudFormation template can declare the same three resources alongside the CloudFront distribution.
+The source's `ResourceArn` can use `Ref` to include the generated distribution ID. A hard-coded ID
+for a missing distribution fails deployment (see [the rules above](#delivering-logs-from-another-service)).
 
 ```yaml
 SiteDistribution:
@@ -501,9 +487,9 @@ The template carries the S3 layout as two flat properties, and the API takes the
 delivery. CloudWatch Logs issues that ID. A template cannot predict it.
 
 `Fn::GetAtt` gives `Arn` on all three. The source also publishes `Service` and `ResourceArns`, and
-the delivery publishes `DeliveryId` and `DeliveryDestinationType`. The destination publishes nothing
-else, and `DeliveryDestinationType` is a property of it rather than an attribute, so read that one
-off the delivery. Anything outside this set is refused here, as CloudFormation refuses it.
+the delivery publishes `DeliveryId` and `DeliveryDestinationType`. The destination publishes only
+`Arn`. Read `DeliveryDestinationType` from the delivery rather than the destination. CloudFormation
+refuses attributes outside this set.
 
 `Tags` and `DeliveryDestinationPolicy` are recorded as ignored properties, and the stack still
 deploys.
@@ -732,7 +718,8 @@ function is. `UpdateAlias` moves what the filter reaches, and the filter stays a
 
 ## Metric filters
 
-A metric filter turns matching log events into CloudWatch metric datapoints. It is how a log line becomes something an alarm can watch, with no handler publishing a metric of its own.
+A metric filter converts matching log events into CloudWatch metric datapoints. An alarm can then
+watch the metric without application code calling `PutMetricData`.
 
 ```typescript sim-logs-metric-filter
 /**
@@ -916,7 +903,9 @@ console.log(MetricAlarms?.[0]?.StateValue);
 
 ## Embedded Metric Format
 
-A log event that is itself an Embedded Metric Format document publishes the metrics it declares. This is how AWS Lambda Powertools counts anything. Its `Metrics` writes an EMF document to the handler's stdout and calls no CloudWatch API at all, and a CDK `NodejsFunction` bundling Powertools does the same in a deployed account.
+A log event containing an Embedded Metric Format (EMF) document publishes its declared metrics.
+AWS Lambda Powertools uses this path. It writes EMF to standard output instead of calling the
+CloudWatch API.
 
 ```typescript sim-logs-embedded-metric-format
 /**
@@ -997,7 +986,9 @@ A log event is read as a document only where it parses as JSON, comes out as an 
 
 Three things go on `simAws.logs().metricPublicationFailures` rather than passing quietly. A metric the metadata declares and the document body carries no number under, a metric asking for `StorageResolution: 1`, which simulated CloudWatch has no period short enough for, and a directive that asked for dimensions and got no usable set of them.
 
-A dimension set is taken whole or dropped whole. One naming a key the body lacks, and one carrying anything but strings, are both dropped, because publishing part of a set would put the datapoint under a narrower identity than the document declared. A directive left with no usable set publishes nothing at all. Falling back to no dimensions would land the datapoint on the undimensioned metric, and that is one an alarm may well be watching.
+A dimension set is accepted or dropped as a whole. Yulin drops a set when the body lacks one of its
+keys or a value has a type other than string. Publishing only part of the set would create the wrong
+metric identity. A directive without a usable set produces no datapoint.
 
 Each entry on the ledger names its `source`, which is `{ kind: "metricFilter", filterName }` or `{ kind: "embeddedMetricFormat" }`. The two are told apart by kind rather than by name, because a metric filter may be called anything.
 
@@ -1132,7 +1123,7 @@ console.log(described.logGroups?.[0]?.logGroupArn);
 - **Events never expire.** Retention is stored and reported, never acted on.
 - **A metric filter reading a field of the log event.** A `metricValue` or a dimension value
   beginning `$` is refused where the filter is put. Both need a structured filter pattern, and
-  neither structured syntax is simulated.
+  both require a structured syntax, which Yulin refuses.
 - **How far back a `defaultValue` looks.** A filter remembers the most recent minute it matched
   something in. A later write into that same minute publishes no default over the top, and a write
   landing in an earlier minute a match was already seen in does publish one. Events
@@ -1143,21 +1134,21 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   read, which is how it reaches CloudWatch in an account.
 - **`AWS::Logs::SubscriptionFilter`.** Recorded as a gap. The log group, the metric filter and the
   three delivery resource types are what simulated CloudFormation deploys here.
-- **`ApplyOnTransformedLogs` and `EmitSystemFieldDimensions` on a metric filter.** Recorded and
-  acted on by nothing. Log transformers are absent, so there is no transformed event to read.
-- **Nothing is actually delivered.** A delivery records that a source was joined to a destination
+- **`ApplyOnTransformedLogs` and `EmitSystemFieldDimensions` on a metric filter.** Recorded as
+  ignored properties. Log transformers are absent.
+- **Delivery resources store configuration only.** A delivery records that a source was joined to a destination
   and how the records would be written. No access log file ever reaches the bucket.
 - **`GetDeliverySource`, `GetDeliveryDestination` and `GetDelivery`.** Absent as SDK operations. The
   three `Describe` operations report the same resources. The three action names are authorized where
   CloudFormation reads a delivery Resource back.
 - **Delivery resource tags and cross-account delivery.** `PutDeliverySource`,
   `PutDeliveryDestination` and `CreateDelivery` refuse tags outright. `DeliveryDestinationPolicy` in
-  a template is recorded and acted on by nothing.
+  a template is recorded as an ignored property.
 - **An `=` in a suffix path with Hive compatible paths off.** Taken. Whether real CloudWatch Logs
   takes one is unverified. A path hand-rolling its own partition keys without the option is left
   alone here, and refused with the option on.
-- **Log types for services other than CloudFront.** Any `logType` is taken over a resource that is
-  not a distribution, because the valid set varies by service and this simulation does not carry it.
+- **Log types for services other than CloudFront.** Yulin accepts any `logType` for resources other
+  than distributions because the valid set varies by service.
 - **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
   `kmsKeyId` on `CreateLogGroup` are refused outright. A property cannot look set here and behave
   differently in an account.

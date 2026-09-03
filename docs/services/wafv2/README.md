@@ -1,16 +1,11 @@
 # Simulated WAFv2
 
-Yulin includes a simulated AWS WAFv2 for tests and local development. It holds web ACLs, IP sets and
-regex pattern sets, and it evaluates a request against a web ACL's rules to reach a decision. A test
-can assert that a request to `/admin` is blocked and one to `/` is allowed, without an AWS account
-and without a distribution in front of anything.
+Yulin simulates AWS WAFv2 web ACLs, IP sets and regex pattern sets for tests and local development.
+You can evaluate a `Request` directly or associate a web ACL with a simulated API Gateway REST API,
+Cognito user pool or CloudFront distribution. Each request is checked against the web ACL before
+the protected service handles it.
 
-A web ACL can also go in front of what serves the requests. A simulated API Gateway REST API stage
-and a simulated Cognito user pool each take one through `AssociateWebACL`, and a simulated
-CloudFront distribution takes one through its own `WebACLId`. The requests that stage, pool or
-distribution serves are then put through the web ACL's rules.
-
-WAFv2 specific types are imported from the `@kensio/yulin/wafv2` subpath.
+Import WAFv2-specific types from `@kensio/yulin/wafv2`.
 
 ## Deciding what happens to a request
 
@@ -91,11 +86,11 @@ carrying the status, the body and any headers the rule named.
 
 ## Rules run in priority order
 
-Rules are evaluated in ascending `Priority` and not in the order the list was written. The first
-rule that matches and carries a terminating action (`Allow` or `Block`) decides the request.
+Rules are evaluated by ascending `Priority`, regardless of their order in the input list. The first
+matching rule with an `Allow` or `Block` action decides the request.
 
-A `Count` action records the match and lets the next rule have a look. That is how a rule is staged
-before it is turned on, and `countedRuleNames` is what a test asserts against.
+A `Count` action records the match and continues to the next rule. Tests can inspect
+`countedRuleNames` before changing a rule to `Allow` or `Block`.
 
 ```typescript sim-wafv2-count
 /**
@@ -154,8 +149,8 @@ whatever serves the request has usually read it by the time WAF gets a look.
 
 ## What a statement can inspect
 
-A statement reads one part of the request, applies the rule's text transformations to it, and tests
-what comes out.
+A statement selects part of the request, applies its text transformations, and then tests the
+result.
 
 The parts a statement can be pointed at are `UriPath`, `QueryString`, `SingleQueryArgument`,
 `AllQueryArguments`, `SingleHeader`, `Headers`, `Cookies`, `Method` and `Body`. `Headers` and
@@ -1371,7 +1366,7 @@ Tags, logging, sampled requests and CloudWatch metrics for a web ACL are not sim
 `AssociationConfig`, `DataProtectionConfig`, `OnSourceDDoSProtectionConfig` and `ApplicationConfig`
 are refused for the same reason, each naming what it would have configured.
 
-## Simulated commands
+## Supported operations
 
 `CreateWebACL`, `GetWebACL`, `UpdateWebACL`, `ListWebACLs`, `DeleteWebACL`, `CreateIPSet`,
 `GetIPSet`, `UpdateIPSet`, `ListIPSets`, `DeleteIPSet`, `CreateRegexPatternSet`,

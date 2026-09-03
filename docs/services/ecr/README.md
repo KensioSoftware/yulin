@@ -1,31 +1,20 @@
 # Simulated ECR
 
-Yulin includes a simulated Amazon ECR for tests and local development. It holds repositories, and
-each repository holds images by tag, where a simulated image is a real in-process handler.
-
-That is what this service is for. A container image Lambda function cannot run here, because Yulin
-never reads an image, so something has to say what the code inside that image actually is. A
-repository is the natural place to say it. It is the stable name for the thing that holds the code,
-outliving any tag and any CDK construct ID, and a repository holding a registered handler outlives
-the stack that declared it too.
+Yulin represents an ECR image with an in-process Lambda handler. Register the handler against a
+repository and tag, then deploy or create a container image function that uses the image URI.
 
 ECR-specific types are imported from the `@kensio/yulin/ecr` subpath.
 
 ## What a simulated image is
 
-An image URI is only ever an identifier here. No image is pulled or inspected, and no layer,
-manifest, digest or scan finding exists. A simulated image is a handler function, registered against
-a repository and a tag.
+An image URI identifies a registered handler. Image content remains outside the simulation.
 
-Registering one is a Yulin-native operation, named `simulateImage` to keep it clear of a simulated
-`PutImage`. Real `PutImage` takes an image manifest for layers that were pushed over the Docker
-registry protocol. None of that happens in this process, and a simulated `PutImage` would be a
-command taking an argument nothing could produce.
+Use the Yulin-specific `simulateImage` method to register a handler. The simulated surface has no
+ECR SDK or Docker registry operations.
 
 ## Registering a handler as an image
 
-Register the handler once, in test setup, and every function that runs an image from that repository
-is created from it.
+Register the handler during test setup. Lambda resolves image functions from the same repository.
 
 ```typescript sim-ecr-register-image
 /**
@@ -82,36 +71,22 @@ console.log(Buffer.from(output.Payload).toString());
 await simAws.backgroundTasksComplete();
 ```
 
-Naming a repository is what creates it. A repository holds only its images. There is no prior
-declaration to make, and a test can name the repository its templates already point at.
+Calling `repository(name)` creates the repository if it is absent.
 
-The repository takes a bare name such as `orders` or `platform/orders`, and never a full image URI.
-The account, the region and the registry host around it come from the simulated ECR the repository
-belongs to. A name real ECR would refuse is refused here too.
+Pass a repository name such as `orders` or `platform/orders`. The selected simulated account and
+Region supply the registry host.
 
 ## How an image URI is matched
 
-Resolving an image URI happens in two steps, and the tag means something different in each.
+Yulin first matches the registry host and repository name. It then looks for the requested tag. A
+registered tag selects that handler. An unknown tag, a digest or no tag selects the most recently
+registered handler. This fallback lets content-hash and build-number tags resolve without copying
+those generated values into the test.
 
-Finding the repository ignores the tag. A function's `Code.ImageUri` is matched on the registry host
-and the repository name, with any tag or digest dropped, because no tag is stable enough to write
-into a test. A CDK image asset is tagged with the asset content hash, which changes whenever the
-image source does, and a pipeline-built image is usually tagged with a git sha or a build number
-passed in as a stack parameter. An `ImageUri` built by `Fn::Sub` or from a stack parameter is
-matched on what it resolves to.
+The registry host determines the account and Region. Repositories with the same name in different
+scopes remain separate. Cross-account image references are supported.
 
-Choosing the image in that repository does read the tag. A tag the repository holds selects exactly
-that image, and any other tag, or none at all, falls back to the image registered most recently.
-
-The registry host is part of the match, and the account and the region have to agree. A function can
-run an image from another account's repository, as it can on real AWS, and a same-named repository
-in another account is a different repository.
-
-So `orders:blue` runs the handler registered under `blue` where the repository holds one, and the
-handler registered most recently otherwise. That is how a blue/green pair of images in one
-repository can back two functions differently, while a content hash tag nobody registered still
-finds something to run. Registering a tag again both replaces what it held and makes it the most
-recent registration.
+Registering a tag again replaces its handler and makes that handler the most recent registration.
 
 ```typescript sim-ecr-image-tags
 /**
@@ -152,18 +127,15 @@ console.log(Buffer.from(output.Payload).toString()); // "blue handler"
 await simAws.backgroundTasksComplete();
 ```
 
-A function created directly through `CreateFunction` resolves its image the same way a template
-function does, as the example above shows. A function whose image resolves to no handler is refused,
-the way real Lambda refuses a function whose image it cannot pull.
+Direct `CreateFunction` calls and CloudFormation deployments use the same resolution rules. Lambda
+refuses an image URI that resolves to no handler.
 
 ## Repositories in CloudFormation
 
-`AWS::ECR::Repository` creates a simulated repository. A template declares a repository and never an
-image, as real CloudFormation does. A deployed repository starts empty unless a handler has already
-been registered in it.
+Simulated CloudFormation creates `AWS::ECR::Repository`. The repository starts empty unless a
+handler was already registered under its name.
 
-`Ref` returns the repository name, and `Fn::GetAtt` exposes `Arn` and `RepositoryUri`. An
-application stack can build its function's `ImageUri` from the repository a platform stack declared.
+`Ref` returns the repository name. `Fn::GetAtt` supports `Arn` and `RepositoryUri`.
 
 ```typescript sim-ecr-cloudformation-repository
 /**
@@ -236,34 +208,23 @@ console.log(Buffer.from(output.Payload).toString());
 await simAws.backgroundTasksComplete();
 ```
 
-A repository a handler is already registered in is adopted, and the order these happen in makes no
-difference. The image can exist before the stack that declares the repository, as it does in real
-life.
+A deployment adopts a repository that already contains a registered handler.
 
-Tearing the stack down removes the repository only where it holds no simulated image. One that does
-is left where it is, and the deletion is recorded as skipped, because the handler in it was
-registered outside any stack and is what every later deploy resolves to. Real ECR also refuses to
-delete a repository that still holds images, which fails the stack unless the template says
-`EmptyOnDelete`. Here the refusal is recorded and the teardown carries on, since what is being
-protected is a test's own registration.
+Stack teardown removes an empty repository. A repository containing a handler remains in place and
+its deletion is recorded as skipped. Teardown continues after the skipped deletion.
 
-Every other property a repository can declare is recorded as an ignored property, and the repository
-is created without it. That covers `ImageScanningConfiguration`, `ImageTagMutability`,
+Other repository properties are recorded as ignored. These include `ImageScanningConfiguration`, `ImageTagMutability`,
 `LifecyclePolicy`, `RepositoryPolicyText`, `EncryptionConfiguration`, `EmptyOnDelete` and `Tags`.
 
 ## Where a function's handler comes from
 
-Two things can back a container image function, and a deploy is looked at in this order:
+Yulin resolves a container image function in this order:
 
-1. An [executable binding](https://yulinsim.dev/services/lambda/#executable-bindings) given to that deploy, including one
-   naming the image repository. A binding is the more specific thing to have said, since it is about
-   one deploy.
-2. The simulated ECR repository the function's `Code.ImageUri` names. That is a standing statement
-   about what the image is, made once and good for every stack that runs it.
+1. An [executable binding](https://yulinsim.dev/services/lambda/#executable-bindings) supplied for the deployment.
+2. The handler registered in the ECR repository named by `Code.ImageUri`.
 
-A function with no binding and no registered image is skipped with a diagnostic, and the rest of the
-stack deploys. The reason separates a missing repository from an empty one, since those send you to
-different places. One is a wrong name, and the other is a handler that was never registered.
+A function with no binding or registered image is skipped. The diagnostic distinguishes a missing
+repository from a repository with no handlers.
 
 ## Available functionality
 
@@ -278,16 +239,14 @@ different places. One is a wrong name, and the other is a handler that was never
 
 ## Limitations
 
-Current documented limitations:
-
 - No image content, layer, digest, manifest or scan behaviour is simulated. A repository holds
   handlers, and no image is ever pulled or inspected.
 - There are no ECR SDK commands. `CreateRepository`, `DescribeRepositories`, `PutImage`,
   `DescribeImages`, `BatchDeleteImage` and `GetAuthorizationToken` are all absent. Registering an
   image is a Yulin-native operation because real `PutImage` takes a manifest for layers pushed over
   the Docker registry protocol, and that protocol never runs in this process.
-- Nothing authorizes against a repository. With no requests to authorize, a repository policy goes
-  unread and simulated IAM stays out of it.
+- CloudFormation authorizes `ecr:CreateRepository` and `ecr:DeleteRepository`. Handler registration
+  has no caller and skips authorization. Repository policies are ignored.
 - Lifecycle policies go unevaluated, and no simulated image ever expires. Tag mutability goes
   unenforced, and registering the same tag again replaces what it held.
 - Naming a repository creates it. There is no `CreateRepository` to fail for a name already taken,
@@ -295,8 +254,8 @@ Current documented limitations:
 - A stack teardown records the deletion of a repository holding a simulated image and carries on,
   where real CloudFormation fails the stack unless the template says `EmptyOnDelete`. The repository
   and its handler are left in place, and `EmptyOnDelete` itself goes unread.
-- Nothing tracks which stack created a repository. A repository holding no simulated image is
-  removed by the teardown of any stack that declared it, and made again by the next deploy.
+- The repository model records no owning stack. Teardown of any declaring stack removes an empty
+  repository.
 - Repository tags, registry policies, pull through cache rules, replication configuration and ECR
-  Public are not simulated.
-- ECR has no HTTP API under `serveSimAws`, and nothing for a Docker client to talk to.
+  Public are absent.
+- `serveSimAws` exposes no ECR HTTP API or Docker registry endpoint.

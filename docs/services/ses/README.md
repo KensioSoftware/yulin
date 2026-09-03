@@ -1,20 +1,14 @@
 # Simulated SES
 
-Yulin includes a simulated Amazon SES for tests and local development, through the SES v2 API. It
-holds email identities, applies the sandbox rules, and keeps a record of every message it would have
-sent. A test can assert that signing someone up produced a welcome email addressed to them, without
-an AWS account and without a mailbox to read.
-
-There is no delivery to simulate. A message SES accepts leaves AWS for a mail system. The whole of
-the observable AWS behaviour is whether SES would have accepted the message and what it would have
-sent. That is what makes this service small and what makes it useful.
+Yulin simulates the Amazon SES v2 API in memory. It stores email identities, applies sandbox and
+suppression rules, renders templates, and records accepted messages. It does not deliver email.
 
 SES specific types are imported from the `@kensio/yulin/ses` subpath.
 
 ## Asserting on a message that was sent
 
-`sentEmails()` hands over the record. Each message carries who it was from, the three recipient
-lists, the subject, the body, its attachments and the message id SES answered with.
+Use `sentEmails()` to inspect accepted messages. Each record contains the sender, To/Cc/Bcc lists,
+subject, body, attachments, and message ID.
 
 ```typescript sim-ses-send-and-assert
 /**
@@ -115,9 +109,8 @@ console.log(
 
 ## Verifying identities
 
-Real SES verifies an email address by emailing it a link and a domain by looking for DNS records.
-Neither can happen inside a test process, so verification here is the simulator's own operation
-instead of an API call. `verifyIdentity` performs it, creating the identity where one is absent.
+SES normally verifies an address by email and a domain through DNS. In tests, call `verifyIdentity`
+instead. It creates the identity if necessary and marks it verified.
 
 Everything else about identities is the ordinary SES API. `CreateEmailIdentity` starts one, and it
 starts unverified, exactly as a real one does:
@@ -631,13 +624,10 @@ one answer whoever asked.
 
 ## The sandbox
 
-An account starts in the SES sandbox, where **both** the sender and every recipient have to be
-verified. That is the state most tests should be written against. It is the configuration that
-refuses to mail an address nobody verified, and catching that refusal in a test is much better than
-catching it in an account.
+An account starts in the SES sandbox. Both the sender and every recipient must be verified. Outside
+the sandbox, only the sender must be verified.
 
-Outside the sandbox only the sender is checked. `PutAccountDetails` with `ProductionAccessEnabled`
-is how an account gets there:
+Call `PutAccountDetails` with `ProductionAccessEnabled` to leave the sandbox:
 
 ```typescript sim-ses-sandbox
 /**
@@ -696,17 +686,12 @@ caller finds out everything it has to verify from one failure:
 Email address is not verified. The following identities failed the check in region US-EAST-1: someone@example.org
 ```
 
-Real SES treats `ProductionAccessEnabled` as a request that a human at AWS then reviews, and an
-account stays in the sandbox until that review lands. Granting it immediately is a deliberate
-divergence. The alternative is a simulator no test can get out of the sandbox in, and waiting for a
-review is beyond what a test can assert on anyway.
+Unlike AWS, Yulin grants production access immediately instead of waiting for a manual review.
 
 ## The suppression list
 
-Real SES holds an account-level suppression list and fills it from hard bounces and complaints.
-Tests supply that feedback explicitly with `recordFeedback`. Suppression commands manage the same
-list. The support tool that lists suppressed addresses, the form that removes one and the script
-that seeds the list all have somewhere to run.
+SES maintains an account suppression list for hard bounces and complaints. Tests add feedback with
+`recordFeedback`, and the suppression commands read and change the same list.
 
 `PutSuppressedDestination`, `GetSuppressedDestination`, `ListSuppressedDestinations` and
 `DeleteSuppressedDestination` manage it.
@@ -870,8 +855,7 @@ recorded.
 
 ## Messages on the console
 
-`sentEmails()` is test code. A dev server has the same messages going past and nothing to read them
-with, so `serveSimAws` prints a summary of each one as SES accepts it:
+For local development, `serveSimAws` prints a summary whenever SES accepts a message:
 
 ```
 sim SES: hello@example.com to alice@example.com, bcc audit@example.com
@@ -899,9 +883,8 @@ pool kept. Both services recorded it, and each block says what that service hold
 
 ## Permissions
 
-Every command authorizes through simulated IAM. A send authorizes against the identity being sent
-**from**, and recipients never enter into it. That is worth knowing when a policy looks like it
-should cover a send and fails to.
+Every command uses simulated IAM. A send authorizes against the sender identity, not the recipient
+addresses.
 
 ```typescript sim-ses-permissions
 /**

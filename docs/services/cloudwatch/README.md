@@ -1,20 +1,11 @@
 # Simulated CloudWatch Metrics
 
-Yulin includes a simulated Amazon CloudWatch for tests and local development. It holds custom
-metrics. Those are the datapoints `PutMetricData` publishes, and the statistics
-`GetMetricStatistics` and `GetMetricData` read back from them, without an AWS account. It also holds alarms over those
-metrics, which evaluate on the simulation's clock and notify an SNS topic when they change state.
+Yulin simulates CloudWatch metrics and alarms in memory. Application code can publish datapoints and
+read their statistics through the normal CloudWatch commands. Alarms evaluate on simulated time and
+can notify simulated SNS topics.
 
-Code that publishes a business metric is code teams already have, and until now the only way to test
-it was to assert that the SDK client had been called. That proves the call was made. What it
-measured goes untested.
-
-Most of what lives here is custom metrics. Simulated Lambda publishes its own `AWS/Lambda`
-`Invocations`, `Errors`, `Duration` and `IteratorAge`, simulated Cognito publishes a pool's
-`AWS/Cognito` counts, and no other simulated service publishes into an `AWS/` namespace yet. A
-query for one nothing measures comes back empty, in place of a number that was never taken. A test
-can stand a datapoint up for one of those itself, which is what drives an alarm on a service metric
-to a state change.
+Simulated Lambda publishes `AWS/Lambda` metrics, and simulated Cognito publishes `AWS/Cognito`
+metrics. Tests can seed other AWS-managed metrics through the service writer described below.
 
 A custom metric's datapoints arrive either from `PutMetricData` or from a CloudWatch Logs metric
 filter counting matching log events. See the [CloudWatch Logs docs](../logs/README.md) for the
@@ -24,8 +15,8 @@ CloudWatch specific types are imported from the `@kensio/yulin/cloudwatch` subpa
 
 ## Publishing and reading back a metric
 
-A metric is identified by its namespace, its name and its dimensions together. Publishing a value
-and asking for it back at a period is the whole loop:
+A metric is identified by its namespace, name, and exact set of dimensions. Publish a value and
+read it back over a period:
 
 ```typescript sim-cloudwatch-publish-and-read
 /**
@@ -84,18 +75,14 @@ the way out. A query naming a unit CloudWatch lacks fails here as it would in an
 
 ## Metrics are identified by their dimensions
 
-Real CloudWatch leaves a custom metric unrolled across its dimensions, and so does this. The same
-metric name published under two channels is two metrics. A read naming no dimensions reaches only the
-metric that was published with none, and never aggregates across the others.
-
-That is the behaviour teams most often get wrong, and it is worth a test of its own. A dashboard
-query written against a metric name alone finds nothing at all if every publish carried a dimension.
+CloudWatch treats each exact set of dimensions as a separate metric. Publishing the same metric name
+with two dimension values creates two metrics. A query without dimensions reads only datapoints
+published without dimensions.
 
 ## Metrics and simulated time
 
-A datum carrying no `Timestamp` is stamped from the simulation's clock. A test with
-a frozen clock therefore gets timestamps it can assert on exactly, and one that moves time on gets
-datapoints in the period it moved to:
+A datum without a `Timestamp` uses the simulation's clock. Set or advance the clock to place
+datapoints in exact periods:
 
 ```typescript sim-cloudwatch-simulated-time
 /**
@@ -153,11 +140,14 @@ window drops a metric out of the listing without anything having to expire it.
 
 ## Metrics a simulated service publishes
 
-Real CloudWatch holds two kinds of metric. A caller publishes a custom one through `PutMetricData`, and AWS publishes its own under a namespace beginning `AWS/` that no caller may write into. Both kinds are read the same way.
+Callers publish custom metrics through `PutMetricData`. AWS-managed metrics use namespaces beginning
+with `AWS/`, which callers cannot publish into.
 
-Two services publish their own. Simulated Cognito counts what a user pool was asked to do, under `AWS/Cognito` and dimensioned by `UserPool` and `UserPoolClient`, which the [Cognito docs](../cognito/README.md) cover.
+Simulated Cognito publishes counts under `AWS/Cognito`, dimensioned by `UserPool` and
+`UserPoolClient`. See the [Cognito docs](../cognito/README.md).
 
-Simulated Lambda publishes three of its own. Every invocation counts `Invocations` and a `Duration`, and one whose handler threw counts an `Errors` alongside them, all under `AWS/Lambda` and dimensioned by `FunctionName`. Nothing has to be turned on, and no execution Role needs a permission for it, which is how real Lambda behaves.
+Simulated Lambda publishes `Invocations`, `Duration`, and `Errors` under `AWS/Lambda`, dimensioned by
+`FunctionName`. These metrics require no extra configuration or execution-role permission.
 
 ```typescript sim-cloudwatch-lambda-errors
 /**
@@ -217,13 +207,15 @@ const { MetricAlarms } = await simAws
 console.log(MetricAlarms?.[0]?.StateValue);
 ```
 
-`Duration` is measured on the simulation's clock rather than the host's, so it is a number a test can assert on. A handler that moves the clock reports the time it moved, and one that returns without touching it reports nothing spent. `IteratorAge` is measured the same way, and the Lambda documentation covers what a stream event source mapping reports.
+`Duration` uses the simulation's clock rather than the host's. A handler that advances the clock
+reports that elapsed time, while a handler that leaves it unchanged reports zero duration.
+`IteratorAge` uses the same clock. The Lambda documentation describes the value reported by a stream
+event source mapping.
 
 ## Seeding a metric AWS publishes
 
-`PutMetricData` refuses a namespace beginning `AWS/`, exactly as an account does. An alarm watching a metric no simulated service publishes therefore sits in `INSUFFICIENT_DATA`, and its arithmetic goes untested however carefully the alarm itself is declared.
-
-The service writer is the way in. It is the same route simulated Lambda's own metrics take, reached from a test through `cloudWatch().serviceWriter()`, and it stands a datapoint up in any namespace.
+`PutMetricData` refuses namespaces beginning with `AWS/`. To test an alarm for another AWS-managed
+metric, add the datapoint through `cloudWatch().serviceWriter()`.
 
 ```typescript sim-cloudwatch-seed-service-metric
 /**
@@ -286,14 +278,13 @@ console.log(MetricAlarms?.[0]?.StateValue);
 
 A datapoint arriving without a `timestamp` is stamped with the simulation's clock. One carrying its own lands where it says, which fills a window without the clock having to be walked through it.
 
-`PutMetricData` is untouched by any of this. A caller naming a reserved namespace is refused exactly as before, and only the account's own machinery and a test reach the store this way.
+The service writer is a test setup API. `PutMetricData` keeps its reserved-namespace validation.
 
 ## Alarms
 
-An alarm watches one metric and changes state on the simulation's clock, with no real timer behind
-it. Each evaluation is scheduled at the next period boundary. A frozen clock evaluates nothing, and
-advancing time by twenty minutes walks twenty one-minute evaluations and settles before the next
-line of the test runs.
+An alarm watches one metric and changes state on the simulation's clock. Each evaluation is scheduled
+at the next period boundary. Advancing time by twenty minutes runs twenty one-minute evaluations and
+settles before the next line of the test.
 
 ```typescript sim-cloudwatch-alarm
 /**
@@ -353,8 +344,8 @@ console.log(described.MetricAlarms?.at(0)?.StateValue);
 ```
 
 A new alarm is in `INSUFFICIENT_DATA` until it has evaluated a period, as on real CloudWatch. The
-window it looks back over reaches behind the moment the alarm was created. An alarm over a metric
-nothing publishes into, with `TreatMissingData: "breaching"`, therefore fires on its first
+window it looks back over reaches behind the moment the alarm was created. An alarm over an empty
+metric, with `TreatMissingData: "breaching"`, therefore fires on its first
 evaluation, without waiting for the periods to accumulate. That is what an account does too.
 
 ### Reaching a subscriber
@@ -458,10 +449,9 @@ had never named them.
 
 ## Permissions
 
-CloudWatch metrics have no ARN, leaving a policy nothing to name. Every metric action here is
-granted on `*`. A policy written against something like
-`arn:aws:cloudwatch:eu-west-2:111111111111:metric/Orders/Failed` reaches nothing, here and in an
-account.
+CloudWatch metrics have no ARN, so every metric action uses a resource of `*`. A policy written
+against a fabricated metric ARN such as
+`arn:aws:cloudwatch:eu-west-2:111111111111:metric/Orders/Failed` is invalid in Yulin and AWS.
 
 Alarms are the exception, and do have an ARN. `PutMetricAlarm`, `DeleteAlarms` and `SetAlarmState`
 authorize against `arn:aws:cloudwatch:<region>:<account>:alarm:<name>`, while `DescribeAlarms` and
@@ -525,7 +515,7 @@ await simAws.cloudWatch().putMetricData(
 // Publishing into any other namespace as this Role is denied.
 ```
 
-## What is simulated
+## Supported operations
 
 - `PutMetricData`, with `Value`, `StatisticValues` and `Values`/`Counts`.
 - `ListMetrics`, filtered by namespace, metric name and dimensions, with `RecentlyActive` and
@@ -546,11 +536,9 @@ await simAws.cloudWatch().putMetricData(
 - `AWS::CloudWatch::Alarm` in simulated CloudFormation, deployed through `PutMetricAlarm` and taken
   down with the stack.
 
-## What is refused, and how it says so
+## Unsupported operations and options
 
-Anything real CloudWatch would accept and this leaves undone is refused with a message saying so,
-rather than accepted and ignored. A silently dropped filter is worse than a failure, because the
-test still passes and no longer means what it says.
+Yulin rejects unsupported CloudWatch behavior instead of ignoring it:
 
 - **Composite and anomaly detection alarms.** `Metrics` and `ThresholdMetricId` on `PutMetricAlarm`
   are refused. There is no trained model here for an anomaly band to come from.
@@ -571,8 +559,6 @@ test still passes and no longer means what it says.
   through the service writer. A CloudWatch Logs metric filter naming a reserved namespace is refused
   when it publishes, as `PutMetricData` refuses a caller naming one.
 
-Two divergences are deliberate, and not refusals. Real CloudWatch rejects a datapoint more than two
-weeks old or more than two hours in the future, and this accepts any timestamp, letting a test seed
-a window without arranging the clock around it. And datapoints come back earliest first, which real
-CloudWatch's contract permits without promising, because a test reading the third period of five
-needs an order it can rely on.
+Two behaviors differ from AWS. Yulin accepts datapoints more than two weeks old or more than two
+hours in the future, which makes it easier to seed a test window. It also returns datapoints in
+ascending timestamp order so tests receive deterministic results.

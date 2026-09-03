@@ -1,18 +1,16 @@
 # Simulated Kinesis Data Firehose
 
-Yulin includes a simulated Kinesis Data Firehose for tests and local development. A delivery stream
-takes records, buffers them, and writes them into a simulated S3 Bucket under the key format real
-Firehose uses. The records come from `PutRecord` or off a simulated Kinesis stream. A test can put an
-event and assert on the Object it landed in, without an AWS account and without waiting five minutes
-for a buffer to flush.
+Yulin simulates Kinesis Data Firehose delivery streams in memory. A stream accepts records directly
+or reads them from simulated Kinesis, buffers them, and writes each completed buffer to simulated S3.
+Advance simulated time to flush interval-based buffers without waiting in real time.
 
 Firehose specific types are imported from the `@kensio/yulin/firehose` subpath.
 
 ## Putting a record and finding the Object
 
-`simAws.firehose()` gives the service for the default account and region. A delivery stream needs a
-Bucket to write into and a Role to write as, so both exist before it does. Advancing the clock past
-the buffering interval is what delivers the buffer.
+`simAws.firehose()` returns Firehose for the default account and region. Create the destination
+bucket and delivery role before the delivery stream. Advance the clock past the buffering interval
+to write the buffered records.
 
 ```typescript sim-firehose-put-and-deliver
 /**
@@ -93,15 +91,13 @@ const { Contents } = await simAws
 console.log(Contents?.[0]?.Key);
 ```
 
-The put is answered straight away with a record id. The Bucket stays empty until the buffer is
-delivered. That delay is what a Firehose pipeline is built around.
+`PutRecord` returns a record ID immediately. The bucket remains empty until the buffer is delivered.
 
 ## Buffering
 
-A delivery stream holds its records until the buffer passes `SizeInMBs` or `IntervalInSeconds`,
-whichever comes first. Everything in one buffer arrives as one Object, with the records concatenated
-end to end. A producer that wants lines puts the newline on the end of each record. The example
-below does exactly that.
+A delivery stream flushes when it reaches `SizeInMBs` or `IntervalInSeconds`, whichever comes first.
+Firehose concatenates all records in the buffer into one S3 object. Add a newline to each record if
+the object should contain separate lines.
 
 `IntervalInSeconds` runs from the first record of a buffer. The default is 300 seconds and the
 default size is 5 MB, as they are on real Firehose.
@@ -224,8 +220,8 @@ the background scheduler, the way real Firehose answers the producer before it w
 
 ## The Object key
 
-The key is the `Prefix`, then the UTC date path, then the delivery stream name, its version, the
-delivery time and a random string:
+Object keys contain the configured `Prefix`, UTC date path, delivery stream name, version, delivery
+time, and a random suffix:
 
 ```
 <Prefix>YYYY/MM/DD/HH/<delivery-stream-name>-<version>-YYYY-MM-DD-HH-MM-SS-<random>
@@ -234,15 +230,15 @@ delivery time and a random string:
 A delivery stream with no `Prefix` gets the bare date path. The version is `1` and stays there,
 since a delivery stream's configuration is fixed once it is created.
 
-Simulated time is what the date path and the timestamp come from. A test that sets the clock to a
-known instant knows the prefix its Objects are under, and can list them.
+The date path and timestamp use simulated time. Set the clock before delivery to make the prefix
+predictable.
 
 ## Reading from a Kinesis stream
 
-A delivery stream can take its records off a simulated Kinesis stream instead. Create it with a
+A delivery stream can read records from simulated Kinesis. Create it with a
 `DeliveryStreamType` of `KinesisStreamAsSource` and a `KinesisStreamSourceConfiguration` naming the
-stream and the Role to read it as. Records put on the stream from then on are buffered and delivered
-the way put records are.
+stream and its read role. Records added after the delivery stream is created are buffered and sent
+to S3.
 
 ```typescript sim-firehose-kinesis-source
 /**
@@ -382,11 +378,8 @@ Creating a delivery stream hands Firehose the destination `RoleARN`, and the sou
 where it reads a Kinesis stream. `CreateDeliveryStream` authorizes `iam:PassRole` against each of
 them. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
 
-The delivery itself is a separate request, made as the delivery stream's `RoleARN`. The caller who
-put the record needs no S3 permission at all, and a Role that cannot write to the Bucket fails the
-delivery. Real
-Firehose answered that `PutRecord` minutes earlier, and what became of the buffer reaches the
-producer through CloudWatch. The simulator keeps the failure for a test to read instead.
+Delivery uses the delivery stream's `RoleARN`, not the identity that called `PutRecord`. The role
+needs `s3:PutObject` on the destination. Failed writes appear in `getDeliveryFailures()`.
 
 ```typescript sim-firehose-permissions
 /**
@@ -507,9 +500,8 @@ what a test checking the denial does. Anything else is also warned about on the 
 `KinesisStreamSourceConfiguration` and `Tags` are read. A `Ref` gives the delivery stream name and
 `Fn::GetAtt` on `Arn` gives the ARN, the way real CloudFormation publishes them.
 
-A CDK `DeliveryStream` with an `S3Bucket` destination synthesizes that resource, along with the
-delivery Role and its policy. A CDK project reaches a simulated delivery stream by deploying its
-synthesized template, and nothing here has to be written by hand.
+A CDK `DeliveryStream` with an `S3Bucket` destination synthesizes this resource, its delivery role,
+and the role policy. Deploy that synthesized template directly into simulated CloudFormation.
 
 ```typescript sim-firehose-cloudformation
 /**
@@ -627,9 +619,9 @@ A `DeliveryStreamType` of `KinesisStreamAsSource` deploys as well. The
 `KinesisStreamSourceConfiguration` names the stream by ARN and the Role to read it as, and a stack
 declaring the stream beside the delivery stream archives what a producer puts on it.
 
-A delivery stream this simulation cannot deliver for is skipped and recorded in
-`stack.skippedResources`, and the rest of the stack deploys. That covers a destination other than
-S3, and a source property naming somewhere the records cannot come from, such as
+A delivery stream with an unsupported source or destination is recorded in
+`stack.skippedResources`, while the rest of the stack deploys. This includes destinations other than
+S3 and unsupported source properties such as
 `MSKSourceConfiguration` or `DatabaseSourceConfiguration`. The source property is what the skip is
 decided on, because a template that leaves `DeliveryStreamType` out gets `DirectPut` by default.
 

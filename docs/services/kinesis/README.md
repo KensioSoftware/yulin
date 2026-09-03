@@ -1,16 +1,14 @@
 # Simulated Kinesis Data Streams
 
-Yulin includes a simulated Kinesis Data Streams for tests and local development. It creates streams,
-places records on shards the way real Kinesis does, and hands them back through shard iterators. A
-test can put an event and assert that the consumer read it, without an AWS account and without
-waiting on a real stream.
+Yulin simulates Kinesis streams, shards, records and shard iterators in memory. Use
+`simAws.kinesis()` directly or intercept a `KinesisClient`.
 
 Kinesis specific types are imported from the `@kensio/yulin/kinesis` subpath.
 
 ## Putting a record and reading it back
 
-`simAws.kinesis()` gives the service for the default account and region. Records go on with
-`PutRecord`, and come off through a shard iterator, which is the walk every Kinesis consumer makes.
+Create a stream, put a record, then read it through a shard iterator. This is the same sequence used
+by an AWS SDK consumer.
 
 ```typescript sim-kinesis-put-and-read
 /**
@@ -59,17 +57,15 @@ const { Records } = await kinesis.getRecords(
 console.log(new TextDecoder().decode(Records[0]?.Data));
 ```
 
-A record keeps the bytes it was given. Whatever the producer encoded is what the consumer decodes.
+Kinesis stores the bytes supplied by the producer. The consumer is responsible for decoding them.
 
 ## Shards and partition keys
 
-A stream is created with the shard count it asks for, and each shard owns a slice of a 128 bit hash
-key space. A record goes to the shard whose slice covers the MD5 hash of its partition key, which is
-the placement real Kinesis makes. Two records sharing a partition key therefore land on one shard,
-in the order they were put, and that per-key ordering is what most Kinesis consumers depend on.
+A stream divides the 128-bit hash key space evenly across its shards. Kinesis uses the MD5 hash of
+the partition key to select a shard. Records with the same partition key reach the same shard in
+write order.
 
-Records under different partition keys can land anywhere. A consumer that has to see every record
-reads every shard.
+Different partition keys may select different shards. Read every shard to consume the whole stream.
 
 ```typescript sim-kinesis-shards
 /**
@@ -121,12 +117,10 @@ console.log(
 );
 ```
 
-An `ExplicitHashKey` on a record overrides the partition key for placement, and the record still
-carries the partition key the producer gave it. That is how a producer pins a record to a shard it
-picked.
+`ExplicitHashKey` overrides the hash used for placement. The stored record still contains the
+original partition key.
 
-A stream created with `StreamModeDetails` of `ON_DEMAND` gets four shards, which is what real
-Kinesis starts an on-demand stream with. Nothing here grows or shrinks that count.
+An `ON_DEMAND` stream starts with four shards. Its shard count remains fixed.
 
 ## Where a read starts
 
@@ -140,24 +134,20 @@ Every shard iterator type resolves to a place on the shard.
 | `AFTER_SEQUENCE_NUMBER` | The record following that sequence number.                    |
 | `AT_TIMESTAMP`          | The first record that arrived at or after the instant given.  |
 
-`GetRecords` hands back a `NextShardIterator` pointing at where the read finished, which is what a
-polling consumer passes to its next call. A read that has caught up comes back empty with an
-iterator standing where it was.
+Pass `NextShardIterator` to the next `GetRecords` call. A reader at the end of the shard receives an
+empty record list and another iterator at the same position.
 
-`MillisBehindLatest` reports how far behind the tip the reader is. Zero means caught up. Otherwise
-it is the age of the last record handed back, measured against simulated time.
+`MillisBehindLatest` is zero for a reader at the end of the shard. Otherwise it reports the age of
+the last returned record, measured against simulated time.
 
 ## Retention
 
-A stream keeps a record for 24 hours. Records older than that are gone from a read, and trimming is
-applied at the instant of the read rather than on a timer, so moving simulated time forward is all a
-test needs.
+A stream retains records for 24 hours by default. Retention is applied when records are read. Move
+simulated time forward to test expiration.
 
-`IncreaseStreamRetentionPeriod` and `DecreaseStreamRetentionPeriod` move it, up to the 8760 hours
-Kinesis keeps at most. Each refuses a request that goes the other way, including one asking for what
-the stream already keeps, which is what real Kinesis does with a caller that has the wrong idea of
-what the stream is set to. Shortening the window drops whatever it has already outlived from the
-next read.
+Use `IncreaseStreamRetentionPeriod` or `DecreaseStreamRetentionPeriod` to change the period. Values
+must stay between 24 and 8,760 hours. Each command rejects a value pointing in the wrong direction.
+Shortening the period affects the next read.
 
 ```typescript sim-kinesis-retention
 /**
@@ -209,26 +199,21 @@ console.log(Records.length);
 ## Triggering a Lambda function
 
 A [Lambda event source mapping](https://yulinsim.dev/services/lambda/#triggering-a-function-from-a-kinesis-stream "Simulated Lambda Kinesis event source docs")
-polls a stream and invokes a function with the records it reads. Every shard is read by a processor
-of its own, as real Lambda reads one, and the function's execution role is what the polling is done
-as.
+polls each shard and invokes the function with batches of records. Reads use the function's
+execution role.
 
 ## Feeding a Firehose delivery stream
 
 A [Firehose delivery stream](https://yulinsim.dev/services/firehose/#reading-from-a-kinesis-stream "Simulated Firehose Kinesis source docs")
-can read a stream and buffer what it reads into an S3 Bucket. It reads every shard as its source
-`RoleARN`, starting at the end of the stream when the delivery stream is created.
+can read every shard and buffer the records into S3. It starts at the end of the stream and reads as
+its source `RoleARN`.
 
 ## Deploying a stream
 
-`AWS::Kinesis::Stream` creates a simulated stream, which is what a CDK `Stream` synthesizes. The
-stream goes through the ordinary `CreateStream` command, so a stream a template deployed is the same
-thing an SDK caller would have got, and a template asking for something Kinesis will not take is
-refused in the words `CreateStream` refuses it in.
+Simulated CloudFormation deploys `AWS::Kinesis::Stream` through `CreateStream`. A CDK `Stream`
+synthesizes this resource type.
 
-`Ref` gives the stream name and `Fn::GetAtt` on `Arn` gives the stream ARN, which is the way round
-real CloudFormation publishes them. Every Kinesis API and every grant names the ARN, so a template
-wiring a stream into a Lambda event source mapping or an IAM policy reads the attribute.
+`Ref` returns the stream name. `Fn::GetAtt Arn` returns its ARN.
 
 ```typescript sim-kinesis-cloudformation
 /**
@@ -274,32 +259,24 @@ await simAws.kinesis().putRecord(
 );
 ```
 
-`Name`, `ShardCount`, `RetentionPeriodHours`, `StreamModeDetails` and `Tags` are read. A stream the
-template does not name is named after the stack, the logical ID and a tail derived from both, as
-[the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
-describe.
+Yulin reads `Name`, `ShardCount`, `RetentionPeriodHours`, `StreamModeDetails` and `Tags`. It generates
+a name when `Name` is absent. See [generated resource names](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates").
 
-`RetentionPeriodHours` is applied after the stream is created, because `CreateStream` takes no
-retention on real Kinesis either. It only ever goes up: a new stream keeps records for 24 hours,
-which is also the least Kinesis accepts, so a template can ask for more or for the same and never
-for less.
+`RetentionPeriodHours` is applied after creation. A new stream already has the minimum 24-hour
+period, so a template may keep it or increase it.
 
-`StreamEncryption` and `DesiredShardLevelMetrics` are recorded against the resource as unsimulated
-and the stream is created anyway, so a template that encrypts its streams still deploys and the
-omission is somewhere a test can find it. Deleting the stack deletes the stream.
+`StreamEncryption` and `DesiredShardLevelMetrics` are recorded as ignored properties. The stream is
+still created. Deleting the stack deletes it.
 
-`AWS::Kinesis::StreamConsumer` and `AWS::Kinesis::ResourcePolicy` are reported as unsupported and
-skipped. One registers an enhanced fan-out consumer and the other admits a caller from another
-account, and neither has anything to act on here.
+`AWS::Kinesis::StreamConsumer` and `AWS::Kinesis::ResourcePolicy` are skipped. Enhanced fan-out and
+resource policies are absent.
 
 ## Permissions
 
-Every operation goes through simulated IAM. The action is the `kinesis:` name of the operation, and
-the resource is the stream ARN, `arn:aws:kinesis:<region>:<account>:stream/<name>`. `ListStreams`
-names no stream and authorizes against `*`.
+Every operation uses simulated IAM. Stream operations authorize the corresponding `kinesis:` action
+against the stream ARN. `ListStreams` authorizes against `*`.
 
-`GetRecords` authorizes against the stream the iterator was made on, which the iterator carries. A
-caller cannot reach a stream it lacks permission for by holding someone else's iterator.
+`GetRecords` authorizes against the stream stored in the iterator.
 
 ```typescript sim-kinesis-permissions
 /**
@@ -362,8 +339,7 @@ try {
 
 ## SDK interception
 
-A `KinesisClient` handed to `SimSdk` reaches the simulated service, so application code that builds
-its own client needs no change.
+Intercept a `KinesisClient` when application code creates and uses the client itself.
 
 ```typescript sim-kinesis-sdk-interception
 /**
@@ -418,38 +394,22 @@ console.log(put.ShardId);
 
 Every operation takes `StreamName` or `StreamARN`, and reads the ARN when a request carries both.
 
-Anything else refuses on send with `SimSdkUnsupportedCommandError`.
+Any other command raises `SimSdkUnsupportedCommandError`.
 
 ## Divergences and limitations
 
-- **A stream is `ACTIVE` as soon as it exists.** Real Kinesis reports `CREATING` while it brings the
-  shards up, and a status a test has to poll through earns nothing when there are no shards to bring
-  up. `DELETING` and `UPDATING` are absent for the same reason.
-- **Nothing reshards.** `UpdateShardCount`, `SplitShard` and `MergeShards` move the shard map
-  underneath consumers holding iterators, and they are left out. A shard is opened when the stream
-  is created and never closes, so no shard reports an ending sequence number and no read reports a
-  child shard.
-- **Enhanced fan-out is absent.** `RegisterStreamConsumer`, `DeregisterStreamConsumer`,
-  `ListStreamConsumers`, `DescribeStreamConsumer` and `SubscribeToShard` need an HTTP/2 event stream
-  that nothing here delivers. Every consumer reads through `GetRecords`.
+- Streams become `ACTIVE` immediately. `CREATING`, `DELETING` and `UPDATING` states are absent.
+- Resharding is absent. `UpdateShardCount`, `SplitShard` and `MergeShards` are unsupported. Shards
+  have no ending sequence number or child shards.
+- Enhanced fan-out is absent. Consumers read through `GetRecords`.
 - **A shard iterator never expires.** Real Kinesis expires one after five minutes. An iterator this
   simulation never issued is still refused, with the `ExpiredIteratorException` real Kinesis uses.
-- **Throughput is unlimited.** Real Kinesis takes 1 MB or 1,000 records a second per shard for
-  writes and 2 MB a second for reads, and refuses past that with
-  `ProvisionedThroughputExceededException`. Nothing here counts. That is why `FailedRecordCount` on
-  `PutRecords` is always zero: the reasons real Kinesis fails one record of a batch are throughput
-  limits and internal faults, and neither is simulated. The per-record result shape is still what a
-  consumer of the response reads.
+- Throughput is unlimited. Yulin never raises `ProvisionedThroughputExceededException`, and
+  `PutRecords` reports zero failed records.
 - **Sequence numbers are 56 digit counters.** They are unique within a stream and increase within a
-  shard, as real Kinesis promises. They also increase across shards here, which real Kinesis does
-  not promise, so a consumer ordering two records from different shards would be relying on
-  something AWS does not offer.
-- **Server-side encryption is absent.** `StartStreamEncryption` and `StopStreamEncryption` are left
-  out, and no response carries an `EncryptionType`.
-- **Tags are kept and never listed.** A stream created with `Tags` holds them, readable through
-  `findStream`. `AddTagsToStream`, `ListTagsForStream` and `RemoveTagsFromStream` are absent.
-- **Kinesis Data Firehose is a separate service.** It has a simulation of its own under
-  `simAws.firehose()`, and a delivery stream there can read a stream here. Kinesis Video Streams is
-  absent.
-- **`AWS::DynamoDB::Table` `KinesisStreamSpecification` stays unsimulated.** A table does not publish
-  its changes into a stream here.
+  shard, as real Kinesis promises. Yulin also increments them across shards. AWS promises ordering
+  within a shard only.
+- Server-side encryption is absent. Responses contain no `EncryptionType`.
+- Stream tags are stored and available through `findStream`. Tagging commands are unsupported.
+- Kinesis Video Streams is absent.
+- The DynamoDB `KinesisStreamSpecification` integration is absent.

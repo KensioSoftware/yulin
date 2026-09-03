@@ -1,7 +1,7 @@
 # Simulated Secrets Manager
 
-Yulin includes a simulated AWS Secrets Manager for tests and local development. Secrets are stored
-in memory, versioned by staging label, and every operation is authorized by simulated IAM.
+Yulin simulates AWS Secrets Manager in memory. Secrets have encrypted versions and staging labels,
+and simulated IAM authorizes every operation.
 
 Secrets Manager-specific types are imported from the `@kensio/yulin/secretsmanager` subpath.
 
@@ -45,19 +45,14 @@ on read.
 
 ## Encryption and KMS permissions
 
-Every version is encrypted through simulated KMS when it is written and decrypted when
-`GetSecretValue` reads it. There is no flag for reading a secret without decrypting it. The read
-either returns the plaintext or fails.
+Every secret version is encrypted through simulated KMS. `GetSecretValue` decrypts the version and
+either returns its plaintext or fails.
 
-A secret naming no `KmsKeyId` uses the `aws/secretsmanager` AWS managed key, which asks the caller
-for no KMS permission at all. Secrets Manager supplies `kms:ViaService`, and that key's policy allows
-the account's principals to use it through Secrets Manager. A Lambda role granted only
-`secretsmanager:GetSecretValue` therefore reads the secret, as it does on real AWS.
+A secret without `KmsKeyId` uses the `aws/secretsmanager` AWS managed key. Its policy permits use
+through Secrets Manager, so callers do not need a separate KMS permission.
 
-Pass `KmsKeyId` to encrypt under a customer managed key instead, and the caller's own permissions on
-that key start to matter. Secrets Manager uses envelope encryption, asking KMS for a data key per
-version. A write needs `kms:GenerateDataKey` and a read needs `kms:Decrypt`. A role granted the
-secret but not the key fails here, ahead of a deployment.
+Pass `KmsKeyId` to use a customer managed key. Writing a version requires `kms:GenerateDataKey`, and
+reading it requires `kms:Decrypt`, in addition to the relevant Secrets Manager permission.
 
 ```typescript sim-secrets-manager-customer-key
 /**
@@ -141,10 +136,9 @@ they were made with and stay readable, as they do on real AWS.
 
 ## Secret ARNs and IAM policies
 
-Real Secrets Manager appends a hyphen and six random characters to the secret name in its ARN. A
-secret named `db-creds` gets an ARN ending `:secret:db-creds-AbCdEf`, and sim Secrets Manager does
-the same. A policy naming the bare ARN therefore matches nothing, and a policy has to end in
-`-??????` or a wildcard.
+Secret ARNs end with a hyphen and six random characters. A secret named `db-creds`, for example,
+gets an ARN ending in `:secret:db-creds-AbCdEf`. An IAM resource pattern for the secret must include
+that suffix, such as `-??????` or `-*`.
 
 ```typescript sim-secrets-manager-iam-policy
 /**
@@ -214,17 +208,16 @@ nothing, here as there.
 
 ## Naming a secret
 
-Every operation takes its target as a `SecretId`, in any of the three forms real Secrets Manager
-accepts. Those are the friendly name, the full ARN including the suffix, and the partial ARN without
-it.
+`SecretId` accepts the friendly name, the full ARN with its random suffix, or the partial ARN without
+the suffix.
 
 An ARN naming another account or region resolves to no secret at all. Its name is never read out and
 looked up locally, and a foreign ARN cannot reach a secret that happens to share a name.
 
 ## Versions and staging labels
 
-Every write creates a version, leaving the earlier ones in place. `AWSCURRENT` names the version a
-plain read returns, and writing a new current version demotes the previous one to `AWSPREVIOUS`.
+Every write creates a version. `AWSCURRENT` marks the version returned by a plain read. Writing a new
+current version moves `AWSPREVIOUS` to the former current version.
 
 ```typescript sim-secrets-manager-staging-labels
 /**
@@ -273,12 +266,9 @@ label. A version that has lost every label is on its way out of existence, and i
 
 ## Deletion and the recovery window
 
-`DeleteSecret` schedules deletion for later. The recovery window is 7 to 30 days, defaulting to 30.
-During that window the secret is still there. It can be described and restored, it refuses to be
-read or written, and it still holds its name.
-
-Holding the name is what a redeployed stack hits. Advancing the simulated clock past the window frees
-it.
+`DeleteSecret` schedules deletion after a recovery window of 7 to 30 days, defaulting to 30. During
+that window the secret can be described or restored, but it cannot be read or changed. Its name also
+remains reserved. Advance simulated time past the window to complete deletion.
 
 ```typescript sim-secrets-manager-deletion
 /**
@@ -435,14 +425,14 @@ console.log(credentials.username); // "app"
 console.log(credentials.password?.length); // 24
 ```
 
-Generated passwords are random. A test reads the value back out of the simulation the way a deployed
-application does.
+Generated passwords are random. Read the deployed value through Secrets Manager instead of asserting
+on an exact password.
 
 ## Reading a secret with a dynamic reference
 
-A template reads a secret that already exists through a `{{resolve:secretsmanager:...}}` dynamic
-reference. The reference is replaced with the secret's value as the resource holding it is created.
-CDK emits one from `SecretValue.secretsManager`.
+A `{{resolve:secretsmanager:...}}` dynamic reference reads an existing secret while CloudFormation
+creates the resource containing the reference. CDK emits this form for
+`SecretValue.secretsManager`.
 
 The whole form is
 `{{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}`. Only the
@@ -554,11 +544,10 @@ another resource of the same stack creates is only there in time when the templa
 Resource properties are reported as they resolved, including this one. Real CloudFormation keeps a
 resolved secret out of its own logs and events, and sim CloudFormation has no such protection.
 
-### A reference the simulation cannot answer
+### Unresolved references
 
-Simulated CloudFormation deploys what it can. A reference naming a secret that was never created
-resolves to `dummy-value-for-<secret-id>`, and the stack carries on deploying. A template reading a
-secret a test does not care about is still worth deploying for everything else in it.
+If Yulin cannot resolve a reference, it substitutes `dummy-value-for-<secret-id>` and continues the
+deployment.
 
 The substitution is recorded on
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without),
@@ -596,9 +585,7 @@ The same applies to `SimSdk` interception. Intercepting `SecretsManagerClient` r
 code into the simulation, served in process. See
 [AWS SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK docs").
 
-## Available functionality
-
-Sim Secrets Manager currently supports:
+## Supported operations
 
 - `CreateSecretCommand`, holding either a string or binary
 - `GetSecretValueCommand`, by staging label or by version id
@@ -618,8 +605,6 @@ Sim Secrets Manager currently supports:
 - A dynamic reference carrying a full ARN reading the account that ARN names
 
 ## Limitations
-
-Current documented limitations:
 
 - A `KmsKeyId` is checked when a version is written under it, not when it is set on its own. An
   `UpdateSecret` changing only the key accepts a key that is absent, and the next write of a value
