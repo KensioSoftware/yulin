@@ -1,5 +1,5 @@
 /**
- * Reaching simulated DynamoDB with an ordinary SDK client over a port.
+ * Calling simulated DynamoDB through a local HTTP endpoint.
  */
 
 import {
@@ -26,29 +26,30 @@ await simAws.dynamoDb().createTable(
   }),
 );
 
-// A served request is authorized as whoever signed it, so the client needs
-// credentials simulated IAM issued.
-const simIam = simAws.iam();
-await simIam.createUser(new CreateUserCommand({ UserName: "Widgets" }));
-await simIam.putUserPolicy(
+const iam = simAws.iam();
+await iam.createUser(new CreateUserCommand({ UserName: "Operator" }));
+await iam.putUserPolicy(
   new PutUserPolicyCommand({
-    UserName: "Widgets",
+    UserName: "Operator",
     PolicyName: "WriteWidgets",
     PolicyDocument: JSON.stringify({
       Version: "2012-10-17",
-      Statement: { Effect: "Allow", Action: "dynamodb:*", Resource: "*" },
+      Statement: {
+        Effect: "Allow",
+        Action: "dynamodb:PutItem",
+        Resource: "*",
+      },
     }),
   }),
 );
-const created = await simIam.createAccessKey(
-  new CreateAccessKeyCommand({ UserName: "Widgets" }),
+const created = await iam.createAccessKey(
+  new CreateAccessKeyCommand({ UserName: "Operator" }),
 );
 
-const srv = await serveSimAws({ simAws, port: 8787 });
-
+const server = await serveSimAws({ simAws });
 const client = new DynamoDBClient({
   region: simAws.defaultRegionName,
-  endpoint: `http://localhost:${srv.port}`,
+  endpoint: `http://localhost:${server.port}`,
   credentials: {
     accessKeyId: created.AccessKey.AccessKeyId,
     secretAccessKey: created.AccessKey.SecretAccessKey,
@@ -58,8 +59,8 @@ const client = new DynamoDBClient({
 await client.send(
   new PutItemCommand({
     TableName: "widgets",
-    Item: { id: { S: "w1" } },
+    Item: { id: { S: "widget-1" } },
   }),
 );
 
-await srv.close();
+await server.close();

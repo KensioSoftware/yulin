@@ -1,13 +1,14 @@
 /**
- * Serving a simulated environment on a port of your choosing.
+ * Serving a simulated AWS environment on localhost.
  */
 
 import { SimAws } from "@kensio/yulin";
 import { serveSimAws } from "@kensio/yulin/serve";
 
 const simAws = new SimAws();
-const srv = await serveSimAws({ simAws, port: 8787 });
+const server = await serveSimAws({ simAws, port: 8787 });
 
-console.log(srv.port); // "8787"
+console.log(server.port); // "8787"
+console.log(server.hostname); // "sim-aws.localhost"
 
-await srv.close();
+await server.close();

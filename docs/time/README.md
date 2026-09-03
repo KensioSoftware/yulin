@@ -1,24 +1,12 @@
 # Simulated time
 
-Every timestamp a simulated AWS service produces comes from that simulation's own clock, and that
-clock can be moved. Time can be frozen, set to an instant, or advanced by a duration. Behaviour that
-depends on time passing, such as a temporary session expiring, can be tested without waiting for it.
+Each `SimAws` has its own clock. Yulin uses that clock for resource timestamps, expiry checks, and
+scheduled work.
 
-Time belongs to a `SimAws` instance. Moving it affects that instance only. The host clock, another
-simulation running in the same test file, and any other code in the process all carry on unchanged.
+## Start at a known time
 
-## Reading the time
-
-`simAws.now()` is what the simulation means by "now". The host clock may say something different. It
-also stamps simulated resources, such as an IAM User's `CreateDate` and an `AssumeRole` session's
-`Expiration`.
-
-By default a new `SimAws` runs in step with the real system clock.
-
-## Starting at a known instant
-
-Pass a clock to start somewhere specific. `SimFixedClock` is the usual choice, since it reports one
-instant and stays there:
+A new simulation follows the system clock by default. Pass a `SimFixedClock` when a test needs an
+exact starting time:
 
 ```typescript sim-clock-freeze-and-advance
 /**
@@ -47,41 +35,33 @@ console.log(simAws.now()); // 2026-07-26T11:30:00.000Z
 simAws.clock().resume();
 ```
 
-Simulated time is layered over whatever clock is supplied. A simulation started at a fixed instant
-is still free to move from there, and it stays measured against that clock. Resuming a simulation
-built on a `SimFixedClock` puts it back in running mode, and its time then moves whenever the clock
-underneath moves. A fixed clock stays where it is. Leave the default real clock in place for a
-simulation whose time should pass by itself.
+`simAws.now()` returns the current simulated time. Services use the same value when they create
+timestamps such as an IAM user's `CreateDate`.
+
+The controllable clock sits on top of the clock passed to `SimAws`. Calling `resume()` makes time
+follow that underlying clock again. A `SimFixedClock` never moves, so resuming it still reports a
+fixed time. Keep the default system clock when resumed time should move normally.
 
 ## Frozen and running
 
-There are two modes:
+Call `freeze()` to stop the clock at its current time. Both `setTo(...)` and `advanceBy(...)` also
+leave the clock frozen at the resulting time. This keeps timestamps stable while the test makes its
+assertions.
 
-- **Frozen**: simulated time only moves when something moves it. A frozen clock reports the same
-  instant however long the host takes, and a slow test holds the state it set up. This is what a
-  deterministic assertion wants.
-- **Running**: simulated time tracks the clock underneath, offset from it. On the default real clock
-  time passes by itself. Use it to jump forward an hour and carry on.
+Call `resume()` to let the underlying clock move time again. Any offset remains in place. For
+example, a simulation advanced by one hour continues to run one hour ahead of the system clock.
 
-Moving time deliberately freezes it. `setTo(...)` and `advanceBy(...)` both leave the clock stopped
-where they put it. A test that asked for a specific instant then asserts on that instant, however
-long the assertion takes. `resume()` is the way back to running, and it carries on from where the
-clock stopped.
-
-`simAws.clock().isFrozen` reports which mode the clock is in.
+Read `simAws.clock().isFrozen` to check the current mode.
 
 ## Advancing time
 
-`advanceBy(...)` takes a duration written as any combination of `days`, `hours`, `minutes`,
-`seconds` and `milliseconds`, which add together. A bare number counts milliseconds, as it does for
-`setTimeout`, and `advanceBy(3_600_000)` moves an hour. Durations are never negative, since time
-passing only runs forwards. `setTo(...)` is the explicit way to move a clock back.
+`advanceBy(...)` accepts days, hours, minutes, seconds, and milliseconds. The values are added
+together. A number means milliseconds, so `advanceBy(3_600_000)` advances by one hour. Durations
+must be zero or greater. Use `setTo(...)` to move to an earlier time.
 
-Advancing moves the clock, and it runs whatever the passage of time should have caused. Work
-scheduled for an instant inside the interval is dispatched in due order, each task running with the
-clock reading its own due time. Further work it schedules settles before `advanceBy` returns where
-that work is itself due by the new time, and stays queued where it falls later. So a test can
-advance and then assert, with no additional waiting:
+Advancing the clock also runs scheduled work due within the interval. Yulin runs each task at its
+due time and waits for the simulation to settle before returning. The test can assert on the result
+immediately:
 
 ```typescript sim-clock-session-expiry
 /**
@@ -138,31 +118,16 @@ try {
 }
 ```
 
-Work triggered by advancing that fails throws from `advanceBy(...)`, where the caller can see it.
-The clock is left at the point it failed, and anything still queued stays queued.
+If scheduled work throws, `advanceBy(...)` throws the same failure. The clock stops at the failed
+task's due time, and later work remains queued.
 
-Delivery to a target is the exception, and deliberately so. An EventBridge rule or a Scheduler
-schedule that cannot reach its target records the failure instead of throwing. Real AWS reports a
-failed delivery to nobody, and one rejected delivery would otherwise fail an unrelated
-`advanceBy(...)` elsewhere in the same test. Read the failures from `eventBridge().deliveryFailures`
-and `scheduler().deliveryFailures`.
+EventBridge and EventBridge Scheduler delivery failures are recorded instead. Read them from
+`eventBridge().deliveryFailures` or `scheduler().deliveryFailures`. Step Functions also records a
+failed state on the execution for `DescribeExecution` to return.
 
-A Step Functions execution works the same way. A state that fails while the clock is being advanced
-is recorded on the execution, and `DescribeExecution` reports it once the advance has returned.
+## Read simulated time in a Lambda handler
 
-Several parts of the simulator schedule work on the clock. Advancing time does more than change what
-timestamps and expiry checks see. A scheduled EventBridge rule fires, an EventBridge Scheduler
-schedule invokes its target, a DynamoDB item passes its time to live, a Secrets Manager deletion
-falls due, a Step Functions execution moves on from a `Wait` state, and a Lambda event source
-mapping polls again. Each of those runs at its own due instant inside the interval, in the order
-they fall due.
-
-## Time inside a simulated Lambda handler
-
-A simulated Lambda function runs on its simulation's clock, and that reaches the JavaScript clock
-the function code itself reads. `Date.now()` and `new Date()` inside a handler report simulated
-time. Code stamping an expiry or building a date-partitioned key can be tested against a clock the
-test controls:
+Inside a simulated Lambda invocation, `Date.now()` and `new Date()` read the simulation's clock:
 
 ```typescript sim-clock-lambda-handler
 /**
@@ -203,30 +168,22 @@ const second = await lambda.invoke(
 console.log(Buffer.from(second.Payload!).toString()); // {"at":"2026-07-26T11:00:00.000Z"}
 ```
 
-How that is arranged depends on where the function code runs. One of the two touches a process
-global:
+Zip code runs in a VM with a `Date` constructor connected to the simulation. An in-process handler
+uses the same simulated time during its invocation. Code outside the invocation continues to read
+the system clock, including code running concurrently in another simulation.
 
-- **Zip code** runs in a vm sandbox owning its own globals, and is handed a `Date` bound to the
-  simulation's clock. The globals outside the sandbox are left alone.
-- **A real in-process handler function** is a closure over the module scope it was written in, and
-  reads the global `Date` like everything else in the test run. So the global is substituted for one
-  reporting the invocation's clock while an invocation is running, and the host clock otherwise,
-  tracked with `AsyncLocalStorage` so concurrent invocations of different simulations stay apart. It
-  is installed on the first in-process invocation and never removed, and with no invocation running
-  it behaves exactly as the host's own `Date` does.
+Only calls that ask for the current time are changed. `new Date("2020-03-12")`, `Date.parse(...)`,
+`Date.UTC(...)`, and `instanceof Date` keep their usual behaviour.
 
-Only the current time comes from the clock. `new Date("2020-03-12")`, `Date.parse(...)`,
-`Date.UTC(...)` and `instanceof Date` all behave as they always did.
-
-Under a frozen clock `Date.now()` returns the same number for the whole invocation, and handler code
-that waits for it to change never finishes. Call `resume()` before invoking if the code under test
-polls the clock.
+The global `setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval` functions also use the
+simulation's clock during an invocation. Start an invocation without awaiting it, advance the
+clock past the timer delay, then await the invocation. Lambda's configured timeout and
+`context.getRemainingTimeInMillis()` use the same clock.
 
 ### Where real AWS gets the time
 
-Real Lambda has no current-time API. The context object carries no timestamp, only
-`getRemainingTimeInMillis()`, and no environment variable holds one. Handler code reading `new
-Date()` is reading the machine clock. AWS does provide the time on the event:
+Real Lambda has no current-time API. A production handler gets the current time from the machine
+clock or from a timestamp in its event:
 
 | Event source              | Field                                             |
 | ------------------------- | ------------------------------------------------- |
@@ -236,49 +193,52 @@ Date()` is reading the machine clock. AWS does provide the time on the event:
 | SNS                       | `Records[].Sns.Timestamp`                         |
 | SQS                       | `Records[].attributes.SentTimestamp`              |
 
-For a scheduled invocation AWS advises reading the event's `time` in preference to the system clock,
-because a retry or a delayed delivery runs later than the time the work was for. Simulated Lambda
-follows the same rule where it builds events. A Function URL request carries simulated time in
-`requestContext.time` and `requestContext.timeEpoch`.
+Yulin puts simulated time into the events it builds. Function URL events include
+`requestContext.time` and `requestContext.timeEpoch`. SQS records include simulated
+`SentTimestamp` and `ApproximateFirstReceiveTimestamp` values. The
+[Lambda documentation](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event source mapping docs")
+describes the event source mapping behaviour.
 
-An SQS event source mapping does the same. The `SentTimestamp` and
-`ApproximateFirstReceiveTimestamp` attributes on a delivered record are simulated time, and a
-handler reading the event's time reads the clock the test controls. See
-[simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event source mapping docs").
-
-Handler code that takes a clock as a dependency stays the most testable option, on real AWS and
-here, and needs none of the machinery above.
+A handler can also accept a clock as a dependency. That approach works without Lambda-specific
+clock handling.
 
 ## Time over HTTP
 
-A simulation served over HTTP, through `serveSimAws` or `SimAwsHttp.fetch(...)`, stamps every
-response with simulated time in its `Date` header, as real AWS stamps every API response with server
-time. Advancing the clock changes what that header reports. A client talking to the simulation sees
-the same "now" the simulation does, with no need to know it is talking to a simulator.
+A simulation served through `serveSimAws` or `SimAwsHttp.fetch(...)` uses simulated time in each
+response's `Date` header. Advancing the clock changes the header on later responses.
 
 ## Time and SDK interception
 
-A `SimSdk` owns a simulated AWS environment, available as `simSdk.simAws`. Intercepted SDK code runs
-on a clock a test can control with `await simSdk.simAws.clock().advanceBy({ hours: 1 })`.
+A `SimSdk` exposes its simulation as `simSdk.simAws`. Advance its clock with
+`await simSdk.simAws.clock().advanceBy({ hours: 1 })`.
+
+## Uses of simulated time
+
+Yulin uses the clock for:
+
+- Resource timestamps and expiry checks
+- EventBridge rules and EventBridge Scheduler schedules
+- DynamoDB time to live and scheduled Secrets Manager deletion
+- Step Functions `Wait` states
+- Lambda event source polling and event timestamps
+- `Date`, global timers, and invocation deadlines inside a simulated Lambda invocation
+- HTTP response `Date` headers
 
 ## Limitations
 
-- Advancing the clock is the only thing that fires a scheduled
-  [EventBridge rule](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule). Nothing runs on the
-  host's clock. A simulation left alone in real time fires nothing however long it is left.
-- Advancing the clock is also the only thing that fires an
-  [EventBridge Scheduler schedule](https://yulinsim.dev/services/scheduler/#firing-a-schedule), including a one-time
-  `at(...)` one.
-- Only `SimAws` exposes time control. Services constructed standalone, such as `new SimS3()`, get
-  their own real clock and no way to move it.
-- A `SimAws` constructed with a `background` scheduler of its own cannot control time, because that
-  scheduler brings its own clock. `simAws.clock()` throws a diagnostic error saying so.
-- Simulated time reaches JavaScript's own clock inside a simulated Lambda invocation, and nowhere
-  else. `Date.now()` and `new Date()` in code under test that is not running as a simulated Lambda
-  function still report real time.
-- Timers are not simulated. `setTimeout` inside a handler is a host timer. A sleeping handler waits
-  in real time, and advancing the clock leaves it asleep.
-- A time already read cannot be reached. A handler module doing `const startedAt = Date.now()` at
-  module scope read it when the test file imported the module, long before any invocation.
-- Advancing time does not re-evaluate simulated state that was already computed, such as an ACM
-  certificate that has finished validating. It changes what is read from the clock next.
+- Scheduled [EventBridge rules](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule)
+  and [EventBridge Scheduler schedules](https://yulinsim.dev/services/scheduler/#firing-a-schedule)
+  run when `advanceBy(...)` or a forward `setTo(...)` reaches their due time. Elapsed system time
+  does not run them.
+- Time control is available through `SimAws`. A standalone service such as `new SimS3()` uses the
+  system clock and has no clock controls.
+- A `SimAws` created with a custom `background` scheduler cannot control time because the scheduler
+  owns its clock. Calling `simAws.clock()` throws `SimAwsTimeNotControllable`.
+- JavaScript's `Date` and global timer functions use simulated time only during a simulated Lambda
+  invocation. Other application code continues to use system time.
+- Lambda code imported from `node:timers` or `node:timers/promises` uses system time. The same is
+  true of `util.promisify(setTimeout)`.
+- A module-level `Date.now()` runs when the module is imported, before the Lambda invocation begins.
+  It reads system time.
+- Moving the clock does not recalculate state that has already been computed. For example, it does
+  not restart validation for an ACM certificate that is already issued.
