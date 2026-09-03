@@ -1055,22 +1055,26 @@ mentions IAM keeps working.
 An account that requires every Role to carry a permissions boundary allows `iam:CreateRole` only
 under `StringEquals` on `iam:PermissionsBoundary`. Its CloudFormation execution policy is written
 that way, and the CDK `PermissionsBoundary.fromName(...)` aspect puts the boundary ARN on every Role
-the app synthesizes. Both halves meet here. A `CreateRoleCommand` carrying `PermissionsBoundary`
-supplies the key, and `AWS::IAM::Role` supplies it from the template property of the same name.
+the app synthesizes. A `CreateRoleCommand` carrying `PermissionsBoundary` supplies the key, and
+`AWS::IAM::Role` supplies it from the template property of the same name.
 
-A request that leaves the property out leaves the key unset, and a positive operator over an unset
-key matches nothing, so the guard refuses the Role. A request naming some other policy is refused
-too. A test can assert both, which is what makes the policy worth standing up as a deploy Role in
-the first place.
+A request that leaves the property out leaves the key unset. A positive operator over an unset key
+matches nothing, and the guard refuses the Role. A request naming some other policy is refused the
+same way. A test can assert both refusals, and that is what makes the policy worth standing up as a
+deploy Role.
 
-The boundary is recorded on the Role the request created. It is not yet evaluated as a policy source
-of its own, so it does not narrow what that Role may then do (see [Limitations](#limitations)).
+`CreateRole` and `GetRole` then describe the boundary the Role carries, in the attachment shape IAM
+answers with (`PermissionsBoundaryType` and `PermissionsBoundaryArn`). `ListRoles` leaves the field
+out, as IAM does, and points a caller at `GetRole`. The boundary is not yet evaluated as a policy
+source of its own, and does not narrow what the Role may then do
+(see [Limitations](#limitations)).
 
 ```typescript sim-iam-permissions-boundary
 /**
  * Deploying into an account that requires a permissions boundary.
  */
 
+import { GetRoleCommand } from "@aws-sdk/client-iam";
 import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "123456789012" });
@@ -1126,6 +1130,13 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 // CREATE_COMPLETE
 console.log(stack.getResource("JobRole")?.status);
+
+const roleRead = await simAws
+  .iam()
+  .getRole(new GetRoleCommand({ RoleName: "JobRole" }));
+
+// arn:aws:iam::123456789012:policy/DeveloperBoundary
+console.log(roleRead.Role.PermissionsBoundary?.PermissionsBoundaryArn);
 
 try {
   await simAws.cloudFormation().deployTemplate({
@@ -1662,7 +1673,7 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - Groups are absent. An `AWS::IAM::User` naming one fails, and an `AWS::IAM::Policy` naming one
   fails too
 - Permissions boundaries and session policies are not evaluated. A boundary a `CreateRole` request
-  declares is authorized against `iam:PermissionsBoundary` and recorded on the Role, and stops
+  declares is authorized against `iam:PermissionsBoundary` and described by `GetRole`, and stops
   there. Service control policies are evaluated, and are attached through
   [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
 - Managed Policies have a single version, and the policy version commands are absent

@@ -1,4 +1,4 @@
-import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import { CreateRoleCommand, GetRoleCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertStringIncludes,
@@ -116,7 +116,13 @@ describe("IAM CreateRole under an iam:PermissionsBoundary condition", () => {
       }),
     );
 
-    // Then the Role records none, rather than an empty one.
+    // Then the Role has no attachment to describe, and IAM leaves the field
+    // out rather than answering an empty one.
+    const roleRead = await simIam.getRole(
+      new GetRoleCommand({ RoleName: "PlainRole" }),
+    );
+
+    assertUndefined(roleRead.Role.PermissionsBoundary);
     assertUndefined(
       simIam.roles.get("PlainRole" as SimIamRoleName)?.permissionsBoundaryArn,
     );

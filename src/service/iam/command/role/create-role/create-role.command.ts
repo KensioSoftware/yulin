@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../../aws/arn.js";
+import type { SimIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
 
 export interface SimCreateRoleCommandInput {
   readonly RoleName?: string | undefined;
@@ -29,5 +30,8 @@ export interface SimCreateRoleCommandOutput {
     readonly CreateDate: Date;
     readonly AssumeRolePolicyDocument?: string | undefined;
     readonly Description?: string | undefined;
+    readonly PermissionsBoundary?:
+      | SimIamAttachedPermissionsBoundary
+      | undefined;
   };
 }

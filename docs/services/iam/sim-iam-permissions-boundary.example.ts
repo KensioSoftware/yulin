@@ -2,6 +2,7 @@
  * Deploying into an account that requires a permissions boundary.
  */
 
+import { GetRoleCommand } from "@aws-sdk/client-iam";
 import { SimAws } from "@kensio/yulin";
 
 const simAws = new SimAws({ defaultAccountId: "123456789012" });
@@ -57,6 +58,13 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 // CREATE_COMPLETE
 console.log(stack.getResource("JobRole")?.status);
+
+const roleRead = await simAws
+  .iam()
+  .getRole(new GetRoleCommand({ RoleName: "JobRole" }));
+
+// arn:aws:iam::123456789012:policy/DeveloperBoundary
+console.log(roleRead.Role.PermissionsBoundary?.PermissionsBoundaryArn);
 
 try {
   await simAws.cloudFormation().deployTemplate({
