@@ -142,6 +142,18 @@ accepted and left out of the internal model. `DefaultRootObject` beginning with 
 refused for the same reason: in real CloudFront it answers the Distribution root with a 403, so a
 Distribution carrying one is not worth creating.
 
+`SimCfCustomErrorResponder` under `controller/error/` puts the rule's page in place of the Origin's
+error. The page is fetched as a request of its own, through the Behavior its own path matches. A
+Distribution can keep its error pages on an Origin of their own, away from the content that failed,
+as CloudFront does.
+
+An S3 Origin reads that page through `SimCfS3OriginSigner` like any other Object. A page behind an
+origin access control is read as the CloudFront service principal for that Distribution, and the
+Bucket policy CDK writes for one covers it. A page the Bucket does not hold is a different matter.
+That policy grants `s3:GetObject` and no `s3:ListBucket`. The read is refused, and the refusal
+reaches the viewer as a 403 in place of the Origin's own error. A Bucket the site's build was never
+loaded into answers exactly this way.
+
 ### Viewer certificates
 
 `distribution/viewer-certificate/` holds the checks CloudFront applies to a Distribution's ACM
