@@ -2,6 +2,7 @@ import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimS3BucketAccess } from "./bucket/sim-s3-bucket-access.js";
+import { SimS3BucketMaker } from "./bucket/sim-s3-bucket-maker.js";
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
@@ -24,6 +25,7 @@ import type { SimS3MountFilesystemOptions } from "./mount/sim-s3-mount.type.js";
  */
 export class SimS3 extends SimS3Operations {
   private readonly bucketAccess: SimS3BucketAccess;
+  private readonly bucketMaker: SimS3BucketMaker;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
   private readonly sdkRouter = new SimS3SdkCommandRouter(this);
 
@@ -48,6 +50,30 @@ export class SimS3 extends SimS3Operations {
       accountRegionScope,
       s3GlobalRegistry,
     });
+    this.bucketMaker = new SimS3BucketMaker({
+      accountRegionScope,
+      buckets,
+      s3GlobalRegistry,
+      background: this.commands.background,
+    });
+  }
+
+  /**
+   * Make a Bucket in this scope without a `CreateBucketCommand`, and so
+   * without a principal to authorize.
+   *
+   * This is for a Bucket real AWS has provisioned before the code under test
+   * runs, which nothing in the simulation is deploying. The CDK bootstrap
+   * staging Bucket is the one the simulator makes for itself: `cdk deploy`
+   * publishes assets into a Bucket the bootstrap stack created, and a
+   * deployment that had to create it would be charged permissions no real
+   * deployment needs.
+   *
+   * A name this scope cannot take is reported the way `CreateBucketCommand`
+   * reports it.
+   */
+  makeSimBucket(bucketName: SimS3BucketName | string): SimS3Bucket {
+    return this.bucketMaker.make(bucketName);
   }
 
   /**

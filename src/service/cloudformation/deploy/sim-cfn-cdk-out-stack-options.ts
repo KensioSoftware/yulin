@@ -42,6 +42,12 @@ export interface SimCfnCdkOutStackOptions {
   readonly caller?: SimAwsCaller | undefined;
 
   /**
+   * The principal this Stack publishes its CDK file assets as, where the
+   * assembly's own assets caller is not the right one for it.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
+  /**
    * The order this Stack creates Resources with no dependency between them in,
    * where the assembly's own order is not the right one for it.
    */
@@ -84,29 +90,4 @@ export function cdkOutBoundTransform(
   const deployedSoFar = new Map(deployed);
 
   return (template) => transform(template, deployedSoFar);
-}
-
-/**
- * Refuse options keyed against a Stack that is not being deployed.
- *
- * A renamed Stack would otherwise take its bindings, its caller and its
- * transform with it without saying anything, and the deployment that lost them
- * looks like one that never had them.
- */
-export function assertCdkOutOptionsAreDeployed(
-  optionsByName: SimCfnCdkOutStackOptionsByName | undefined,
-  deploying: readonly SimCdkAssemblyStack[],
-): void {
-  const names = new Set(
-    deploying.flatMap((stack) => [stack.stackName, stack.artifactId]),
-  );
-  const unmatched = Object.keys(optionsByName ?? {}).filter(
-    (name) => !names.has(name),
-  );
-
-  if (unmatched.length > 0) {
-    throw new Error(
-      `Options were given for ${unmatched.join(", ")}, which no Stack being deployed is named. The Stacks being deployed are ${deploying.map((stack) => stack.stackName).join(", ")}.`,
-    );
-  }
 }

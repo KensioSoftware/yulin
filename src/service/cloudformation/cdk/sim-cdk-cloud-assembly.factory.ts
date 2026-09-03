@@ -2,6 +2,7 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 import { TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
+import type { SimCdkAssetsManifest } from "./sim-cdk-out-context.js";
 
 /**
  * One synthesized Stack in a cloud assembly a test writes.
@@ -32,10 +33,23 @@ export interface SimCdkCloudAssemblyStackInput {
 
   /** The template's Outputs, which a Stack sharing a value needs. */
   readonly outputs?: SimCfnTemplateValueRecord | undefined;
+
+  /**
+   * The assets manifest `cdk synth` writes beside the template, for a Stack
+   * that stages file assets. A Stack given none has no manifest file at all,
+   * which is what a Stack with nothing to stage synthesizes.
+   */
+  readonly assets?: SimCdkAssetsManifest | undefined;
 }
 
 export interface SimCdkCloudAssemblyInput {
   readonly stacks: readonly SimCdkCloudAssemblyStackInput[];
+
+  /**
+   * Staged asset files to write into the assembly, keyed by the path an assets
+   * manifest source names.
+   */
+  readonly assetFiles?: Record<string, string> | undefined;
 }
 
 /** The Bucket a Stack in a written assembly creates, unless it is given others. */
@@ -71,8 +85,8 @@ export const simCdkCloudAssemblyFactory = new AsyncMappedFactory<
       jsonStringify(assemblyManifest(input.stacks)),
     );
 
-    await Promise.all(
-      input.stacks.map(async (stack) =>
+    await Promise.all([
+      ...input.stacks.map(async (stack) =>
         directory.writeFile(
           ["cdk.out", templateFileName(stack)],
           // JSON.stringify drops an undefined value, so a Stack given no
@@ -83,7 +97,19 @@ export const simCdkCloudAssemblyFactory = new AsyncMappedFactory<
           }),
         ),
       ),
-    );
+      ...input.stacks
+        .filter((stack) => stack.assets !== undefined)
+        .map(async (stack) =>
+          directory.writeFile(
+            ["cdk.out", assetsFileName(stack)],
+            jsonStringify(stack.assets),
+          ),
+        ),
+      ...Object.entries(input.assetFiles ?? {}).map(
+        async ([assetPath, content]) =>
+          directory.writeFile(["cdk.out", assetPath], content),
+      ),
+    ]);
 
     return directory;
   },
@@ -117,6 +143,10 @@ function assemblyManifest(
 
 function templateFileName(stack: SimCdkCloudAssemblyStackInput): string {
   return `${stack.artifactId}.template.json`;
+}
+
+function assetsFileName(stack: SimCdkCloudAssemblyStackInput): string {
+  return `${stack.artifactId}.assets.json`;
 }
 
 function stackResources(

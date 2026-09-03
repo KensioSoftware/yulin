@@ -8,10 +8,7 @@ import {
   SimCdkAssetPublications,
 } from "./sim-cdk-asset-publications.js";
 import { readSimCdkAssetBytes } from "./sim-cdk-asset-bytes.js";
-import {
-  simCfnResourceCallerOptions,
-  type SimCfnResourceCallerOptions,
-} from "../../resource/caller/sim-cfn-resource-caller-options.js";
+import { simCfnResourceCallerOptions } from "../../resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 
 interface SimCdkAssetsPublisherProperties {
@@ -21,12 +18,16 @@ interface SimCdkAssetsPublisherProperties {
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 
   /**
-   * The principal the deployment runs as, which the staging Bucket is created
-   * and written to as. A real `cdk deploy` publishes assets before
-   * CloudFormation sees the template, and it publishes them as somebody; a
-   * deployment that names a caller is what says who.
+   * The principal the assets are published as.
+   *
+   * A real `cdk deploy` publishes assets before CloudFormation sees the
+   * template, as the file publishing Role the assets manifest names in each
+   * destination's `assumeRoleArn`. CloudFormation then processes the template
+   * as the execution Role. A deployment that names an assets caller is what
+   * tells the two apart here, and one that names none publishes as whoever
+   * deploys.
    */
-  readonly caller?: SimAwsCaller | undefined;
+  readonly assetsCaller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -39,7 +40,7 @@ interface SimCdkAssetsPublisherProperties {
  * Lambda function resolves its code through the ordinary sim S3 fetch with no
  * Lambda-specific asset handling.
  *
- * Publishing is byte movement only; nothing here runs asset code. Functions
+ * Publishing is byte movement only. Nothing here runs asset code. Functions
  * sim Lambda cannot run, such as a CDK BucketDeployment provider written in
  * Python, are declined later by the Lambda resource creator on their Runtime.
  */
@@ -74,7 +75,7 @@ export class SimCdkAssetsPublisher {
     }).resolve(cdkOutContext.assetsManifest);
 
     for (const publication of publications) {
-      // oxlint-disable-next-line no-await-in-loop -- assets sharing a staging Bucket must not race to create it
+      // oxlint-disable-next-line no-await-in-loop -- published in manifest order, as cdk-assets publishes them
       await this.publishAsset(publication);
     }
   }
@@ -88,9 +89,8 @@ export class SimCdkAssetsPublisher {
     }
 
     const s3 = this.stagingS3();
-    const options = simCfnResourceCallerOptions(this.properties.caller);
 
-    await this.ensureBucket(s3, publication.bucketName, options);
+    this.ensureBucket(s3, publication.bucketName);
     await s3.putObject(
       {
         input: {
@@ -99,36 +99,25 @@ export class SimCdkAssetsPublisher {
           Body: assetBytes,
         },
       },
-      options,
+      simCfnResourceCallerOptions(this.properties.assetsCaller),
     );
   }
 
   /**
-   * Create the staging Bucket if this is the first asset published into it,
+   * Make the staging Bucket if this is the first asset published into it,
    * standing in for the CDK bootstrap stack that provisions it for real.
    *
-   * Stacks deployed concurrently share one staging Bucket, and creating it is
-   * not atomic: sim S3 reaches a sequencing point before registering the
-   * Bucket, so both can pass the check above and the loser is refused. A
-   * Bucket that exists by the time the failure lands is the outcome this
-   * wanted, whoever created it. Anything else, such as the name already being
-   * taken in another scope, is a real failure and is reported.
+   * The bootstrap stack runs long before the deployment, and neither the file
+   * publishing Role nor the execution Role creates this Bucket. It comes
+   * through `makeSimBucket` for that reason, which asks IAM nothing. A
+   * deployment scoped to the permissions its real execution Role holds would
+   * otherwise be refused `s3:CreateBucket` before creating a Resource.
+   *
+   * A name already taken in another scope is a real failure, and is reported.
    */
-  private async ensureBucket(
-    s3: SimS3,
-    bucketName: string,
-    options: SimCfnResourceCallerOptions,
-  ): Promise<void> {
-    if (s3.getSimBucketByName(bucketName) !== undefined) {
-      return;
-    }
-
-    try {
-      await s3.createBucket({ input: { Bucket: bucketName } }, options);
-    } catch (error) {
-      if (s3.getSimBucketByName(bucketName) === undefined) {
-        throw error;
-      }
+  private ensureBucket(s3: SimS3, bucketName: string): void {
+    if (s3.getSimBucketByName(bucketName) === undefined) {
+      s3.makeSimBucket(bucketName);
     }
   }
 

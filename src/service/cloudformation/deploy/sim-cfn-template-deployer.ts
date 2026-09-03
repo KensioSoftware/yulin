@@ -52,6 +52,16 @@ export interface SimCloudFormationCreateStackProperties {
   readonly caller?: SimAwsCaller | undefined;
 
   /**
+   * The principal the CDK file assets staged beside the template are published
+   * as.
+   *
+   * A real `cdk deploy` publishes them as the file publishing Role and only
+   * then processes the template as the execution Role, which is why the two
+   * are named apart. Left out, assets are published as `caller`.
+   */
+  readonly assetsCaller?: SimAwsCaller | undefined;
+
+  /**
    * The order Resources with no dependency between them are created in.
    *
    * CloudFormation is free to create them either way round, and the template's
@@ -138,6 +148,7 @@ export class SimCloudFormationTemplateDeployer {
       parameters: properties.parameters,
       bindings: properties.bindings,
       caller: properties.caller,
+      assetsCaller: properties.assetsCaller,
       resourceOrder: properties.resourceOrder,
       cdkOutContext: await cdkOutContextForTemplatePath(
         properties.templatePath,
@@ -230,6 +241,7 @@ export class SimCloudFormationTemplateDeployer {
       cdkOutContext: deployment.cdkOutContext,
       bindings: deployment.bindings,
       caller: deployment.caller,
+      assetsCaller: deployment.assetsCaller,
       resourceOrder: deployment.resourceOrder,
       exports: this.exports,
     });
@@ -256,6 +268,7 @@ interface SimCfnTemplateDeployment {
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnBinding[] | undefined;
   readonly caller?: SimAwsCaller | undefined;
+  readonly assetsCaller?: SimAwsCaller | undefined;
   readonly resourceOrder?: SimCfnResourceOrder | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 }

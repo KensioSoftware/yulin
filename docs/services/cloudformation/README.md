@@ -2115,8 +2115,62 @@ const stacks = await simAws.cloudFormation().deployCdkOut({
 console.log(stacks.get("PipelineStack")?.stackName);
 ```
 
-A staged CDK asset is published under the same principal, before CloudFormation reads the template
-that points at it.
+### The principal a CDK asset is published as
+
+A real `cdk deploy` runs in two phases under two Roles. `cdk-assets` publishes every staged file
+asset to the bootstrap staging bucket as the file publishing Role, and CloudFormation then processes
+the template as the execution Role. `assetsCaller` names the first of those, beside the `caller`
+naming the second.
+
+```typescript sim-cloudformation-assets-caller
+/**
+ * Publishing a Stack's CDK file assets as the file publishing Role.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultRegionName: "eu-west-2",
+});
+
+const publisher = await simAws.iam().makeDeployRole({
+  roleName: "cdk-file-publishing",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: {
+      Effect: "Allow",
+      Action: ["s3:GetObject*", "s3:GetBucket*", "s3:List*", "s3:PutObject"],
+      Resource: "arn:aws:s3:::cdk-hnb659fds-assets-*",
+    },
+  },
+});
+
+const executor = await simAws.iam().makeDeployRole({
+  roleName: "cdk-exec",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: { Effect: "Allow", Action: "s3:*", Resource: "*" },
+  },
+});
+
+const stacks = await simAws.cloudFormation().deployCdkOut({
+  directoryPath: "cdk.out",
+  caller: executor,
+  assetsCaller: publisher,
+});
+
+console.log(stacks.size);
+```
+
+`deployTemplate(...)` and `deployTemplateFile(...)` take the same option, and a Stack in an assembly
+names its own in `stackOptions`. A deployment that names no `assetsCaller` publishes its assets as
+`caller`, the way every deployment did before the two could be told apart.
+
+The CDK bootstrap stack provisions the staging bucket, long before either Role runs. Yulin stands in
+for that and makes the bucket outside IAM when the first asset is published into it. So a Role
+holding only what a scoped execution policy grants on `cdk-hnb659fds-assets-*` deploys a cloud
+assembly with file assets, with no `s3:CreateBucket` or `s3:PutObject` added to it.
 
 ## Editing a synthesized template before deploying it
 
