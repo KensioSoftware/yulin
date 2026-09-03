@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import {
   assertIdentical,
   assertInstanceOf,
+  assertStringIncludes,
   assertThrowsError,
 } from "@kensio/smartass";
 import { SimRoute53InvalidInput } from "../../error/sim-route53.error.js";
@@ -98,6 +99,61 @@ describe("sim Route53 Hosted Zone ID", () => {
 
       // Then InvalidInput is reported.
       assertInstanceOf(error, SimRoute53InvalidInput);
+    });
+
+    it("names CDK's unresolved lookup stand-in", () => {
+      // Given the Hosted Zone ID CDK synthesizes for an unresolved
+      // HostedZone.fromLookup.
+      const value = "DUMMY";
+
+      // When the Hosted Zone ID is normalized.
+      const error = assertThrowsError(() =>
+        normalizeSimRoute53HostedZoneId(value),
+      );
+
+      // Then InvalidInput names the stand-in and how to resolve the lookup.
+      assertInstanceOf(error, SimRoute53InvalidInput);
+      assertIdentical(
+        error.message,
+        "Invalid Route53 Hosted Zone ID: DUMMY. CDK fills an unresolved " +
+          "`HostedZone.fromLookup` with this stand-in. Run `cdk synth` with " +
+          "credentials for the account holding the zone, or commit the " +
+          "`cdk.context.json` a resolved lookup writes.",
+      );
+    });
+
+    it("names the stand-in behind a /hostedzone/ prefix", () => {
+      // Given the stand-in in its resource path form.
+      const value = "/hostedzone/DUMMY";
+
+      // When the Hosted Zone ID is normalized.
+      const error = assertThrowsError(() =>
+        normalizeSimRoute53HostedZoneId(value),
+      );
+
+      // Then InvalidInput still points at the unresolved lookup.
+      assertInstanceOf(error, SimRoute53InvalidInput);
+      assertStringIncludes(
+        error.message,
+        "CDK fills an unresolved `HostedZone.fromLookup` with this stand-in.",
+      );
+    });
+
+    it("rejects an ID merely containing DUMMY with the plain message", () => {
+      // Given a malformed ID that holds the stand-in as a substring.
+      const value = "DUMMYZONE!";
+
+      // When the Hosted Zone ID is normalized.
+      const error = assertThrowsError(() =>
+        normalizeSimRoute53HostedZoneId(value),
+      );
+
+      // Then InvalidInput reports the value and nothing about CDK.
+      assertInstanceOf(error, SimRoute53InvalidInput);
+      assertIdentical(
+        error.message,
+        "Invalid Route53 Hosted Zone ID: DUMMYZONE!",
+      );
     });
 
     it("rejects a missing Hosted Zone ID", () => {
