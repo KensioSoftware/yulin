@@ -1055,8 +1055,15 @@ simulated CloudFront hostname, such as `e123example.cloudfront.net`.
 #### Values from a skipped Resource
 
 A Resource that was skipped, because its type is outside the simulation or because there is no
-simulated Resource to create at all, still answers both intrinsics. `Ref` returns the logical ID, and
-`Fn::GetAtt` returns the string `<logical ID>.<attribute name>`.
+simulated Resource to create at all, still answers both intrinsics.
+
+What `Ref` answers with follows how far the refusal got. A service that had already worked out the
+Resource's name answers with that name. That is the name real CloudFormation would have produced,
+and the simulation holds it whether or not the Resource behind it was created. Sim Lambda declining
+a function on its `Runtime` is the case to know about, and it covers CDK's own Python providers. A
+Resource refused before any name existed answers with the logical ID.
+
+`Fn::GetAtt` answers with the string `<logical ID>.<attribute name>` for either of them.
 
 ```typescript sim-cloudformation-skipped-resource-values
 /**
@@ -1071,28 +1078,31 @@ const stack = await simAws.cloudFormation().deployTemplate({
   stackName: "stand-in-stack",
   template: {
     Resources: {
-      AlarmRule: {
-        Type: "AWS::CloudWatch::Alarm",
+      SearchApi: {
+        Type: "AWS::AppSync::GraphQLApi",
+        Properties: {
+          Name: "search",
+        },
       },
     },
     Outputs: {
-      AlarmRef: { Value: { Ref: "AlarmRule" } },
-      AlarmArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
+      SearchApiRef: { Value: { Ref: "SearchApi" } },
+      SearchApiArn: { Value: { "Fn::GetAtt": ["SearchApi", "Arn"] } },
     },
   },
 });
 
 await stack.waitForDeployComplete();
 
-console.log(stack.output("AlarmRef"));
-// "AlarmRule"
+console.log(stack.output("SearchApiRef"));
+// "SearchApi"
 
-console.log(stack.output("AlarmArn"));
-// "AlarmRule.Arn"
+console.log(stack.output("SearchApiArn"));
+// "SearchApi.Arn"
 
 for (const skipped of stack.skippedResources) {
   console.log(skipped.logicalId, skipped.skippedReason);
-  // "AlarmRule Unsupported sim CloudFormation Resource service CloudWatch"
+  // "SearchApi Unsupported sim CloudFormation Resource service AppSync"
 }
 ```
 
@@ -1101,7 +1111,7 @@ every Resource holding a `Ref` or `Fn::GetAtt` to a skipped Resource would fail 
 every Resource depending on those, until one EventBridge rule took the whole stack down with it. The skip
 stays where it happened.
 
-A stand-in is deliberately shaped unlike an ARN. It fails closed wherever the simulator reads it.
+A logical ID is deliberately shaped unlike an ARN. It fails closed wherever the simulator reads it.
 
 - In an IAM policy `Resource` it matches no ARN, so a caller relying on that statement is denied.
 - In a property that is parsed as an ARN it is refused as malformed, and that Resource fails.
@@ -1112,9 +1122,58 @@ A stand-in is deliberately shaped unlike an ARN. It fails closed wherever the si
   SDK call fails the way a call for a missing resource does. A `PutItem` naming the skipped table
   gets `ResourceNotFoundException: No DynamoDB Table named Orders`.
 
-A stand-in stands in for something absent, and is never a value to rely on. A test asserting against
-one is asserting on a Resource that was never created. `stack.skippedResources` is where to find out
-which Resources those are and why, under
+A generated name behaves differently, and is meant to. It is the name an account would have held, so
+anything reading it reads a well-formed name. CDK writes a function's log group name as
+`/aws/lambda/` joined to a `Ref` of the function, and the log group is created under
+`/aws/lambda/<stack>-<logical ID>-<suffix>` even where the function was declined. A deploy Role
+scoped to `<stack>-*` and `/aws/lambda/<stack>-*` covers the deployment, the way it does on AWS.
+
+```typescript sim-cloudformation-skipped-resource-generated-name
+/**
+ * A function skipped on its Runtime, and the Log Group named after it.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "ReportStack",
+  template: {
+    Resources: {
+      ReportFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          Role: "arn:aws:iam::111111111111:role/ReportRole",
+          Handler: "index.handler",
+          Runtime: "python3.13",
+          Code: { ZipFile: "def handler(event, context): return 'report'" },
+        },
+      },
+      ReportFunctionLogGroup: {
+        Type: "AWS::Logs::LogGroup",
+        Properties: {
+          LogGroupName: {
+            "Fn::Join": ["", ["/aws/lambda/", { Ref: "ReportFunction" }]],
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.getResource("ReportFunction")?.refValue);
+// "ReportStack-ReportFunction-42d643ca8338"
+
+console.log(simAws.logs().allLogGroups()[0]?.logGroupName);
+// "/aws/lambda/ReportStack-ReportFunction-42d643ca8338"
+```
+
+The Resource is absent all the same, and the name is no evidence that it is there. Invoking the
+function above fails with `ResourceNotFoundException`. `stack.skippedResources` is where to find out
+which Resources were left out and why, under
 [Inspecting stacks and resources](#inspecting-stacks-and-resources).
 
 ### `Fn::Join`

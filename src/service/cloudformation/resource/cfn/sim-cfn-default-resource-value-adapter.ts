@@ -4,6 +4,7 @@ import { simCfnUnansweredAttribute } from "./sim-cfn-unanswered-attribute.js";
 
 interface SimCfnDefaultResourceValueAdapterProperties {
   readonly logicalId: string;
+  readonly uncreatedPhysicalName?: string | undefined;
 }
 
 /**
@@ -12,16 +13,23 @@ interface SimCfnDefaultResourceValueAdapterProperties {
  */
 export class SimCfnDefaultResourceValueAdapter implements SimCfnResourceValueAdapter {
   private readonly logicalId: string;
+  private readonly uncreatedPhysicalName: string | undefined;
 
   constructor(properties: SimCfnDefaultResourceValueAdapterProperties) {
     this.logicalId = properties.logicalId;
+    this.uncreatedPhysicalName = properties.uncreatedPhysicalName;
   }
 
   /**
-   * Default physical-ID stand-in.
+   * The physical ID this Resource would have had, or the logical-ID stand-in.
+   *
+   * A service that worked out the Resource's name before refusing to create it
+   * leaves the simulation holding the name real CloudFormation would have
+   * produced. That is what Ref answers with. The logical ID is left for a
+   * Resource nothing ever named.
    */
   refValue(): SimCfnTemplateValue {
-    return this.logicalId;
+    return this.uncreatedPhysicalName ?? this.logicalId;
   }
 
   /**

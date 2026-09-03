@@ -43,6 +43,8 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
   public readonly stackName: string | undefined;
   public readonly template: SimCfnTemplateValueRecord;
 
+  #uncreatedPhysicalName: string | undefined;
+
   private readonly ignoredPropertyList = new SimCfnIgnoredProperties();
   private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
   private readonly propertyResolver: SimCfnResourcePropertyResolver;
@@ -88,6 +90,17 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
    * The simulated AWS object created for this CloudFormation Resource.
    */
   public abstract get simResource(): object | undefined;
+
+  /**
+   * The name real CloudFormation would have given this Resource, where a
+   * service worked it out before refusing to create it.
+   *
+   * A Resource with a name behind it answers Ref with that name. The
+   * logical-ID stand-in is left for a Resource nothing ever named.
+   */
+  public get uncreatedPhysicalName(): string | undefined {
+    return this.#uncreatedPhysicalName;
+  }
 
   /**
    * The properties this Resource was created without acting on.
@@ -188,6 +201,15 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
   }
 
   /**
+   * Record the name a service worked out for this Resource before refusing to
+   * create it. Called by the creation operation, which is where a refusal
+   * carrying a name is read.
+   */
+  recordUncreatedPhysicalName(physicalName: string | undefined): void {
+    this.#uncreatedPhysicalName = physicalName;
+  }
+
+  /**
    * The value returned when this Resource is referenced via Fn::GetAtt.
    *
    * Mirroring CloudFormation, Resource attributes are Resource-type specific.
@@ -236,11 +258,19 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
     this.ignoredPropertyList.clear();
   }
 
+  /**
+   * Forget the name a refusal recorded, for a Resource being created again.
+   */
+  protected clearUncreatedPhysicalName(): void {
+    this.#uncreatedPhysicalName = undefined;
+  }
+
   private cfnValueAdapter(): SimCfnResourceValueAdapter {
     return simCfnResourceValueAdapter({
       logicalId: this.logicalId,
       type: this.type,
       simResource: this.simResource,
+      uncreatedPhysicalName: this.uncreatedPhysicalName,
     });
   }
 }

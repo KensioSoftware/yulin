@@ -2,6 +2,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -138,5 +139,39 @@ describe("CloudFormation Resource Ref value", () => {
     assertNonNullable(bucketResource);
     assertIdentical(handleResource.refValue, "handle");
     assertIdentical(bucketResource.simResource, bucket);
+  });
+
+  it("keeps the logical ID for a Resource skipped before anything named it", async () => {
+    // Given a template holding a Resource of a service the simulation does
+    // not model, so nothing works out a name for it before refusing it.
+    const template = {
+      Resources: {
+        SearchApi: {
+          Type: "AWS::AppSync::GraphQLApi",
+          Properties: {
+            Name: "search",
+          },
+        },
+      },
+      Outputs: {
+        SearchApiRef: { Value: { Ref: "SearchApi" } },
+      },
+    };
+
+    // When the template is deployed through sim CloudFormation.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "search-stack",
+      template,
+    });
+
+    // Then the Resource is skipped and Ref answers with the logical-ID
+    // stand-in, since the simulation holds no name to answer with instead.
+    const apiResource = stack.getResource("SearchApi");
+
+    assertNonNullable(apiResource);
+    assertTrue(apiResource.skipped);
+    assertIdentical(apiResource.refValue, "SearchApi");
+    assertIdentical(stack.output("SearchApiRef"), "SearchApi");
   });
 });
