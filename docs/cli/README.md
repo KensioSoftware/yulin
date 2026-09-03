@@ -1,15 +1,11 @@
-# AWS CLI
+# Use the AWS CLI with Yulin
 
-The real `aws` CLI reaches a served simulated environment over a local endpoint URL, and twenty of
-Yulin's twenty-five SDK-facing services answer it.
+Point the AWS CLI at a served `SimAws` instance to run supported commands against simulated AWS.
 
-[Serving on localhost](https://yulinsim.dev/serve/) is the reference for what each service serves. This page
-covers the way in from a shell.
+## Start a local endpoint
 
-## An endpoint and a key to sign with
-
-Serving binds a simulated environment to a port. A served request runs as whoever signed it, and the
-access key to sign the first one comes from simulated IAM in the process that built the environment:
+Create an IAM user and access key in the simulation, then pass the same `SimAws` instance to
+`serveSimAws`:
 
 ```typescript sim-cli-endpoint
 /**
@@ -53,12 +49,11 @@ console.log(
 console.log(`export AWS_DEFAULT_REGION=${simAws.defaultRegionName}`);
 ```
 
-Pin the port when the URL has to stay the same between runs. Without one the server takes whatever
-is free.
+Set `port` when scripts need a stable endpoint. If you omit it, Yulin chooses an available port.
 
-## Configuring the CLI
+## Configure the CLI
 
-Four environment variables are the whole configuration:
+Export the endpoint, simulated credentials, and Region printed by the setup script:
 
 ```bash
 export AWS_ENDPOINT_URL=http://localhost:8787
@@ -67,8 +62,8 @@ export AWS_SECRET_ACCESS_KEY=RzIvKRp1sd5yXfEifA1twsUTd4GlHL5JpzvECpox
 export AWS_DEFAULT_REGION=us-east-1
 ```
 
-`sts get-caller-identity` is the call to check the wiring with. It reports the principal behind the
-key that signed the request:
+Run `sts get-caller-identity` to check the connection. It returns the simulated principal that owns
+the access key:
 
 ```bash
 aws sts get-caller-identity
@@ -79,16 +74,15 @@ aws sts get-caller-identity
 }
 ```
 
-The credentials have to come from simulated IAM. Any other key is refused with `403 Forbidden`, and
-an unsigned request reaches nothing.
+The credentials must come from simulated IAM. Yulin rejects an unknown key with `403 Forbidden`.
+It also rejects unsigned AWS API requests.
 
-A Region is required, as it is against real AWS. Changing it moves the CLI between simulated
-Regions, and a Queue created under `eu-west-2` is invisible to `AWS_DEFAULT_REGION=us-east-1`.
+A Region is required. Changing `AWS_DEFAULT_REGION` selects another simulated Region. For example,
+a queue created in `eu-west-2` is absent from `us-east-1`.
 
-### A named profile instead
+### Use a named profile
 
-A profile in the CLI's own config file carries the same four values. The simulation then stays out
-of the ambient environment:
+You can put the endpoint and credentials in the AWS CLI config:
 
 ```ini
 [profile sim]
@@ -98,12 +92,12 @@ aws_access_key_id = AKIAVEXOWARWMKBOA0MP
 aws_secret_access_key = RzIvKRp1sd5yXfEifA1twsUTd4GlHL5JpzvECpox
 ```
 
-`aws --profile sim sts get-caller-identity` then reaches the simulation while a bare `aws` still
-goes to real AWS. The profile has to carry credentials of its own. Once `--profile` is given the CLI
-stops reading `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment.
+Now `aws --profile sim sts get-caller-identity` reaches Yulin. The profile must contain its own
+credentials because the CLI stops reading `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` after you
+pass `--profile`.
 
-`role_arn` and `source_profile` work too. The CLI assumes the simulated Role for itself and signs
-with the session it gets back:
+Profiles with `role_arn` and `source_profile` also work. The CLI calls simulated STS and signs later
+requests with the returned role session:
 
 ```ini
 [profile reader]
@@ -113,10 +107,10 @@ role_arn = arn:aws:iam::888888888888:role/Reader
 source_profile = sim
 ```
 
-## Building the rest of the identities from the shell
+## Create more simulated identities
 
-Only the first key has to come from the process that built the simulation. `aws iam` builds
-everything after it:
+Only the first access key needs to come from the setup process. Use `aws iam` to create more users
+and keys through the endpoint:
 
 ```bash
 aws iam create-user --user-name shopper
@@ -125,8 +119,8 @@ aws iam put-user-policy --user-name shopper --policy-name read-buckets \
 aws iam create-access-key --user-name shopper
 ```
 
-`create-access-key` answers with the secret once. Signing with the new key reports the new User, and
-simulated IAM authorizes every request against the policy it was given:
+`create-access-key` returns the secret once. Requests signed with the new key run as the new user and
+are checked against its simulated IAM policies:
 
 ```bash
 aws s3api create-bucket --bucket nope
@@ -136,8 +130,8 @@ arn:aws:iam::888888888888:user/shopper is not authorized to perform: s3:CreateBu
 arn:aws:s3:::nope
 ```
 
-`aws sts assume-role` answers with temporary credentials. Export the three values it returns and the
-rest of the session runs as the Role:
+`aws sts assume-role` returns temporary credentials. Export the access key, secret key, and session
+token to run later commands as the role:
 
 ```bash
 aws sts assume-role --role-arn arn:aws:iam::888888888888:role/Reader --role-session-name probe
@@ -146,17 +140,12 @@ export AWS_SECRET_ACCESS_KEY=jm2N56vfVtLgJEo11OtbIXbgnJBgxpUMrszPrQdl
 export AWS_SESSION_TOKEN=11568oBDksY9czECUMiAWk9tzmvG7zlQNjtLI1WmhZFS...
 ```
 
-The expiry is stamped from the simulation's own clock, and
-[advancing it](https://yulinsim.dev/time/) past the expiry stops the session authenticating.
+The credentials expire according to [simulated time](https://yulinsim.dev/time/). Requests fail once
+the `SimAws` clock passes their expiry.
 
-## What answers
+## Run service commands
 
-Twenty simulated services answer the endpoint. S3, STS, IAM, ELBv2, SNS, CloudFormation and Lambda,
-along with the AWS JSON protocol services: DynamoDB, DynamoDB Streams, SQS, Cognito Identity
-Provider, EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager and
-Rekognition.
-
-A quick tour of the ones a shell reaches for most:
+Use ordinary AWS CLI commands after the endpoint is configured:
 
 ```bash
 aws s3 cp ./index.html s3://widgets/index.html
@@ -168,16 +157,12 @@ aws secretsmanager get-secret-value --secret-id shop/db --query SecretString --o
 aws logs describe-log-groups --query 'logGroups[].logGroupName' --output text
 ```
 
-`--query`, `--output text` and the rest of the CLI's own machinery work throughout, because they run
-client-side over an ordinary AWS response.
+Client-side CLI options such as `--query` and `--output text` work with simulated responses.
 
-[The serve docs](https://yulinsim.dev/serve/#which-services-answer) list the operations each service
-implements. Anything outside those lists is refused as `NotImplemented`.
+The [localhost server guide](https://yulinsim.dev/serve/#which-services-answer) lists the operations
+available for each service. Yulin returns `NotImplemented` for other operations.
 
-## CLI traps
-
-Each of these is CLI behaviour, and each catches people out against real AWS too. They are collected
-here because a simulated endpoint is often where someone meets them first.
+## Commands that need extra configuration
 
 ### `--payload` needs `--cli-binary-format`
 
@@ -189,7 +174,7 @@ aws lambda invoke --function-name orders --payload '{"id":1}' out.json
 aws: [ERROR]: Invalid base64: "{"id":1}"
 ```
 
-Pass `--cli-binary-format raw-in-base64-out` and the same call runs the function:
+Pass `--cli-binary-format raw-in-base64-out` to send the JSON payload:
 
 ```bash
 aws lambda invoke --function-name orders --payload '{"id":1}' \
@@ -197,22 +182,21 @@ aws lambda invoke --function-name orders --payload '{"id":1}' \
 cat out.json
 ```
 
-`--invocation-type Event` answers `202` and runs the handler on the background scheduler. A script
-reading what the function did waits on `simAws.backgroundTasksComplete()` first.
+`--invocation-type Event` returns `202` before the handler runs. Code in the server process can call
+`simAws.backgroundTasksComplete()` before inspecting the result.
 
 ### S3 addressing style
 
-The CLI needs nothing here. Its default `auto` style sends path-style requests to a custom endpoint,
-which is what this endpoint routes. An SDK client is the one that needs `forcePathStyle: true`.
+The CLI's default `auto` addressing style sends path-style requests to custom endpoints. Yulin
+supports that form. AWS SDK clients need `forcePathStyle: true` when they use the served endpoint.
 
-Forcing `addressing_style = virtual` in the config file breaks it. The Bucket moves into a hostname
-the endpoint has no route for, and `list-objects-v2` comes back empty while `head-object` comes back
-`404`.
+Do not set `addressing_style = virtual` for the CLI profile. Yulin does not route virtual-hosted S3
+API requests through the general endpoint.
 
 ### `aws cloudformation deploy` uses change sets
 
-`deploy` is a CLI-side wrapper over `CreateChangeSet`, and simulated CloudFormation implements four
-operations that do not include it:
+The CLI implements `aws cloudformation deploy` with change sets. Yulin does not serve
+`CreateChangeSet`, so the command fails:
 
 ```bash
 aws cloudformation deploy --stack-name site --template-file template.json
@@ -221,26 +205,25 @@ aws: [ERROR]: An error occurred (NotImplemented) when calling the CreateChangeSe
 Simulated CloudFormation does not serve CreateChangeSet
 ```
 
-`create-stack` and `describe-stacks` do work. A deployment starts in the background and
-`create-stack` is answered before the Resources exist, as real CloudFormation answers it.
+Use `create-stack` and `describe-stacks` instead. `create-stack` returns while resource creation runs
+in the background.
 
-### Presigning needs the S3 service hostname
+### Presigned S3 URLs
 
-`aws s3 presign` signs whatever endpoint the CLI is configured with, and a URL built over the
-general endpoint has no Bucket in it for the endpoint to route on. Point the one command at
-simulated S3's own hostname on the served port:
+Run `aws s3 presign` against the configured endpoint:
 
 ```bash
-aws --endpoint-url http://s3.us-east-1.sim-aws.localhost:8787 s3 presign s3://widgets/one.txt
+aws s3 presign s3://widgets/one.txt
 ```
 
-The URL that comes back is fetchable by anything, including `curl` and a browser. The same hostname
-serves [presigned URLs built by the SDK](https://yulinsim.dev/services/s3/#presigned-urls).
+The returned URL includes a signed credential scope, which Yulin uses to route the request to S3.
+It works with `curl`, a browser, or another HTTP client. The S3 guide also covers
+[presigned URLs built with the SDK](https://yulinsim.dev/services/s3/#presigned-urls).
 
 ### A bad key looks like an XML parse failure
 
-STS, IAM and ELBv2 speak the AWS Query protocol and expect an XML body. The endpoint answers a
-rejected signature as JSON. The CLI reports the body it could not parse:
+STS, IAM, and ELBv2 return XML responses. Yulin currently returns a rejected signature as JSON for
+these services, so the CLI reports an XML parsing error:
 
 ```bash
 aws sts get-caller-identity
@@ -250,18 +233,38 @@ XML received. Further retries may succeed:
 b'{"Message":"Forbidden"}'
 ```
 
-`Forbidden` in the quoted body is the real answer. The other seventeen services report the same
-rejection as a plain `403`.
+The `{"Message":"Forbidden"}` body means that the access key or signature was rejected. Other served
+services report the rejection as a plain `403`.
+
+## Available functionality
+
+The served AWS API supports CLI operations for these services:
+
+- ACM
+- CloudFormation
+- CloudWatch metrics and CloudWatch Logs
+- Cognito Identity Provider
+- DynamoDB and DynamoDB Streams
+- ECS and Elastic Load Balancing v2
+- EventBridge
+- IAM and STS
+- KMS and Secrets Manager
+- Lambda
+- Rekognition
+- S3
+- SNS and SQS
+- SSM Parameter Store
+
+Profiles and role assumption work with the endpoint. Client-side features such as JMESPath queries
+and output formatting work with simulated responses.
 
 ## Limitations
 
-- Five services are refused with `501 Not Implemented`. Route 53 and CloudFront speak REST-XML, and
-  API Gateway v2, SES v2 and EventBridge Scheduler speak REST-JSON. Every one of them is reachable
-  in process through `SimAws` and through [SDK interception](https://yulinsim.dev/sdk/). Simulated ECR is
-  refused the same way and has no AWS API surface at all, since its images are registered in
-  process.
-- An operation a served service has not implemented is refused as `NotImplemented`. That is a
-  separate answer from the protocol refusal above. `aws iam list-users` reports
+- Services absent from the list above are not available through the general AWS API endpoint. Use
+  `SimAws` directly or [SDK interception](https://yulinsim.dev/sdk/) where the service supports it.
+  Simulated ECR exposes only an in-process API.
+- An unsupported operation on a served service returns `NotImplemented`. For example,
+  `aws iam list-users` reports
   `Simulated IAM does not serve ListUsers`, and `aws lambda list-functions` names the path it
   arrived at.
 - `aws cloudwatch get-metric-statistics` and `aws cloudwatch get-metric-data` fail with
@@ -269,16 +272,3 @@ rejection as a plain `403`.
   seconds and the endpoint hands that number to the simulation where a `Date` is expected. Both
   reads work in process and through SDK interception. `put-metric-data` and `list-metrics` are
   unaffected.
-- `aws s3 cp` and `aws s3 sync` corrupt a **download** above the CLI's 8MB threshold
-  ([#717](https://github.com/KensioSoftware/yulin/issues/717)). The CLI splits
-  the download into ranged GETs, simulated S3 ignores `Range` and returns the whole Object for each
-  one, and the parts land on top of each other. A 12MB Object arrives as a 20MB file. Uploads above
-  the threshold are fine, and so is any download under it. Two ways round it, both verified.
-  `aws s3api get-object` issues one unranged GET. Raising the threshold in the config file keeps
-  `aws s3 cp` on a single GET too.
-
-  ```ini
-  [profile sim]
-  s3 =
-    multipart_threshold = 5GB
-  ```

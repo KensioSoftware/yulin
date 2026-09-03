@@ -1,6 +1,5 @@
 /**
- * Pointing a simulated Lambda function at a dependency Yulin does not
- * simulate, alongside one it does.
+ * Giving a simulated Lambda function the address of an external dependency.
  */
 
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
@@ -17,17 +16,12 @@ await lambda.createFunction(
     Role: "arn:aws:iam::111111111111:role/RatesRole",
     Environment: {
       Variables: {
-        // Simulated by Yulin, reached with no network involved.
         TABLE_NAME: "rates",
-        // Yours. A deployment points this at ElastiCache. A test points it
-        // at whatever it wants the code to talk to instead.
         CACHE_URL: "redis://127.0.0.1:6379",
       },
     },
     Code: {
       ZipFile: makeLambdaZipFileInput(() => ({
-        // Building a Redis client from the second value involves nothing of
-        // Yulin's. It is an ordinary environment variable read.
         tableName: process.env["TABLE_NAME"],
         cacheUrl: process.env["CACHE_URL"],
       })),
@@ -39,6 +33,7 @@ const output = await lambda.invoke(
   new InvokeCommand({ FunctionName: "rates" }),
 );
 
-if (output.Payload === undefined) throw new Error("No invoke Payload");
-// {"tableName":"rates","cacheUrl":"redis://127.0.0.1:6379"}
+if (output.Payload === undefined) throw new Error("No invoke payload");
+
 console.log(Buffer.from(output.Payload).toString());
+// {"tableName":"rates","cacheUrl":"redis://127.0.0.1:6379"}

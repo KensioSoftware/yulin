@@ -1,27 +1,29 @@
-# Terraform
+# Deploy Terraform plans
 
-A team whose infrastructure is written in Terraform can deploy it into simulated AWS without
-hand-writing a second CloudFormation template describing the same infrastructure. `TerraformAdapter`
-reads the JSON `terraform show -json` writes for a saved plan file and creates the resources the
-plan declares.
+`TerraformAdapter` reads a Terraform plan in JSON form and deploys its AWS resources into a
+`SimAws` instance.
 
 ```bash
 npm i -D @kensio/yulin
 ```
 
-## Deploying a plan
+## Create the plan JSON
 
-Write the JSON first. `terraform plan` produces the saved plan in Terraform's own binary format, and
-`terraform show -json` turns that into the document the adapter reads.
+Save a plan, then convert it to JSON:
 
 ```bash
 terraform plan -out=orders.tfplan
 terraform show -json orders.tfplan > orders.tfplan.json
 ```
 
-A plan carries no code for its functions. It points at a zip on disk, an S3 object or a container
-image, and none of the three is a handler Yulin can run. A binding matched on the function name the
-plan declares is where the behaviour comes from.
+`TerraformAdapter` expects the JSON file produced by `terraform show -json`. The binary `.tfplan`
+file is only the input to that command.
+
+## Deploy the plan
+
+Create an adapter for the `SimAws` instance and pass the JSON path to `deployPlan`. A Terraform plan
+records the location of each Lambda deployment package. Use a binding to supply an executable
+handler for the simulated function:
 
 ```typescript terraform-deploy-plan
 /**
@@ -50,9 +52,10 @@ console.log(simAws.dynamoDb().findTable("orders-orders")?.tableName);
 console.log(stack.status);
 ```
 
-The Stack is named after the plan file when the deployment does not name one, so
-`orders.tfplan.json` deploys as `orders`. Pass `stackName` to name it yourself, and pass the path on
-its own where nothing else needs saying.
+The default stack name comes from the plan filename. For example, `orders.tfplan.json` creates a
+stack named `orders`. Pass `stackName` when the stack needs a different name.
+
+If the deployment needs no bindings, overrides, or custom stack name, pass the path directly:
 
 ```typescript terraform-deploy-plan-path
 /**
@@ -71,43 +74,75 @@ const { stack } = await new TerraformAdapter(simAws).deployPlan(
 console.log(stack.stackName);
 ```
 
-## What comes back
+## Read the deployed stack and import report
 
-`deployPlan` answers with the Stack and a report of what reading the plan made of it.
+`deployPlan` returns `stack` and `report`.
 
-The Stack is an ordinary simulated CloudFormation Stack, and everything the [CloudFormation
-docs](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation usage docs") describe applies to it.
-Resources are read with `stack.getResource(...)`, Outputs with `stack.output(...)`, and the whole
-thing is torn down with `stack.delete()`.
+`stack` is a simulated CloudFormation stack. Use `stack.getResource(...)` to read a resource,
+`stack.output(...)` to read an output, and `stack.delete()` to delete it. The
+[CloudFormation guide](https://yulinsim.dev/services/cloudformation/ "Simulated CloudFormation usage docs")
+describes the rest of the stack API.
 
-## What the adapter reads
+`report` explains how Terraform resources were imported:
+
+```typescript terraform-plan-report
+/**
+ * Reading what a Terraform plan import made of the plan.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { TerraformAdapter } from "@kensio/yulin/terraform";
+
+const simAws = new SimAws();
+
+const { report } = await new TerraformAdapter(simAws).deployPlan(
+  "terraform/orders.tfplan.json",
+);
+
+// [ { address: 'aws_s3_bucket.uploads', type: 'aws_s3_bucket',
+//     cfnType: 'AWS::S3::Bucket', logicalId: 'AwsS3BucketUploads' } ]
+console.log(report.mapped);
+
+// [ { address: 'aws_route53_zone.public', type: 'aws_route53_zone',
+//     reason: 'no mapping for resource type' } ]
+console.log(report.skipped);
+
+// The aws_s3_bucket_versioning and friends that became bucket properties.
+console.log(report.folded);
+
+// Attributes a mapping could not carry and no override supplied, such as a
+// Lambda's environment variables, which Terraform collapses whole when one of
+// them is unknown.
+console.log(report.lost);
+```
+
+- `mapped` lists resources that became CloudFormation resources.
+- `folded` lists Terraform resources that became properties of another resource.
+- `skipped` lists resources that were omitted and gives the reason for each omission.
+- `lost` lists attributes that the plan could not supply and no override replaced.
+
+The `mapped`, `folded`, and `skipped` lists account for every managed resource in the plan.
+
+## How resources and references are imported
 
 A resource declared with `count` or `for_each` arrives in the plan already expanded, and each
-instance becomes a resource of its own. Resources declared inside a module are reached through the
-module path they were declared under, however many modules deep.
+instance becomes a separate simulated resource. The adapter also reads resources from nested
+modules.
 
-An attribute Terraform could not resolve at plan time is absent from the plan's values. The plan
-keeps the reference behind it, and that reference becomes the link a hand-written template would
-have carried.
+When an attribute is unknown at plan time, Terraform omits its value but keeps its references. The
+adapter follows references through module inputs, module outputs, `each.value`, and `each.key`.
 
-Ordering is rebuilt. Terraform resolves what it can before writing the plan, so a Lambda permission
-naming a function the same plan creates carries the function's name as a plain string. The value is
-right and the edge CloudFormation orders from has gone with it. Every reference a resource declares
-becomes an ordering edge, whether or not the value resolved.
+The adapter also restores dependency ordering from each resource's references. This matters when
+Terraform has already resolved a reference to a plain string in the planned values.
 
 ## Supplying environment variables and role policies
 
-Terraform resolves nothing inside a value it could not build. A Lambda `environment.variables` map
-holding one reference to a queue of the same plan arrives unknown in its entirety, and the variable
-names go with it. An `aws_iam_role_policy` written with `jsonencode` around an ARN of the same plan
-arrives without its statements.
+Terraform marks a whole compound value as unknown when any part of it cannot be resolved. This can
+remove every key from a Lambda `environment.variables` map. It can also remove every statement from
+an IAM policy built with `jsonencode`.
 
-Those two cost more than their count suggests (four attributes out of 154 on a hand-written
-application configuration). A handler reads its configuration out of environment variables, and
-simulated IAM evaluates authorization.
-
-`overrides` supplies them, matched on the name the plan carries, the way a binding is matched on a
-function name. An environment is matched on the function's name and an inline policy on the role's.
+Use `overrides` to supply these values. Lambda environment overrides match the function name. IAM
+policy overrides match the role name:
 
 ```typescript terraform-plan-overrides
 /**
@@ -160,89 +195,36 @@ const { report } = await new TerraformAdapter(simAws).deployPlan({
 console.log(report.lost);
 ```
 
-An override fills a gap. Where Terraform resolved the value, the plan wins, and environment
-variables are merged one variable at a time. A configuration that stops collapsing a value stops
-needing the override written for it.
+An override only fills a missing value. A value resolved by Terraform takes precedence. Environment
+variables are merged by key.
 
-A role whose policy no override supplies is created allowing everything, and `policy` is named on
-the report's `lost`. Simulated IAM evaluates authorization, and a role holding no policy would deny
-what the configuration allowed and fail the resources using it (an event source mapping is refused
-outright when its execution role cannot poll the queue). Supplying the policy takes that default
-off. The document is evaluated as it stands, and one omitting `sqs:ReceiveMessage` fails the mapping
-the way AWS fails it.
+If an IAM role's inline policy is missing, Yulin gives the role an allow-all policy so resources can
+still be created. The report records `policy` under `lost`. Supplying a policy override removes that
+fallback, and simulated IAM evaluates the supplied policy normally.
 
-## What it maps
+## Available functionality
 
-The adapter maps 24 Terraform resource types and folds 11 more into the resource they configure. The
-set covers API Gateway, CloudWatch (log groups, metric alarms and EventBridge rules), Cognito,
-DynamoDB, ECR, IAM, KMS, Lambda, S3, Secrets Manager, SNS, SQS and SSM Parameter Store.
+- `TerraformAdapter` reads JSON produced by `terraform show -json` for a saved plan.
+- `deployPlan` accepts a path or an object containing `planPath`, `stackName`, `bindings`, and
+  `overrides`.
+- The adapter maps 24 Terraform resource types and folds 11 configuration resources into their
+  parent resources.
+- Supported resource areas include API Gateway HTTP APIs, CloudWatch, Cognito, DynamoDB, ECR, IAM,
+  KMS, Lambda, S3, Secrets Manager, SNS, SQS, and SSM Parameter Store.
+- Resources created with `count` and `for_each` are imported as separate instances.
+- Resources in nested modules are imported.
+- The adapter reports mapped, folded, skipped, and lost data for the plan.
 
-A hand-written application configuration of 46 resources deploys whole. A configuration built out of
-published `terraform-aws-modules` modules reaches 21 of its 25. Of the four it leaves, the Lambda
-module uses `null_resource` and `local_file` to package a zip, and an integration and a route read
-their values through a `for_each` hop the adapter steps over.
+## Limitations
 
-## What the report says
-
-A type with no mapping, and a resource from a provider other than AWS, are recorded and stepped over
-rather than failing the deployment.
-
-```typescript terraform-plan-report
-/**
- * Reading what a Terraform plan import made of the plan.
- */
-
-import { SimAws } from "@kensio/yulin";
-import { TerraformAdapter } from "@kensio/yulin/terraform";
-
-const simAws = new SimAws();
-
-const { report } = await new TerraformAdapter(simAws).deployPlan(
-  "terraform/orders.tfplan.json",
-);
-
-// [ { address: 'aws_s3_bucket.uploads', type: 'aws_s3_bucket',
-//     cfnType: 'AWS::S3::Bucket', logicalId: 'AwsS3BucketUploads' } ]
-console.log(report.mapped);
-
-// [ { address: 'aws_route53_zone.public', type: 'aws_route53_zone',
-//     reason: 'no mapping for resource type' } ]
-console.log(report.skipped);
-
-// The aws_s3_bucket_versioning and friends that became bucket properties.
-console.log(report.folded);
-
-// Attributes a mapping could not carry and no override supplied, such as a
-// Lambda's environment variables, which Terraform collapses whole when one of
-// them is unknown.
-console.log(report.lost);
-```
-
-`mapped`, `folded` and `skipped` add up to the plan's managed resource count. `lost` names the
-attributes that did not survive the plan and that no override covered, per resource. A Terraform
-value that names a resource of the same plan and sits inside something Terraform builds in one go,
-such as a `jsonencode` document or a `for_each` map, is unknown in its entirety and its contents go
-with it.
-
-## What a reference cannot reach
-
-A value a plan resolved arrives as a value. A value the plan could not resolve arrives as a
-reference, and the import follows that reference to the resource that will produce it, through
-module outputs, module variables, `each.value` and `each.key`. That covers what a community module
-such as `terraform-aws-modules/apigateway-v2/aws` does with a `routes` map.
-
-Two shapes stop it, and both are recorded as `unresolved required attribute` on `report.skipped`.
-
-A plan records the references of a whole collection in one list, and the list says what the
-collection was built from without saying which entry holds which. A `routes` map naming one function
-is unambiguous. A `routes` map naming two functions leaves `each.value.uri` able to mean either, and
-the import declines. Setting the value with a resource of its own, or with one module call per
-function, gives each reference a collection to itself.
-
-A value reaching a resource through a `local` is out of range whatever it holds. A plan carries the
-locals' effects and none of their definitions, so there is nothing to follow.
-
-## The scope of what it reads
-
-One plan JSON file, already produced. Reading HCL, reading `terraform.tfstate`, and running
-`terraform` as a subprocess are all outside it.
+- The adapter reads one existing plan JSON file. It does not read HCL or Terraform state, and it does
+  not run Terraform.
+- Resources from non-AWS providers and Terraform types without a mapping are skipped and recorded in
+  `report.skipped`.
+- The adapter cannot follow values through Terraform `local` declarations because a plan contains
+  their results but not their definitions.
+- A collection reference can be ambiguous. For example, `each.value.uri` cannot be resolved when the
+  source collection contains several possible Lambda function references. The affected resource is
+  skipped with the reason `unresolved required attribute`.
+- Some unknown compound values need an override because Terraform omits the whole value from the
+  plan.

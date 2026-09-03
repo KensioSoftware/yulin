@@ -1,21 +1,18 @@
 /**
- * Serving with live reload, so a browser reloads itself when the process
- * restarts.
+ * Serving HTML with browser reload support.
  */
 
 import { SimAws } from "@kensio/yulin";
 import { serveSimAws } from "@kensio/yulin/serve";
 
 const simAws = new SimAws();
-const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
-
-// Build the simulated environment the pages are served from here.
-
-async function stopServing(): Promise<void> {
-  // Waiting means the browsers hear about the restart before the process goes.
-  await srv.close();
-}
-
-process.on("SIGTERM", () => {
-  void stopServing();
+const server = await serveSimAws({
+  simAws,
+  port: 8787,
+  liveReload: true,
 });
+
+// Reload connected browsers after changing simulated content in place.
+server.reload();
+
+await server.close();
