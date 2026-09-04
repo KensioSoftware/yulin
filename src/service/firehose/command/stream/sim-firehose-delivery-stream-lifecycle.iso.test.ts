@@ -16,6 +16,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
@@ -201,8 +202,9 @@ describe("Simulated Firehose delivery stream lifecycle", () => {
     assertIdentical(error.name, "ResourceNotFoundException");
 
     await simFirehoseDeliveryStreamFactory.make({}, simAws);
-    assertTrue(
-      simAws.firehose().findDeliveryStream("order-events") !== undefined,
+    assertNotEqual(
+      simAws.firehose().findDeliveryStream("order-events"),
+      undefined,
     );
   });
 

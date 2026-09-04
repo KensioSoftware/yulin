@@ -12,9 +12,9 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   assertArrayEquals,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
@@ -235,7 +235,7 @@ describe("Simulated AWS DNS server", () => {
 
     try {
       // Then it serves on a different port rather than failing to serve at all.
-      assertFalse(dnsServer.port === String(occupiedPort));
+      assertNotEqual(dnsServer.port, String(occupiedPort));
 
       const fallbackResolver = new Resolver({ timeout: 1000, tries: 1 });
       fallbackResolver.setServers([`127.0.0.1:${dnsServer.port}`]);

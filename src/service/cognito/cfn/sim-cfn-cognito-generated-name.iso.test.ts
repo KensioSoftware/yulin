@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertStringLength,
   assertStringMatches,
   assertStringStartsWith,
@@ -85,7 +85,7 @@ describe("SimCfnCognitoGeneratedName", () => {
     // resources do not ask for one name.
     assertStringLength(first.value, 128);
     assertStringLength(second.value, 128);
-    assertFalse(first.value === second.value);
+    assertNotEqual(first.value, second.value);
   });
 
   it("generates a name the Cognito name rules accept", () => {

@@ -1,4 +1,8 @@
-import { assertIdentical, assertTrue, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNotEqual,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimCloudFrontCacheKey } from "../cache-policy/sim-cf-cache-key.js";
@@ -30,7 +34,7 @@ describe("A sim CloudFront cache key", () => {
     // Given a policy keying on nothing but the path.
     // When two requests for different paths are keyed.
     // Then they are held apart.
-    assertTrue(keyFor("/one.html") !== keyFor("/two.html"));
+    assertNotEqual(keyFor("/one.html"), keyFor("/two.html"));
   });
 
   it("leaves out a query string the policy does not name", () => {
@@ -57,8 +61,9 @@ describe("A sim CloudFront cache key", () => {
 
     // When two requests differ in the query string it names.
     // Then they are held apart.
-    assertTrue(
-      keyFor("/list?page=1", cacheKey) !== keyFor("/list?page=2", cacheKey),
+    assertNotEqual(
+      keyFor("/list?page=1", cacheKey),
+      keyFor("/list?page=2", cacheKey),
     );
   });
 
@@ -68,9 +73,9 @@ describe("A sim CloudFront cache key", () => {
 
     // When two requests differ in one the other policy would have ignored.
     // Then they are held apart.
-    assertTrue(
-      keyFor("/list?utm=email", cacheKey) !==
-        keyFor("/list?utm=social", cacheKey),
+    assertNotEqual(
+      keyFor("/list?utm=email", cacheKey),
+      keyFor("/list?utm=social", cacheKey),
     );
   });
 
@@ -87,8 +92,9 @@ describe("A sim CloudFront cache key", () => {
       keyFor("/list?utm=email", cacheKey),
       keyFor("/list?utm=social", cacheKey),
     );
-    assertTrue(
-      keyFor("/list?page=1", cacheKey) !== keyFor("/list?page=2", cacheKey),
+    assertNotEqual(
+      keyFor("/list?page=1", cacheKey),
+      keyFor("/list?page=2", cacheKey),
     );
   });
 
@@ -124,7 +130,7 @@ describe("A sim CloudFront cache key", () => {
     });
 
     // Then the named header holds two apart and the other does not.
-    assertTrue(english !== french);
+    assertNotEqual(english, french);
     assertIdentical(english, traced);
   });
 
@@ -148,7 +154,7 @@ describe("A sim CloudFront cache key", () => {
     });
 
     // Then the named cookie holds two apart and the other does not.
-    assertTrue(dark !== light);
+    assertNotEqual(dark, light);
     assertIdentical(dark, otherSession);
   });
 
@@ -161,9 +167,9 @@ describe("A sim CloudFront cache key", () => {
     // When one viewer accepts gzip and another accepts nothing.
     // Then the two are held apart, so one object is cached compressed and
     // once not.
-    assertTrue(
-      keyFor("/", cacheKey, { headers: { "accept-encoding": "gzip" } }) !==
-        keyFor("/", cacheKey),
+    assertNotEqual(
+      keyFor("/", cacheKey, { headers: { "accept-encoding": "gzip" } }),
+      keyFor("/", cacheKey),
     );
   });
 
@@ -186,9 +192,9 @@ describe("A sim CloudFront cache key", () => {
     // Given a policy keying on nothing but the path.
     // When the same path is asked for both ways.
     // Then the two are held apart, since a HEAD response carries no body.
-    assertTrue(
-      keyFor("/one.html", new SimCloudFrontCacheKey(), { method: "HEAD" }) !==
-        keyFor("/one.html"),
+    assertNotEqual(
+      keyFor("/one.html", new SimCloudFrontCacheKey(), { method: "HEAD" }),
+      keyFor("/one.html"),
     );
   });
 
@@ -215,9 +221,9 @@ describe("A sim CloudFront cache key", () => {
     // Given the same request arriving at two points of presence.
     // When each one is keyed.
     // Then neither is answered from the other's cache.
-    assertTrue(
-      keyFor("/one.html", new SimCloudFrontCacheKey(), {}, "edge-one") !==
-        keyFor("/one.html", new SimCloudFrontCacheKey(), {}, "edge-two"),
+    assertNotEqual(
+      keyFor("/one.html", new SimCloudFrontCacheKey(), {}, "edge-one"),
+      keyFor("/one.html", new SimCloudFrontCacheKey(), {}, "edge-two"),
     );
   });
 });

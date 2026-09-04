@@ -1,7 +1,7 @@
 import {
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsError,
@@ -80,7 +80,7 @@ describe("Sim CloudFront key value store", () => {
 
     // Then the resource ETag it had is no longer current, which is what makes
     // a stale CloudFront client write fail
-    assertFalse(store.resourceETag === before);
+    assertNotEqual(store.resourceETag, before);
   });
 
   it("keeps the two ETags apart, as AWS does", () => {
@@ -90,7 +90,7 @@ describe("Sim CloudFront key value store", () => {
     const dataBefore = store.dataETag;
 
     // Then they are different values to begin with
-    assertFalse(resourceBefore === dataBefore);
+    assertNotEqual(resourceBefore, dataBefore);
 
     // When the keys change
     store.touchData();
@@ -98,13 +98,13 @@ describe("Sim CloudFront key value store", () => {
     // Then only the data ETag moves, so a CloudFront client write that was
     // already holding the resource ETag is still good
     assertIdentical(store.resourceETag, resourceBefore);
-    assertFalse(store.dataETag === dataBefore);
+    assertNotEqual(store.dataETag, dataBefore);
 
     // And when the configuration changes, only the resource ETag moves
     const dataAfterWrite = store.dataETag;
     store.touchResource();
     assertIdentical(store.dataETag, dataAfterWrite);
-    assertFalse(store.resourceETag === resourceBefore);
+    assertNotEqual(store.resourceETag, resourceBefore);
   });
 
   it("refuses a write carrying an ETag that is not the current one", () => {

@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertStringLength,
   assertStringMatches,
   assertStringStartsWith,
@@ -153,7 +153,7 @@ describe("SimCfnGeneratedResourceName", () => {
     // Resources do not collide on one name.
     assertStringLength(first.value, 64);
     assertStringLength(second.value, 64);
-    assertFalse(first.value === second.value);
+    assertNotEqual(first.value, second.value);
   });
 
   it("keeps a name inside a limit with no room for both parts", () => {

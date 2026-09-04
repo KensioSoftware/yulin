@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertStringLength,
   assertStringMatches,
   assertStringStartsWith,
@@ -86,6 +86,6 @@ describe("SimCfnSqsQueueName", () => {
     // queues do not collide on one name.
     assertStringLength(first.value, 80);
     assertStringLength(second.value, 80);
-    assertFalse(first.value === second.value);
+    assertNotEqual(first.value, second.value);
   });
 });

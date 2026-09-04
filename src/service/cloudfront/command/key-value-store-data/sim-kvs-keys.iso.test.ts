@@ -10,8 +10,8 @@ import {
 import {
   assertArrayEmpty,
   assertArrayLength,
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -98,7 +98,7 @@ describe("CloudFront key value store data commands", () => {
 
     // Then it is accepted, and the ETag moved on again
     assertIdentical(second.ItemCount, 2);
-    assertFalse(second.ETag === first.ETag);
+    assertNotEqual(second.ETag, first.ETag);
   });
 
   it("refuses a write carrying a stale ETag", async () => {
@@ -261,7 +261,7 @@ describe("CloudFront key value store data commands", () => {
 
     // Then it is accepted and changes nothing but the ETag
     assertIdentical(updated.ItemCount, 0);
-    assertFalse(updated.ETag === eTag);
+    assertNotEqual(updated.ETag, eTag);
   });
 
   it("describes the data in the store", async () => {

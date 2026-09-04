@@ -2,6 +2,7 @@ import {
   assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertStringIncludes,
   assertStringLength,
   assertThrowsError,
@@ -69,7 +70,7 @@ describe("SimDynamoDbTable", () => {
     const second = simDynamoDbTableFactory.make({ tableName: "SecondTable" });
 
     // Then each has its own table ID.
-    assertFalse(first.tableId === second.tableId);
+    assertNotEqual(first.tableId, second.tableId);
   });
 });
 

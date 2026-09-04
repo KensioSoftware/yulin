@@ -11,7 +11,7 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertNonNullable,
-  assertTrue,
+  assertNotEqual,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -180,7 +180,7 @@ describe("sim Cognito token claims", () => {
     // pool keeps the one it generated.
     assertNonNullable(firstKey);
     assertNonNullable(secondKey);
-    assertTrue(firstKey.kid !== secondKey.kid);
+    assertNotEqual(firstKey.kid, secondKey.kid);
     assertIdentical(
       cognito.userPool(first.UserPool.Id).jwks().keys[0]?.kid,
       firstKey.kid,

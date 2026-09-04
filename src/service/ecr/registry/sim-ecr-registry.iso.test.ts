@@ -1,7 +1,7 @@
 import {
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -78,7 +78,7 @@ describe("SimEcrRegistry", () => {
     // registry host is part of what a repository is.
     assertNonNullable(found);
     assertIdentical(otherFound, otherAccount);
-    assertFalse(found === otherAccount);
+    assertNotEqual(found, otherAccount);
   });
 
   it("finds nothing for a repository no simulated ECR holds", () => {

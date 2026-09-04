@@ -3,9 +3,9 @@ import https from "node:https";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   assertArrayEquals,
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertStringIncludes,
   assertThrowsError,
   assertUndefined,
@@ -49,7 +49,7 @@ describe("SimSdkLambdaVmModuleProvider", () => {
     // Then a wrapped module is provided: the client class is intercepted
     // while other exports pass through by identity.
     assertNonNullable(provided);
-    assertFalse(provided["S3Client"] === S3Client);
+    assertNotEqual(provided["S3Client"], S3Client);
     assertIdentical(provided["GetObjectCommand"], GetObjectCommand);
   });
 
@@ -95,8 +95,8 @@ describe("SimSdkLambdaVmModuleProvider", () => {
     assertIdentical(nodeHttp["Agent"], http.Agent);
     assertIdentical(plainHttps["Agent"], https.Agent);
     assertIdentical(nodeHttps["Agent"], https.Agent);
-    assertFalse(nodeHttp["request"] === http.request);
-    assertFalse(nodeHttps["request"] === https.request);
+    assertNotEqual(nodeHttp["request"], http.request);
+    assertNotEqual(nodeHttps["request"], https.request);
   });
 
   it("reports an uninstalled AWS SDK package helpfully", () => {
