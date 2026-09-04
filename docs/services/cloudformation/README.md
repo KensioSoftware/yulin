@@ -1901,6 +1901,10 @@ it.
 environment names. The assembly's `manifest.json` is where that comes from, so an app synthesizing
 several Stacks across several regions needs no loop of its own and no region constants beside it.
 
+An application test suite should normally call `deployCdkOut(...)` once from its shared Yulin setup.
+Every test then uses the same deployed Stacks. The [test suite setup guide](https://yulinsim.dev/testing/)
+shows this arrangement with Vitest and SDK interception.
+
 ```typescript sim-cloudformation-cdk-out-assembly
 /**
  * Deploying every Stack a synthesized CDK cloud assembly holds.

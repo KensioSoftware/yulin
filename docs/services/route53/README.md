@@ -1700,8 +1700,9 @@ await scopedRoute53.createHostedZone(
 );
 ```
 
-Each `SimAws` instance has its own isolated state. Create a fresh instance per test, or share one
-across related local setup.
+Each `SimAws` instance has its own isolated state. Application tests should normally use the instance
+from their shared [test suite setup](https://yulinsim.dev/testing/). A fresh instance remains useful
+when a test specifically needs an empty simulated account.
 
 ## Standalone SimRoute53
 

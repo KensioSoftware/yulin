@@ -3,6 +3,18 @@
 `SimSdk` routes AWS SDK for JavaScript v3 commands to Yulin. Use it to test code that already sends
 commands through AWS SDK clients.
 
+## Install interception in suite setup
+
+Application tests should normally create one `SimSdk` in Vitest suite setup and keep its class
+interceptions installed for the whole suite. Every SDK client then reaches the same simulated state,
+including clients created in different test files.
+
+The [test suite setup guide](https://yulinsim.dev/testing/) shows how to share one in-process
+environment across Vitest files. It also covers the worker and isolation settings this requires.
+A separate `SimSdk` for each test or file remains supported when a case needs an empty environment.
+Tests that control the simulation's clock should use a separate `SimSdk` so their time changes cannot
+affect the shared suite.
+
 ## Intercept a client
 
 Create a `SimSdk`, intercept a client class, and run the code under test:
@@ -146,6 +158,9 @@ Restore an interception before later code needs the client's original `send` met
 - Save the result of `simSdk.intercept(...)` and call its `restore()` method to restore one client.
 - Call `simSdk.restoreAll()` to restore every client intercepted by that `SimSdk`.
 - Declare `SimSdk` or an interception handle with `using` to restore it when the scope ends.
+
+A suite-wide interception stays installed until the test worker exits. Do not restore it in a
+per-file `afterAll`, since later files use the same interception and simulated state.
 
 ## Limit the intercepted commands
 
