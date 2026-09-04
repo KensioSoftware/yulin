@@ -78,12 +78,13 @@ export class SimSesSendEmail {
   ): SimSendEmailCommandOutput {
     const input = command.input;
     const fromEmailAddress = requiredSimSesFromAddress(input.FromEmailAddress);
+    const bareFromAddress = simSesBareAddress(fromEmailAddress);
 
     refuseUnsimulatedSendInput(input);
 
-    this.#authorizer.authorizeIdentity(
-      "ses:SendEmail",
-      this.#identities.covering(simSesBareAddress(fromEmailAddress)),
+    this.#authorizer.authorizeSendEmail(
+      this.#identities.covering(bareFromAddress),
+      bareFromAddress,
       options?.caller,
     );
 

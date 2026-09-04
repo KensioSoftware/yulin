@@ -1,5 +1,5 @@
 /**
- * A Role that may only send from one domain.
+ * A Role that may only send from one address at a verified domain.
  */
 
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
@@ -39,6 +39,9 @@ await simAws.iam().putRolePolicy(
           Effect: "Allow",
           Action: "ses:SendEmail",
           Resource: "arn:aws:ses:us-east-1:111111111111:identity/example.com",
+          Condition: {
+            StringEquals: { "ses:FromAddress": "hello@example.com" },
+          },
         },
       ],
     }),
@@ -47,7 +50,7 @@ await simAws.iam().putRolePolicy(
 
 await ses.sendEmail(
   new SendEmailCommand({
-    FromEmailAddress: "anything@example.com",
+    FromEmailAddress: "hello@example.com",
     Destination: { ToAddresses: ["someone@example.com"] },
     Content: {
       Simple: {
