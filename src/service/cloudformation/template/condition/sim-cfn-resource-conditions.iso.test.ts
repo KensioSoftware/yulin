@@ -2,6 +2,7 @@ import {
   assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
@@ -48,7 +49,7 @@ describe("SimCfnStack Resource Condition", () => {
     });
 
     // Then both Buckets are created, and the Fn::If took its true branch.
-    assertTrue(stack.getResource("Backups") !== undefined);
+    assertNotEqual(stack.getResource("Backups"), undefined);
     assertIdentical(simAws.s3().getSimBucketByName("site")?.bucketName, "site");
   });
 

@@ -2,9 +2,9 @@ import { describe, it } from "vitest";
 import { faker } from "@faker-js/faker";
 import {
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertStringIncludes,
   assertStringStartsWith,
   assertThrowsErrorAsync,
@@ -79,7 +79,7 @@ describe("sim CloudFormation Stack IDs", () => {
 
     // Then the second Stack is a different Stack, rather than the first one
     // under a name it happens to share.
-    assertFalse(secondDeployment.StackId === firstDeployment.StackId);
+    assertNotEqual(secondDeployment.StackId, firstDeployment.StackId);
   });
 
   it("resolves AWS::StackId to the Stack ID and AWS::StackName to the name", async () => {

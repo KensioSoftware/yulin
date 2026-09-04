@@ -4,6 +4,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -196,7 +197,7 @@ describe("SimSdkModuleClientInterceptor", () => {
     // Then the source exports still expose the unwrapped client class, as the
     // host module registry caches that object process-wide.
     assertIdentical(moduleExports["FakeSdkClient"], FakeSdkClient);
-    assertFalse(intercepted["FakeSdkClient"] === FakeSdkClient);
+    assertNotEqual(intercepted["FakeSdkClient"], FakeSdkClient);
   });
 
   it("defaults the client region when none is configured", () => {

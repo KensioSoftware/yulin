@@ -1,11 +1,11 @@
 import {
   assertArrayEquals,
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertMapSize,
   assertNonNullable,
+  assertNotEqual,
   assertObjectMatches,
   assertStringIncludes,
   assertStringStartsWith,
@@ -246,8 +246,9 @@ describe("Registering a simulated Route53 Hosted Zone", () => {
     const createdHostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(createdHostedZoneId, "Created Hosted Zone ID");
     assertStringStartsWith(createdHostedZoneId, "Z");
-    assertFalse(
-      createdHostedZoneId === lookedUpHostedZoneId,
+    assertNotEqual(
+      createdHostedZoneId,
+      lookedUpHostedZoneId,
       "Created Hosted Zone ID should not be the registered one",
     );
   });

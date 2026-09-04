@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -162,6 +162,6 @@ describe("Simulated Step Functions resource handling", () => {
     });
 
     // Then the state machine kept its own.
-    assertFalse(described.creationDate.getFullYear() === 1999);
+    assertNotEqual(described.creationDate.getFullYear(), 1999);
   });
 });

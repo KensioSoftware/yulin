@@ -4,6 +4,7 @@ import {
   assertArrayIncludesAll,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertObjectHasProperty,
   assertObjectMatches,
   assertResponseStatus,
@@ -248,11 +249,13 @@ describe("sim CFF event structure adapter", () => {
       assertTypeString(requestEvent1.context.requestId);
       assertTypeString(responseEvent1.context.requestId);
 
-      assertTrue(
-        requestEvent1.context.requestId !== requestEvent2.context.requestId,
+      assertNotEqual(
+        requestEvent1.context.requestId,
+        requestEvent2.context.requestId,
       );
-      assertTrue(
-        requestEvent1.context.requestId !== responseEvent1.context.requestId,
+      assertNotEqual(
+        requestEvent1.context.requestId,
+        responseEvent1.context.requestId,
       );
     });
   });

@@ -10,10 +10,10 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsErrorAsync,
-  assertTrue,
   assertUuidV4,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -225,8 +225,9 @@ describe("sim Cognito user commands", () => {
 
     // Then it reports the users it holds.
     assertIdentical(described.UserPool?.EstimatedNumberOfUsers, 2);
-    assertTrue(
-      cognito.findUserPool(userPoolId)?.findUser("alice") !== undefined,
+    assertNotEqual(
+      cognito.findUserPool(userPoolId)?.findUser("alice"),
+      undefined,
     );
   });
 });

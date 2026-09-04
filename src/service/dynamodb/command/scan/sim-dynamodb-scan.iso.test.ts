@@ -3,9 +3,9 @@ import {
   assertArrayEmpty,
   assertArrayEquals,
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -166,7 +166,7 @@ describe("DynamoDB ScanCommand", () => {
     const answered = customerIds(output);
     const sorted = answered.toSorted((one, other) => one.localeCompare(other));
 
-    assertFalse(answered.join(",") === sorted.join(","));
+    assertNotEqual(answered.join(","), sorted.join(","));
   });
 
   it("walks the table the same way every time", async () => {

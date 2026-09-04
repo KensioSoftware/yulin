@@ -12,9 +12,9 @@ import {
 import {
   assertArrayEmpty,
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertStringLength,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -122,9 +122,9 @@ describe("Route53 DNSSEC", () => {
 
     // Then the DS records differ, because the cryptography behind them is
     // real rather than a fixed string.
-    assertFalse(
-      firstDnssec.KeySigningKeys?.[0]?.DSRecord ===
-        secondDnssec.KeySigningKeys?.[0]?.DSRecord,
+    assertNotEqual(
+      firstDnssec.KeySigningKeys?.[0]?.DSRecord,
+      secondDnssec.KeySigningKeys?.[0]?.DSRecord,
     );
   });
 

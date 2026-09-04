@@ -6,6 +6,7 @@ import {
   assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
@@ -153,7 +154,7 @@ describe("AWS::SES::EmailIdentity", () => {
     assertTypeString(value1);
     assertStringIncludes(name1, "._domainkey.example.com");
     assertStringIncludes(value1, ".dkim.amazonses.com");
-    assertFalse(name1 === name3);
+    assertNotEqual(name1, name3);
   });
 
   it("makes the same DKIM tokens for the same identity every time", async () => {

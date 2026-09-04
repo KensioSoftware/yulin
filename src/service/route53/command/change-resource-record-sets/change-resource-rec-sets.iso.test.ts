@@ -1,7 +1,7 @@
 import {
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertObjectMatches,
   assertStringStartsWith,
   assertUndefined,
@@ -347,6 +347,6 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     // the clock
     assertStringStartsWith(firstId, `/change/${hostedZoneId}-`);
     assertStringStartsWith(secondId, `/change/${hostedZoneId}-`);
-    assertFalse(firstId === secondId);
+    assertNotEqual(firstId, secondId);
   });
 });

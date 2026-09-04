@@ -7,8 +7,8 @@ import {
 } from "@aws-sdk/client-cloudfront";
 import {
   assertArrayLength,
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -123,7 +123,7 @@ describe("CloudFront key value store commands", () => {
 
     // Then the comment changed, and the ETag moved on with it
     assertIdentical(updated.KeyValueStore.Comment, "second");
-    assertFalse(updated.ETag === created.ETag);
+    assertNotEqual(updated.ETag, created.ETag);
   });
 
   it("deletes a key value store against its ETag", async () => {

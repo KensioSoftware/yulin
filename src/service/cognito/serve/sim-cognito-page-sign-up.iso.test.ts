@@ -1,7 +1,7 @@
 import {
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertResponseStatus,
   assertStringIncludes,
   assertTrue,
@@ -102,7 +102,7 @@ describe("Signing up through the pages a sim Cognito domain serves", () => {
 
     const second = pool.confirmationCode(simCognitoLocalUsername);
     assertNonNullable(second);
-    assertFalse(second === first);
+    assertNotEqual(second, first);
   });
 
   it("shows a refused sign-up on the form", async () => {

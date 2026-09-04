@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertStringLength,
   assertStringMatches,
   assertStringStartsWith,
@@ -86,6 +86,6 @@ describe("SimCfnSnsTopicName", () => {
     // topics do not collide on one name.
     assertStringLength(first.value, 256);
     assertStringLength(second.value, 256);
-    assertFalse(first.value === second.value);
+    assertNotEqual(first.value, second.value);
   });
 });

@@ -1,8 +1,8 @@
 import {
   assertArrayEmpty,
   assertIdentical,
+  assertNotEqual,
   assertStringIncludes,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -79,7 +79,7 @@ describe("AWS::Athena::WorkGroup unread properties", () => {
     // Then the workgroup is still created, and the property is recorded as one
     // this simulation knows nothing about.
     assertArrayEmpty(stack.skippedResources);
-    assertTrue(simAws.athena().findWorkGroup("with-nonsense") !== undefined);
+    assertNotEqual(simAws.athena().findWorkGroup("with-nonsense"), undefined);
     assertStringIncludes(
       ignoredReason(stack, "Nonsense"),
       "not a property simulated Athena knows",

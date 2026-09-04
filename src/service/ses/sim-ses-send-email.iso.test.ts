@@ -8,9 +8,9 @@ import {
   assertArrayEquals,
   assertArrayLength,
   assertBufferEqual,
-  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertNotEqual,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -276,7 +276,7 @@ describe("SimSesV2 SendEmail", () => {
 
     // Then the two are told apart by their ids, as they would be on AWS.
     assertNonNullable(first.MessageId);
-    assertFalse(first.MessageId === second.MessageId);
+    assertNotEqual(first.MessageId, second.MessageId);
   });
 
   it("records nothing when a send is refused", async () => {

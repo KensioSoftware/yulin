@@ -6,10 +6,10 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertStringIncludes,
   assertStringMatches,
   assertThrowsErrorAsync,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -115,8 +115,9 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
     );
 
     // Then the URLs differ.
-    assertTrue(
-      greeterUrl.FunctionUrl !== otherUrl.FunctionUrl,
+    assertNotEqual(
+      greeterUrl.FunctionUrl,
+      otherUrl.FunctionUrl,
       "Expected distinct Function URLs",
     );
   });

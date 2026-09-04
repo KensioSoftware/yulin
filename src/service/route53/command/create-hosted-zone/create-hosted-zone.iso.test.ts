@@ -1,9 +1,9 @@
 import {
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertObjectMatches,
   assertOneOf,
   assertStringIncludes,
@@ -163,8 +163,9 @@ describe("Route53 CreateHostedZoneCommand", () => {
 
     assertIdentical(firstOutput.HostedZone?.Name, "duplicate.example.com.");
     assertIdentical(secondOutput.HostedZone?.Name, "duplicate.example.com.");
-    assertFalse(
-      firstHostedZoneId === secondHostedZoneId,
+    assertNotEqual(
+      firstHostedZoneId,
+      secondHostedZoneId,
       "Hosted Zone IDs should be distinct",
     );
   });

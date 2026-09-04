@@ -1,7 +1,7 @@
 import {
   assertIdentical,
+  assertNotEqual,
   assertResponseStatus,
-  assertTrue,
   assertUuidV4,
   describeResponse,
 } from "@kensio/smartass";
@@ -35,7 +35,7 @@ describe("SimCloudFrontResponseHeadersPolicy", () => {
     // told apart by it.
     assertUuidV4(first.id);
     assertUuidV4(second.id);
-    assertTrue(first.id !== second.id);
+    assertNotEqual(first.id, second.id);
   });
 
   it("adds its headers to a response", () => {

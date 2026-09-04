@@ -1,6 +1,6 @@
 import {
-  assertFalse,
   assertIdentical,
+  assertNotEqual,
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -36,7 +36,7 @@ describe("Sim IAM registry scoping", () => {
     const secondAccountIam = secondAccount.iam();
 
     // Then each Account gets and resolves its own IAM facade.
-    assertFalse(firstAccountIam === secondAccountIam);
+    assertNotEqual(firstAccountIam, secondAccountIam);
     assertIdentical(
       simAws.iamRegistry.iamForAccount(firstAccount.accountId),
       firstAccountIam,

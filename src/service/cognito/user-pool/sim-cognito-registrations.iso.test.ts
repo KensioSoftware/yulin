@@ -10,10 +10,10 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayLength,
-  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertObjectEquals,
   assertObjectMatches,
   assertStringIncludes,
@@ -378,12 +378,14 @@ describe("Registering a simulated Cognito user pool", () => {
 
     // Then both took ids of the simulation's own choosing, neither command
     // having an input to ask for one.
-    assertFalse(
-      createdUserPoolId === pinnedUserPoolId,
+    assertNotEqual(
+      createdUserPoolId,
+      pinnedUserPoolId,
       "A created pool takes an allocated id",
     );
-    assertFalse(
-      createdClient.UserPoolClient?.ClientId === pinnedClientId,
+    assertNotEqual(
+      createdClient.UserPoolClient?.ClientId,
+      pinnedClientId,
       "A created app client takes an allocated id",
     );
   });

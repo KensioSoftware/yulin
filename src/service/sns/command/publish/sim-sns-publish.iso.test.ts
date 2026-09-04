@@ -1,8 +1,8 @@
 import { PublishCommand } from "@aws-sdk/client-sns";
 import {
-  assertFalse,
   assertInstanceOf,
   assertNonNullable,
+  assertNotEqual,
   assertStringLength,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -43,7 +43,7 @@ describe("SNS publish", () => {
       .publish(new PublishCommand({ TopicArn: topicArn, Message: "order-1" }));
 
     // Then the two publishes are told apart by their ids.
-    assertFalse(first.MessageId === second.MessageId);
+    assertNotEqual(first.MessageId, second.MessageId);
   });
 
   it("takes a subject that is UTF-8 rather than ASCII", async () => {
