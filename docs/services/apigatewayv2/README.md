@@ -1,11 +1,9 @@
 # Simulated API Gateway HTTP APIs
 
-Yulin includes a simulated API Gateway v2 service, reachable as `simAws.apiGatewayV2()`. It covers
-HTTP APIs with a Lambda proxy integration. A handler that runs behind an HTTP API can be tested
-against a real HTTP request, with no hand-built event to keep in step.
+Yulin simulates API Gateway HTTP APIs with Lambda proxy integrations. Use
+`simAws.apiGatewayV2()` directly or intercept an `ApiGatewayV2Client`.
 
-This is HTTP APIs only. WebSocket APIs and REST APIs (the older API Gateway v1 service, on a
-separate SDK client) are outside it.
+REST APIs use the separate `simAws.apiGateway()` service. WebSocket APIs are unsupported.
 
 ## Creating an API
 
@@ -46,21 +44,19 @@ The endpoint names the API id and the region, as a real one does:
 https://a1b2c3d4e5.execute-api.eu-west-1.amazonaws.com
 ```
 
-A name is a label here, as it is on real AWS. Two APIs in one Account and Region may share a name,
-and only the id tells them apart.
+An API name is a label. Two APIs in the same account and region may share a name. Use the API ID to
+address it.
 
 ## Routing requests to a Lambda function
 
-An API needs three more resources before it serves anything. Those are an integration naming the
-function, a route pointing at that integration, and a stage to serve it from. The function also has to allow API
-Gateway to invoke it. That grant is a permission on the function, not on the API. See
+An API needs an integration, a route and a stage before it can serve requests. The function must
+also grant API Gateway permission to invoke it. See
 [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
-Once all of that exists, `serveSimAws` answers requests to the generated endpoint by invoking the
-function.
 
-Pass the API endpoint through `srv.localUrl(...)`. It keeps the endpoint's hostname and sends the
-request to the local server, the way it adapts simulated S3 website and Lambda Function URL
-endpoints.
+`serveSimAws` then routes requests from the generated endpoint to the function.
+
+Pass the API endpoint to `srv.localUrl(...)` before making a local HTTP request. The returned URL
+keeps the simulated hostname and points at the local server.
 
 ```typescript sim-apigatewayv2-lambda-proxy
 /**
@@ -152,12 +148,11 @@ Region. It is looked up where its ARN says it is.
 
 ## Granting the API permission to invoke the function
 
-A Lambda proxy integration works once the function's resource policy allows
-`apigateway.amazonaws.com` to invoke it. The console adds that permission for you. An integration
-created through CloudFormation, the CLI or an SDK leaves it to you. That is what
-`AddPermissionCommand` in the example above does. Without it the request is answered with a 500 and
-`{"message":"Internal Server Error"}`, and the handler never runs. CDK's `HttpLambdaIntegration`
-emits the same grant as an `AWS::Lambda::Permission`.
+A Lambda proxy integration requires a resource-based permission for
+`apigateway.amazonaws.com`. Add it with `AddPermissionCommand` or deploy an
+`AWS::Lambda::Permission`. Without the permission, the API returns 500 with
+`{"message":"Internal Server Error"}` and does not invoke the handler. CDK's
+`HttpLambdaIntegration` creates this permission.
 
 Each request is authorized as `lambda:InvokeFunction` on the function ARN, with the caller being the
 service principal `apigateway.amazonaws.com`. The function's own resource policy is the whole
@@ -204,9 +199,8 @@ arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-
 
 A Lambda `REQUEST` authorizer's `AuthorizerUri` takes the same qualifier.
 
-The qualifier is read when the request arrives. A route built on the alias `live` runs whichever
-version `live` points at now, and `UpdateAliasCommand` carries the route to another version with the
-API untouched. (That is how a deployment behind an HTTP API usually moves on AWS.)
+The qualifier is resolved for each request. A route that uses the `live` alias follows changes made
+by `UpdateAliasCommand` without changing the API.
 
 The invoke permission is granted on the qualifier as well. An alias holds a resource policy of its
 own, and a grant made on the function admits an unqualified call and says nothing about `live`. Pass
@@ -336,8 +330,7 @@ was never created does. The endpoint answers 500 and the handler never runs.
 
 ## Route keys
 
-A route key is either the literal `$default` or an upper-case HTTP method and a path separated by one
-space:
+A route key is `$default` or an uppercase HTTP method followed by a path:
 
 ```text
 GET /pets
@@ -370,7 +363,7 @@ Gateway refuses it too is unestablished. This is stricter than AWS is known to b
 
 ## Which route serves a request
 
-More than one route may match a request, and the most specific one takes it. In order:
+When several routes match, Yulin selects one in this order:
 
 1. A route matching the whole path beats a route ending in a greedy parameter, which beats
    `$default`.
@@ -402,9 +395,8 @@ A request whose path matches a route with a different method matches no route at
 
 ## Path parameters and named stages
 
-What a route captured reaches the handler as `event.pathParameters`. A named stage is served under
-its own path segment. Stage selection runs before route selection, and the routes never see the stage
-name.
+Captured route parameters are available as `event.pathParameters`. A named stage uses the first path
+segment. Yulin removes that segment before selecting a route.
 
 ```typescript sim-apigatewayv2-routes
 /**
@@ -529,16 +521,14 @@ left out the same way when the stage has none.
 
 ## Throttling a stage and a route
 
-A stage holds a token bucket for every route it serves. `DefaultRouteSettings` sets the rate and the
-burst those buckets start with, and a `RouteSettings` entry keyed by route key overrides them for the
-route it names. `ThrottlingRateLimit` is requests per second, and `ThrottlingBurstLimit` is how many
-requests a route will take at once.
+Each stage keeps a token bucket per route. `DefaultRouteSettings` sets the default rate and burst.
+`RouteSettings` can override them by route key. `ThrottlingRateLimit` is requests per second and
+`ThrottlingBurstLimit` is the number accepted at once.
 
 A request that finds an empty bucket is answered 429 with `{"message":"Too Many Requests"}`. The
 route's authorizer and its integration are both skipped.
 
-The buckets refill against the simulated clock. Freeze it, spend a route's burst, assert on the 429,
-then move a second on and watch the route serve again.
+Buckets refill against the simulated clock. Advance the clock to test recovery after a 429 response.
 
 ```typescript sim-apigatewayv2-throttling
 /**
@@ -681,8 +671,8 @@ are refused by `CreateStage`. A template carrying one deploys, and the member it
 
 ## Protecting a route with a Cognito user pool
 
-A JWT authorizer verifies a signed token before the integration is invoked. `CreateAuthorizerCommand`
-creates one, and a route asks for it with `AuthorizationType: "JWT"` and the authorizer's id.
+A JWT authorizer verifies a signed token before invoking the integration. Create it with
+`CreateAuthorizerCommand`, then set `AuthorizationType: "JWT"` and `AuthorizerId` on the route.
 
 The issuer is a URL. Point it at a [simulated Cognito user pool](https://yulinsim.dev/services/cognito/ "Simulated Cognito docs")
 and the pool's own signing key verifies the token. A token from `InitiateAuthCommand` or
@@ -852,9 +842,8 @@ console.log(expired.status); // 401
 await srv.close();
 ```
 
-The verification is real. The token is parsed, its `alg` has to be `RS256`, its `kid` has to name a
-key the issuer publishes, and the signature is checked against that key with `node:crypto`. The whole
-check runs in process, with no network fetch and no verification library.
+Yulin parses the token, requires `alg` to be `RS256`, resolves `kid` against the issuer's keys and
+checks the signature with `node:crypto`. Verification runs in process.
 
 ### What a refused request gets back
 
@@ -933,9 +922,8 @@ left out of its events entirely.
 
 ## Protecting a route with IAM
 
-A route declared `AuthorizationType: "AWS_IAM"` reaches its integration only when the caller is
-allowed `execute-api:Invoke` on the ARN of the route being called. IAM itself decides. The route takes
-no authorizer, and naming one is refused.
+A route with `AuthorizationType: "AWS_IAM"` requires `execute-api:Invoke` on the request ARN. The
+route has no separate authorizer.
 
 The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
 naming a principal directly. A request offering neither is anonymous, owns no policies, and is
@@ -948,14 +936,13 @@ The ARN a request is authorized against is:
 arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<path>
 ```
 
-- The Account and Region are the API's own, not the caller's.
+- The account and region identify the API.
 - The stage is the one that served the request, so `$default` for the default stage.
 - The method is the one the client sent, upper case. A `GET` reaching a route keyed `ANY /orders`
   gives `GET`.
-- The path is the request path with the stage segment and the leading slash taken off, so
-  `/dev/orders/42` served from stage `dev` gives `orders/42`. This is the path asked for, not the route
-  key, because a policy is written against it by hand. A request to the API root gives an ARN ending
-  `/GET/`.
+- The path is the request path without the stage segment or leading slash. `/dev/orders/42` on stage
+  `dev` becomes `orders/42`. It uses the requested path, including resolved parameter values. A
+  request to the API root produces an ARN ending in `/GET/`.
 
 An identity policy may wildcard any part of that. `<apiId>/*`, `<apiId>/$default/*` and
 `<apiId>/*/GET/orders/*` all allow a `GET` of `/orders/42` on the default stage.
@@ -1132,13 +1119,13 @@ Account.
 
 ## Protecting a route with a Lambda authorizer
 
-A Lambda `REQUEST` authorizer runs a function of its own before the integration is invoked, and that
-function decides. `CreateAuthorizerCommand` with `AuthorizerType: "REQUEST"` creates one, and a route
-asks for it with `AuthorizationType: "CUSTOM"` and the authorizer's id.
+A Lambda `REQUEST` authorizer invokes a function before the integration. Create it with
+`AuthorizerType: "REQUEST"`, then configure the route with `AuthorizationType: "CUSTOM"` and the
+authorizer ID.
 
-`IdentitySource` is what the request has to carry before the function is invoked at all. Each entry
-is `$request.header.<name>` or `$request.querystring.<name>`, and a request missing any one of them is
-refused without the function running.
+`IdentitySource` lists values required before invoking the authorizer. Each entry is
+`$request.header.<name>` or `$request.querystring.<name>`. A missing value returns 401 without running
+the function.
 
 `EnableSimpleResponses: true` asks the function for `{ isAuthorized, context }`. With it off, the
 function answers a `principalId` and an IAM `policyDocument` instead. Either way, the `context` it
@@ -1357,9 +1344,8 @@ is a different grant from the integration's, and a function used for both needs 
 
 ### Caching the authorizer's decision
 
-`AuthorizerResultTtlInSeconds` holds a decision for that many seconds, and a request presenting the
-same identity source values within it is served from that decision without the function running
-again. AWS accepts up to 3600. The default, 0, holds no decision at all.
+`AuthorizerResultTtlInSeconds` caches a decision by identity source values. AWS accepts values up to
+3,600 seconds. The default of zero disables caching.
 
 The key is the identity source values and nothing else, so one decision covers every route of the API
 that uses the authorizer. Adding `$context.routeKey` as an identity source puts the route in the key.
@@ -1517,8 +1503,7 @@ ran.
 
 ## The event the handler receives
 
-The handler is invoked with the API Gateway HTTP API payload format 2.0 event, exported as
-`SimPayload2Event`:
+The handler receives a payload format 2.0 event, exported as `SimPayload2Event`:
 
 ```json
 {
@@ -1630,9 +1615,8 @@ endpoint, and has
 
 ## The response the handler returns
 
-A handler returning an object with a `statusCode` produces that HTTP response. Its `headers` are
-sent as headers, its `cookies` become `set-cookie` headers, and an empty body is sent as no body,
-leaving a 204 a valid response.
+A result with `statusCode` becomes the HTTP response. `headers` are sent as response headers,
+`cookies` become `set-cookie` headers and an omitted body stays empty.
 
 A handler returning anything else produces a 200 whose body is that value as JSON. That includes an
 object with no `statusCode` in it. A handler returning `{ body: "hi" }` produces a 200 whose body is
@@ -1640,8 +1624,8 @@ the JSON `{"body":"hi"}` with `content-type: application/json`. Real API Gateway
 
 ## Reading an API back
 
-`GetApisCommand`, `GetIntegrationsCommand`, `GetRoutesCommand` and `GetStagesCommand` list what an
-API has. Each answers in full, as paging is outside the simulation.
+`GetApisCommand`, `GetIntegrationsCommand`, `GetRoutesCommand` and `GetStagesCommand` list the API's
+resources. Each command returns all results because pagination is unsupported.
 
 ```typescript sim-apigatewayv2-list-resources
 /**
@@ -1684,10 +1668,9 @@ console.log(stages.Items[0]?.StageVariables);
 
 ## Deleting what an API has
 
-`DeleteRouteCommand`, `DeleteIntegrationCommand` and `DeleteStageCommand` each take one resource off
-an API and leave the rest of it in place. A deleted route stops matching, and a request that used to
-reach it is answered the way any unmatched request is. A deleted stage stops resolving. A request
-addressed to it finds no stage, while the routes it served are still served by the API's other stages.
+`DeleteRouteCommand`, `DeleteIntegrationCommand` and `DeleteStageCommand` remove one resource. A
+deleted route stops matching. Deleting a stage removes its URL while leaving the API's routes
+available through other stages.
 
 An integration a route still points at cannot be deleted. That is a `BadRequestException` naming the
 routes in the way, as it is on real AWS, and an API comes apart routes first and then the integrations
@@ -1761,8 +1744,7 @@ const integrations = await apiGateway.getIntegrations(
 console.log(routes.Items.length, integrations.Items.length);
 ```
 
-`DeleteApiCommand` deletes the API and everything under it, so taking a whole API away needs none of
-these.
+`DeleteApiCommand` deletes the API and all of its resources.
 
 ## Turning the generated endpoint off
 
@@ -1774,9 +1756,8 @@ status nor the body for that case, so both are what a disabled endpoint was obse
 
 ## Serving an API on a custom domain name
 
-`CreateDomainNameCommand` creates a domain that answers on a hostname the project owns.
-`CreateApiMappingCommand` points a base path of that domain at one API and one of its stages. A
-domain with no mapping answers 404 to everything.
+`CreateDomainNameCommand` creates a custom domain. `CreateApiMappingCommand` maps a base path to an
+API stage. A domain with no mapping returns 404.
 
 An empty `ApiMappingKey` maps the root of the domain. Every request reaching the domain goes to that
 API, with the path as the client sent it. A non-empty key is one or more path segments (`orders`,
