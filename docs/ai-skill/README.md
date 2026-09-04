@@ -37,9 +37,14 @@ The skill tells an agent how to:
 - control simulated time
 - inspect simulated state in assertions
 - match simulated service errors by `name`
-- share an expensive deployment across tests in one file
+- share one simulated deployment and SDK interception across a whole test suite
+- give tests that control simulated time their own isolated Yulin environment
 - invoke code through a simulated Lambda function with its configured role and environment
 - treat unsupported behaviour as a gap to report, not behaviour to guess
+
+The [test suite setup guide](https://yulinsim.dev/testing/) states the default explicitly. An agent
+should set Yulin up once for the suite and let tests share it as they would share an AWS account or a
+container-based simulator. Tests that move the shared simulated clock are the main exception.
 
 ## Give the agent access to the API docs
 

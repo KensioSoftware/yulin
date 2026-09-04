@@ -66,6 +66,7 @@ npm i -D @kensio/yulin
 - [Non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/ "Dependencies Yulin does not simulate docs")
 - [Serving on localhost](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost docs")
 - [Simulated time](https://yulinsim.dev/time/ "Simulated time docs")
+- [Test suite setup](https://yulinsim.dev/testing/ "Sharing one Yulin environment across a test suite")
 - [Terraform](https://yulinsim.dev/terraform/ "Deploying Terraform into simulated AWS docs")
 
 Every page listed above also ships inside the package as markdown, documenting the version
@@ -73,6 +74,24 @@ installed. `node_modules/@kensio/yulin/llms.txt` indexes them, and a coding agen
 reach can read them from there.
 
 ## Usage
+
+### Set up Yulin once for the test suite
+
+An application test suite should normally create one Yulin environment in its Vitest setup. Install
+SDK interception and deploy the application's simulated infrastructure there, then let every test
+use that state. Treat the environment like an AWS account or a LocalStack container that belongs to
+the suite.
+
+Keep tests independent by giving their records and resources unique names. A fresh `SimAws` or
+`SimSdk` for every test or test file is supported, but it is intended for cases that specifically
+need an empty simulated account.
+
+The simulated clock is shared too. Most tests should leave it alone and use the suite environment.
+Put tests that call `freeze()`, `setTo(...)`, `advanceBy(...)`, or `resume()` in a separate group with
+a fresh Yulin environment for each test.
+
+The [test suite setup guide](https://yulinsim.dev/testing/ "Sharing one Yulin environment across a test suite")
+shows the Vitest configuration, shared deployment, and SDK interception.
 
 ### Intercept AWS SDK clients
 
@@ -166,8 +185,9 @@ const accountId = simAwsAccountId("111111111111");
 const someOtherAccountId = makeSimAwsAccountId();
 ```
 
-Each instance of `SimAws` is cheap and encapsulated. Make one wherever you need it, in every test
-case or in shared test setup, whichever suits.
+Each instance of `SimAws` is encapsulated. Application tests should usually share one instance from
+suite setup. Create another instance when a test needs a separate simulated account with no shared
+state.
 
 If you prefer, you can also instantiate simulated services individually:
 

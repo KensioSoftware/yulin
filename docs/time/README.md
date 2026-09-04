@@ -3,6 +3,16 @@
 Each `SimAws` has its own clock. Yulin uses that clock for resource timestamps, expiry checks, and
 scheduled work.
 
+## Isolate tests that control time
+
+A shared [test suite environment](https://yulinsim.dev/testing/) also has one shared clock. Most
+tests should use that environment without calling `freeze()`, `setTo(...)`, `advanceBy(...)`, or
+`resume()`.
+
+Put tests that control simulated time in a separate test group. Give each of those tests its own
+`SimAws` or `SimSdk`, along with the infrastructure it needs. A clock change then affects only that
+test's environment. The rest of the suite can keep sharing one deployment and SDK interception.
+
 ## Start at a known time
 
 A new simulation follows the system clock by default. Pass a `SimFixedClock` when a test needs an

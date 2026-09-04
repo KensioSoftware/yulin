@@ -15,6 +15,12 @@ npm install --save-dev @kensio/yulin
 
 ## Choose how to use Yulin
 
+Start with [test suite setup](https://yulinsim.dev/testing/) when adding Yulin to an application's
+tests. Create one simulated environment, deploy the application's infrastructure, and install SDK
+interception for the whole suite. Tests then use that shared environment as they would use an AWS
+account or a container-based simulator. Put the smaller set of tests that control simulated time in
+an isolated group because the clock belongs to the environment too.
+
 Start with [AWS SDK interception](https://yulinsim.dev/sdk/) when the code under test already uses an
 AWS SDK client. Yulin intercepts the client's `send` calls and returns responses from a simulated
 service. The application code continues to use the AWS SDK normally.
@@ -81,4 +87,5 @@ credential, or run other work that depends on time passing.
 - [Non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/ "Dependencies Yulin does not simulate usage docs")
 - [Serving on localhost](https://yulinsim.dev/serve/ "Serving simulated AWS on localhost usage docs")
 - [Simulated time](https://yulinsim.dev/time/ "Simulated time usage docs")
+- [Test suite setup](https://yulinsim.dev/testing/ "Sharing one Yulin environment across a test suite")
 - [Terraform](https://yulinsim.dev/terraform/ "Deploying Terraform into simulated AWS usage docs")
