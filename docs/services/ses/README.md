@@ -888,7 +888,7 @@ addresses.
 
 ```typescript sim-ses-permissions
 /**
- * A Role that may only send from one domain.
+ * A Role that may only send from one address at a verified domain.
  */
 
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
@@ -928,6 +928,9 @@ await simAws.iam().putRolePolicy(
           Effect: "Allow",
           Action: "ses:SendEmail",
           Resource: "arn:aws:ses:us-east-1:111111111111:identity/example.com",
+          Condition: {
+            StringEquals: { "ses:FromAddress": "hello@example.com" },
+          },
         },
       ],
     }),
@@ -936,7 +939,7 @@ await simAws.iam().putRolePolicy(
 
 await ses.sendEmail(
   new SendEmailCommand({
-    FromEmailAddress: "anything@example.com",
+    FromEmailAddress: "hello@example.com",
     Destination: { ToAddresses: ["someone@example.com"] },
     Content: {
       Simple: {
@@ -960,6 +963,10 @@ console.log(ses.sentEmails().length);
 The more specific identity wins when both exist. A policy naming `identity/example.com` covers a
 send from any address at the domain, unless that address is an identity in its own right, in which
 case the send authorizes against `identity/hello@example.com` instead.
+
+`ses:FromAddress` carries the bare `FromEmailAddress`. A policy can use it to allow one address at a
+verified domain. A display name does not change the value. For example, `Welcome team
+<hello@example.com>` supplies `hello@example.com` to IAM.
 
 `ses:ListEmailIdentities`, `ses:GetAccount` and `ses:PutAccountDetails` have no resource type at all
 on real SES, and only a policy written against `*` allows them. A policy scoped to identity ARNs

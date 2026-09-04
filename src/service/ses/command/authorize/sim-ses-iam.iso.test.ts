@@ -96,6 +96,57 @@ describe("SES IAM authorization", () => {
     assertArrayLength(ses.sentEmails(), 1);
   });
 
+  it("allows a send whose From address matches the policy condition", async () => {
+    // Given a Role allowed to send from one address at a verified domain.
+    const simAws = await simAwsWithRole({
+      Action: "ses:SendEmail",
+      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/example.com`,
+      Condition: {
+        StringEquals: { "ses:FromAddress": "hello@example.com" },
+      },
+    });
+    const ses = simAws.sesV2();
+
+    ses.verifyIdentity("example.com");
+    ses.verifyIdentity("example.org");
+
+    // When it sends with a display name around that address.
+    await ses.sendEmail(
+      new SendEmailCommand({
+        ...welcome,
+        FromEmailAddress: "Welcome team <hello@example.com>",
+      }),
+      asRole,
+    );
+
+    // Then IAM compares the condition with the bare From address and allows it.
+    assertArrayLength(ses.sentEmails(), 1);
+  });
+
+  it("refuses a send whose From address does not match the condition", async () => {
+    // Given a Role allowed to send from one address at a verified domain.
+    const simAws = await simAwsWithRole({
+      Action: "ses:SendEmail",
+      Resource: `arn:aws:ses:us-east-1:${accountIdOneOnes}:identity/example.com`,
+      Condition: {
+        StringEquals: { "ses:FromAddress": "orders@example.com" },
+      },
+    });
+    const ses = simAws.sesV2();
+
+    ses.verifyIdentity("example.com");
+    ses.verifyIdentity("example.org");
+
+    // When it sends from another address at that domain.
+    const error = await assertThrowsErrorAsync(async () => {
+      await ses.sendEmail(new SendEmailCommand(welcome), asRole);
+    });
+
+    // Then the resource still matches, but the condition denies the send.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertArrayEmpty(ses.sentEmails());
+  });
+
   it("refuses a send from an identity the policy does not name", async () => {
     // Given a Role allowed to send from one domain only.
     const simAws = await simAwsWithRole({

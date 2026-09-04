@@ -67,6 +67,27 @@ export class SimSesAuthorizer {
   }
 
   /**
+   * Ensure the caller may send from one email identity and address.
+   *
+   * SES supplies the bare sender address as `ses:FromAddress`. A policy can
+   * use this key to grant one address under a verified domain identity.
+   *
+   * https://docs.aws.amazon.com/ses/latest/dg/sending-authorization-policy-examples.html#sending-authorization-policy-example-from
+   */
+  authorizeSendEmail(
+    emailIdentity: string,
+    fromAddress: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(
+      "ses:SendEmail",
+      simSesIdentityArn(this.#accountRegionScope, emailIdentity),
+      caller,
+      { "ses:FromAddress": fromAddress },
+    );
+  }
+
+  /**
    * Ensure the caller may perform an action on one email template.
    *
    * The template need not exist, for the same reason an identity need not:
@@ -125,8 +146,14 @@ export class SimSesAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
+    conditionContext?: Readonly<Record<string, string>>,
   ): SimAwsResolvedCaller {
-    const decision = this.#iam.authorize({ action, resource, caller });
+    const decision = this.#iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext,
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({
