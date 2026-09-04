@@ -1,18 +1,13 @@
 # Simulated DynamoDB
 
-Yulin includes a simulated DynamoDB for tests and local development. Tables are held in memory, and
-every operation is authorized by simulated IAM.
-
-This page covers creating, describing, listing and deleting tables. What a request says is checked
-the way real DynamoDB checks it. A table that can be created here is one that could be created on
-AWS.
-
-DynamoDB-specific types are imported from the `@kensio/yulin/dynamodb` subpath.
+Yulin simulates DynamoDB tables, indexes, items, streams and time to live in memory. Use
+`simAws.dynamoDb()` directly or intercept a `DynamoDBClient`. DynamoDB types are available from
+`@kensio/yulin/dynamodb`.
 
 ## Creating a table
 
-`CreateTable` needs a `TableName`, a `KeySchema`, and an `AttributeDefinitions` entry for every
-attribute the key schema names.
+`CreateTable` requires a table name, a key schema and an attribute definition for every key
+attribute.
 
 ```typescript sim-dynamodb-create-table
 /**
@@ -45,8 +40,7 @@ await simAws.backgroundTasksComplete();
 A new table is `CREATING`, and activation is scheduled as background work. Call
 `simAws.backgroundTasksComplete()` when a test needs the table to be `ACTIVE`.
 
-The description carries back what the request asked for. That is the key schema, the attribute
-definitions, the table ARN, a table ID, and the billing and capacity the table was created with.
+The response describes the table's keys, attribute definitions, ARN, ID, billing mode and capacity.
 
 ## Key schema and attribute definitions
 
@@ -62,9 +56,8 @@ attribute as the type the table declared for it.
 
 ## Billing modes and throughput
 
-`BillingMode` defaults to `PROVISIONED`, making `ProvisionedThroughput` required with at least one
-read and one write capacity unit. A request that leaves both out asks for a provisioned table with
-no capacity, and is refused.
+`BillingMode` defaults to `PROVISIONED`. A provisioned table requires at least one read and one write
+capacity unit in `ProvisionedThroughput`.
 
 `PAY_PER_REQUEST` refuses `ProvisionedThroughput`, since an on-demand table has no capacity to
 provision.
@@ -111,8 +104,8 @@ reports for one.
 
 ## Global secondary indexes
 
-`GlobalSecondaryIndexes` on `CreateTable` declares indexes with a key of their own over the same
-items. Each index needs an `IndexName`, a `KeySchema` and a `Projection`.
+`GlobalSecondaryIndexes` adds indexes over the table's items. Each index requires an `IndexName`,
+`KeySchema` and `Projection`.
 
 ```typescript sim-dynamodb-global-secondary-index
 /**
@@ -583,9 +576,8 @@ console.log(description.Table?.TableStatus); // "ACTIVE"
 
 ## Tagging tables
 
-A table is tagged by `CreateTable`, or afterwards by `TagResource`. `UntagResource` takes tags off,
-and `ListTagsOfResource` reads them back. The three tag commands name their resource by ARN, in
-`ResourceArn`, where the table commands take a name or an ARN.
+Add tags during `CreateTable` or later with `TagResource`. Remove them with `UntagResource` and read
+them with `ListTagsOfResource`. Tag commands require the table ARN in `ResourceArn`.
 
 ```typescript sim-dynamodb-tag-table
 /**
@@ -683,9 +675,8 @@ calling `Tags.of(stack).add("Environment", "test")` gets a tagged table.
 
 ## Writing items
 
-`PutItem` writes one item, replacing the whole item under its primary key rather than merging into
-it. The item is there by the time the call returns. A write and the read that follows it need no
-step in between.
+`PutItem` replaces the complete item stored under the primary key. The write is visible when the
+command returns.
 
 ```typescript sim-dynamodb-put-item
 /**
@@ -739,10 +730,9 @@ anywhere else in the item.
 
 ## Reading and deleting items
 
-`GetItem` reads one item by its primary key, and `DeleteItem` removes one the same way. The `Key`
-both take is the whole primary key and nothing else. A missing key element, an attribute outside the
-key, or a value whose type fails to match the table's `AttributeDefinitions` is a
-`ValidationException` naming the attribute at fault.
+`GetItem` reads an item by primary key. `DeleteItem` removes it. The `Key` must contain every key
+attribute and no others, using the types declared in `AttributeDefinitions`. Invalid keys raise
+`ValidationException`.
 
 ```typescript sim-dynamodb-get-delete-item
 /**
@@ -822,9 +812,8 @@ Both take the table's name or its ARN, as the table commands do.
 
 ## Updating items
 
-`UpdateItem` changes part of an item, where `PutItem` replaces the whole thing. What to change is
-written as an `UpdateExpression` made of `SET`, `REMOVE`, `ADD` and `DELETE` clauses, in any order.
-Each keyword appears at most once, and the actions inside a clause are separated by commas.
+`UpdateItem` changes selected attributes. Its `UpdateExpression` may contain `SET`, `REMOVE`, `ADD`
+and `DELETE` clauses in any order. Each clause may appear once and contain comma-separated actions.
 
 A `SET` action is `path = operand`, where an operand is a value from `ExpressionAttributeValues`,
 another document path, or a call to `if_not_exists(path, operand)` or `list_append(one, other)`. Two
@@ -1066,12 +1055,11 @@ placeholder used by either counts as used.
 
 ## Conditional writes
 
-`PutItem`, `DeleteItem` and `UpdateItem` take a `ConditionExpression`, checked against whatever is
-stored under the key before anything changes. A condition that fails to hold leaves the item exactly
-as it was and throws `ConditionalCheckFailedException`, with the name and message real DynamoDB
-uses.
+`PutItem`, `DeleteItem` and `UpdateItem` evaluate `ConditionExpression` against the stored item before
+writing. A failed condition leaves the item unchanged and raises
+`ConditionalCheckFailedException`.
 
-That is how a write becomes an insert if absent, and how a version attribute becomes optimistic
+Use `attribute_not_exists` for insert-only writes or compare a version attribute for optimistic
 locking.
 
 ```typescript sim-dynamodb-conditional-write
@@ -1176,9 +1164,8 @@ expression, in both directions. A placeholder the request leaves undefined is a
 
 ## Projecting attributes
 
-`GetItem` takes a `ProjectionExpression`, a comma-separated list of document paths. Only those paths
-come back. A path is an attribute name, then any number of `.attribute` dereferences and `[n]` list
-indexes, such as `address.city` or `lines[0].sku`.
+`ProjectionExpression` is a comma-separated list of document paths returned by `GetItem`. A path can
+contain map attributes and list indexes, such as `address.city` or `lines[0].sku`.
 
 An attribute name that is a DynamoDB reserved word, or that has a character an expression cannot
 carry, is written as a `#name` placeholder and defined in `ExpressionAttributeNames`.
@@ -1259,12 +1246,11 @@ index and a path past that depth are each a `ValidationException` naming the pat
 
 ## Querying an item collection
 
-A table with a sort key holds an item collection under each partition key, holding the items with
-that partition key, ordered by their sort key. `Query` reads one of those collections.
+A table with a sort key keeps one ordered item collection per partition key. `Query` reads one
+collection.
 
-`KeyConditionExpression` says which. It is one equality on the partition key, optionally joined by
-`AND` to one condition on the sort key. The sort key condition is `=`, `<`, `<=`, `>`, `>=`,
-`BETWEEN` or `begins_with`, and both bounds of a `BETWEEN` are inside the range.
+`KeyConditionExpression` requires equality on the partition key. It may add one sort key condition
+with `AND`. Sort key operators are `=`, `<`, `<=`, `>`, `>=`, `BETWEEN` and `begins_with`.
 
 ```typescript sim-dynamodb-query
 /**
@@ -1371,8 +1357,8 @@ in `ExpressionAttributeNames`, as in any other expression.
 
 ### Paging a collection
 
-`Limit` counts the items a query evaluated. `LastEvaluatedKey` is the primary key of the item the
-walk stopped on, and the next request passes it back as `ExclusiveStartKey` to resume after it.
+`Limit` counts evaluated items. Pass `LastEvaluatedKey` back as `ExclusiveStartKey` to continue after
+the last evaluated item.
 
 ```typescript sim-dynamodb-query-paging
 /**
@@ -1447,9 +1433,7 @@ from a different partition key is refused, since it names a collection this quer
 
 ## Reading a global secondary index
 
-`IndexName` on `Query` and `Scan` reads an index in place of the table. The key condition is held to
-the index key schema and not the table's, which is the point. The index is how an access pattern the
-table key cannot serve gets served.
+Set `IndexName` on `Query` or `Scan` to read an index. Key conditions then use the index key schema.
 
 ```typescript sim-dynamodb-query-index
 /**
@@ -1572,9 +1556,8 @@ refused.
 
 ## Scanning a table
 
-`Scan` reads every item in a table. It needs no key knowledge at all. That is what makes it the
-operation test setup and assertions reach for, and the wrong operation for most application access
-patterns, since it reads the whole table however few items the caller wanted.
+`Scan` reads every item in a table without a key condition. It is useful for test assertions but
+usually reads more data than application code needs.
 
 ```typescript sim-dynamodb-scan
 /**

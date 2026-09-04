@@ -1,31 +1,20 @@
 # Simulated ECS
 
-Yulin includes a simulated Amazon ECS for tests and local development. It holds clusters, task
-definitions and services in memory, runs tasks from handlers you bind to their containers, and
-authorizes every operation with simulated IAM.
+Yulin simulates ECS clusters, task definitions, tasks and services. It runs JavaScript or TypeScript
+handlers bound to container image URIs. Use `simAws.ecs()` directly or intercept an `ECSClient`.
+ECS types are available from `@kensio/yulin/ecs`.
 
-ECS-specific types are imported from the `@kensio/yulin/ecs` subpath.
+## Binding code to a container image
 
-## What Yulin does with a container image
+Yulin uses an image URI as an identifier for an in-process handler. It does not pull or execute the
+image. A container with a matching binding runs the handler. An unbound container is recorded as
+unsimulated while the rest of the task continues.
 
-Yulin never looks inside a container image, and it could not if it tried. An image may hold a Go
-binary, nginx, Redis or anything else, and the only thing Yulin can run is JavaScript or TypeScript
-in its own process.
+A task definition may include application and support containers. Yulin stores and reports every
+container, but only runs containers that have a binding.
 
-So an image URI is only ever an identifier. Nothing here reads it, pulls it, or runs anything from
-it. It is stored as declared, and it is what a container is matched on when a task runs, in the same
-way an image URI identifies a container image Lambda function. The rule that follows is that a
-container matched to a handler runs that handler, and a container with no match is recorded as not
-simulated while the rest of the task carries on.
-
-A realistic task definition holds an application container, a log router and an observability agent.
-Only the first of those is something Yulin could ever run, and all three are stored and reported
-back exactly as declared.
-
-The case this leaves out is a sidecar the application depends on, such as a Redis or a database in
-the same task. Point its connection details, which are ordinary environment variables, at a real one
-you run yourself. See [non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/) for how that fits
-together.
+Run required sidecars such as Redis separately and pass their connection details through environment
+variables. See [non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/).
 
 ## Registering a task definition
 
@@ -76,9 +65,7 @@ console.log(described.taskDefinition?.containerDefinitions?.[0]?.image);
 // "example.dkr.ecr.eu-west-2.amazonaws.com/checkout:1"
 ```
 
-Container definitions are stored as declared, whatever the image is and whether or not Yulin could
-ever run it. That covers port mappings, environment variables and secrets. A `valueFrom` naming a
-Secrets Manager secret is held as the identifier it is, and never resolved.
+Container definitions retain their images, port mappings, environment variables and secrets.
 
 A registration that declares something this simulation has no room for is refused outright, and
 never trimmed. That way a declaration cannot go missing from the revision it made.
@@ -132,9 +119,8 @@ a full task definition ARN. The ARN of a revision is
 
 ## Deregistering a revision
 
-`DeregisterTaskDefinition` marks one revision `INACTIVE` without removing it. It stays describable
-by `family:revision` and by ARN, because something already holding either of those still needs to
-find out what it declared. What it stops being is the revision the family resolves to.
+`DeregisterTaskDefinition` marks a revision `INACTIVE` without removing it. The revision remains
+available by `family:revision` or ARN, but the family name no longer resolves to it.
 
 ```typescript sim-ecs-deregister-task-definition
 /**
@@ -234,8 +220,8 @@ A family counts as inactive once every one of its revisions has been deregistere
 
 ## Clusters
 
-A cluster is a named scope for the tasks and services that will run in it. `CreateCluster`,
-`DescribeClusters`, `ListClusters` and `DeleteCluster` hold them.
+A cluster contains tasks and services. Use `CreateCluster`, `DescribeClusters`, `ListClusters` and
+`DeleteCluster` to manage it.
 
 ```typescript sim-ecs-clusters
 /**
@@ -290,13 +276,13 @@ A cluster is named either by its short name or by its full ARN, and the two are 
 ARN belonging to another account or region names a different cluster. `DescribeClusters` reports it
 as a `MISSING` failure, and `DeleteCluster` refuses it.
 
-A cluster has to exist before a task can run in it, including the `default` one. Yulin creates no
-cluster on its own, so create the one the tasks run in.
+Create a cluster before running a task. This includes the `default` cluster, which Yulin does not
+create automatically.
 
 ## Running a task
 
-`bindContainer` says what a container runs. `RunTask` then starts a task in a cluster, and the bound
-handlers run in this process.
+`bindContainer` associates an image with a handler. `RunTask` starts the task and schedules bound
+handlers to run in process.
 
 ```typescript sim-ecs-run-task
 /**
@@ -376,9 +362,7 @@ The task stops with a `stopCode` of `TaskFailedToStart` saying that nothing ran.
 
 ### Binding by image repository
 
-A container built by CDK or by a pipeline has an image tag that changes with every build, so naming
-the container by hand is the wrong way round. A binding can name the repository instead, and the tag
-is ignored on both sides.
+Use a repository binding when image tags change between builds. Repository matching ignores the tag.
 
 ```typescript sim-ecs-bind-image-repository
 /**
@@ -505,9 +489,8 @@ Read inside the handler to get the container's own.
 
 ## The task role
 
-While a container runs, its AWS calls are attributed to the task definition's `taskRoleArn`, in the
-same way a sim Lambda function's are to its execution role. Calls made through an SDK client
-intercepted by `SimSdk` pick this up without the code under test knowing.
+AWS calls made by a container use the task definition's `taskRoleArn`. An SDK client intercepted by
+`SimSdk` picks up the role from the running handler.
 
 ```typescript sim-ecs-task-role
 /**
@@ -600,10 +583,8 @@ alone, since there is no image to pull and no log driver to write to.
 
 ## Container secrets
 
-A container definition's `secrets` are resolved when the task starts, from simulated Secrets Manager
-or simulated SSM Parameter Store according to what each `valueFrom` names, and the values appear in
-the container's environment alongside its declared `environment`. A handler reads them through
-`process.env` like anything else.
+Yulin resolves container `secrets` from simulated Secrets Manager or SSM Parameter Store when the
+task starts. The values appear in `process.env` alongside the declared environment variables.
 
 They are read as the task definition's `executionRoleArn` rather than its `taskRoleArn`. That is the
 split real ECS makes. The execution role is what the task agent pulls secrets with before a
@@ -765,8 +746,7 @@ is reported as it stands, keeping the reason it stopped for.
 
 ## Services
 
-A task runs and stops. A service keeps tasks running, and that is what a deployed application
-usually is. It is a named service in a cluster, running some number of tasks from a task definition.
+An ECS service maintains a desired number of tasks from one task definition in a cluster.
 
 `CreateService` creates one. Its tasks exist as soon as the request is answered and reach `RUNNING`
 on the simulation's background work, as real ECS brings a new service up. The service reports the

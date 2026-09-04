@@ -1,12 +1,11 @@
 # Simulated CloudFormation
 
-Yulin includes a simulated CloudFormation service for tests and local development. It creates
-simulated AWS resources from CloudFormation templates, and works with hand-written templates, AWS
-SDK-style `CreateStackCommand` calls, or synthesized CDK template files.
+Yulin deploys CloudFormation templates into a simulated AWS environment. It accepts inline
+templates, AWS SDK command inputs, template files and synthesized CDK cloud assemblies.
 
 ## Basic usage
 
-Create a simulated AWS environment, get simulated CloudFormation, and deploy a template.
+Call `deployTemplate(...)` with a template and wait for the stack to finish deploying.
 
 ```typescript sim-cloudformation-basic-template
 /**
@@ -84,7 +83,7 @@ console.log(simAws.s3().getSimBucketByName("typed-site-bucket")?.bucketName);
 
 ## Creating stacks with AWS SDK command shapes
 
-You can also use AWS SDK-style CloudFormation commands.
+Use `createStack(...)` when the code under test works with AWS SDK command shapes.
 
 ```typescript sim-cloudformation-create-stack-command
 /**
@@ -263,11 +262,9 @@ await simAws.backgroundTasksComplete();
 
 ## Updating a stack
 
-`UpdateStackCommand` applies a changed template to a stack that is already deployed. Resources the
-new template adds are created, resources it drops are deleted, and resources it changed are
-replaced. Everything else is left alone, holding whatever it holds in simulated S3, DynamoDB or
-anywhere else. That is what lets a long-running local process pick up an infrastructure change
-without restarting and losing its data.
+`UpdateStackCommand` applies a changed template to an existing stack. It creates added resources,
+deletes removed resources and replaces changed resources. Unchanged resources keep their simulated
+state.
 
 ```typescript sim-cloudformation-update-stack
 /**
@@ -352,11 +349,9 @@ could mean nothing else.
 
 ### What counts as a change
 
-Resources are compared as they resolve, not as they are written. A changed parameter value shows up
-as a changed resource even when the template body is identical, and a template reordered without
-being changed shows up as no change at all. Outputs are compared the same way. The rest of the
-template body is compared as written. A change to a section the simulator ignores, such as
-`Description`, is still an update.
+Yulin compares resolved resources and outputs. Changing a parameter can therefore change a resource
+without changing the template body. Reordering an unchanged template has no effect. Other template
+sections are compared as written, including ignored sections such as `Description`.
 
 A template that changes nothing at all is refused with a `ValidationError` reading
 `No updates are to be performed.`, the same answer CloudFormation gives. So is an update asked for
@@ -436,12 +431,11 @@ An update from the held template with the deployed values changes nothing, and i
 
 ### Changed resources are replaced
 
-A resource whose template entry changed is deleted and created again from the new template. Real
-CloudFormation updates most properties in place and keeps what the resource holds. That makes this a
-divergence worth knowing about. A bucket that gains a property loses its objects here, where in AWS
-it would keep them. In-place update is the obvious next step, still to be built.
+Yulin replaces a resource when its resolved template entry changes. It deletes the old resource and
+creates a new one. AWS updates many properties in place. A simulated bucket therefore loses its
+objects when a property change replaces it.
 
-Three things follow from replacement:
+Replacement also affects dependencies and retention policies:
 
 - A resource naming a replaced resource is replaced too, all the way up the dependency chain, and
   nothing is left pointing at a resource that has gone. Real CloudFormation hands the dependent the
@@ -618,9 +612,8 @@ to create. Name the replacement in the template, as the example above does, to h
 
 ## Deploying through a change set
 
-A change set says what a template would do to a stack before anything happens to it. `cdk deploy`
-goes through one by default, and so does any deployment script that wants to see what an update will
-touch. Simulated CloudFormation serves `CreateChangeSetCommand`, `DescribeChangeSetCommand`,
+A change set describes a proposed stack operation without applying it. Simulated CloudFormation
+serves `CreateChangeSetCommand`, `DescribeChangeSetCommand`,
 `ExecuteChangeSetCommand`, `DeleteChangeSetCommand` and `ListChangeSetsCommand`.
 
 ```typescript sim-cloudformation-change-set
@@ -735,8 +728,7 @@ holds, in the order they were created.
 
 ## Deleting a stack
 
-`DeleteStackCommand` deletes the resources a stack created, in the reverse of the order they were
-created in, and then releases the stack name.
+`DeleteStackCommand` deletes resources in reverse creation order, then releases the stack name.
 
 ```typescript sim-cloudformation-delete-stack
 /**
@@ -801,9 +793,8 @@ Deleting a stack name that was never deployed succeeds, as it does in CloudForma
 
 ### When a resource cannot be deleted
 
-Some resources refuse to go, the same way they do in AWS. An S3 bucket that still holds objects is
-the common one. CloudFormation fails there and never empties the bucket for you. That is why CDK
-ships an `autoDeleteObjects` custom resource.
+Resource deletion can fail. For example, S3 refuses to delete a non-empty bucket. CloudFormation
+leaves the stack in `DELETE_FAILED` and does not empty the bucket automatically.
 
 A refusal leaves the stack in `DELETE_FAILED` with the reason on it, and keeps the stack name in use.
 `waitForStackDeleteComplete(...)` rethrows the error, and `DescribeStacksCommand` reports it as
@@ -896,7 +887,7 @@ takes either.
 
 ## Parameters
 
-Template parameters can be supplied when creating a stack.
+Pass template parameter values when creating or updating a stack.
 
 ```typescript sim-cloudformation-parameters
 /**
@@ -949,7 +940,7 @@ the type.
 
 ## Intrinsic functions
 
-Sim CloudFormation supports common intrinsic functions used by supported resources.
+Yulin resolves the following intrinsic functions in resource properties and outputs.
 
 ### `Ref`
 
@@ -991,8 +982,8 @@ console.log(
 );
 ```
 
-For supported resource types, `Ref` returns the resource-specific CloudFormation value. For example,
-an S3 Bucket `Ref` returns the Bucket name.
+`Ref` returns the CloudFormation value for a resource type. For an S3 bucket, it returns the bucket
+name.
 
 ### `Fn::GetAtt`
 
@@ -1251,8 +1242,8 @@ console.log(simAws.s3().getSimBucketByName("docs-site-bucket")?.bucketName);
 
 ### `Fn::FindInMap`
 
-A template `Mappings` section holds two levels of keys against a value. `Fn::FindInMap` reads one of
-those values, given the map name, the top-level key and the second-level key.
+A template `Mappings` section stores values under two levels of keys. `Fn::FindInMap` reads a value
+using the map name and both keys.
 
 ```typescript sim-cloudformation-fn-find-in-map
 /**
@@ -1330,9 +1321,7 @@ expression. A lookup that finds its value in the map ignores the default.
 
 ### `Fn::Split` and `Fn::Select`
 
-`Fn::Split` cuts a string into a list on a delimiter. `Fn::Select` reads one value out of a list by
-its zero-based index. They are usually written together, to pull one part out of a string another
-resource gave.
+`Fn::Split` divides a string by a delimiter. `Fn::Select` reads a list value by zero-based index.
 
 ```typescript sim-cloudformation-fn-select-split
 /**
@@ -1418,8 +1407,7 @@ resource and the property path the value sat at, for example
 
 ### `Fn::ImportValue`
 
-`Fn::ImportValue` reads a value another Stack exported. A Stack exports one by giving an Output an
-`Export.Name`, and a Stack in the same Account and Region imports it by that name.
+`Fn::ImportValue` reads a named output exported by another stack in the same account and region.
 
 CDK writes both halves on its own. Referencing a resource in another Stack of the same app puts an
 `Export` on the producer and an `Fn::ImportValue` on the consumer, with no opt-in.
@@ -1486,8 +1474,8 @@ exports published in that Region.
 
 ## Dynamic references
 
-A `{{resolve:...}}` dynamic reference reads a value from another service while a resource is being
-created. It is written into the template as ordinary text, so it can sit inside a longer string.
+A `{{resolve:...}}` dynamic reference reads an SSM parameter or Secrets Manager secret while
+creating a resource. A reference can appear inside a longer string.
 
 `Fn::Sub` and `Fn::Join` resolve first, and the reference is read from the string they built. CDK
 writes that shape whenever a secret sits in the same stack as the resource reading it (the secret's
@@ -1506,9 +1494,8 @@ for the segments and for what a reference Secrets Manager cannot answer resolves
 
 ## Conditions
 
-A template `Conditions` section names boolean expressions over the stack's parameter values. A
-condition decides whether a resource is created, and which value `Fn::If` gives a property or an
-output.
+The `Conditions` section defines boolean expressions over parameter and pseudo-parameter values.
+Conditions control resource creation and select `Fn::If` values.
 
 ```typescript sim-cloudformation-conditions
 /**
@@ -1632,7 +1619,7 @@ condition the template leaves undefined fails the deployment.
 
 ## Resource dependencies
 
-Resources can depend on each other explicitly with `DependsOn`.
+Use `DependsOn` to declare an explicit resource dependency.
 
 ```typescript sim-cloudformation-depends-on
 /**
@@ -1765,8 +1752,7 @@ in the assembly, and a Stack named in `stackOptions` carries its own.
 
 ## Deploying synthesized CDK templates
 
-Use `deployTemplateFile(...)` to deploy a template file, including the JSON templates CDK synthesis
-produces.
+Use `deployTemplateFile(...)` to deploy a JSON or YAML template file, including CDK synth output.
 
 ```typescript sim-cloudformation-cdk-template-file
 /**
@@ -1805,8 +1791,7 @@ const stack = await simAws.cloudFormation().deployTemplateFile({
 await stack.waitForDeployComplete();
 ```
 
-This is useful for local integration tests where you want CDK to produce the template, then Yulin to
-create the simulated resources from that synthesized output template.
+This lets an integration test synthesize with CDK and deploy the resulting template through Yulin.
 
 A template path with no file at it is refused with
 `No Sim CloudFormation template file at <path>`, naming the resolved path. A synthesized template
@@ -1814,8 +1799,7 @@ is build output, and a checkout that has yet to synthesize one meets this on the
 
 ## Deploying a template written as YAML
 
-CloudFormation takes a template in JSON or in YAML, and a template written by hand is usually YAML.
-`deployTemplateFile(...)` reads a `.yaml` or `.yml` file as YAML.
+`deployTemplateFile(...)` parses `.yaml` and `.yml` files as YAML.
 
 ```yaml
 Resources:
@@ -3250,10 +3234,10 @@ another function's event put there.
 Two shapes are refused rather than expanded. A bucket writing its `NotificationConfiguration` or its
 `LambdaConfigurations` as an intrinsic such as `Fn::If` is one, because there is no appending to a
 list CloudFormation has not resolved yet, and adding the event's own entries would drop whatever the
-intrinsic resolved to. The other is a function the template conditions out, which real CloudFormation
-refuses for the same reason SAM cannot fix it: the notification belongs to the bucket, the bucket is
-not conditioned, and nothing can condition one entry of somebody else's property. Condition the
-bucket along with the function, or declare the notification on the bucket yourself.
+intrinsic resolved to. The other is a function the template conditions out. Real CloudFormation
+refuses this because the notification belongs to the unconditioned bucket, and one entry of that
+property cannot have its own condition. Condition the bucket along with the function, or declare the
+notification on the bucket yourself.
 
 ### Simple tables
 

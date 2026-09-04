@@ -1,13 +1,12 @@
 # Simulated S3
 
-Yulin includes a simulated S3 service for tests and local development.
+Yulin simulates S3 buckets, objects, policies, notifications and website hosting. Use
+`simAws.s3()` as part of a simulated AWS environment or create a standalone `SimS3`.
+`serveSimAws` exposes the S3 API and website endpoints over localhost.
 
-Sim S3 can be used directly through `SimAws` or instantiated on its own as `SimS3` with isolated
-state. Yulin can serve a simulated S3 service on localhost.
+## Create a bucket and object
 
-## Basic usage
-
-Create a simulated AWS environment, get simulated S3, create a Bucket, and put an Object into it.
+Create a bucket, write an object and read it back.
 
 ```typescript sim-s3-bucket
 /**
@@ -104,15 +103,15 @@ await scopedS3.createBucket(
 );
 ```
 
-Within one `SimAws` instance, Bucket names are globally registered across Accounts and Regions.
-Creating a Bucket with a name already used in another simulated Region or Account throws an error.
+Bucket names are global within a `SimAws` instance. Creating the same name in another simulated
+account or region fails.
 
-Each `SimAws` instance has its own isolated state. Create a fresh one per test or share one across
-all tests, as you prefer.
+Each `SimAws` instance has isolated state.
 
-## Listing Buckets
+## Listing buckets
 
-Use `ListBucketsCommand` to inspect Buckets in the selected simulated S3 scope. Each Bucket reports the instant it was created, taken from [simulated time](https://yulinsim.dev/time/) rather than the host clock.
+`ListBucketsCommand` lists buckets in the selected account and region. Each bucket reports its
+creation time from the [simulated clock](https://yulinsim.dev/time/).
 
 ```typescript sim-s3-list-buckets
 /**
@@ -137,17 +136,20 @@ console.log(listBucketsOutput.Buckets?.map((bucket) => bucket.Name));
 console.log(listBucketsOutput.Buckets?.[0]?.CreationDate);
 ```
 
-## Asking whether something is there
+## Checking whether a bucket or object exists
 
-`HeadObjectCommand` reports what a read would say about an Object without returning the Object, and `HeadBucketCommand` reports whether a Bucket is there and reachable. `HeadBucket` also reports the Region it was found in.
+`HeadObjectCommand` returns object metadata without the body. `HeadBucketCommand` checks that a
+bucket exists and is accessible, and reports its region.
 
-A HEAD response carries no body, so there is no document for an error code to travel in. Real S3 answers a `HeadObject` with `403` or `404`, and a `HeadBucket` with `400`, `403` or `404`, leaving the SDK to name the failure from the status alone. The simulator answers `404` for an absent Bucket and an absent Object alike, which an SDK client raises as `NotFound`, and `403` for a caller the permission is missing for. A read distinguishes `NoSuchBucket` from `NoSuchKey`, because a read has a body to say which.
+A HEAD response has no error document. Yulin returns 404 for a missing bucket or object, which the
+SDK raises as `NotFound`. It returns 403 when the caller lacks permission. `GetObject` can distinguish
+`NoSuchBucket` from `NoSuchKey` because its error response has a body.
 
 `HeadObject` authorizes against `s3:GetObject` and `HeadBucket` against `s3:ListBucket`, as real S3 does, so knowing something is there needs the permission to read it.
 
-## Listing Objects
+## Listing objects
 
-Use `ListObjectsV2Command` to list the Objects in a Bucket. The simulator supports `Prefix`,
+Use `ListObjectsV2Command` to list objects in a bucket. Yulin supports `Prefix`,
 `Delimiter`, `MaxKeys`, `ContinuationToken` and `StartAfter`, and answers with `Contents`,
 `CommonPrefixes`, `KeyCount`, `IsTruncated` and `NextContinuationToken`.
 
@@ -197,18 +199,16 @@ for (const object of listedObjects) {
 }
 ```
 
-Listings are sorted by key, and a page holds at most 1,000 keys, as in real S3. `MaxKeys` above that
-is lowered to it, and the response reports the page size that was actually used. A `MaxKeys` of zero
-returns no keys and completes the listing, and a negative one is refused with `InvalidArgument`.
+Listings sort objects by key and return at most 1,000 entries. Larger `MaxKeys` values are capped at
+1,000. Zero returns an empty complete page, and a negative value raises `InvalidArgument`.
 
 A listing that found no keys has no `Contents` at all, and the example reaches for `Contents ?? []`
 for that reason. `KeyCount` is the count either way.
 
 ### Walking a truncated listing
 
-A truncated response carries `NextContinuationToken`, which the next request passes as
-`ContinuationToken`. The token is opaque, as it is in real S3. Pass it back unchanged, read nothing
-out of it, and simulated S3 refuses one it did not issue.
+A truncated response includes `NextContinuationToken`. Pass it unchanged as `ContinuationToken` in
+the next request. Yulin rejects tokens it did not issue.
 
 ```typescript sim-s3-list-objects-v2-pagination
 /**
@@ -533,9 +533,8 @@ An Object uploaded in parts gets a different form. See
 
 ## Uploading an Object in parts
 
-`aws s3 cp` switches to a multipart upload above eight megabytes, and `@aws-sdk/lib-storage` uploads
-in parts whatever the size. Sim S3 answers the six operations that path is made of, over the SDK and
-over a served endpoint alike.
+Yulin supports multipart upload through the SDK and served S3 endpoint. This covers the operations
+used by `aws s3 cp` for files above eight megabytes and by `@aws-sdk/lib-storage`.
 
 ```bash
 aws s3 cp ./big.bin s3://widgets/big.bin   # 12MB, multipart under the covers
@@ -846,9 +845,8 @@ See [Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost) for sett
 
 ## Deleting Objects
 
-Use `DeleteObjectCommand` to remove one Object, and `DeleteObjectsCommand` to remove several in one
-request. Both are authorized against `s3:DeleteObject` on the Object ARN. A caller allowed to read a
-Bucket cannot empty it.
+Use `DeleteObjectCommand` to remove one object or `DeleteObjectsCommand` to remove several. Each
+object requires `s3:DeleteObject` permission on its ARN.
 
 ```typescript sim-s3-delete-object
 /**
@@ -931,9 +929,9 @@ failures come back.
 
 ## Object versioning
 
-A versioned Bucket keeps every write of a key instead of overwriting it, and answers a delete with a
-marker rather than removing anything. Turn it on with `PutBucketVersioningCommand`, or with
-`VersioningConfiguration` on an `AWS::S3::Bucket` resource.
+A versioned bucket keeps each write as a separate version. Deleting a key adds a delete marker. Enable
+versioning with `PutBucketVersioningCommand` or the `VersioningConfiguration` property of an
+`AWS::S3::Bucket`.
 
 ```typescript sim-s3-object-versioning
 import {
@@ -1096,12 +1094,11 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 
 ## Object Lock
 
-Object Lock holds a version of an Object against a delete. A version can be held by a retention
-period, by a legal hold or by both, and a delete naming a held version is answered with
-`AccessDenied`. One way past exists and it is narrow. A `GOVERNANCE` retention period gives way to a
-request carrying `BypassGovernanceRetention` from a caller allowed to use it. A `COMPLIANCE` period
-and a legal hold hold against everyone, the account root included. Turn it on with `PutObjectLockConfigurationCommand`, or with
-`ObjectLockEnabled` on an `AWS::S3::Bucket` resource.
+Object Lock protects an object version with a retention period, a legal hold, or both. Deleting a
+protected version raises `AccessDenied`. A caller with `s3:BypassGovernanceRetention` may bypass
+`GOVERNANCE` retention by setting `BypassGovernanceRetention`. `COMPLIANCE` retention and legal
+holds cannot be bypassed. Enable Object Lock with `PutObjectLockConfigurationCommand` or
+`ObjectLockEnabled` on an `AWS::S3::Bucket`.
 
 Object Lock holds a version, and versioning has to be on underneath it. Turning it on over a Bucket
 with versioning off is refused with `InvalidBucketState`, as real S3 refuses it, and a template
@@ -1256,8 +1253,8 @@ Bucket created around the property would report a default retention it never app
 
 ## Event notifications
 
-A simulated S3 Bucket can notify a simulated Lambda function, a simulated SQS queue or a simulated
-SNS topic when an Object is created or removed. The configuration is applied with
+A simulated bucket can notify Lambda, SQS or SNS when an object is created or removed. Apply the
+configuration with
 `PutBucketNotificationConfigurationCommand` and read back with
 `GetBucketNotificationConfigurationCommand`.
 
@@ -1360,10 +1357,10 @@ can take the `.jpg` files under a prefix while another takes the `.png` files un
 The rule applies across the destination groups. A function and a queue that both want the same
 event are refused as readily as two functions.
 
-`PutBucketNotificationConfigurationCommand` replaces the whole configuration rather than adding to
-it. `GetBucketNotificationConfigurationCommand` answers an empty configuration for a Bucket that has
-none. Note that the response carries the destination groups at the top level, while the request nests
-them under `NotificationConfiguration`:
+`PutBucketNotificationConfigurationCommand` replaces the complete configuration.
+`GetBucketNotificationConfigurationCommand` returns an empty configuration when none is set. The
+request nests destination groups under `NotificationConfiguration`, while the response puts them at
+the top level:
 
 ```typescript
 const read = await simAws
@@ -1476,9 +1473,9 @@ function is.
 
 ### To an SQS queue
 
-A `QueueConfigurations` entry names a queue by ARN. The whole `Records` document arrives as one
-message body, and a consumer parses `record.body` to get at the event. Put a Lambda event source
-mapping on the queue and the chain runs end to end after one `backgroundTasksComplete()`.
+A `QueueConfigurations` entry names a queue by ARN. S3 sends the complete `Records` document as one
+message body. Add a Lambda event source mapping to consume it, then call
+`backgroundTasksComplete()` to finish the delivery chain.
 
 The queue's `Policy` attribute has to allow `sqs:SendMessage` for the `s3.amazonaws.com` service
 principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`. The `ArnLike` condition CDK's
@@ -1633,10 +1630,9 @@ its own policy and its own Account's IAM are what admit the Bucket. A FIFO queue
 
 ### To an SNS topic
 
-A `TopicConfigurations` entry names a topic by ARN. The whole `Records` document is published as the
-SNS `Message`, with a `Subject` of `Amazon S3 Notification`, as real S3 publishes it. A queue
-subscribed to the topic therefore has two envelopes to reach through. Parse the message body for the
-SNS envelope, then parse its `Message` for the S3 event.
+A `TopicConfigurations` entry names a topic by ARN. S3 publishes the complete `Records` document as
+the SNS `Message` with the subject `Amazon S3 Notification`. A subscribed queue receives an SNS
+envelope whose `Message` contains the S3 event.
 
 The topic's `Policy` attribute has to allow `sns:Publish` for the `s3.amazonaws.com` service
 principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`. The `ArnLike` condition CDK's

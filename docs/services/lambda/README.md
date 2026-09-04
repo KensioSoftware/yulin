@@ -1,7 +1,7 @@
 # Simulated Lambda
 
-Yulin includes a simulated AWS Lambda service for tests and local development. Functions are created
-and invoked in-process and in memory, with no containers and no real AWS infrastructure.
+Yulin creates and invokes Lambda functions in process. A function can use an in-process handler,
+code from a zip archive, code stored in simulated S3, or a handler bound to a container image.
 
 Handlers run with their execution role as the simulated caller, so AWS calls made inside a handler
 are authorized by simulated IAM, as on real Lambda. Creating a function and changing its role are
@@ -9,16 +9,14 @@ authorized as well, both against `lambda:` actions and against `iam:PassRole` on
 the request names. See [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service)
 in the IAM docs.
 
-Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath. Real `LambdaClient`
-instances can be routed into sim Lambda with
+Lambda helpers are available from `@kensio/yulin/lambda`. A `LambdaClient` can be routed to Yulin with
 [SDK interception](https://yulinsim.dev/sdk/ "Simulated AWS SDK interception docs").
 
 ## Creating and invoking a function
 
-The quickest way to a working function is to pass a real in-process handler function through the
-SDK-shaped `Code.ZipFile` input with `makeLambdaZipFileInput(...)`. The handler is an ordinary
-function in your Node.js process. It can be stepped through in a debugger and can close over local
-state.
+Use `makeLambdaZipFileInput(...)` to pass an in-process handler through the SDK-shaped `Code.ZipFile`
+input. The handler runs as an ordinary function in the Node.js process. It supports breakpoints and
+access to local state.
 
 ```typescript sim-lambda-create-and-invoke
 /**
@@ -84,18 +82,13 @@ The invoke call itself returns normally.
 
 ## Zip-packaged code and the vm runtime
 
-A real in-process handler is the one to reach for first. `makeLambdaZipFileInput(...)` backs a
-function created through the SDK with one, and an [executable binding](#executable-bindings) backs
-one a template declares. The handler stops on a breakpoint and can close over the test's own state.
-Run the packaged code where the test is about the bundle a deployment ships, its imports and its
-bundling included. Both paths invoke through simulated Lambda, and simulated IAM authorizes the
-handler's own AWS calls under the execution role either way.
+Use an in-process handler for most tests. Use packaged code when the test covers the deployed bundle,
+including its imports. Both forms run through simulated Lambda and make AWS calls as the function's
+execution role.
 
-Real Lambda receives function code as a zip archive. `makeLambdaCodeZip(...)` builds real zip
-bytes from a source string (which becomes a single `index.js` module) or from a files map keyed by
-archive path (like a bundled deployment package). The archive runs in a Node.js `vm` context with
-real cold-start semantics. The module is imported once, on first invocation, and module state stays
-warm across invocations.
+`makeLambdaCodeZip(...)` builds zip bytes from a source string or a map of archive paths to file
+contents. A source string becomes `index.js`. Yulin runs the archive in a Node.js `vm`, loads the
+module on the first invocation and preserves module state for later invocations.
 
 ```typescript sim-lambda-zip-code-vm-runtime
 /**
@@ -171,18 +164,15 @@ package is refused at cold start. A handler file ending in `.mjs` is reported as
 Real Lambda has run ES module packages since nodejs14.x, and `NodejsFunction` in CDK emits one
 under `format: OutputFormat.ESM`.
 
-There are two ways round that. An [executable binding](#executable-bindings) or
-`makeLambdaZipFileInput(...)` backs the function with a real in-process handler. The test's own
-module system loads that handler, and its format is whatever the test file's is. An ESM project
-needs nothing further. Where the archive itself has to be the deployed artefact, compile a CommonJS
-build of the same source and deploy that as the function's code.
+Use an [executable binding](#executable-bindings) or `makeLambdaZipFileInput(...)` for an ESM handler.
+The test's module system loads an in-process handler. To test the archive itself, compile the source
+to CommonJS before creating the zip.
 
 `Code.ZipFile` bytes that fail to unzip are rejected at creation with the AWS-like
 `InvalidParameterValueException: Could not unzip uploaded file`.
 
-The archives are real zip files, and they interoperate with real tooling in both directions. A zip
-built by any other tool works as `Code.ZipFile` input, and `makeLambdaCodeZip` output can be
-unzipped normally.
+`Code.ZipFile` accepts zip archives produced by other tools. Archives from `makeLambdaCodeZip` can
+also be opened with standard zip tools.
 
 ### What a handler prints
 
@@ -408,9 +398,8 @@ writes none of those.
 
 ## Function code from S3
 
-Function code can also be fetched from a zip object stored in sim S3, as SAM and CDK deployments
-do on real AWS. The code object is fetched once at creation time, as the creating caller, so
-simulated IAM applies to the code object read.
+Function code may reference a zip object in simulated S3. Yulin reads the object once during
+function creation as the caller creating the function, so simulated IAM applies to the S3 read.
 
 ```typescript sim-lambda-s3-code
 /**
@@ -944,10 +933,9 @@ the operation header that says so.
 
 ## Invocation types
 
-`InvokeCommand` supports the three AWS invocation types. `RequestResponse` (the default) awaits
-the handler and returns its JSON-serialised result as the response payload. `Event` returns `202`
-immediately and runs the handler in the background. `DryRun` returns `204` without invoking the
-handler at all.
+`InvokeCommand` supports all three invocation types. `RequestResponse` waits for the handler and
+returns its JSON result. `Event` returns 202 and schedules the handler in the background. `DryRun`
+returns 204 without invoking the handler.
 
 ```typescript sim-lambda-invocation-types
 /**
@@ -1007,14 +995,12 @@ covers.
 
 ## Asynchronous retries and destinations
 
-An `Event` invocation whose handler throws is retried twice, as real Lambda retries one. The retries
-wait on the simulated clock, about a minute before the first and two before the second, so a test
-reaches them by advancing time rather than by waiting for it.
+An `Event` invocation retries a failed handler twice by default. Retries use the simulated clock,
+after about one minute and then two minutes. Advance the clock to run them in a test.
 
-`PutFunctionEventInvokeConfigCommand` changes how many retries a function makes and where its
-results go. An invocation that fails its last attempt is sent to the `OnFailure` destination, and
-one whose handler returns is sent to `OnSuccess`. A destination ARN can name a simulated SQS queue,
-SNS topic, EventBridge event bus or Lambda function.
+`PutFunctionEventInvokeConfigCommand` controls retry count and destinations. Lambda sends a final
+failure to `OnFailure` and a successful result to `OnSuccess`. Destinations may be SQS, SNS,
+EventBridge or another Lambda function.
 
 The source function's execution role must allow the operation that writes to the destination:
 
@@ -1154,11 +1140,9 @@ a config of its own, and an invocation of a qualifier with no config of its own 
 
 ### Dead-letter targets
 
-`DeadLetterConfig` is the older way to keep a failed asynchronous invocation, and simulated Lambda
-takes it on `CreateFunction` and `UpdateFunctionConfiguration`. Its `TargetArn` names a simulated
-SQS queue or SNS topic, which receives the event as it was invoked rather than the destination
-record around it. The execution role needs `sqs:SendMessage` for a queue or `sns:Publish` for a
-topic. A denied delivery rejects the background task and leaves the target unchanged.
+`DeadLetterConfig` sends a failed asynchronous event to SQS or SNS. Configure it with
+`CreateFunction` or `UpdateFunctionConfiguration`. The target receives the original event rather
+than a destination record. The execution role needs `sqs:SendMessage` or `sns:Publish`.
 
 ```typescript sim-lambda-dead-letter-queue
 /**
@@ -1249,11 +1233,9 @@ A function carrying both a dead-letter target and an `OnFailure` destination sen
 
 ## Versions and aliases
 
-`PublishVersionCommand` copies a function as it stands and numbers the copy. The first is version
-`1`, and each later one counts up. The copy keeps the code, handler, timeout, memory and
-environment it was published with. `CreateAliasCommand` gives one of those versions a name, and
-`UpdateAliasCommand` moves the name to another version, so a deployment can repoint what callers
-invoke.
+`PublishVersionCommand` creates an immutable numbered copy of the function's code and configuration.
+Versions start at `1`. `CreateAliasCommand` gives a version a name, and `UpdateAliasCommand` moves
+that name to another version.
 
 `InvokeCommand` and `GetFunctionCommand` take a `Qualifier` naming a version number or an alias.
 The same qualifier can travel on the `FunctionName` instead, appended to the name (`orders:live`)
@@ -1366,9 +1348,8 @@ ARN. A `FunctionName` carrying a qualifier (`orders:live`) is refused with an
 
 ## Triggering a function from an SQS queue
 
-An event source mapping connects a [simulated queue](https://yulinsim.dev/services/sqs/ "Simulated SQS docs") to a function.
-Messages sent to the queue are delivered to the handler as an SQS event, with the `Records` shape
-real Lambda uses.
+An event source mapping polls a [simulated queue](https://yulinsim.dev/services/sqs/ "Simulated SQS docs") and invokes the function
+with an SQS `Records` event.
 
 Polling runs on the simulation's background scheduler. A test awaits
 `simAws.backgroundTasksComplete()` and then asserts, without sleeping.
@@ -1600,10 +1581,9 @@ from.
 
 ### When the handler fails
 
-A handler that returns normally has handled the batch, and the messages are deleted from the queue.
-A handler that throws returns the whole batch. The messages stay on the queue, hidden until their
-visibility timeout lapses, and are delivered again after that. Advancing the simulation's clock is
-what brings them back:
+A successful handler deletes the batch from the queue. When the handler throws, every message stays
+in flight until its visibility timeout expires, then becomes available for another delivery. Advance
+the simulated clock to reach that retry:
 
 ```typescript
 await simAws.clock().advanceBy({ seconds: 31 });
@@ -1618,10 +1598,8 @@ the sender sees is the message coming back.
 
 ### Reporting individual message failures
 
-A queue mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
-`batchItemFailures` list the handler returns. The message ids named in it go back to the queue, and
-the rest of the batch is deleted. A stream mapping takes the same list and does something else with
-it, under [reporting individual record failures](#reporting-individual-record-failures).
+A queue mapping with `FunctionResponseTypes: ["ReportBatchItemFailures"]` reads the handler's
+`batchItemFailures`. Named message IDs return to the queue and the remaining messages are deleted.
 
 ```typescript
 await simAws.lambda().createEventSourceMapping(
@@ -1646,9 +1624,8 @@ or an empty `batchItemFailures` list, has handled the whole batch.
 
 ### Making an SQS event without a queue
 
-A test of the handler on its own, with no queue and no mapping, still has to pass it a whole event.
-`lambdaSqsEventFactory` makes one, and `lambdaSqsEventRecordFactory` makes the records in it. Such a
-test then says what the messages carry and leaves the rest to the factory:
+Use `lambdaSqsEventFactory` and `lambdaSqsEventRecordFactory` to call an SQS handler without creating
+a queue or event source mapping:
 
 ```typescript sim-lambda-sqs-event-factory
 /**
@@ -1708,9 +1685,9 @@ the same records whether it carries them or not. The deploy stands and nothing r
 
 ## Triggering a function from a DynamoDB stream
 
-An event source mapping also connects a [simulated table's stream](https://yulinsim.dev/services/dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs")
-to a function. Changes to the table are delivered to the handler as a DynamoDB stream event, with
-the `Records` shape real Lambda uses.
+An event source mapping can also poll a
+[simulated DynamoDB stream](https://yulinsim.dev/services/dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs").
+Table changes reach the handler as a DynamoDB `Records` event.
 
 `StartingPosition` is required for a stream and is `TRIM_HORIZON` or `LATEST`. `TRIM_HORIZON` reads
 what the stream still holds, so changes made before the mapping existed are delivered too. `LATEST`
@@ -2058,9 +2035,8 @@ because a message the handler never takes is left to the queue's own redrive pol
 
 ### Reporting individual record failures
 
-A stream mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
-`batchItemFailures` list the handler returns. For a stream the identifier is the record's
-`SequenceNumber`:
+A stream mapping with `FunctionResponseTypes: ["ReportBatchItemFailures"]` reads the handler's
+`batchItemFailures`. Each item identifies a record by `SequenceNumber`:
 
 ```typescript
 await simAws.lambda().createEventSourceMapping(
@@ -2308,15 +2284,13 @@ Write the grant as an inline policy, as the example above and CDK both do.
 
 ## Triggering a function from a Kinesis stream
 
-An event source mapping also connects a [simulated Kinesis stream](https://yulinsim.dev/services/kinesis/ "Simulated Kinesis Data Streams docs")
-to a function. Records put onto the stream are delivered to the handler as a Kinesis event, with the
-`Records` shape real Lambda uses.
+An event source mapping can poll a
+[simulated Kinesis stream](https://yulinsim.dev/services/kinesis/ "Simulated Kinesis Data Streams docs") and invoke the function
+with a Kinesis `Records` event.
 
-A Kinesis stream has as many shards as it was created with, and every one of them is read. Real
-Lambda runs a processor per shard, and so does this: each shard keeps its own place on the stream,
-delivers its own batches and backs off on its own when a batch fails. One invocation is given
-records from one shard, so a handler that has to see records in order should put them under one
-partition key, which is what puts them on one shard.
+Yulin reads every shard in a Kinesis stream. Each shard tracks its own iterator, delivers its own
+batches and backs off independently after a failure. An invocation receives records from one shard.
+Use one partition key when the handler requires ordered records.
 
 `StartingPosition` is required for a stream. A Kinesis stream takes all three positions.
 `TRIM_HORIZON` reads what the stream still holds, `LATEST` reads only what arrives from the moment

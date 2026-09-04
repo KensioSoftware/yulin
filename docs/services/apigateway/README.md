@@ -1,16 +1,11 @@
 # Simulated API Gateway REST APIs
 
-Yulin includes a simulated API Gateway v1 service, reachable as `simAws.apiGateway()`. It covers the
-REST API resource tree, the methods declared on it, a Lambda proxy integration behind each method,
-and the deployments and stages that publish them. REST-API-specific types are imported from the
-`@kensio/yulin/apigateway` subpath.
+Yulin simulates API Gateway REST APIs (the v1 API) with Lambda proxy integrations. Use
+`simAws.apiGateway()` directly or intercept an `APIGatewayClient`. REST API types are available from
+`@kensio/yulin/apigateway`.
 
-This is the v1 service. HTTP APIs are v2, on a separate SDK client, and they are documented under
-[API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/). The two hold separate state. A REST API created here
-stays out of `simAws.apiGatewayV2()`.
-
-A handler behind a REST API can be tested against a real HTTP request, with no hand-built event to
-keep in step.
+HTTP APIs use the separate `simAws.apiGatewayV2()` service. See
+[API Gateway HTTP APIs](https://yulinsim.dev/services/apigatewayv2/).
 
 ## Creating a REST API
 
@@ -48,13 +43,13 @@ console.log(typeof created.rootResourceId);
 // "string"
 ```
 
-A REST API name identifies nothing. Two APIs in one account and region may share a name, and the id
-is what tells them apart. Hold the id the create returns.
+A REST API name is a label. Two APIs in the same account and region may share a name. Use the ID
+returned by `CreateRestApiCommand` to address the API.
 
 ## Building the path tree
 
-A REST API path is a chain of resources, each holding one segment. `CreateResourceCommand` adds a
-segment under a parent and reports the full path its place in the tree gives it.
+A REST API stores its path as a tree of resources. Each resource holds one segment.
+`CreateResourceCommand` adds a segment below a parent and returns its full path.
 
 ```typescript sim-apigateway-resource-tree
 /**
@@ -103,18 +98,17 @@ console.log(listed.items.map((resource) => resource.path));
 // [ "/", "/orders", "/orders/{orderId}" ]
 ```
 
-A segment is a literal such as `orders`, a path parameter such as `{orderId}`, or a greedy path
-parameter such as `{proxy+}`. A greedy segment matches the rest of the request path. A resource
-holding one therefore takes no children, and adding under it is refused.
+A segment may be literal (`orders`), a path parameter (`{orderId}`), or a greedy path parameter
+(`{proxy+}`). A greedy segment matches the rest of the path and cannot have children.
 
 Deleting a resource deletes everything under it, the way real API Gateway does. The root resource
 stays, because every REST API has one.
 
 ## Methods and their integrations
 
-A method is declared on a resource with `PutMethodCommand`, and what it does with a request goes
-behind it with `PutIntegrationCommand`. Both address the same resource id and HTTP method, since a
-REST API method has no id of its own.
+`PutMethodCommand` declares a method on a resource. `PutIntegrationCommand` connects that method to
+a Lambda function. Both commands use the resource ID and HTTP method because a method has no ID of
+its own.
 
 ```typescript sim-apigateway-method-integration
 /**
@@ -184,18 +178,15 @@ console.log(method.methodIntegration?.uri);
 // echoed back as one line, the way it was configured
 ```
 
-The integration URI is written either as the bare function ARN, which CDK emits, or wrapped in the
-API Gateway invoke path above, which CloudFormation templates and OpenAPI documents emit. Both reach
-the same function, and the string is echoed back as it was configured, the way real API Gateway does.
-A version or alias qualifier on the end of the ARN is kept. An integration built on an alias
-therefore follows that alias.
+The integration URI may be a function ARN or the API Gateway invocation URI shown above. CDK emits
+the first form. CloudFormation templates and OpenAPI documents commonly emit the second. A version
+or alias qualifier is preserved. An integration that names an alias follows that alias.
 
 Deleting a method deletes its integration, because a REST API integration is part of the method.
 
 ## Deployments and stages
 
-A REST API has an invocation URL once a stage exists, and every stage is the first path segment of
-that URL. An HTTP API can serve a `$default` stage at the root, and a REST API always carries the
+A REST API gets an invocation URL when it has a stage. The stage name is always the first path
 segment.
 
 ```typescript sim-apigateway-deploy-stage
@@ -249,15 +240,13 @@ console.log(restApi?.invokeUrl("prod"));
 `invokeUrl` is a simulator accessor. Real API Gateway reports no endpoint for a REST API and leaves
 callers to build the URL themselves. CDK's `RestApi.urlForPath` builds the same one.
 
-Real API Gateway freezes the resources and methods into a deployment, and an edit made afterwards
-reaches no client until another deployment is created. Here a stage serves the API's current
-resources. A test that edits a method sees the change straight away, with no redeployment in
-between. That is the one place this departs from AWS.
+Stages serve the API's current resources and methods. Changes take effect immediately. AWS freezes
+the configuration in a deployment and requires another deployment before changes become visible.
 
 ## Serving a request
 
-A request to the stage's invoke URL walks the resource tree to a method and invokes that method's
-integration, and the handler's response becomes the HTTP response.
+A request to a stage selects a resource and method, then invokes its integration. The Lambda result
+becomes the HTTP response.
 
 ```typescript sim-apigateway-serve
 /**
@@ -300,14 +289,13 @@ console.log(await response.text());
 await srv.close();
 ```
 
-`simRestApiLambdaProxyFactory` builds the function, the resources, the method, the integration, the
-invoke permission and the deployment in one call. A test about serving wants all of them and is
-about none of them. A test about the commands themselves sends them one at a time.
+`simRestApiLambdaProxyFactory` creates a ready-to-call REST API in one operation. It creates the
+function, resources, method, integration, invoke permission and deployment.
 
 ### The event a handler receives
 
-A REST API sends payload format 1.0. It carries both a single-value and a multi-value map for the
-headers and the query string, and it sends `null` for an empty map where format 2.0 omits the field:
+A REST API sends a payload format 1.0 event. Headers and query parameters appear in both single-value
+and multi-value maps. Empty values use `null`:
 
 | Field                                                      | Empty case |
 | ---------------------------------------------------------- | ---------- |
@@ -319,18 +307,15 @@ headers and the query string, and it sends `null` for an empty map where format 
 client asked for, stage segment and all. A handler behind a `{proxy+}` reads `resource` to tell which
 template caught its request.
 
-Each format's handler reads the other format's event wrongly. One function behind both an HTTP API
-and a REST API therefore has to pick a side.
+REST API and HTTP API events have different shapes. A handler shared by both must handle both
+formats explicitly.
 
 ### The response a handler returns
 
-A REST API proxy integration takes one shape. A result carrying a numeric `statusCode` becomes the
-response, and `multiValueHeaders` sends a header more than once. Anything else is a 502 with
-`Internal server error`. That is what real API Gateway answers when it cannot read the integration
-response. Payload format 2.0 is the lenient one, wrapping an unrecognised value in a 200, and a
-handler relying on that behaves differently here for the same reason it does on AWS.
+A REST API proxy result must contain a numeric `statusCode`. Use `multiValueHeaders` to send the
+same header more than once. An invalid result produces a 502 response with `Internal server error`.
 
-### Answers when the request matches nothing
+### Responses before an integration runs
 
 | Case                                          | Answer                             |
 | --------------------------------------------- | ---------------------------------- |
@@ -340,8 +325,8 @@ handler relying on that behaves differently here for the same reason it does on 
 | No integration, no function, or no permission | 502 `Internal server error`        |
 | The handler threw                             | 502 `Internal server error`        |
 
-`Missing Authentication Token` is the wording real API Gateway is well known for. It answers a path
-that matched nothing just as much as one that needed credentials.
+API Gateway uses `Missing Authentication Token` for an unmatched path or method, even when the
+request did not require authentication.
 
 ### The invoke permission
 
@@ -467,9 +452,8 @@ is named `ANY`, whatever method the client sent.
 
 Real `CreateStage` carries no method settings. AWS sets them with `UpdateStage` patch operations,
 which are outside this simulation, or from an `AWS::ApiGateway::Stage`. The `methodSettings` input
-above is this simulator's own, so that a test can throttle a stage without a template, and the SDK's
-`CreateStageCommand` declares no such member. `GetStage` reports the settings the way AWS reports
-them.
+above is specific to Yulin and lets a test configure throttling without a template. The SDK's
+`CreateStageCommand` has no such member. `GetStage` reports the settings in the AWS response shape.
 
 ## Authorizing a method
 
@@ -482,8 +466,8 @@ function answers an IAM policy document, evaluated for `execute-api:Invoke` agai
 request being made. Whatever `context` it returns reaches the handler.
 
 A `REQUEST` authorizer sends the whole request to its function (see
-[A REQUEST authorizer](#a-request-authorizer)), so it can identify a caller by several headers
-together or by the query string. It answers the same policy document.
+[A REQUEST authorizer](#a-request-authorizer)). It can identify a caller from several headers or
+query parameters. It answers the same policy document.
 
 ```typescript sim-apigateway-token-authorizer
 /**
@@ -674,9 +658,8 @@ left out.
 | `pathParameters`, `stageVariables`                         | What the resource path captured, and the stage's variables     |
 | `requestContext`                                           | The same block a handler gets, without the `authorizer` member |
 
-The maps are empty objects where the request supplied nothing. An integration event sends `null`
-there, and AWS's own example of the authorizer event sends `{}`, so a function reading
-`event.queryStringParameters.plan` finds nothing rather than throwing.
+The maps are empty objects when the request supplies no values. Integration events use `null` for
+the same fields. AWS's authorizer event examples use `{}`.
 
 ### Answering with a policy
 
@@ -710,8 +693,8 @@ authorizer's own logs, and IAM never sees it.
 ### The context the handler receives
 
 `context` reaches the handler under `requestContext.authorizer`, flattened alongside `principalId`.
-Payload format 2.0 keeps the context in a block of its own, so a handler moved between a REST API and
-an HTTP API reads a different shape.
+Payload format 2.0 keeps the context in its own block. A handler shared with an HTTP API must handle
+both shapes.
 
 An open method has no caller to describe, and leaves `requestContext.authorizer` out of the event
 altogether.
@@ -976,9 +959,8 @@ An admitted caller reaches the handler under `requestContext.identity`.
 | `user`      | The caller's ARN                   |
 | `userArn`   | The caller's ARN                   |
 
-Real API Gateway puts the unique id of the principal in `caller` and `user`, such as `AIDA...` for a
-User. A request carries no such id into the simulation, so the ARN identifying the caller goes in
-every field that can be filled from it.
+Real API Gateway puts the principal's unique ID in `caller` and `user`, such as `AIDA...` for a user.
+The simulation receives only the caller ARN and uses it for each identity field it can populate.
 
 A method of any other authorization type leaves those four `null`, and so does an `AWS_IAM` method
 called by a principal with no ARN behind it. `accessKey`, `apiKey`, `apiKeyId`, `principalOrgId` and
@@ -987,8 +969,8 @@ request itself and are filled for every method.
 
 ## Authorizing a method with a user pool
 
-A `COGNITO_USER_POOLS` authorizer verifies the token itself against the keys the user pools it names
-publish. Nothing is invoked, so there is no function to write and no policy to answer.
+A `COGNITO_USER_POOLS` authorizer verifies the token against the keys published by its user pools.
+It uses no Lambda function or returned policy.
 `CreateAuthorizerCommand` takes the pools as `providerARNs`, and `PutMethodCommand` binds the
 authorizer to a method with `authorizationType: "COGNITO_USER_POOLS"`.
 
@@ -1118,8 +1100,8 @@ two groups arrive as `[Admins Readers]`.
 }
 ```
 
-An HTTP API puts the same claims under `requestContext.authorizer.jwt.claims`, with the scopes
-beside them, so a handler moved between the two reads a different shape.
+An HTTP API puts the same claims under `requestContext.authorizer.jwt.claims`, with scopes beside
+them. A handler shared by both API types must handle both shapes.
 
 ### Scopes
 
@@ -1141,9 +1123,8 @@ token, since an id token carries no `scope` claim at all.
 | A token that has expired, or has no `exp` at all           | 401 `Unauthorized`                                   |
 | A verified token claiming none of the method's scopes      | 403 `User is not authorized to access this resource` |
 
-Every refusal up to and including the claim checks is the same 401, so a client learns that its
-token was not accepted and nothing about which check it failed. An unmet scope is the one 403: the
-token was accepted, and it does not allow this method.
+Token parsing and claim failures return the same 401 response. An unmet scope returns 403 because
+the token was valid but did not allow the method.
 
 The token is taken with or without the `Bearer` scheme in front of it. The identity source is one
 header, as it is for a `TOKEN` authorizer.
@@ -1503,7 +1484,7 @@ AWS sorts what an import finds into three categories, and the third is valid Ope
 leaves unsupported without a request validator. AWS ignores it silently, and so does this:
 `requestBody`, the content schemas under `responses`, `components.schemas`, and an operation's
 `parameters`, `summary`, `description` and `tags`. Request validation is refused at the root of the
-document, so a request whose body contradicts a declared schema still reaches the handler.
+document. A request body is not checked against the declared schema.
 `operationId` is ignored too, since it only supplies the `OperationName` a method carries for
 documentation.
 
@@ -1902,8 +1883,8 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
   that is the form the platform's `Headers` hands over. Real API Gateway reports each separately.
 - A Lambda authorizer's `context` reaches the handler as the authorizer returned it. AWS accepts a
   string, a number or a boolean for each value, and how it renders them is not published.
-- A Cognito authorizer reads a `providerARN` for the pool id it names, so a pool in another account
-  is verified against whenever this simulation holds it. `identityValidationExpression`, which real
+- A Cognito authorizer resolves a `providerARN` by pool ID across the simulated accounts.
+  `identityValidationExpression`, which real
   API Gateway matches a token against before verifying it, is outside this.
 - Binary media types negotiated by `Accept`, CORS preflight and gateway responses are outside this.
   A response body is still base64 decoded when the handler says `isBase64Encoded`.

@@ -1,17 +1,14 @@
 # Simulated Cognito IDP
 
-Yulin includes a simulated Cognito user pool directory for tests and local development. Pools and
-their app clients are held in memory, and every operation is authorized by simulated IAM.
+Yulin simulates Cognito user pools, app clients, users, groups, tokens, hosted domains and Lambda
+triggers. Use `simAws.cognitoIdp()` directly or intercept a `CognitoIdentityProviderClient`.
+Cognito types are available from `@kensio/yulin/cognito`.
 
-Only user pools are simulated. Cognito identity pools, which exchange a token for AWS credentials,
-are a different service and are outside the simulation.
-
-Cognito-specific types are imported from the `@kensio/yulin/cognito` subpath.
+Cognito identity pools are unsupported.
 
 ## Creating a pool and an app client
 
-A pool needs a name. Everything else has a default, and the defaults here are the ones real Cognito
-applies.
+A user pool needs a name. Other properties use Cognito's defaults.
 
 ```typescript sim-cognito-create-user-pool
 /**
@@ -46,16 +43,14 @@ const appClient = await cognito.createUserPoolClient(
 console.log(appClient.UserPoolClient?.ClientId); // 26 lowercase characters
 ```
 
-A pool id names the region the pool was created in, as real pool ids do. Application code that
-splits the id on the underscore to find the region works here for the same reason it works on AWS.
+A pool ID contains the region before its underscore, matching Cognito's ID format.
 
 Two pools may share a name. Only the id identifies one.
 
 ## Password policy
 
-A pool created without a `Policies` of its own gets the real default of eight characters, with an
-uppercase letter, a lowercase letter, a number and a symbol each required. A request setting some of
-those keeps the defaults for the rest.
+A pool created without `Policies` requires at least eight characters with uppercase, lowercase,
+numeric and symbol characters. Setting part of the policy keeps the defaults for omitted fields.
 
 ```typescript sim-cognito-password-policy
 /**
@@ -86,10 +81,9 @@ with `InvalidPasswordException`, saying which rule it broke.
 
 ## Users
 
-`AdminCreateUser` creates a user in `FORCE_CHANGE_PASSWORD`, where real Cognito leaves a user an
-admin made. It has a temporary password and cannot sign in with it. Setting a permanent password
-moves the user to `CONFIRMED`. The sign-in flows read that status. A user in
-`FORCE_CHANGE_PASSWORD` gets the `NEW_PASSWORD_REQUIRED` challenge, not tokens.
+`AdminCreateUser` creates a user in `FORCE_CHANGE_PASSWORD` with a temporary password. Sign-in
+returns the `NEW_PASSWORD_REQUIRED` challenge until `AdminSetUserPassword` sets a permanent
+password. A permanent password changes the status to `CONFIRMED`.
 
 ```typescript sim-cognito-create-user
 /**
@@ -145,11 +139,9 @@ console.log(read.UserAttributes?.find((each) => each.Name === "sub")?.Value);
 A password set without `Permanent: true` is temporary, and leaves the user in
 `FORCE_CHANGE_PASSWORD` again.
 
-A user's `sub` is a UUID Cognito allocates, reported among its attributes. It is not the username,
-and code treating the two as interchangeable fails here, and not in a deployment. Admin
-operations here name a user by its username only. Real Cognito also accepts a `sub` where an
-operation asks for a username. That is one thing that works there and not here. The refusal says so
-when the username given is some user's `sub`.
+A user's `sub` is a generated UUID and differs from the username. Yulin's admin operations accept
+the username only. Cognito also accepts a `sub` for some operations, which Yulin reports as an
+unsupported lookup.
 
 Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, and under
 `UserAttributes` from `AdminGetUser`, as the real API names them.
@@ -160,11 +152,9 @@ Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, 
 
 ## Signing in by email or phone number
 
-A pool created with `UsernameAttributes` signs its users in by that attribute, not by a username
-they chose. Cognito generates a UUID as the username for such a user, and the value the
-request called the username goes into the attribute the pool signs in by. That generated username
-is what `AdminGetUser` reports and what the `cognito:username` claim carries. An application reading
-"the username" off such a pool reads a UUID.
+A pool with `UsernameAttributes` signs users in with an email address or phone number. Cognito
+generates a UUID for the stored username. `AdminGetUser` and the `cognito:username` token claim
+report that UUID.
 
 A CDK `UserPool` with `signInAliases: { email: true }` emits `UsernameAttributes: ["email"]`, the
 usual way to build an email sign-in pool.
@@ -384,13 +374,11 @@ outside the simulation.
 
 ## Signing up
 
-`SignUp` is the other way a user gets into a pool. It names an app client rather than a pool, is
-authorized by no IAM policy, and leaves the user in `UNCONFIRMED` with the password it chose.
+`SignUp` creates an `UNCONFIRMED` user through an app client. The operation does not use IAM
+authorization.
 
-Real Cognito emails or texts a confirmation code at that point. Nothing here delivers a message, and
-the code is readable from the pool instead, through `confirmationCode` on the pool object. That is a
-deliberate divergence. Real Cognito never reports a code back to anyone, and reading one is what
-makes a registration flow testable at all.
+Read the confirmation code from `confirmationCode` on the simulated pool. Cognito sends the code by
+email or text and never exposes it through the service API.
 
 The pool also records the message it would have sent, holding the wording and the code a user
 would have read. That is in [Messages a pool would have sent](#messages-a-pool-would-have-sent)
@@ -500,9 +488,8 @@ the deployed pool would give. A pool created without the setting allows sign-up,
 
 ## Resetting a forgotten password
 
-A user that cannot get in asks for a code with `ForgotPassword` and sets a new password with
-`ConfirmForgotPassword`. Both name an app client, and neither is authorized by an IAM policy. They
-are the pair an application calls when it has built its own sign-in screens.
+`ForgotPassword` sends a code and `ConfirmForgotPassword` sets the new password. Both operations use
+an app client and bypass IAM authorization.
 
 The code goes to the same place a sign-up code goes, and is read back the same way, through
 `confirmationCode` on the pool object. `ForgotPassword` answers with `CodeDeliveryDetails` naming
@@ -633,9 +620,8 @@ are refused for one.
 
 ## Messages a pool would have sent
 
-Nothing here delivers an email or a text message. A pool records what it would have sent instead,
-and `sentMessages` on the pool object hands the record over. Each message carries the recipient, the
-medium, the subject, the body and the occasion it was sent on.
+The pool records outgoing email and text messages in `sentMessages`. Each entry contains the
+recipient, medium, subject, body and message type.
 
 A message is recorded on five occasions. Those are a `SignUp`, a `ResendConfirmationCode`, an
 `AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`, an MFA code sent by text message,
@@ -2060,10 +2046,9 @@ own users at the same address, which real Cognito keeps as two accounts until
 `AdminLinkProviderForUser` merges them. That operation is unsimulated.
 
 Posting the page carries on into the sign-in the authorize endpoint already runs, ending in the same
-`<ProviderName>_<subject>` user and the same authorization code. Nothing is kept on the provider
-afterwards: a further authorize request asks again, because real Cognito asks the provider afresh
-every time. A provider that `signInAs` has already put somebody at skips the page, which is what
-leaves a test that says who is signing in seeing none of this.
+`<ProviderName>_<subject>` user and the same authorization code. Provider state is discarded after
+the request. A later authorize request asks again because real Cognito asks the provider afresh each
+time. A provider configured with `signInAs` skips the page and uses the configured identity.
 
 `/signup` is a link from that page. Its form asks for a username, a password and the attributes the
 pool needs, which are the ones its `Schema` made required and the ones its `AutoVerifiedAttributes`
@@ -3704,8 +3689,8 @@ console.log(described.UserPoolClient?.ClientName);
 
 A registered pool behaves like any other. It answers `DescribeUserPoolCommand` and
 `ListUserPoolsCommand`, holds users, groups and app clients, and serves its JWKS and OpenID
-configuration on localhost. Everything written against a pool id follows from the id it was
-registered under: its ARN, its issuer URL, the `iss` claim of its tokens and its `ProviderName`. A
+configuration on localhost. The registered ID determines the pool ARN, issuer URL, token `iss` claim
+and `ProviderName`. A
 policy naming `arn:aws:cognito-idp:eu-west-2:111111111111:userpool/eu-west-2_aBcDeFgHi` authorizes
 the handler that reads the pool, which is what a template carrying the id in two places needs.
 
