@@ -31,6 +31,14 @@ export class SimLambdaStreamProgress {
   }
 
   /**
+   * How many records the next read may take, which is the mapping's batch size
+   * until a batch is being bisected.
+   */
+  batchSizeWithin(batchSize: number): number {
+    return this.state.bisect.sizeWithin(batchSize);
+  }
+
+  /**
    * Take a read that came back with nothing.
    *
    * The place is still worth keeping: it is what a starting position of LATEST
@@ -50,7 +58,8 @@ export class SimLambdaStreamProgress {
   }
 
   /**
-   * Take what became of a batch: move past it, or wait and try it again.
+   * Take what became of a batch: move past it, split it, or wait and try it
+   * again.
    */
   async after(
     outcome: SimLambdaStreamBatchOutcome,
@@ -62,6 +71,10 @@ export class SimLambdaStreamProgress {
       this.handled(batch);
 
       return;
+    }
+
+    if (this.state.bisect.split(outcome)) {
+      this.state.retry.reset();
     }
 
     const again = this.state.retry.after(outcome, this.position);

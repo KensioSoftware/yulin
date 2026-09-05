@@ -141,6 +141,24 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     );
   });
 
+  it("refuses bisection on a queue mapping, which does not count attempts", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping on the queue asks to bisect a batch its function threw on.
+    const error = await refusedMapping(ready, {
+      BisectBatchOnFunctionError: true,
+    });
+
+    // Then it is refused, as real Lambda refuses it: a message the function
+    // never handles is the queue's own problem once the batch goes back.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(
+      error.message,
+      "BisectBatchOnFunctionError is not valid for a queue",
+    );
+  });
+
   it("refuses a queue in another Account or Region", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();

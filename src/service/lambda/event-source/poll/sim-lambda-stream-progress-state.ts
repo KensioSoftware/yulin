@@ -3,6 +3,7 @@ import { SimLambdaStreamBatchAge } from "./sim-lambda-stream-batch-age.js";
 import { SimLambdaStreamFailureDestination } from "./sim-lambda-stream-failure-destination.js";
 import { SimLambdaStreamCursor } from "./sim-lambda-stream-cursor.js";
 import { SimLambdaStreamRetry } from "./sim-lambda-stream-retry.js";
+import { SimLambdaStreamBisect } from "./sim-lambda-stream-bisect.js";
 import { PollSchedule } from "../../../../util/background/poll-schedule.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type {
@@ -23,6 +24,7 @@ export class SimLambdaStreamProgressState {
   readonly failures: SimLambdaStreamFailureDestination;
   readonly cursor: SimLambdaStreamCursor;
   readonly retry: SimLambdaStreamRetry;
+  readonly bisect: SimLambdaStreamBisect;
   constructor(properties: SimLambdaStreamProgressProperties) {
     const { mapping, background } = properties;
     this.failures = new SimLambdaStreamFailureDestination(mapping);
@@ -38,6 +40,9 @@ export class SimLambdaStreamProgressState {
       new PollSchedule(properties),
     );
     this.retry = new SimLambdaStreamRetry(streamRetryLimits, background);
+    this.bisect = new SimLambdaStreamBisect(
+      streamRetryLimits.bisectBatchOnFunctionError,
+    );
     this.expiry = new SimLambdaStreamExpiry({
       age: new SimLambdaStreamBatchAge(streamRetryLimits, background),
       cursor: this.cursor,
@@ -50,6 +55,7 @@ export class SimLambdaStreamProgressState {
   handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.failures.reset();
     this.retry.reset();
+    this.bisect.reset();
     this.cursor.handled(batch);
   }
 }

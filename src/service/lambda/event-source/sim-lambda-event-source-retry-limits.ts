@@ -5,13 +5,14 @@ import {
 } from "./sim-lambda-stream-retry-limits.js";
 
 /**
- * Whether the event source a mapping names has failed-batch limits at all.
+ * Whether the event source a mapping names decides for itself what becomes of
+ * a failed batch.
  *
- * A stream does: a record stays on the stream whatever the function makes of
- * it, so the mapping is the only thing that decides when to stop trying. A
- * queue does not, because a message the function never handles goes to the
- * queue's own redrive policy, and real Lambda refuses a request that names
- * either limit for one.
+ * A stream leaves it to the mapping: a record stays on the stream whatever the
+ * function makes of it, so the mapping is the only thing that decides when to
+ * stop trying and whether to split the batch first. A queue does not, because a
+ * message the function never handles goes to the queue's own redrive policy,
+ * and real Lambda refuses a request that names any of the three for one.
  */
 export interface SimLambdaEventSourceRetryLimitRules {
   /**
@@ -36,7 +37,7 @@ export class SimLambdaNoRetryLimits implements SimLambdaEventSourceRetryLimitRul
   }
 
   /**
-   * Refuse both limits, since this source is not the one counting.
+   * Refuse all three, since this source is not the one counting.
    */
   limitsIn(
     input: SimLambdaEventSourceRetryLimitsInput,
@@ -80,7 +81,11 @@ function namedLimit(
     return "MaximumRetryAttempts";
   }
 
-  return input.maximumRecordAgeInSeconds === undefined
+  if (input.maximumRecordAgeInSeconds !== undefined) {
+    return "MaximumRecordAgeInSeconds";
+  }
+
+  return input.bisectBatchOnFunctionError === undefined
     ? undefined
-    : "MaximumRecordAgeInSeconds";
+    : "BisectBatchOnFunctionError";
 }

@@ -5,9 +5,11 @@ import {
 } from "@aws-sdk/client-lambda";
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -27,6 +29,7 @@ import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.j
 interface RetryLimitsRequest {
   readonly MaximumRetryAttempts?: number;
   readonly MaximumRecordAgeInSeconds?: number;
+  readonly BisectBatchOnFunctionError?: boolean;
 }
 
 /**
@@ -128,6 +131,38 @@ describe("the failed-batch limits a stream event source mapping is created with"
       listed.EventSourceMappings[0].MaximumRecordAgeInSeconds,
       120,
     );
+  });
+
+  it("reports whether the mapping was asked to bisect a failed batch", async () => {
+    // Given a stream and a function to map it to.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping is created asking for batch bisection.
+    const created = await createStreamMapping(ready, {
+      BisectBatchOnFunctionError: true,
+    });
+
+    // Then it reports the setting back, and a Get reports the same.
+    assertTrue(created.BisectBatchOnFunctionError);
+
+    const read = await ready.simAws
+      .lambda()
+      .getEventSourceMapping(
+        new GetEventSourceMappingCommand({ UUID: created.UUID }),
+      );
+
+    assertTrue(read.BisectBatchOnFunctionError);
+  });
+
+  it("reports no bisection for a mapping that did not ask for it", async () => {
+    // Given a stream and a function to map it to.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping is created without the setting.
+    const created = await createStreamMapping(ready, {});
+
+    // Then it reports false, and a failed batch is retried whole.
+    assertFalse(created.BisectBatchOnFunctionError);
   });
 
   it("reports no limit for a mapping that asked for neither", async () => {

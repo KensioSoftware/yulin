@@ -33,7 +33,7 @@ export class SimLambdaDynamoDbStreamPolling {
     const batch = await stream.read(
       simFunction.roleArn,
       progress.position,
-      mapping.batchSize,
+      progress.batchSizeWithin(mapping.batchSize),
     );
 
     await processSimLambdaStreamBatch({

@@ -2033,6 +2033,38 @@ discarded, and the mapping reads on from behind it.
 10,000 retries, `-1` to 604,800 seconds) is a `ValidationException`. A queue mapping takes neither,
 because a message the handler never takes is left to the queue's own redrive policy.
 
+### Splitting a failed batch around the record that broke it
+
+`BisectBatchOnFunctionError` splits a batch the handler threw on in half, and delivers each half as
+its own batch. A half that fails is split again, down to a single record. That is how the records
+beside a poison record get through, and how the poison record ends up delivered on its own and
+discarded on its own.
+
+```json
+{
+  "StartingPosition": "TRIM_HORIZON",
+  "BatchSize": 100,
+  "MaximumRetryAttempts": 10,
+  "BisectBatchOnFunctionError": true
+}
+```
+
+A batch of four whose third record the handler cannot take is delivered as `1, 2, 3, 4`, then
+`1, 2`, then `3, 4`, then `3` on its own, and finally `4`. The record that broke every batch it was
+in leaves the mapping under the retry and record-age limits, and reaches the
+[failure destination](#sending-discarded-stream-batches-to-a-destination) naming one record rather
+than four.
+
+Splitting puts the retry count back to the start, so a batch always reaches a single record before
+the count decides anything. Once it is down to one record, the limits count as they do for any other
+failing batch. A batch the handler reported partial failures on is left whole, because the report
+already says which record to go back to. The limit is dropped as soon as a batch goes through, so
+the rest of a split batch is read at the mapping's own batch size again.
+
+`GetEventSourceMapping` and `ListEventSourceMappings` report the setting, and
+`AWS::Lambda::EventSourceMapping` takes it in a template. Both stream sources have it. A queue
+mapping is refused for naming it, the way real Lambda refuses one.
+
 ### Sending discarded stream batches to a destination
 
 DynamoDB Streams and Kinesis mappings accept `DestinationConfig.OnFailure` with a standard SQS
@@ -2324,8 +2356,10 @@ this, and deploys without hand-editing. The grant CDK writes alongside it is an 
 the three stream actions on the stream ARN and `dynamodb:ListStreams` on every stream, exactly what
 the mapping's execution-role check is looking for.
 
-The properties a non-default `DynamoEventSource` adds are recorded rather than acted on. Those are
-`FilterCriteria`, `ParallelizationFactor`, `BisectBatchOnFunctionError` and `TumblingWindowInSeconds`.
+`bisectBatchOnError` is simulated, and is covered under
+[Splitting a failed batch around the record that broke it](#splitting-a-failed-batch-around-the-record-that-broke-it).
+The other properties a non-default `DynamoEventSource` adds are recorded rather than acted on. Those
+are `FilterCriteria`, `ParallelizationFactor` and `TumblingWindowInSeconds`.
 The mapping deploys, delivers every record whole and unfiltered, and each property it was created
 without is listed in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without "Properties a Resource was created without")
@@ -4303,8 +4337,8 @@ Current documented limitations:
   it stands.
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
   Kinesis enhanced fan-out consumers are refused outright. `CreateEventSourceMapping` also refuses
-  `FilterCriteria`, `ScalingConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
-  `TumblingWindowInSeconds` and the other inputs this simulation has no behaviour for. An
+  `FilterCriteria`, `ScalingConfig`, `ParallelizationFactor`, `TumblingWindowInSeconds` and the
+  other inputs this simulation has no behaviour for. An
   `AWS::Lambda::EventSourceMapping` naming any of them deploys instead, and records each one against
   the Resource (see
   [Properties a Resource was created without](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without "Properties a Resource was created without")).
@@ -4315,6 +4349,10 @@ Current documented limitations:
   discards the batch, where AWS goes on until the records age out a day later. A batch item failure
   report counts against the same retries, and never starts them again for the records it rewound
   to.
+- Splitting a batch under `BisectBatchOnFunctionError` puts the retry count back to the start, where
+  AWS counts a bisected batch's deliveries against the same quota. Without that, the simulator's own
+  cap of five attempts would discard a batch of a hundred long before it was down to one record. The
+  splitting still ends on its own, because a batch halves at every step.
 - A handler writing into the table whose stream invoked it is refused with
   `SimLambdaStreamCascadeError` rather than being delivered its own writes forever. Real Lambda runs
   that loop.
