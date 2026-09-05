@@ -2324,8 +2324,13 @@ this, and deploys without hand-editing. The grant CDK writes alongside it is an 
 the three stream actions on the stream ARN and `dynamodb:ListStreams` on every stream, exactly what
 the mapping's execution-role check is looking for.
 
-The properties a non-default `DynamoEventSource` adds are refused by name. Those are
+The properties a non-default `DynamoEventSource` adds are recorded rather than acted on. Those are
 `FilterCriteria`, `ParallelizationFactor`, `BisectBatchOnFunctionError` and `TumblingWindowInSeconds`.
+The mapping deploys, delivers every record whole and unfiltered, and each property it was created
+without is listed in
+[`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without "Properties a Resource was created without")
+with what the mapping does in its place. `CreateEventSourceMapping` still refuses the same
+properties, since a caller naming one is asking for behaviour by hand.
 
 A hand-written template or a SAM application usually gives the function the AWS managed policy
 `AWSLambdaDynamoDBExecutionRole` instead. Simulated IAM has no model for managed policy ARNs, so
@@ -4297,11 +4302,12 @@ Current documented limitations:
   function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as
   it stands.
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
-  Kinesis enhanced fan-out consumers are refused outright, and so are `FilterCriteria`,
-  `ScalingConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
-  `TumblingWindowInSeconds` and the other mapping inputs this simulation has no behaviour for. An
-  `AWS::Lambda::EventSourceMapping` carrying `Tags` is the exception, and deploys with the tags
-  dropped and the property recorded.
+  Kinesis enhanced fan-out consumers are refused outright. `CreateEventSourceMapping` also refuses
+  `FilterCriteria`, `ScalingConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
+  `TumblingWindowInSeconds` and the other inputs this simulation has no behaviour for. An
+  `AWS::Lambda::EventSourceMapping` naming any of them deploys instead, and records each one against
+  the Resource (see
+  [Properties a Resource was created without](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without "Properties a Resource was created without")).
 - A failed stream batch waits 1, 2, 4, 8 and 16 seconds between attempts, where AWS documents no
   delay. That is deliberate. A delay of zero falls due at the instant the clock already reads, and a
   handler that always throws would leave `advanceBy` with work falling due forever. A mapping that

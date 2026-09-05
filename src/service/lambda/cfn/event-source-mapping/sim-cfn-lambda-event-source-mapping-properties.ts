@@ -4,7 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimCreateEventSourceMappingCommandInput } from "../../command/event-source-mapping/event-source-mapping.command.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
-import { assertSimulatedEventSourceMappingProperties } from "./sim-cfn-lambda-event-source-mapping-property-rules.js";
+import { recordUnsimulatedEventSourceMappingProperties } from "./sim-cfn-lambda-event-source-mapping-property-rules.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
 
 /**
@@ -37,7 +37,7 @@ export class SimCfnLambdaEventSourceMappingProperties {
   }
 
   /**
-   * The create input this Resource asks for, refusing what is not simulated.
+   * The create input this Resource asks for, recording what is left out of it.
    *
    * The event source ARN is read before anything else is judged, as the command
    * reads it first for the same reason: what a mapping may ask for depends on
@@ -50,7 +50,10 @@ export class SimCfnLambdaEventSourceMappingProperties {
       "EventSourceArn",
     );
 
-    assertSimulatedEventSourceMappingProperties(this.resource, this.properties);
+    recordUnsimulatedEventSourceMappingProperties(
+      this.resource,
+      this.properties,
+    );
 
     return {
       EventSourceArn: eventSourceArn,
