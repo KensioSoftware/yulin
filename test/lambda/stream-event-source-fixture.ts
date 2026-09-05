@@ -138,6 +138,7 @@ interface StreamEventSourceOptions {
   readonly batchSize?: number;
   readonly startingPosition?: EventSourcePosition;
   readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
+  readonly destinationArn?: string;
   readonly maximumRetryAttempts?: number;
   readonly maximumRecordAgeInSeconds?: number;
 }
@@ -168,6 +169,11 @@ export async function simAwsWithStreamEventSource(
     new CreateEventSourceMappingCommand({
       EventSourceArn: stream.streamArn,
       FunctionName: functionName,
+      ...(options.destinationArn !== undefined && {
+        DestinationConfig: {
+          OnFailure: { Destination: options.destinationArn },
+        },
+      }),
       StartingPosition: options.startingPosition ?? "TRIM_HORIZON",
       ...(options.batchSize !== undefined && { BatchSize: options.batchSize }),
       ...(options.functionResponseTypes !== undefined && {

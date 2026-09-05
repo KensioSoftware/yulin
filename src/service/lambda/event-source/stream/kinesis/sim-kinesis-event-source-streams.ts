@@ -71,6 +71,7 @@ export class SimKinesisEventSourceStreams implements SimLambdaKinesisStreams {
 
     return {
       records: output.Records,
+      shardId: request.shardId,
       next: { kind: "iterator", shardIterator: output.NextShardIterator },
       drained: false,
     };

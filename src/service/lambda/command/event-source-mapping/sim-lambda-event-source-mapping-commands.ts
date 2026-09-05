@@ -1,3 +1,4 @@
+import type { SimLambdaDestinationTargets } from "../../destination/sim-lambda-destination-targets.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
@@ -34,6 +35,7 @@ interface SimLambdaEventSourceMappingCommandsProperties {
   readonly kinesisStreams: SimLambdaKinesisStreams;
   readonly functions: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
+  readonly destinations?: SimLambdaDestinationTargets;
   readonly background: BackgroundScheduler;
 }
 

@@ -21,6 +21,7 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "MaximumBatchingWindowInSeconds",
   "MaximumRecordAgeInSeconds",
   "MaximumRetryAttempts",
+  "DestinationConfig",
   "StartingPosition",
   "StartingPositionTimestamp",
 ]);
@@ -36,7 +37,6 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
 const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "AmazonManagedKafkaEventSourceConfig",
   "BisectBatchOnFunctionError",
-  "DestinationConfig",
   "DocumentDBEventSourceConfig",
   "FilterCriteria",
   "KmsKeyArn",

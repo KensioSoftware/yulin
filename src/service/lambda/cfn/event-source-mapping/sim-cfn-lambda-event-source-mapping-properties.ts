@@ -1,3 +1,4 @@
+import { simLambdaStreamDestinationConfig } from "../../event-source/sim-lambda-stream-destination-config.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateEventSourceMappingCommandInput } from "../../command/event-source-mapping/event-source-mapping.command.js";
@@ -53,6 +54,9 @@ export class SimCfnLambdaEventSourceMappingProperties {
 
     return {
       EventSourceArn: eventSourceArn,
+      DestinationConfig: simLambdaStreamDestinationConfig(
+        this.properties["DestinationConfig"],
+      ),
       FunctionName: simCfnLambdaTargetFunctionName(
         this.parser.requiredString(
           this.resource,

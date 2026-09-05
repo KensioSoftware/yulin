@@ -57,3 +57,8 @@ export type {
   SimLambdaDestinationResponseContext,
 } from "./destination/sim-lambda-destination-record.js";
 export type { SimLambdaInvocationCondition } from "./function/event-invoke/sim-lambda-event-invoke-config.js";
+
+export type {
+  SimLambdaStreamFailureRecord,
+  SimLambdaStreamFailureCondition,
+} from "./event-source/poll/sim-lambda-stream-failure-record.js";

@@ -1,3 +1,4 @@
+import type { SimLambdaDestinationTargets } from "../../destination/sim-lambda-destination-targets.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
@@ -31,6 +32,7 @@ interface CreateEventSourceMappingCommandHandlerProperties {
   readonly kinesisStreams: SimLambdaKinesisStreams;
   readonly functions: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
+  readonly destinations?: SimLambdaDestinationTargets;
   readonly background: BackgroundScheduler;
 }
 
@@ -145,6 +147,8 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
       enabled: input.enabled,
       functionResponseTypes: input.functionResponseTypes,
       streamRetryLimits: input.streamRetryLimits,
+      destinationConfig: input.destinationConfig,
+      destinations: this.properties.destinations,
       createdAt: this.properties.background.now(),
     });
 

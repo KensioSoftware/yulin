@@ -1,5 +1,6 @@
+import { processSimLambdaStreamBatch } from "../sim-lambda-stream-batch-processing.js";
+import { simLambdaKinesisStreamRecordTimes } from "../sim-lambda-stream-record-times.js";
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
-import type { SimLambdaFunction } from "../../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-mapping.js";
 import { simLambdaEventSourceFunction } from "../sim-lambda-event-source-function.js";
@@ -81,7 +82,11 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
    * reading the same records.
    */
   async poll(): Promise<void> {
-    const simFunction = this.pollingFunction();
+    const simFunction = simLambdaEventSourceFunction(
+      this.functions,
+      this.mapping,
+      this.stopped,
+    );
 
     if (simFunction === undefined) {
       return;
@@ -95,23 +100,12 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
       this.mapping.batchSize,
     );
 
-    if (batch.records.length === 0) {
-      progress.caughtUp(batch);
-
-      return;
-    }
-
-    progress.after(await this.delivery.to(simFunction, batch.records), batch);
-  }
-
-  /**
-   * The function this mapping delivers to, while it should be delivering.
-   */
-  private pollingFunction(): SimLambdaFunction | undefined {
-    if (this.stopped || !this.mapping.isPolling) {
-      return undefined;
-    }
-
-    return simLambdaEventSourceFunction(this.functions, this.mapping);
+    await processSimLambdaStreamBatch({
+      batch,
+      progress,
+      simFunction,
+      times: simLambdaKinesisStreamRecordTimes,
+      deliver: async (records) => await this.delivery.to(simFunction, records),
+    });
   }
 }

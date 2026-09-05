@@ -1,3 +1,4 @@
+import type { SimLambdaStreamFailureRecord } from "../event-source/poll/sim-lambda-stream-failure-record.js";
 import { SimLambdaError } from "../error/sim-lambda.error.js";
 import type { SimLambdaDestinationArn } from "./sim-lambda-destination-arn.js";
 import type { SimLambdaDestinationRecord } from "./sim-lambda-destination-record.js";
@@ -7,7 +8,7 @@ import type { SimLambdaDestinationRecord } from "./sim-lambda-destination-record
  */
 export interface SimLambdaDestinationDeliveryRequest {
   readonly destinationArn: SimLambdaDestinationArn;
-  readonly record: SimLambdaDestinationRecord;
+  readonly record: SimLambdaDestinationRecord | SimLambdaStreamFailureRecord;
 
   /**
    * The function whose invocation produced this record, which is what the
