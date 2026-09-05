@@ -49,12 +49,27 @@ export class SimLambdaStreamProgress {
     this.state.cursor.advanceTo(batch.next);
   }
 
+  /**
+   * Drop the records at the front of a batch that are too old to hand over,
+   * answering with where the live ones start.
+   *
+   * Records that aged out are as finished with as records the function took, so
+   * a batch being split counts them off its remainder too.
+   */
   async before(
     records: readonly SimLambdaStreamRecordTime[],
     batch: SimLambdaEventSourceStreamProgressBatch,
     simFunction: SimLambdaFunction,
   ): Promise<number> {
-    return await this.state.expiry.before(records, batch, simFunction);
+    const firstLive = await this.state.expiry.before(
+      records,
+      batch,
+      simFunction,
+    );
+
+    this.state.bisect.finished(firstLive);
+
+    return firstLive;
   }
 
   /**
@@ -68,6 +83,7 @@ export class SimLambdaStreamProgress {
   ): Promise<void> {
     this.state.failures.invoked(outcome);
     if (outcome.isHandled) {
+      this.state.bisect.finished(outcome.records.length);
       this.handled(batch);
 
       return;
@@ -85,6 +101,7 @@ export class SimLambdaStreamProgress {
       simFunction,
     );
     if (again === undefined) {
+      this.state.bisect.finished(outcome.records.length);
       this.handled(batch);
     } else {
       this.state.cursor.resume(again);

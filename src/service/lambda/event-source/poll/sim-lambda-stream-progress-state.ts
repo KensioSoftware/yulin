@@ -55,7 +55,6 @@ export class SimLambdaStreamProgressState {
   handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.failures.reset();
     this.retry.reset();
-    this.bisect.reset();
     this.cursor.handled(batch);
   }
 }

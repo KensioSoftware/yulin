@@ -2058,8 +2058,11 @@ than four.
 Splitting puts the retry count back to the start, so a batch always reaches a single record before
 the count decides anything. Once it is down to one record, the limits count as they do for any other
 failing batch. A batch the handler reported partial failures on is left whole, because the report
-already says which record to go back to. The limit is dropped as soon as a batch goes through, so
-the rest of a split batch is read at the mapping's own batch size again.
+already says which record to go back to.
+
+The halves carry the batch that failed and nothing else. A record written while the splitting is
+going on waits behind it and is delivered as part of the batch after it, and the mapping reads at its
+own batch size again once the whole of the split batch is through.
 
 `GetEventSourceMapping` and `ListEventSourceMappings` report the setting, and
 `AWS::Lambda::EventSourceMapping` takes it in a template. Both stream sources have it. A queue

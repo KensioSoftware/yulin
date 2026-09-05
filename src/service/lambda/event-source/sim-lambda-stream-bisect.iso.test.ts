@@ -78,38 +78,50 @@ function deliveries<EventType>(
 }
 
 /**
+ * The order written after the first delivery has already failed, which belongs
+ * to the batch behind the one being split rather than to a half of it.
+ */
+const laterOrderId = "order-5";
+
+/**
  * Write every order to the table at once, so one poll reads them as one batch.
  */
 async function writeOrders(simAws: SimAws, tableName: string): Promise<void> {
   await Promise.all(
-    orderIds.map(async (orderId) =>
-      simAws.dynamoDb().putItem(
-        new PutItemCommand({
-          TableName: tableName,
-          Item: { orderId: { S: orderId } },
-        }),
-      ),
-    ),
+    orderIds.map(async (orderId) => writeOrder(simAws, tableName, orderId)),
   );
   await simAws.backgroundTasksComplete();
+}
+
+async function writeOrder(
+  simAws: SimAws,
+  tableName: string,
+  orderId: string,
+): Promise<void> {
+  await simAws.dynamoDb().putItem(
+    new PutItemCommand({
+      TableName: tableName,
+      Item: { orderId: { S: orderId } },
+    }),
+  );
 }
 
 /**
  * Put every order onto one Kinesis shard at once.
  */
 async function putOrders(simAws: SimAws): Promise<void> {
-  await Promise.all(
-    orderIds.map(async (orderId) =>
-      simAws.kinesis().putRecord(
-        new PutRecordCommand({
-          StreamName: "orders",
-          PartitionKey: "customer-1",
-          Data: new TextEncoder().encode(orderId),
-        }),
-      ),
-    ),
-  );
+  await Promise.all(orderIds.map(async (orderId) => putOrder(simAws, orderId)));
   await simAws.backgroundTasksComplete();
+}
+
+async function putOrder(simAws: SimAws, orderId: string): Promise<void> {
+  await simAws.kinesis().putRecord(
+    new PutRecordCommand({
+      StreamName: "orders",
+      PartitionKey: "customer-1",
+      Data: new TextEncoder().encode(orderId),
+    }),
+  );
 }
 
 describe("bisecting a stream batch a function threw on", () => {
@@ -176,6 +188,61 @@ describe("bisecting a stream batch a function threw on", () => {
       "order-3, order-4",
       "order-3",
       "order-4",
+    ]);
+  });
+
+  it("keeps a record written mid-split out of the halves", async () => {
+    // Given a bisecting stream mapping whose first delivery of four records
+    // has already failed, leaving a split under way.
+    const { simAws, tableName, events } = await simAwsWithStreamEventSource({
+      handlerResult: throwingOnPoison(streamOrderIds),
+      bisectBatchOnFunctionError: true,
+      maximumRetryAttempts: 1,
+    });
+
+    await writeOrders(simAws, tableName);
+
+    // When a fifth record is written before the halves are delivered.
+    await writeOrder(simAws, tableName, laterOrderId);
+    await simAws.backgroundTasksComplete();
+    await simAws.clock().advanceBy({ hours: 1 });
+
+    // Then the halves carry the batch that failed and nothing else, and the
+    // later record is delivered behind it rather than being retried with it.
+    assertArrayEquals(deliveries(events, streamOrderIds), [
+      "order-1, order-2, order-3, order-4",
+      "order-1, order-2",
+      "order-3, order-4",
+      "order-3",
+      "order-4",
+      "order-5",
+    ]);
+  });
+
+  it("keeps a Kinesis record written mid-split out of the halves", async () => {
+    // Given a bisecting Kinesis mapping whose first delivery has failed.
+    const { simAws, events } = await simAwsWithKinesisEventSource({
+      handlerResult: throwingOnPoison(kinesisOrderIds),
+      bisectBatchOnFunctionError: true,
+      maximumRetryAttempts: 1,
+    });
+
+    await putOrders(simAws);
+
+    // When a fifth record is put onto the shard before the halves are
+    // delivered.
+    await putOrder(simAws, laterOrderId);
+    await simAws.backgroundTasksComplete();
+    await simAws.clock().advanceBy({ hours: 1 });
+
+    // Then the halves carry the batch that failed and nothing else.
+    assertArrayEquals(deliveries(events, kinesisOrderIds), [
+      "order-1, order-2, order-3, order-4",
+      "order-1, order-2",
+      "order-3, order-4",
+      "order-3",
+      "order-4",
+      "order-5",
     ]);
   });
 

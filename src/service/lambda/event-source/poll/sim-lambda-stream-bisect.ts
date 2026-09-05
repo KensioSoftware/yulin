@@ -1,7 +1,7 @@
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 
 /**
- * How many records the next delivery of a failing batch may carry.
+ * How much of a failing batch the next delivery may carry.
  *
  * A mapping asked to bisect halves a batch its function threw on, and halves
  * again on each further error, until a failing batch holds one record. That is
@@ -15,12 +15,17 @@ import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outc
  * and the single record it ends on is then counted and discarded as any failing
  * batch is.
  *
- * The limit is dropped as soon as a batch goes through. The rest of a split
- * batch is read at the mapping's own batch size again, and a poison record
- * still in it splits the batch it lands in.
+ * Two numbers say what the next read may take. The half is how many records a
+ * delivery may carry, and the remainder is how many records of the batch being
+ * split are still to get through. Reading the lower of the two is what keeps a
+ * record written while the splitting is going on out of it: the halves are the
+ * batch that failed, and a record that arrived afterwards belongs to the batch
+ * after it. The mapping's own batch size comes back once the whole of the split
+ * batch is through.
  */
 export class SimLambdaStreamBisect {
-  #limit: number | undefined;
+  #half: number | undefined;
+  #remaining = 0;
 
   constructor(private readonly enabled: boolean) {}
 
@@ -28,9 +33,11 @@ export class SimLambdaStreamBisect {
    * How many records the next read may take, within the mapping's batch size.
    */
   sizeWithin(batchSize: number): number {
-    const limit = this.#limit;
+    const half = this.#half;
 
-    return limit === undefined ? batchSize : Math.min(limit, batchSize);
+    return half === undefined
+      ? batchSize
+      : Math.min(half, this.#remaining, batchSize);
   }
 
   /**
@@ -47,15 +54,36 @@ export class SimLambdaStreamBisect {
       return false;
     }
 
-    this.#limit = Math.ceil(count / 2);
+    this.#half = Math.ceil(count / 2);
+    this.#remaining = count;
 
     return true;
   }
 
   /**
-   * Read whole batches again, which a batch that is finished with does.
+   * Take records of the batch being split that the mapping is finished with,
+   * whether the function handled them, they were discarded, or they aged out.
+   *
+   * The whole of the split batch being through is what puts the mapping back on
+   * full batches.
+   */
+  finished(count: number): void {
+    if (this.#half === undefined || count <= 0) {
+      return;
+    }
+
+    this.#remaining -= count;
+
+    if (this.#remaining <= 0) {
+      this.reset();
+    }
+  }
+
+  /**
+   * Read whole batches again.
    */
   reset(): void {
-    this.#limit = undefined;
+    this.#half = undefined;
+    this.#remaining = 0;
   }
 }
