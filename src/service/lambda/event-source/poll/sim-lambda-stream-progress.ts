@@ -31,6 +31,14 @@ export class SimLambdaStreamProgress {
   }
 
   /**
+   * How many records the next read may take, which is the mapping's batch size
+   * until a batch is being bisected.
+   */
+  batchSizeWithin(batchSize: number): number {
+    return this.state.bisect.sizeWithin(batchSize);
+  }
+
+  /**
    * Take a read that came back with nothing.
    *
    * The place is still worth keeping: it is what a starting position of LATEST
@@ -41,16 +49,32 @@ export class SimLambdaStreamProgress {
     this.state.cursor.advanceTo(batch.next);
   }
 
+  /**
+   * Drop the records at the front of a batch that are too old to hand over,
+   * answering with where the live ones start.
+   *
+   * Records that aged out are as finished with as records the function took, so
+   * a batch being split counts them off its remainder too.
+   */
   async before(
     records: readonly SimLambdaStreamRecordTime[],
     batch: SimLambdaEventSourceStreamProgressBatch,
     simFunction: SimLambdaFunction,
   ): Promise<number> {
-    return await this.state.expiry.before(records, batch, simFunction);
+    const firstLive = await this.state.expiry.before(
+      records,
+      batch,
+      simFunction,
+    );
+
+    this.state.bisect.finished(firstLive);
+
+    return firstLive;
   }
 
   /**
-   * Take what became of a batch: move past it, or wait and try it again.
+   * Take what became of a batch: move past it, split it, or wait and try it
+   * again.
    */
   async after(
     outcome: SimLambdaStreamBatchOutcome,
@@ -59,9 +83,14 @@ export class SimLambdaStreamProgress {
   ): Promise<void> {
     this.state.failures.invoked(outcome);
     if (outcome.isHandled) {
+      this.state.bisect.finished(outcome.records.length);
       this.handled(batch);
 
       return;
+    }
+
+    if (this.state.bisect.split(outcome)) {
+      this.state.retry.reset();
     }
 
     const again = this.state.retry.after(outcome, this.position);
@@ -72,6 +101,7 @@ export class SimLambdaStreamProgress {
       simFunction,
     );
     if (again === undefined) {
+      this.state.bisect.finished(outcome.records.length);
       this.handled(batch);
     } else {
       this.state.cursor.resume(again);

@@ -18,6 +18,7 @@ export const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "MaximumBatchingWindowInSeconds",
   "MaximumRecordAgeInSeconds",
   "MaximumRetryAttempts",
+  "BisectBatchOnFunctionError",
   "DestinationConfig",
   "StartingPosition",
   "StartingPositionTimestamp",
@@ -45,11 +46,6 @@ const absentEventSource =
  */
 export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["AmazonManagedKafkaEventSourceConfig", absentEventSource],
-  [
-    "BisectBatchOnFunctionError",
-    "a failing stream batch is retried whole, and is never split in half " +
-      "around the record the function threw on",
-  ],
   ["DocumentDBEventSourceConfig", absentEventSource],
   [
     "FilterCriteria",

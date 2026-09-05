@@ -1,11 +1,13 @@
 import { PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { ListEventSourceMappingsCommand } from "@aws-sdk/client-lambda";
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -217,6 +219,39 @@ describe("Lambda CloudFormation DynamoDB stream event source mapping", () => {
       listed.EventSourceMappings[0].MaximumRecordAgeInSeconds,
       300,
     );
+  });
+
+  it("deploys a mapping that bisects a failed batch, as CDK synthesises one", async () => {
+    // Given a template asking the mapping to bisect, which is what a
+    // DynamoEventSource with bisectBatchOnError set synthesises.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: projectorTemplate({
+        ...mappingProperties,
+        BisectBatchOnFunctionError: true,
+      }),
+      bindings: [
+        {
+          logicalId: "ProjectorFunction",
+          handler: (): undefined => undefined,
+        },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // When the mappings of the deployed function are listed.
+    const listed = await simAws
+      .lambda()
+      .listEventSourceMappings(
+        new ListEventSourceMappingsCommand({ FunctionName: "order-projector" }),
+      );
+
+    // Then the mapping deployed with the setting, and nothing was recorded as
+    // left out of it.
+    assertArrayLength(listed.EventSourceMappings, 1);
+    assertTrue(listed.EventSourceMappings[0].BisectBatchOnFunctionError);
+    assertArrayEmpty(stack.ignoredProperties);
   });
 
   it("refuses a failed-batch limit outside the range Lambda takes", async () => {

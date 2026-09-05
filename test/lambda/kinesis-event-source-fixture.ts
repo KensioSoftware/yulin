@@ -105,6 +105,7 @@ interface KinesisEventSourceOptions {
   readonly destinationArn?: string;
   readonly maximumRetryAttempts?: number;
   readonly maximumRecordAgeInSeconds?: number;
+  readonly bisectBatchOnFunctionError?: boolean;
 }
 
 /**
@@ -157,6 +158,9 @@ export async function simAwsWithKinesisEventSource(
       }),
       ...(options.maximumRecordAgeInSeconds !== undefined && {
         MaximumRecordAgeInSeconds: options.maximumRecordAgeInSeconds,
+      }),
+      ...(options.bisectBatchOnFunctionError !== undefined && {
+        BisectBatchOnFunctionError: options.bisectBatchOnFunctionError,
       }),
     }),
   );

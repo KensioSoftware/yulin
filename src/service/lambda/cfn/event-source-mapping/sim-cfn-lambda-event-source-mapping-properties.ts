@@ -92,6 +92,11 @@ export class SimCfnLambdaEventSourceMappingProperties {
         this.properties["MaximumRecordAgeInSeconds"],
         "MaximumRecordAgeInSeconds",
       ),
+      BisectBatchOnFunctionError: this.parser.optionalBoolean(
+        this.resource,
+        this.properties["BisectBatchOnFunctionError"],
+        "BisectBatchOnFunctionError",
+      ),
       StartingPosition: this.parser.optionalString(
         this.resource,
         this.properties["StartingPosition"],

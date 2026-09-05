@@ -117,6 +117,7 @@ export class SimLambdaEventSourceMappingInput {
       streamRetryLimits: eventSourceArn.retryLimitRules.limitsIn({
         maximumRetryAttempts: input.MaximumRetryAttempts,
         maximumRecordAgeInSeconds: input.MaximumRecordAgeInSeconds,
+        bisectBatchOnFunctionError: input.BisectBatchOnFunctionError,
       }),
     });
   }

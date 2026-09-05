@@ -39,6 +39,7 @@ const millisecondsPerSecond = 1000;
 export interface SimLambdaEventSourceRetryLimitsInput {
   readonly maximumRetryAttempts?: number | undefined;
   readonly maximumRecordAgeInSeconds?: number | undefined;
+  readonly bisectBatchOnFunctionError?: boolean | undefined;
 }
 
 /**
@@ -47,20 +48,28 @@ export interface SimLambdaEventSourceRetryLimitsInput {
 export interface SimLambdaStreamRetryLimitsConfiguration {
   readonly MaximumRetryAttempts: number;
   readonly MaximumRecordAgeInSeconds: number;
+  readonly BisectBatchOnFunctionError: boolean;
 }
 
 /**
- * When a stream mapping stops delivering a batch its function keeps failing.
+ * What a stream mapping does with a batch its function keeps failing.
  *
- * The two limits are one thing rather than two, because they end the same
- * lifecycle: a record leaves the mapping when it has had its retries or when it
- * is too old to be worth another, whichever comes first. Both are held as
- * Lambda states them, with `-1` for no limit, so a Get or a List reports back
- * exactly what was asked for.
+ * The three settings are one thing rather than three, because they run the same
+ * lifecycle. A failing batch is split around the record that broke it where the
+ * mapping was asked to bisect, and a record leaves the mapping when it has had
+ * its retries or when it is too old to be worth another, whichever comes first.
+ * The limits are held as Lambda states them, with `-1` for no limit, so a Get
+ * or a List reports back exactly what was asked for.
  */
 export class SimLambdaStreamRetryLimits {
   public readonly maximumRetryAttempts: number;
   public readonly maximumRecordAgeInSeconds: number;
+
+  /**
+   * Whether a batch the function threw on is split in half and delivered again
+   * as two batches.
+   */
+  public readonly bisectBatchOnFunctionError: boolean;
 
   constructor(input: SimLambdaEventSourceRetryLimitsInput = {}) {
     this.maximumRetryAttempts = checkedLimit({
@@ -75,15 +84,17 @@ export class SimLambdaStreamRetryLimits {
       maximum: maximumRecordAgeLimit,
       unit: "seconds",
     });
+    this.bisectBatchOnFunctionError = input.bisectBatchOnFunctionError ?? false;
   }
 
   /**
-   * The two limits as a Get, a List or a create response reports them.
+   * The three settings as a Get, a List or a create response reports them.
    */
   configuration(): SimLambdaStreamRetryLimitsConfiguration {
     return {
       MaximumRetryAttempts: this.maximumRetryAttempts,
       MaximumRecordAgeInSeconds: this.maximumRecordAgeInSeconds,
+      BisectBatchOnFunctionError: this.bisectBatchOnFunctionError,
     };
   }
 

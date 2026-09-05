@@ -97,7 +97,7 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
     // simulated IAM decides whether this mapping may read its stream.
     const batch = await this.shard.read(
       progress.position,
-      this.mapping.batchSize,
+      progress.batchSizeWithin(this.mapping.batchSize),
     );
 
     await processSimLambdaStreamBatch({

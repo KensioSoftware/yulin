@@ -249,8 +249,8 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
   });
 
   it("records mapping settings it cannot act on rather than failing the stack", async () => {
-    // Given a mapping asking for batch bisection and event filtering, as a CDK
-    // event source carrying those options synthesises one.
+    // Given a mapping asking for a tumbling window and event filtering, as a
+    // CDK event source carrying those options synthesises one.
     const simAws = new SimAws();
     const events: SimLambdaSqsEvent[] = [];
 
@@ -259,7 +259,7 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
       stackName: "orders-stack",
       template: consumerTemplate({
         ...mappingProperties,
-        BisectBatchOnFunctionError: true,
+        TumblingWindowInSeconds: 30,
         FilterCriteria: { Filters: [{ Pattern: '{"body":["order-2"]}' }] },
       }),
       bindings: [
@@ -283,11 +283,11 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
 
     assertArrayIncludesAll(
       resource.ignoredProperties.map((ignored) => ignored.path),
-      ["BisectBatchOnFunctionError", "FilterCriteria"],
+      ["TumblingWindowInSeconds", "FilterCriteria"],
     );
     assertArrayIncludesAll(
       stack.ignoredProperties.map((ignored) => ignored.path),
-      ["BisectBatchOnFunctionError", "FilterCriteria"],
+      ["TumblingWindowInSeconds", "FilterCriteria"],
     );
 
     // And it delivers, unfiltered, as the recorded reason says it does.
