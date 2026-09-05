@@ -13,7 +13,9 @@ import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-map
 export function simLambdaEventSourceFunction(
   functions: SimLambdaFunctionLookup,
   mapping: SimLambdaEventSourceMapping,
+  stopped = false,
 ): SimLambdaFunction | undefined {
+  if (stopped || !mapping.isPolling) return undefined;
   return functions.findTarget(mapping.functionName, mapping.qualifier)
     ?.simFunction;
 }

@@ -1904,7 +1904,7 @@ with more steps.
 `MaximumRetryAttempts` and `MaximumRecordAgeInSeconds` govern the same failed-batch lifecycle, and a
 stream mapping keeps both. `MaximumRetryAttempts: 0` makes one delivery and no retries, and a
 positive value allows that many retries after the first delivery. `MaximumRecordAgeInSeconds`
-discards a record once the next attempt would fall past that age. Lambda's `-1` means no limit
+discards expired records before each invocation, including the first poll. Lambda's `-1` means no limit
 (that is what a mapping naming neither reports back).
 
 ```typescript sim-lambda-stream-retry-limits
@@ -2032,6 +2032,58 @@ discarded, and the mapping reads on from behind it.
 `AWS::Lambda::EventSourceMapping` takes both in a template. A value outside Lambda's range (`-1` to
 10,000 retries, `-1` to 604,800 seconds) is a `ValidationException`. A queue mapping takes neither,
 because a message the handler never takes is left to the queue's own redrive policy.
+
+### Sending discarded stream batches to a destination
+
+DynamoDB Streams and Kinesis mappings accept `DestinationConfig.OnFailure` with a standard SQS
+queue or SNS topic ARN. Supply it to `CreateEventSourceMapping` or the
+`AWS::Lambda::EventSourceMapping` resource alongside the retry and record-age limits:
+
+```json
+{
+  "MaximumRetryAttempts": 10,
+  "MaximumRecordAgeInSeconds": 3600,
+  "DestinationConfig": {
+    "OnFailure": {
+      "Destination": "arn:aws:sqs:eu-west-2:111111111111:stream-failures"
+    }
+  }
+}
+```
+
+CDK's `DynamoEventSource` and `KinesisEventSource` accept `onFailure: new SqsDlq(queue)` or
+`onFailure: new SnsDlq(topic)`. Their synthesized destination configuration is passed through to
+the simulated mapping. Create, Get, List and Delete responses preserve that configuration.
+
+The function's execution role needs `sqs:SendMessage` on the queue or `sns:Publish` on the topic.
+Delivery goes through the simulated destination service, so its IAM checks and SNS subscriptions
+apply. An IAM denial or a missing destination rejects `backgroundTasksComplete()` or the clock
+advance that exhausted the batch. The discarded records have already advanced the checkpoint.
+Yulin attempts destination delivery once and does not retry a failed send.
+
+The JSON message follows the AWS
+[DynamoDB Streams](https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html) and
+[Kinesis](https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html)
+notification formats. Import `SimLambdaStreamFailureRecord` from `@kensio/yulin/lambda` to type it.
+
+- `version` is `"1.0"` and `timestamp` is the simulated discard time in ISO 8601 format.
+- `requestContext` contains a generated `requestId`, the mapping's `functionArn`,
+  `approximateInvokeCount`, and either `RetryAttemptsExhausted` or `RecordAgeExceeded` as `condition`.
+- `responseContext` reports `statusCode: 200` and `executedVersion`. A handler error adds
+  `functionError: "Unhandled"`. A valid partial-batch failure response leaves that field out.
+  Records discarded before any invocation omit `responseContext`.
+- `DDBStreamBatchInfo` or `KinesisBatchInfo` identifies the stream ARN, shard ID, first and last
+  sequence numbers, first and last arrival times, and batch size. Arrival times are ISO 8601 strings.
+
+The original record payloads are absent. A successful batch produces no notification. After a
+partial-batch response, the notification covers the discarded suffix starting at the failed
+checkpoint. When only an older prefix expires, its notification excludes the younger records.
+Records already expired on their first poll report zero invocations. Request IDs are generated for
+the notification and are not correlated with the handler's invocation context.
+
+S3 destinations, FIFO queues or topics, and `OnSuccess` are refused. SQS source mappings cannot
+have this destination configuration. The simulator's existing five-retry cap for mappings with
+neither limit also produces a failure notification when it discards a batch.
 
 ### Reporting individual record failures
 
@@ -2273,8 +2325,7 @@ the three stream actions on the stream ARN and `dynamodb:ListStreams` on every s
 the mapping's execution-role check is looking for.
 
 The properties a non-default `DynamoEventSource` adds are refused by name. Those are
-`FilterCriteria`, `ParallelizationFactor`, `BisectBatchOnFunctionError`, `TumblingWindowInSeconds`
-and `DestinationConfig`.
+`FilterCriteria`, `ParallelizationFactor`, `BisectBatchOnFunctionError` and `TumblingWindowInSeconds`.
 
 A hand-written template or a SAM application usually gives the function the AWS managed policy
 `AWSLambdaDynamoDBExecutionRole` instead. Simulated IAM has no model for managed policy ARNs, so
@@ -4154,8 +4205,10 @@ Current documented limitations:
 - Throttling does not drive a retry. A retry follows a handler that threw or ran out of time, and
   the `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was
   accepted.
-- `DestinationConfig` on an event source mapping is left out. It is a different mechanism from the
-  asynchronous invocation destinations above.
+- Stream mappings support standard SQS and SNS `DestinationConfig.OnFailure` destinations.
+  S3 destinations and `OnSuccess` are refused. Destination delivery is attempted once. A delivery
+  failure rejects the background task after the discarded records have advanced the checkpoint.
+  Destination delivery retries and `DestinationDeliveryFailures` metrics are not simulated.
 - A settings change takes effect at once. Real Lambda reports `LastUpdateStatus: "InProgress"` while
   it rolls the change out, and neither that member nor the wait it implies is simulated.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
@@ -4245,7 +4298,7 @@ Current documented limitations:
   it stands.
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
   Kinesis enhanced fan-out consumers are refused outright, and so are `FilterCriteria`,
-  `ScalingConfig`, `DestinationConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
+  `ScalingConfig`, `BisectBatchOnFunctionError`, `ParallelizationFactor`,
   `TumblingWindowInSeconds` and the other mapping inputs this simulation has no behaviour for. An
   `AWS::Lambda::EventSourceMapping` carrying `Tags` is the exception, and deploys with the tags
   dropped and the property recorded.

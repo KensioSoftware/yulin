@@ -1,8 +1,7 @@
+import { SimLambdaDynamoDbStreamPolling } from "./sim-lambda-dynamodb-stream-polling.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
-import { simLambdaEventSourceFunction } from "./sim-lambda-event-source-function.js";
 import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda-dynamodb-stream-event-source-arn.js";
 import type { SimLambdaEventSourceStreams } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaDynamoDbPolledStream } from "./sim-lambda-dynamodb-polled-stream.js";
@@ -38,10 +37,9 @@ interface SimLambdaDynamoDbStreamEventSourcePollerProperties {
 export class SimLambdaDynamoDbStreamEventSourcePoller
   implements SimLambdaEventSourcePoller, SimLambdaEventSourcePolls
 {
-  private readonly mapping: SimLambdaEventSourceMapping;
-  private readonly functions: SimLambdaFunctionLookup;
   private readonly stream: SimLambdaDynamoDbPolledStream;
   private readonly delivery: SimLambdaDynamoDbStreamDelivery;
+  private readonly polling: SimLambdaDynamoDbStreamPolling;
   private readonly progress: SimLambdaStreamProgress;
   private readonly turn = new SimLambdaEventSourcePollTurn(this);
 
@@ -50,8 +48,6 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
   constructor(properties: SimLambdaDynamoDbStreamEventSourcePollerProperties) {
     const { eventSourceArn, mapping } = properties;
 
-    this.mapping = mapping;
-    this.functions = properties.functions;
     this.stream = new SimLambdaDynamoDbPolledStream(
       properties.streams,
       eventSourceArn.value,
@@ -66,6 +62,12 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
       poll: async (): Promise<void> => {
         await this.turn.take();
       },
+    });
+    this.polling = new SimLambdaDynamoDbStreamPolling({
+      ...properties,
+      stream: this.stream,
+      progress: this.progress,
+      delivery: this.delivery,
     });
   }
 
@@ -122,38 +124,6 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
    * reading the same records.
    */
   async poll(): Promise<void> {
-    const simFunction = this.pollingFunction();
-
-    if (simFunction === undefined) {
-      return;
-    }
-
-    const { progress } = this;
-    // Reading is done as the function's execution role, as on real Lambda, so
-    // simulated IAM decides whether this mapping may read its stream.
-    const batch = await this.stream.read(
-      simFunction.roleArn,
-      progress.position,
-      this.mapping.batchSize,
-    );
-
-    if (batch.records.length === 0) {
-      progress.caughtUp(batch);
-
-      return;
-    }
-
-    progress.after(await this.delivery.to(simFunction, batch.records), batch);
-  }
-
-  /**
-   * The function this mapping delivers to, while it should be delivering.
-   */
-  private pollingFunction(): SimLambdaFunction | undefined {
-    if (this.stopped || !this.mapping.isPolling) {
-      return undefined;
-    }
-
-    return simLambdaEventSourceFunction(this.functions, this.mapping);
+    await this.polling.poll(this.stopped);
   }
 }

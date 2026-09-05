@@ -15,11 +15,6 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
   ["ScalingConfig", "polling concurrency is not simulated"],
   ["ProvisionedPollerConfig", "polling concurrency is not simulated"],
   [
-    "DestinationConfig",
-    "failure destinations are not simulated, so a stream batch that runs out " +
-      "of attempts is discarded rather than sent anywhere",
-  ],
-  [
     "BisectBatchOnFunctionError",
     "batch bisection is not simulated, so a failing stream batch is retried " +
       "whole",

@@ -86,6 +86,7 @@ export interface SimLambdaEventSourceStreamReadRequest extends SimLambdaEventSou
 export interface SimLambdaEventSourceStreamProgressBatch {
   readonly next: SimLambdaEventSourceStreamPosition;
   readonly drained: boolean;
+  readonly shardId?: string;
 }
 
 /**

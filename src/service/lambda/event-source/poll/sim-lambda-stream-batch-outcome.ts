@@ -4,6 +4,7 @@ import type { SimLambdaStreamRecordTime } from "./sim-lambda-stream-record-times
 interface SimLambdaStreamBatchOutcomeProperties {
   readonly isHandled: boolean;
   readonly records: readonly SimLambdaStreamRecordTime[];
+  readonly functionError?: boolean;
   readonly rewindTo?: string | undefined;
 }
 
@@ -21,6 +22,7 @@ interface SimLambdaStreamBatchOutcomeProperties {
  * to and the instants its records are aged from.
  */
 export class SimLambdaStreamBatchOutcome {
+  public readonly functionError: boolean;
   public readonly isHandled: boolean;
 
   /**
@@ -31,6 +33,7 @@ export class SimLambdaStreamBatchOutcome {
   private readonly rewindTo: string | undefined;
 
   private constructor(properties: SimLambdaStreamBatchOutcomeProperties) {
+    this.functionError = properties.functionError ?? false;
     this.isHandled = properties.isHandled;
     this.records = properties.records;
     this.rewindTo = properties.rewindTo;
@@ -51,7 +54,11 @@ export class SimLambdaStreamBatchOutcome {
   static failed(
     records: readonly SimLambdaStreamRecordTime[],
   ): SimLambdaStreamBatchOutcome {
-    return new SimLambdaStreamBatchOutcome({ isHandled: false, records });
+    return new SimLambdaStreamBatchOutcome({
+      isHandled: false,
+      records,
+      functionError: true,
+    });
   }
 
   /**

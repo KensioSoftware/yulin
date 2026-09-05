@@ -191,6 +191,7 @@ export class SimLambdaCommands {
       background,
     });
     this.eventSourceMappings = new SimLambdaEventSourceMappingCommands({
+      destinations,
       accountRegionScope,
       pollers: new SimLambdaEventSourcePollers({
         functions: this.functionLookup,

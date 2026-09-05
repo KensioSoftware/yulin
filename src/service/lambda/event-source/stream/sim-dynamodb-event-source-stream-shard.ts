@@ -74,6 +74,14 @@ export class SimDynamoDbEventSourceStreamShard {
     return iterator.ShardIterator;
   }
 
+  async shardId(request: SimLambdaEventSourceStreamRequest): Promise<string> {
+    const description = await this.describe(request);
+    const shardId = description.Shards?.[0]?.ShardId;
+    if (shardId === undefined)
+      refuse(request, "reports no shard to read records from");
+    return shardId;
+  }
+
   private async describe(
     request: SimLambdaEventSourceStreamRequest,
   ): Promise<SimLambdaEventSourceStreamDescription> {

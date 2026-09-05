@@ -552,6 +552,17 @@ enough. The five-attempt cap applies to a mapping that named neither limit
 ([issue 1219](https://github.com/KensioSoftware/yulin/issues/1219)). One that named a record age has
 an end of its own, and retries until the records reach it.
 
+`SimLambdaStreamProgress.before` checks record age before invoking a batch. Expired records are
+removed from the front, including when the mapping has never invoked them. `after` accounts for
+the handler response and the retry quota. Both paths advance the checkpoint before attempting a
+failure notification, so a destination error cannot cause a discarded batch to be invoked again.
+
+Stream mappings preserve `DestinationConfig.OnFailure` and deliver through
+`SimLambdaDestinationTargets` using the execution role. `sim-lambda-stream-failure-record.ts`
+builds the SQS/SNS metadata envelope with shard and sequence-number bounds. The stream readers
+supply their shard IDs. Destination delivery is attempted once and failures reject the background
+task. The usage guide lists the supported fields and delivery limitations.
+
 Two polls must never overlap, which a queue mapping does not have to care about: a received message
 is hidden and a read record is not, so a second poll from the same checkpoint would deliver the same
 records twice. `SimLambdaEventSourcePollTurn` is the one-at-a-time guard, and it reschedules from

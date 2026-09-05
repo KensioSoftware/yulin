@@ -49,6 +49,7 @@ export class SimDynamoDbEventSourceStreamReader {
 
     return {
       records: output.Records ?? [],
+      shardId: await this.shard.shardId(request),
       next: simDynamoDbEventSourceNextPosition(next, position),
       drained: next === undefined,
     };

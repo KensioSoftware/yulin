@@ -102,6 +102,7 @@ interface KinesisEventSourceOptions {
   readonly startingPosition?: EventSourcePosition;
   readonly startingPositionTimestamp?: Date;
   readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
+  readonly destinationArn?: string;
   readonly maximumRetryAttempts?: number;
   readonly maximumRecordAgeInSeconds?: number;
 }
@@ -138,6 +139,11 @@ export async function simAwsWithKinesisEventSource(
     new CreateEventSourceMappingCommand({
       EventSourceArn: stream.arn,
       FunctionName: functionName,
+      ...(options.destinationArn !== undefined && {
+        DestinationConfig: {
+          OnFailure: { Destination: options.destinationArn },
+        },
+      }),
       StartingPosition: options.startingPosition ?? "TRIM_HORIZON",
       ...(options.startingPositionTimestamp !== undefined && {
         StartingPositionTimestamp: options.startingPositionTimestamp,

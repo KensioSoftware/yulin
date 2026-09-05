@@ -1,3 +1,6 @@
+import type { SimLambdaStreamDestinationConfiguration } from "./sim-lambda-stream-destination-config.js";
+import type { SimLambdaDestinationTargets } from "../destination/sim-lambda-destination-targets.js";
+import { SimLambdaNoDestinationTargets } from "../destination/sim-lambda-destination-targets.js";
 import { randomUUID } from "node:crypto";
 
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -49,6 +52,10 @@ interface SimLambdaEventSourceMappingProperties {
     | readonly SimLambdaFunctionResponseType[]
     | undefined;
   readonly streamRetryLimits?: SimLambdaStreamRetryLimits | undefined;
+  readonly destinationConfig?:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
+  readonly destinations?: SimLambdaDestinationTargets | undefined;
   readonly createdAt: Date;
 }
 
@@ -58,6 +65,9 @@ interface SimLambdaEventSourceMappingProperties {
  * DeleteEventSourceMapping responses all report it.
  */
 export interface SimLambdaEventSourceMappingConfiguration extends Partial<SimLambdaStreamRetryLimitsConfiguration> {
+  readonly DestinationConfig?:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
   readonly UUID: string;
   readonly EventSourceMappingArn: SimLambdaEventSourceMappingArn;
   readonly EventSourceArn: string;
@@ -83,6 +93,7 @@ export interface SimLambdaEventSourceMappingConfiguration extends Partial<SimLam
  * it.
  */
 export class SimLambdaEventSourceMapping {
+  public readonly destinations: SimLambdaDestinationTargets;
   public readonly uuid: string = randomUUID();
   public readonly eventSourceArn: string;
   public readonly functionName: string;
@@ -114,12 +125,18 @@ export class SimLambdaEventSourceMapping {
    */
   public readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
 
+  private readonly destinationConfig:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly enabled: boolean;
   private readonly lastModified: Date;
   #state: SimLambdaEventSourceMappingState = "Creating";
 
   constructor(properties: SimLambdaEventSourceMappingProperties) {
+    this.destinationConfig = properties.destinationConfig;
+    this.destinations =
+      properties.destinations ?? new SimLambdaNoDestinationTargets();
     this.accountRegionScope = properties.accountRegionScope;
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
@@ -135,9 +152,12 @@ export class SimLambdaEventSourceMapping {
     this.lastModified = properties.createdAt;
   }
 
-  /**
-   * The ARN naming this mapping.
-   */
+  /** The configured failure queue or topic ARN. */
+  get failureDestinationArn(): string | undefined {
+    return this.destinationConfig?.OnFailure?.Destination;
+  }
+
+  /** The ARN naming this mapping. */
   get arn(): SimLambdaEventSourceMappingArn {
     const { regionName, accountId } = this.accountRegionScope;
 
@@ -182,6 +202,7 @@ export class SimLambdaEventSourceMapping {
    */
   configuration(): SimLambdaEventSourceMappingConfiguration {
     return {
+      DestinationConfig: structuredClone(this.destinationConfig),
       UUID: this.uuid,
       EventSourceMappingArn: this.arn,
       EventSourceArn: this.eventSourceArn,

@@ -1,3 +1,7 @@
+import {
+  simLambdaStreamDestinationConfig,
+  type SimLambdaStreamDestinationConfiguration,
+} from "../../event-source/sim-lambda-stream-destination-config.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   type SimLambdaEventSourceArn,
@@ -26,6 +30,9 @@ interface SimLambdaEventSourceMappingInputProperties {
   readonly start: SimLambdaEventSourceStart | undefined;
   readonly enabled: boolean;
   readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
+  readonly destinationConfig:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
   readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
 }
 
@@ -56,6 +63,10 @@ export class SimLambdaEventSourceMappingInput {
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
+  public readonly destinationConfig:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
+
   /**
    * When a failed batch stops being delivered again, for a source that leaves
    * the counting to the mapping.
@@ -70,6 +81,7 @@ export class SimLambdaEventSourceMappingInput {
     this.start = properties.start;
     this.enabled = properties.enabled;
     this.functionResponseTypes = properties.functionResponseTypes;
+    this.destinationConfig = properties.destinationConfig;
     this.streamRetryLimits = properties.streamRetryLimits;
   }
 
@@ -88,6 +100,10 @@ export class SimLambdaEventSourceMappingInput {
 
     return new this({
       eventSourceArn,
+      destinationConfig: simLambdaStreamDestinationConfig(
+        input.DestinationConfig,
+        eventSourceArn.kind,
+      ),
       ...simLambdaFunctionReferenceOf(
         requiredString(input.FunctionName, "functionName"),
       ),
