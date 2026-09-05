@@ -1,5 +1,6 @@
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
+  assertArrayIncludesAll,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -36,20 +37,6 @@ const mappingProperties: SimCfnTemplateValueRecord = {
   FunctionName: { Ref: "ConsumerFunction" },
   BatchSize: 5,
   FunctionResponseTypes: ["ReportBatchItemFailures"],
-};
-
-/**
- * The same mapping as a Resource created on its own is given it, with the
- * intrinsics already resolved.
- *
- * The event source ARN is read before anything else about the Resource is
- * judged, since what a mapping may ask for depends on the kind of source it
- * names, so a test about another property has to state a real ARN.
- */
-const resolvedMappingProperties: SimCfnTemplateValueRecord = {
-  ...mappingProperties,
-  EventSourceArn: "arn:aws:sqs:eu-west-2:111111111111:orders",
-  FunctionName: "order-consumer",
 };
 
 /**
@@ -261,32 +248,87 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
     assertStringIncludes(error.message, "Nonsense");
   });
 
-  it("refuses a property this simulation does not model", async () => {
-    // Given a template asking a mapping to filter events.
-    const error = await mappingCreationError({
-      ...resolvedMappingProperties,
-      FilterCriteria: { Filters: [{ Pattern: "{}" }] },
-    });
+  it("records mapping settings it cannot act on rather than failing the stack", async () => {
+    // Given a mapping asking for batch bisection and event filtering, as a CDK
+    // event source carrying those options synthesises one.
+    const simAws = new SimAws();
+    const events: SimLambdaSqsEvent[] = [];
 
-    // Then the Resource fails rather than deploying a mapping ignoring it.
-    assertStringIncludes(
-      error.message,
-      "Invalid AWS::Lambda::EventSourceMapping Resource BadMapping: " +
-        "FilterCriteria is a real AWS::Lambda::EventSourceMapping property",
+    // When the template is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: consumerTemplate({
+        ...mappingProperties,
+        BisectBatchOnFunctionError: true,
+        FilterCriteria: { Filters: [{ Pattern: '{"body":["order-2"]}' }] },
+      }),
+      bindings: [
+        {
+          logicalId: "ConsumerFunction",
+          handler: (event: SimLambdaSqsEvent): undefined => {
+            events.push(event);
+
+            return undefined;
+          },
+        },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the mapping is there, and both settings are recorded against it.
+    const resource = stack.getResource("OrderConsumerMapping");
+
+    assertNonNullable(resource);
+    assertInstanceOf(resource.simResource, SimLambdaEventSourceMapping);
+
+    assertArrayIncludesAll(
+      resource.ignoredProperties.map((ignored) => ignored.path),
+      ["BisectBatchOnFunctionError", "FilterCriteria"],
     );
+    assertArrayIncludesAll(
+      stack.ignoredProperties.map((ignored) => ignored.path),
+      ["BisectBatchOnFunctionError", "FilterCriteria"],
+    );
+
+    // And it delivers, unfiltered, as the recorded reason says it does.
+    await simAws.sqs().sendMessage(
+      new SendMessageCommand({
+        QueueUrl: simAws.sqs().findQueue("orders")?.url,
+        MessageBody: "order-1",
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    assertArrayLength(events, 1);
+    assertIdentical(events[0].Records[0]?.body, "order-1");
   });
 
-  it("refuses a property AWS::Lambda::EventSourceMapping does not have", async () => {
-    // Given a template with a made-up property.
-    const error = await mappingCreationError({
-      ...resolvedMappingProperties,
-      Nonsense: "true",
-    });
+  it("records a property AWS::Lambda::EventSourceMapping does not have", async () => {
+    // Given a mapping carrying a name this simulation has never heard of,
+    // which is a template's typo or a property AWS has added since.
+    const simAws = new SimAws();
 
-    // Then the Resource fails rather than dropping it.
+    // When the template is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: consumerTemplate({ ...mappingProperties, Nonsense: "true" }),
+      bindings: [
+        { logicalId: "ConsumerFunction", handler: (): undefined => undefined },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the mapping is there, and the unread name is reported.
+    const resource = stack.getResource("OrderConsumerMapping");
+
+    assertNonNullable(resource);
+    assertInstanceOf(resource.simResource, SimLambdaEventSourceMapping);
+
+    assertArrayLength(resource.ignoredProperties, 1);
+    assertIdentical(resource.ignoredProperties[0].path, "Nonsense");
     assertStringIncludes(
-      error.message,
-      "Nonsense is not an AWS::Lambda::EventSourceMapping property",
+      resource.ignoredProperties[0].reason,
+      "whether because AWS added it or because the template misspelled",
     );
   });
 
