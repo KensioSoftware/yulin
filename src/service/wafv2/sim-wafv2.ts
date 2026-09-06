@@ -123,8 +123,10 @@ export class SimWafV2 extends SimWafSets {
       );
     }
 
+    const limitBytes = webAcl.bodyInspectionLimitBytes(evaluation.resourceType);
+
     return webAcl.evaluate(
-      simWafInspectedRequest(evaluation.request, evaluation.body),
+      simWafInspectedRequest(evaluation.request, evaluation.body, limitBytes),
     );
   }
 

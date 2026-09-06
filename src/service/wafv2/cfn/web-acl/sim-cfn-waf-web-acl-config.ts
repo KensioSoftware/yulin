@@ -1,4 +1,5 @@
 import type { SimWafActionInput } from "../../web-acl/sim-waf-action.type.js";
+import type { SimWafAssociationConfigInput } from "../../web-acl/sim-waf-association-config.js";
 import type { SimWafCustomResponseBodies } from "../../web-acl/sim-waf-custom-response.type.js";
 import type { SimWafRuleInput } from "../../web-acl/sim-waf-rule.type.js";
 import type { SimCreateWebAclCommandInput } from "../../command/web-acl/web-acl.command.js";
@@ -42,6 +43,9 @@ export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
       VisibilityConfig: this.value("VisibilityConfig"),
       CustomResponseBodies: this.value("CustomResponseBodies") as
         | SimWafCustomResponseBodies
+        | undefined,
+      AssociationConfig: this.value("AssociationConfig") as
+        | SimWafAssociationConfigInput
         | undefined,
     };
   }

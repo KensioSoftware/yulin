@@ -232,5 +232,6 @@ function configurationOf(
     customResponseBodies: input.CustomResponseBodies,
     visibilityConfig: input.VisibilityConfig,
     description: checkedSimWafDescription(input.Description),
+    associationConfig: input.AssociationConfig,
   };
 }

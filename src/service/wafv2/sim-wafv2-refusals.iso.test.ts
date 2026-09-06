@@ -8,7 +8,10 @@ import { describe, it } from "vitest";
 import { SimAws } from "../aws/sim-aws.js";
 import { simWafCreateWebAclFactory } from "./command/web-acl/sim-waf-create-web-acl.factory.js";
 import type { SimCreateWebAclCommandInput } from "./command/web-acl/web-acl.command.js";
-import { SimWafUnsimulatedInputException } from "./error/sim-wafv2.error.js";
+import {
+  SimWafInvalidParameterException,
+  SimWafUnsimulatedInputException,
+} from "./error/sim-wafv2.error.js";
 import { createSimWafWebAcl } from "./sim-wafv2.fixture.js";
 import type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 import type { SimWafRuleInput } from "./web-acl/sim-waf-rule.type.js";
@@ -203,17 +206,33 @@ describe("SimWafV2 refusals", () => {
     assertStringIncludes(challenge.message, "Challenge");
   });
 
-  it("refuses a web ACL member this simulation does not model", async () => {
-    // When a web ACL sets the body size its associations inspect.
+  it("refuses a body inspection limit that is not one of the four sizes", async () => {
+    // When a web ACL asks for a body inspection limit AWS has no setting for.
     const error = await refusalFor({
       AssociationConfig: {
-        RequestBody: { CLOUDFRONT: { DefaultSizeInspectionLimit: "KB_16" } },
+        RequestBody: { CLOUDFRONT: { DefaultSizeInspectionLimit: "KB_24" } },
       },
     });
 
-    // Then it is refused, since nothing is associated with a web ACL yet.
+    // Then it is refused, the way WAFv2 refuses the value.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "KB_24");
+  });
+
+  it("refuses a body inspection limit for a resource type it cannot protect", async () => {
+    // When a web ACL sets the limit for a resource type nothing here goes in
+    // front of.
+    const error = await refusalFor({
+      AssociationConfig: {
+        RequestBody: {
+          APP_RUNNER_SERVICE: { DefaultSizeInspectionLimit: "KB_32" },
+        },
+      },
+    });
+
+    // Then it is refused rather than accepted and never applied.
     assertInstanceOf(error, SimWafUnsimulatedInputException);
-    assertStringIncludes(error.message, "AssociationConfig");
+    assertStringIncludes(error.message, "APP_RUNNER_SERVICE");
   });
 
   it("refuses tags on a web ACL", async () => {

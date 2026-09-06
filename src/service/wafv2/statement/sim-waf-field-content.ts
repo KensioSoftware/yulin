@@ -14,13 +14,13 @@ export type SimWafFieldContent =
   | { readonly outcome: "noMatch" };
 
 /**
- * How much of a request body, header set or cookie set WAF reads.
+ * How much of a header set or a cookie set WAF reads.
  *
- * Real WAF stops at 8 KB for a web ACL as it is created here. A CloudFront
- * association can raise the body limit, which is settled where associations
- * are, so this is the one figure until then.
+ * Real WAF stops at 8 KB and 200 entries for both, whatever the web ACL is in
+ * front of. A body is the component whose limit varies by resource type, and
+ * `simWafBodyInspectionLimitBytes` carries that one.
  */
-export const simWafInspectionLimitBytes = 8192;
+export const simWafHeaderInspectionLimitBytes = 8192;
 
 /**
  * What a rule does about content too large for WAF to read.
@@ -56,15 +56,19 @@ export function requiredSimWafOversizeHandling(
  * settle the statement without looking, and `CONTINUE` inspects as much as WAF
  * would have read: whole entries while they fit, and the first entry cut to
  * the limit when even one does not.
+ *
+ * The limit is passed in because a body's varies with the resource type the
+ * request reached, while a header set and a cookie set are always 8 KB.
  */
 export function simWafFieldContent(
   candidates: readonly string[],
   oversizeHandling: SimWafOversizeHandling,
+  limitBytes: number,
 ): SimWafFieldContent {
   const encoded = candidates.map((candidate) => encoder.encode(candidate));
   const total = encoded.reduce((sum, bytes) => sum + bytes.length, 0);
 
-  if (total <= simWafInspectionLimitBytes) {
+  if (total <= limitBytes) {
     return { outcome: "inspect", candidates };
   }
 
@@ -72,15 +76,21 @@ export function simWafFieldContent(
     return { outcome: oversizeHandling === "MATCH" ? "match" : "noMatch" };
   }
 
-  return { outcome: "inspect", candidates: readWithinLimit(encoded) };
+  return {
+    outcome: "inspect",
+    candidates: readWithinLimit(encoded, limitBytes),
+  };
 }
 
 /**
  * The content WAF would have read before it stopped.
  */
-function readWithinLimit(encoded: readonly Uint8Array[]): readonly string[] {
+function readWithinLimit(
+  encoded: readonly Uint8Array[],
+  limitBytes: number,
+): readonly string[] {
   const read: string[] = [];
-  let budget = simWafInspectionLimitBytes;
+  let budget = limitBytes;
 
   for (const bytes of encoded) {
     if (budget === 0) {

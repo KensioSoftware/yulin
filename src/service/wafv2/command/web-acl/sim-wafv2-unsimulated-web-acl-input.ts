@@ -20,12 +20,6 @@ const refusedMembers: readonly SimWafRefusedMember[] = [
   [(input): unknown => input.ChallengeConfig, "ChallengeConfig", tokenActions],
   [(input): unknown => input.TokenDomains, "TokenDomains", tokenActions],
   [
-    (input): unknown => input.AssociationConfig,
-    "AssociationConfig",
-    "it sets the body size a web ACL inspects for the resources it is " +
-      "associated with, and nothing is associated with a web ACL yet",
-  ],
-  [
     (input): unknown => input.DataProtectionConfig,
     "DataProtectionConfig",
     "it decides what a request field looks like in logs, and web ACL logging " +

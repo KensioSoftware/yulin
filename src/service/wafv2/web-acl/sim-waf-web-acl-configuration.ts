@@ -1,5 +1,6 @@
 import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 import { SimWafAction } from "./sim-waf-action.js";
+import type { SimWafAssociationConfigInput } from "./sim-waf-association-config.js";
 import type { SimWafActionInput } from "./sim-waf-action.type.js";
 import type { SimWafCustomResponseBodies } from "./sim-waf-custom-response.type.js";
 import type { SimWafRuleInput } from "./sim-waf-rule.type.js";
@@ -13,6 +14,7 @@ export interface SimWafWebAclConfiguration {
   readonly customResponseBodies?: SimWafCustomResponseBodies | undefined;
   readonly visibilityConfig?: unknown;
   readonly description?: string | undefined;
+  readonly associationConfig?: SimWafAssociationConfigInput | undefined;
 }
 
 /**

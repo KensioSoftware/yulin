@@ -21,5 +21,6 @@ export function simWafWebAclOutput(webAcl: SimWafWebAcl): SimWafWebAclOutput {
     Rules: configuration.rules ?? [],
     VisibilityConfig: configuration.visibilityConfig,
     CustomResponseBodies: configuration.customResponseBodies,
+    AssociationConfig: configuration.associationConfig,
   };
 }

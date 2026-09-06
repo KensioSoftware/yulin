@@ -53,6 +53,7 @@ export class SimCfWebAclGuard {
       webAclArn,
       request,
       body: await requestBody(request),
+      resourceType: "CLOUDFRONT",
     });
 
     return decision.action === "BLOCK"

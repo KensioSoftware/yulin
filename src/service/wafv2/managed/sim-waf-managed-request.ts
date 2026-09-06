@@ -1,5 +1,4 @@
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
-import { simWafInspectionLimitBytes } from "../statement/sim-waf-field-content.js";
 import { simWafQueryArguments } from "../statement/sim-waf-request-fields.js";
 
 const encoder = new TextEncoder();
@@ -69,7 +68,7 @@ export function simWafManagedRequestParts(
     headerValues: [...request.headers].map(([, value]) => value),
     userAgent: request.headers.get("user-agent") ?? undefined,
     cookieHeader,
-    body: decoder.decode(body.subarray(0, simWafInspectionLimitBytes)),
+    body: decoder.decode(body.subarray(0, request.bodyInspectionLimitBytes)),
     uriPathBytes: simWafByteLength(request.uriPath),
     queryStringBytes: simWafByteLength(request.queryString),
     cookieHeaderBytes: simWafByteLength(cookieHeader),

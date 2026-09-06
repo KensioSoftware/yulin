@@ -95,7 +95,11 @@ export class SimWafAssociations implements SimWafProtection {
     }
 
     return association.webAcl.evaluate(
-      simWafInspectedRequest(request.request, request.body),
+      simWafInspectedRequest(
+        request.request,
+        request.body,
+        association.webAcl.bodyInspectionLimitBytes(association.resourceType),
+      ),
     );
   }
 
