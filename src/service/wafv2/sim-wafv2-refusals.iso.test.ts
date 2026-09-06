@@ -219,6 +219,19 @@ describe("SimWafV2 refusals", () => {
     assertStringIncludes(error.message, "KB_24");
   });
 
+  it("refuses a RequestBody entry that sets no body inspection limit", async () => {
+    // When a web ACL names a resource type and says nothing about the limit,
+    // which a hand-written template is where this comes from.
+    const error = await refusalFor({
+      AssociationConfig: { RequestBody: { CLOUDFRONT: undefined } },
+    });
+
+    // Then it is refused the way an unusable size is, ahead of the type error
+    // reading a limit off nothing would have raised.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "DefaultSizeInspectionLimit");
+  });
+
   it("refuses a body inspection limit for a resource type it cannot protect", async () => {
     // When a web ACL sets the limit for a resource type nothing here goes in
     // front of.

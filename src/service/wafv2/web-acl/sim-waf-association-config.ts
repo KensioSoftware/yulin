@@ -54,7 +54,7 @@ export interface SimWafRequestBodyConfigInput {
  */
 export interface SimWafAssociationConfigInput {
   readonly RequestBody?:
-    | Readonly<Record<string, SimWafRequestBodyConfigInput>>
+    | Readonly<Record<string, SimWafRequestBodyConfigInput | undefined>>
     | undefined;
 }
 
@@ -86,7 +86,7 @@ export class SimWafBodyInspectionLimits {
     for (const [resourceType, config] of configured) {
       limits.set(
         simulatedResourceType(resourceType),
-        inspectionLimit(resourceType, config.DefaultSizeInspectionLimit),
+        inspectionLimit(resourceType, config),
       );
     }
 
@@ -132,11 +132,17 @@ function simulatedResourceType(
 
 /**
  * Read one resource type's `DefaultSizeInspectionLimit`.
+ *
+ * An entry carrying no size is refused the same way one carrying a size WAF
+ * has no setting for is. A template writes this part of a web ACL by hand, and
+ * an entry that says nothing about the limit it is there to set is a mistake
+ * worth reporting as one.
  */
 function inspectionLimit(
   resourceType: string,
-  limit: string | undefined,
+  config: SimWafRequestBodyConfigInput | undefined,
 ): number {
+  const limit = config?.DefaultSizeInspectionLimit;
   const bytes = limit === undefined ? undefined : inspectionLimits.get(limit);
 
   if (bytes === undefined) {
