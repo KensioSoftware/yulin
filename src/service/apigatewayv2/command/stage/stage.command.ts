@@ -3,6 +3,7 @@ import type {
   SimHttpApiRouteSettings,
   SimHttpApiRouteSettingsMap,
 } from "../../api/stage/settings/sim-http-api-route-settings.type.js";
+import type { SimHttpApiAccessLogSettingsInput } from "../../api/stage/access-log/sim-http-api-access-log-settings.type.js";
 import type { SimHttpApiStageView } from "../../api/stage/sim-http-api-stage.js";
 
 /**
@@ -22,6 +23,7 @@ export interface SimCreateStageCommandInput {
   readonly Description?: string | undefined;
   readonly DefaultRouteSettings?: SimHttpApiRouteSettings | undefined;
   readonly RouteSettings?: SimHttpApiRouteSettingsMap | undefined;
+  readonly AccessLogSettings?: SimHttpApiAccessLogSettingsInput | undefined;
 }
 
 export interface SimCreateStageCommandOutput extends SimHttpApiStageView {

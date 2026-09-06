@@ -666,8 +666,146 @@ route configured that way is served unthrottled.
 `GetStages` answers with the settings a stage was created with. `AWS::ApiGatewayV2::Stage` deploys
 both properties as well (see [CloudFormation](#cloudformation)). The three members of `RouteSettings`
 that say nothing about throttling, `DetailedMetricsEnabled`, `LoggingLevel` and `DataTraceEnabled`,
-are refused by `CreateStage`. A template carrying one deploys, and the member it named is recorded on
-`stack.ignoredProperties`.
+are refused by `CreateStage`. They are execution logging, which is a different log from the one
+[`AccessLogSettings` writes](#writing-a-stages-access-log). A template carrying one deploys, and the
+member it named is recorded on `stack.ignoredProperties`.
+
+## Writing a stage's access log
+
+`AccessLogSettings` sends one line per request to a CloudWatch Logs log group. `DestinationArn` names
+the group and `Format` is the line, with `$context` variables substituted from the request that
+produced it.
+
+The line is written whether or not an integration ran. A request the stage throttle refused, one a
+Lambda authorizer denied, and one with no identity source header all reach the log group, and for
+those the access log is the only record of the request.
+
+```typescript sim-apigatewayv2-access-log
+/**
+ * Recording a simulated HTTP API stage's access log, including a request the
+ * stage's throttle refused.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  CreateLogGroupCommand,
+  FilterLogEventsCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const logGroupName = "/aws/vendedlogs/user-api";
+
+await simAws.logs().createLogGroup(new CreateLogGroupCommand({ logGroupName }));
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "users",
+    Role: "arn:aws:iam::111111111111:role/UsersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: "ok",
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "users", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /user/profile",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({
+    ApiId,
+    StageName: "$default",
+    AutoDeploy: true,
+    DefaultRouteSettings: { ThrottlingRateLimit: 1, ThrottlingBurstLimit: 1 },
+    AccessLogSettings: {
+      DestinationArn: `arn:aws:logs:us-east-1:888888888888:log-group:${logGroupName}:*`,
+      Format:
+        "$context.httpMethod $context.path $context.status " +
+        "$context.error.message",
+    },
+  }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "users",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+simAws.clock().freeze();
+
+const profile = srv.localUrl(`${ApiEndpoint}/user/profile`);
+await fetch(profile);
+await fetch(profile);
+
+const { events } = await simAws
+  .logs()
+  .filterLogEvents(new FilterLogEventsCommand({ logGroupName }));
+
+const lines = events ?? [];
+
+for (const event of lines) {
+  console.log(event.message);
+}
+
+await srv.close();
+```
+
+The served request and the throttled one are both there. A variable with no value renders as a dash,
+which is what `$context.error.message` does for the request the integration answered:
+
+```text
+GET /user/profile 200 -
+GET /user/profile 429 Too Many Requests
+```
+
+The lines go to the log group and nowhere else. An API answering a few hundred requests in one test
+file would otherwise bury the suite's own output, so nothing here is forwarded to the console the way
+a [Lambda handler's output](https://yulinsim.dev/services/lambda/#capturing-handler-output) is.
+
+A `DestinationArn` naming a log group nothing has created yet is written to anyway, and the group is
+made by the first line. `Format` is copied through apart from its `$context` references, so a JSON
+format string arrives as JSON.
 
 ## Protecting a route with a Cognito user pool
 
@@ -2287,7 +2425,7 @@ parts behaves differently to the template. The simulated properties are:
 - `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
 - `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
 - `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`,
-  `DefaultRouteSettings`, `RouteSettings`
+  `DefaultRouteSettings`, `RouteSettings`, `AccessLogSettings`
 
 CDK's `HttpIamAuthorizer` deploys too. It emits no `AWS::ApiGatewayV2::Authorizer` and no
 `AuthorizerId`, only `AuthorizationType: "AWS_IAM"` on the `Route`, and the deployed route then
@@ -2436,6 +2574,9 @@ the simulation without being given one. See the
   under their own path segment, including stage variables
 - `DefaultRouteSettings` and `RouteSettings` throttling, with a token bucket per route refilling
   against the simulated clock and a 429 for the requests past it
+- `AccessLogSettings`, writing one line per request to the log group `DestinationArn` names, with the
+  `Format` string's `$context` variables substituted, including for a request the throttle or an
+  authorizer refused before any integration ran
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
   payload format 2.0 event and turning its result back into an HTTP response
 - The invoke permission of an integration's function and of an authorizer's, each evaluated against
@@ -2474,9 +2615,24 @@ Current documented limitations:
 - Deployments are outside the simulation, so `CreateStage` requires `AutoDeploy: true`. A stage
   without it serves whichever Deployment it was given, which on real AWS is nothing until one is
   created.
-- `AccessLogSettings` on a stage is refused, as is any other option `CreateStage` takes and this one
-  lacks. `RouteSettings` and `DefaultRouteSettings` are taken, and only their throttling members are
-  read. `DetailedMetricsEnabled`, `LoggingLevel` and `DataTraceEnabled` are refused by name.
+- Any option `CreateStage` takes and this one lacks is refused. `RouteSettings` and
+  `DefaultRouteSettings` are taken, and only their throttling members are read.
+  `DetailedMetricsEnabled`, `LoggingLevel` and `DataTraceEnabled` are refused by name. Those three
+  are execution logging, which is a different log from the access log and is not simulated.
+- An access log `DestinationArn` has to name a CloudWatch Logs log group. A Kinesis Data Firehose
+  delivery stream, which a REST API stage may name, is refused.
+- The access log variables carrying a value are `accountId`, `apiId`, `domainName`, `domainPrefix`,
+  `stage`, `routeKey`, `httpMethod`, `path`, `protocol`, `requestId`, `extendedRequestId`,
+  `requestTime`, `requestTimeEpoch`, `status`, `responseLength`, `responseLatency`,
+  `identity.sourceIp`, `identity.userAgent`, `integrationStatus`, `integrationLatency`,
+  `integrationErrorMessage`, `authorizer.error`, `error.message`, `error.messageString`,
+  `customDomain.basePathMatched`, the `integration.*` aliases, and `authorizer.claims.<property>` and
+  `authorizer.<property>` from the route's authorizer. Anything else AWS documents renders as a dash.
+- `responseLatency` and `integrationLatency` are simulated milliseconds, so a test holding the clock
+  still logs zero rather than however long the process took.
+- The access log stream is named for the hour it was written in, dated from the simulation's clock.
+  Real API Gateway appends an identifier this simulation has no counterpart for, so a test should
+  filter the log group rather than name the stream.
 - `AWS_PROXY` is the only integration type, and its URI must name a Lambda function ARN, written
   either as that ARN or as the
   `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.

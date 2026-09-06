@@ -24,6 +24,7 @@ export function simHttpApiEndpoint(
   const { api, match, domainName } = serving;
 
   return {
+    ...(serving.requestId !== undefined && { requestId: serving.requestId }),
     apiId: api.apiId,
     domainName,
     // The first label, which is the API id for a generated endpoint and the

@@ -4,6 +4,7 @@ import { SimApiGatewayV2NotFound } from "../../error/sim-api-gateway-v2.error.js
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
+import { simHttpApiAccessLogSettings } from "./sim-http-api-access-log-settings-input.js";
 import { simHttpApiStageRouteSettings } from "./sim-http-api-stage-route-settings-input.js";
 import { SimHttpApiStageRules } from "./sim-http-api-stage-rules.js";
 import type {
@@ -25,6 +26,7 @@ const acceptedCreateStageOptions = [
   "Description",
   "DefaultRouteSettings",
   "RouteSettings",
+  "AccessLogSettings",
 ];
 
 interface SimHttpApiStageCommandsProperties {
@@ -64,6 +66,7 @@ export class SimHttpApiStageCommands {
       unsimulated,
       clock: this.clock,
     });
+    const accessLogSettings = simHttpApiAccessLogSettings(input, unsimulated);
 
     const httpApi = this.access.api({
       method: "POST",
@@ -80,6 +83,7 @@ export class SimHttpApiStageCommands {
       description: input.Description,
       createdDate: this.clock.now(),
       routeSettings,
+      accessLogSettings,
     });
     httpApi.stages.add(stage);
 

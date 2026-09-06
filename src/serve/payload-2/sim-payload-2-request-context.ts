@@ -73,7 +73,7 @@ export class SimPayload2RequestContextBuilder {
         sourceIp: simAwsProxiedSourceIp,
         userAgent: request.headers.get("user-agent") ?? "",
       },
-      requestId: randomUUID(),
+      requestId: endpoint.requestId ?? randomUUID(),
       routeKey: endpoint.routeKey,
       stage: endpoint.stage,
       time: simProxyEventTime(at),

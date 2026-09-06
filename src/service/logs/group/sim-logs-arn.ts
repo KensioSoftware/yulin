@@ -58,3 +58,53 @@ export function simLogsLogStreamArn(
 ): string {
   return `${simLogsLogGroupArn(scope, logGroupName)}:log-stream:${logStreamName}`;
 }
+
+/**
+ * The account, region and group name a log group ARN carries, or undefined
+ * for a string that is not one.
+ *
+ * Both forms are read. `DescribeLogGroups` reports `logGroupArn` without a
+ * trailing wildcard, while the `arn` field and CDK's `logGroup.logGroupArn`
+ * both end in `:*`, and a template naming either means the same group. A log
+ * group name cannot contain a colon, so what follows `log-group:` is the name
+ * up to an optional trailing `:*`.
+ */
+export function simLogsParsedLogGroupArn(arn: string):
+  | {
+      readonly accountId: string;
+      readonly regionName: string;
+      readonly logGroupName: string;
+    }
+  | undefined {
+  const [prefix, partition, service, region, account, resourceType, ...rest] =
+    arn.split(":");
+
+  if (
+    prefix !== "arn" ||
+    service !== "logs" ||
+    resourceType !== "log-group" ||
+    !isPresent(partition) ||
+    !isPresent(region) ||
+    !isPresent(account)
+  ) {
+    return undefined;
+  }
+
+  const [logGroupName, wildcard, ...extra] = rest;
+
+  if (
+    logGroupName === undefined ||
+    logGroupName.length === 0 ||
+    extra.length > 0 ||
+    (wildcard !== undefined && wildcard !== "*")
+  ) {
+    return undefined;
+  }
+
+  return { accountId: account, regionName: region, logGroupName };
+}
+
+/** Whether an ARN component was written at all. */
+function isPresent(component: string | undefined): component is string {
+  return component !== undefined && component.length > 0;
+}
