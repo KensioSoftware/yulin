@@ -16,7 +16,10 @@ export interface SimIamConditionOperator {
    * there is none for the policy value to equal.
    *
    * A `ForAnyValue` operator answers false whatever it wraps, because no
-   * request value is there to satisfy it. AWS documents both rules.
+   * request value is there to satisfy it. A `ForAllValues` operator answers
+   * true, because every value the request carries matches vacuously. AWS
+   * documents all three rules, and warns that the `ForAllValues` rule leaves
+   * an `Allow` overly permissive without a `Null` guard beside it.
    */
   readonly matchesAbsentKey: boolean;
 

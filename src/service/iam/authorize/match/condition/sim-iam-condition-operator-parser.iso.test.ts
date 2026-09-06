@@ -15,6 +15,8 @@ const negatedKeywords = [
   "StringNotLike",
 ];
 
+const positiveKeywords = ["StringEquals", "StringLike"];
+
 const setQualifiers = ["ForAnyValue", "ForAllValues"];
 
 describe("sim IAM condition operator parsing", () => {
@@ -51,6 +53,25 @@ describe("sim IAM condition operator parsing", () => {
     assertArrayEquals(
       matchesAbsentKey,
       negatedKeywords.flatMap(() => [true, true, false]),
+    );
+  });
+
+  it("matches an absent context key only in the ForAllValues form of a positive keyword", () => {
+    // Given the positive keywords carrying both set forms
+    const parser = new SimIamConditionOperatorParser();
+
+    // When each form is asked whether an absent context key matches it
+    const matchesAbsentKey = positiveKeywords.flatMap((keyword) => [
+      parser.parse(keyword)?.matchesAbsentKey,
+      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey,
+      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey,
+    ]);
+
+    // Then only the `ForAllValues` forms answer true. AWS matches those where
+    // the request carries no value for the key
+    assertArrayEquals(
+      matchesAbsentKey,
+      positiveKeywords.flatMap(() => [false, true, false]),
     );
   });
 
