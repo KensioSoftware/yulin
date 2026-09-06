@@ -75,20 +75,41 @@ export function simHttpApiAccessLogRecord(
       authorization.errorDescription !== undefined && {
         authorizerError: authorization.errorDescription,
       }),
-    ...(integration?.integrationStatus !== undefined && {
-      integrationStatus: integration.integrationStatus,
-    }),
-    ...(integration?.lambdaInvokeStatus !== undefined && {
-      lambdaInvokeStatus: integration.lambdaInvokeStatus,
-    }),
-    ...(integration?.integrationErrorMessage !== undefined && {
-      integrationErrorMessage: integration.integrationErrorMessage,
-    }),
+    ...integrationFields(integration),
     ...(admitted?.jwt !== undefined && { jwt: admitted.jwt }),
     ...(admitted?.lambda !== undefined && { lambda: admitted.lambda }),
     ...(serving.basePathMatched !== undefined && {
       basePathMatched: serving.basePathMatched,
     }),
+  };
+}
+
+/**
+ * What the integration contributed, with the members it has no value for left
+ * out so that they render as dashes.
+ *
+ * A request no integration ran for contributes nothing at all, which is what a
+ * throttled or refused request does.
+ */
+function integrationFields(
+  integration: SimHttpApiIntegrationOutcome | undefined,
+): Partial<SimHttpApiAccessLogRequest> {
+  if (integration === undefined) {
+    return {};
+  }
+
+  const {
+    integrationStatus,
+    lambdaInvokeStatus,
+    integrationErrorMessage,
+    integrationLatency,
+  } = integration;
+
+  return {
+    ...(integrationStatus !== undefined && { integrationStatus }),
+    ...(lambdaInvokeStatus !== undefined && { lambdaInvokeStatus }),
+    ...(integrationErrorMessage !== undefined && { integrationErrorMessage }),
+    ...(integrationLatency !== undefined && { integrationLatency }),
   };
 }
 

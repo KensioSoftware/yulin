@@ -11,6 +11,11 @@ export interface SimHttpApiIntegrationOutcome {
   readonly integrationStatus?: number | undefined;
   readonly lambdaInvokeStatus?: number | undefined;
   readonly integrationErrorMessage?: string | undefined;
+  /**
+   * Simulated milliseconds the invocation took. A test holding the clock still
+   * measures zero, the way the whole request's latency does.
+   */
+  readonly integrationLatency?: number | undefined;
 }
 
 /**

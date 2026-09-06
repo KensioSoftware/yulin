@@ -127,7 +127,9 @@ describe("Writing a sim HTTP API stage's access log", () => {
     );
     const http = new SimAwsHttp({ simAws });
 
-    // When one more request arrives than the throttle admits
+    // When one more request arrives than the throttle admits. The clock is
+    // held still, so the bucket refills only when this test moves it.
+    simAws.clock().freeze();
     await http.fetch(localUrl(api.apiEndpoint));
     const refused = await http.fetch(localUrl(api.apiEndpoint));
 
@@ -228,6 +230,55 @@ describe("Writing a sim HTTP API stage's access log", () => {
     // Then the lines are in the log group and none of them reached the console
     expect(await accessLogLines(simAws)).toHaveLength(2);
     expect(written.join("")).toBe("");
+  });
+
+  it("keeps punctuation written around a context reference", async () => {
+    // Given a format whose variables carry the punctuation of a sentence
+    const simAws = new SimAws();
+    const api = await simHttpApiLambdaProxyFactory.make(
+      {
+        handler: (): string => "hello",
+        accessLogSettings: {
+          DestinationArn: destinationArn(simAws),
+          Format: "answered $context.status. path=$context.path, done",
+        },
+      },
+      simAws,
+    );
+
+    // When a request is served
+    await new SimAwsHttp({ simAws }).fetch(
+      localUrl(api.apiEndpoint, "/orders"),
+    );
+
+    // Then the full stop and the comma are still there
+    expect(await accessLogLines(simAws)).toStrictEqual([
+      "answered 200. path=/orders, done",
+    ]);
+  });
+
+  it("reports how long the integration took", async () => {
+    // Given a stage logging the integration's latency, and a handler that
+    // takes a second of simulated time
+    const simAws = new SimAws();
+    const api = await simHttpApiLambdaProxyFactory.make(
+      {
+        handler: (): string => "hello",
+        accessLogSettings: {
+          DestinationArn: destinationArn(simAws),
+          Format: "$context.integrationStatus $context.integrationLatency",
+        },
+      },
+      simAws,
+    );
+    simAws.clock().freeze();
+
+    // When a request is served
+    await new SimAwsHttp({ simAws }).fetch(localUrl(api.apiEndpoint));
+
+    // Then the latency is measured rather than left as a dash. The clock is
+    // held still, so it is zero.
+    expect(await accessLogLines(simAws)).toStrictEqual(["200 0"]);
   });
 
   it("writes nothing for a stage that was given no access log settings", async () => {

@@ -76,15 +76,16 @@ export function simLogsParsedLogGroupArn(arn: string):
       readonly logGroupName: string;
     }
   | undefined {
-  const [, partition, service, regionName, accountId, resourceType, ...rest] =
+  const [prefix, partition, service, region, account, resourceType, ...rest] =
     arn.split(":");
 
   if (
-    partition === undefined ||
+    prefix !== "arn" ||
     service !== "logs" ||
-    regionName === undefined ||
-    accountId === undefined ||
-    resourceType !== "log-group"
+    resourceType !== "log-group" ||
+    !isPresent(partition) ||
+    !isPresent(region) ||
+    !isPresent(account)
   ) {
     return undefined;
   }
@@ -100,5 +101,10 @@ export function simLogsParsedLogGroupArn(arn: string):
     return undefined;
   }
 
-  return { accountId, regionName, logGroupName };
+  return { accountId: account, regionName: region, logGroupName };
+}
+
+/** Whether an ARN component was written at all. */
+function isPresent(component: string | undefined): component is string {
+  return component !== undefined && component.length > 0;
 }

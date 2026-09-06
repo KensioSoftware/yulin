@@ -31,9 +31,12 @@ export function simHttpApiAccessLogLine(
 ): string {
   return format.replaceAll(contextReference, (reference) => {
     // A trailing dot belongs to the text around the reference rather than to
-    // the name, as in a format ending one variable with a full stop.
-    const name = reference.slice("$context.".length).replace(/\.+$/, "");
+    // the name, as in a format ending one variable with a full stop. It is put
+    // back after the value, so the punctuation survives the substitution.
+    const written = reference.slice("$context.".length);
+    const name = written.replace(/\.+$/, "");
+    const punctuation = written.slice(name.length);
 
-    return variables.get(name) ?? noValue;
+    return (variables.get(name) ?? noValue) + punctuation;
   });
 }

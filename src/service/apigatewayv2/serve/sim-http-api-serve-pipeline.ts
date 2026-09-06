@@ -83,10 +83,13 @@ export class SimHttpApiServePipeline {
       };
     }
 
-    const integration = await this.#integration.invoke({
-      ...asked,
-      authorization,
-    });
+    const clock = this.#router.simAws;
+    const invokedAt = clock.now().getTime();
+    const outcome = await this.#integration.invoke({ ...asked, authorization });
+    const integration = {
+      ...outcome,
+      integrationLatency: clock.now().getTime() - invokedAt,
+    };
 
     return { response: integration.response, authorization, integration };
   }
