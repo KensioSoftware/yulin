@@ -162,21 +162,19 @@ describe("API Gateway v2 CloudFormation validation", () => {
   });
 
   it("creates a stage without a property outside the simulated set", async () => {
-    // Given a stage asking for access logging
+    // Given a stage carrying tags, which nothing here reads
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
-        stageProperties: {
-          AccessLogSettings: { Format: "$context.requestId" },
-        },
+        stageProperties: { Tags: { Team: "orders" } },
       }),
     );
 
-    // Then the stage is created logging nothing, and the record names the
-    // Resource type, the logical ID, the property and what is simulated
+    // Then the stage is created untagged, and the record names the Resource
+    // type, the logical ID, the property and what is simulated
     assertTrue(stack.getResource("Stage")?.deployed);
 
     const [reason] = ignoredReasons(stack);
@@ -184,12 +182,13 @@ describe("API Gateway v2 CloudFormation validation", () => {
     assertStringIncludes(reason, "Stage");
     assertStringIncludes(
       reason,
-      "AWS::ApiGatewayV2::Stage property AccessLogSettings is not simulated",
+      "AWS::ApiGatewayV2::Stage property Tags is not simulated",
     );
     assertStringIncludes(
       reason,
       "The simulated properties are ApiId, StageName, AutoDeploy, " +
-        "StageVariables, Description, DefaultRouteSettings, RouteSettings.",
+        "StageVariables, Description, DefaultRouteSettings, RouteSettings, " +
+        "AccessLogSettings.",
     );
   });
 

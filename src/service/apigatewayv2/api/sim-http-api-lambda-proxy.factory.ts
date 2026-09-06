@@ -6,6 +6,7 @@ import { simApiGatewayServicePrincipal } from "../../apigateway/sim-api-gateway-
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import type { SimHttpApiAccessLogSettingsInput } from "./stage/access-log/sim-http-api-access-log-settings.type.js";
 import type {
   SimHttpApiRouteSettings,
   SimHttpApiRouteSettingsMap,
@@ -60,6 +61,11 @@ export interface SimHttpApiLambdaProxyInput {
   /** The throttles those stages apply to the route keys they name. */
   readonly routeSettings: SimHttpApiRouteSettingsMap | undefined;
   /**
+   * Where those stages write an access log line per request, or undefined for
+   * stages that log nothing.
+   */
+  readonly accessLogSettings: SimHttpApiAccessLogSettingsInput | undefined;
+  /**
    * Whether the function grants the API permission to invoke it, which it
    * needs before any route serves anything.
    *
@@ -113,6 +119,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     stageVariables: {},
     defaultRouteSettings: undefined,
     routeSettings: undefined,
+    accessLogSettings: undefined,
     invokePermission: true,
   }),
   async (input, simAws) => {
@@ -193,6 +200,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
             StageVariables: input.stageVariables,
             DefaultRouteSettings: input.defaultRouteSettings,
             RouteSettings: input.routeSettings,
+            AccessLogSettings: input.accessLogSettings,
           },
         }),
       ),

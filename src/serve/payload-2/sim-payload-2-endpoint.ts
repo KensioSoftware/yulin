@@ -29,6 +29,15 @@ export interface SimPayload2Endpoint {
   readonly pathParameters?: Record<string, string> | undefined;
   /** The stage's variables, if it has any. */
   readonly stageVariables?: Record<string, string> | undefined;
+  /**
+   * The id the endpoint assigned to this request, where the endpoint assigns
+   * one before building the event.
+   *
+   * An HTTP API settles it up front so that the request's access log line, its
+   * authorizer event and its integration event all name the same request.
+   * Absent for an endpoint that leaves the event builder to issue one.
+   */
+  readonly requestId?: string | undefined;
 }
 
 /**

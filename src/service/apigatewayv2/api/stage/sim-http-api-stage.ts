@@ -1,3 +1,5 @@
+import type { SimHttpApiAccessLogSettings } from "./access-log/sim-http-api-access-log-settings.js";
+import type { SimHttpApiAccessLogSettingsView } from "./access-log/sim-http-api-access-log-settings.type.js";
 import type { SimHttpApiRouteSettingsView } from "./settings/sim-http-api-route-settings.type.js";
 import type { SimHttpApiStageRouteSettings } from "./settings/sim-http-api-stage-route-settings.js";
 
@@ -14,6 +16,7 @@ interface SimHttpApiStageProperties {
   readonly description?: string | undefined;
   readonly createdDate: Date;
   readonly routeSettings?: SimHttpApiStageRouteSettings | undefined;
+  readonly accessLogSettings?: SimHttpApiAccessLogSettings | undefined;
 }
 
 /**
@@ -25,6 +28,7 @@ export interface SimHttpApiStageView extends SimHttpApiRouteSettingsView {
   CreatedDate: Date;
   StageVariables?: Record<string, string>;
   Description?: string;
+  AccessLogSettings?: SimHttpApiAccessLogSettingsView;
 }
 
 /**
@@ -47,6 +51,12 @@ export class SimHttpApiStage {
    */
   public readonly routeSettings?: SimHttpApiStageRouteSettings | undefined;
 
+  /**
+   * Where this stage writes an access log line per request, or undefined for a
+   * stage that was given no access log settings and so logs nothing.
+   */
+  public readonly accessLogSettings?: SimHttpApiAccessLogSettings | undefined;
+
   constructor(properties: SimHttpApiStageProperties) {
     this.stageName = properties.stageName;
     this.autoDeploy = properties.autoDeploy;
@@ -54,6 +64,7 @@ export class SimHttpApiStage {
     this.description = properties.description;
     this.createdDate = properties.createdDate;
     this.routeSettings = properties.routeSettings;
+    this.accessLogSettings = properties.accessLogSettings;
   }
 
   /**
@@ -86,6 +97,10 @@ export class SimHttpApiStage {
 
     if (this.description !== undefined) {
       view.Description = this.description;
+    }
+
+    if (this.accessLogSettings !== undefined) {
+      view.AccessLogSettings = this.accessLogSettings.view();
     }
 
     return view;

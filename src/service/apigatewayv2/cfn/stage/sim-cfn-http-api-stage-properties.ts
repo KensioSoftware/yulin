@@ -2,15 +2,14 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateStageCommandInput } from "../../command/stage/stage.command.js";
 import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-property-parser.js";
+import { SimCfnHttpApiAccessLogSettingsProperties } from "./sim-cfn-http-api-access-log-settings-properties.js";
 import { SimCfnHttpApiRouteSettingsProperties } from "./sim-cfn-http-api-route-settings-properties.js";
 
 /**
  * The AWS::ApiGatewayV2::Stage properties this simulation deploys.
  *
- * `DeploymentId`, `AccessLogSettings` and `Tags` are left out, so a template
- * carrying one is recorded and the stage is created without it. None of them
- * is modelled, and a stage that looked logged to the template and logged
- * nothing when serving is the failure worth recording.
+ * `DeploymentId` and `Tags` are left out, so a template carrying one is
+ * recorded and the stage is created without it. Neither is modelled.
  */
 const simulatedProperties = [
   "ApiId",
@@ -20,6 +19,7 @@ const simulatedProperties = [
   "Description",
   "DefaultRouteSettings",
   "RouteSettings",
+  "AccessLogSettings",
 ];
 
 interface SimCfnHttpApiStagePropertiesProperties {
@@ -40,6 +40,7 @@ export class SimCfnHttpApiStageProperties {
   });
 
   private readonly routeSettingsParser: SimCfnHttpApiRouteSettingsProperties;
+  private readonly accessLogSettingsParser: SimCfnHttpApiAccessLogSettingsProperties;
 
   constructor(properties: SimCfnHttpApiStagePropertiesProperties) {
     this.resource = properties.resource;
@@ -48,6 +49,12 @@ export class SimCfnHttpApiStageProperties {
       resource: this.resource,
       propertyParser: this.propertyParser,
     });
+    this.accessLogSettingsParser = new SimCfnHttpApiAccessLogSettingsProperties(
+      {
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      },
+    );
 
     this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
@@ -109,6 +116,10 @@ export class SimCfnHttpApiStageProperties {
       RouteSettings: this.routeSettingsParser.settingsMap(
         this.properties["RouteSettings"],
         "RouteSettings",
+      ),
+      AccessLogSettings: this.accessLogSettingsParser.settings(
+        this.properties["AccessLogSettings"],
+        "AccessLogSettings",
       ),
     };
   }

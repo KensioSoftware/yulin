@@ -26,6 +26,18 @@ export interface SimHttpApiServing {
    * carrying.
    */
   readonly rawPath: string;
+  /**
+   * The id this request is logged and reported under, settled by the
+   * controller before anything runs. The resolver leaves it out, and the
+   * controller adds it to the serving it passes on.
+   */
+  readonly requestId?: string | undefined;
+  /**
+   * The API mapping base path this request matched, for a request that
+   * reached a custom domain. It is the empty string for a mapping serving the
+   * root of its domain, and absent for the generated endpoint.
+   */
+  readonly basePathMatched?: string | undefined;
 }
 
 /**
@@ -182,6 +194,7 @@ export class SimHttpApiServingResolver {
         match,
         domainName: domain.domainName,
         rawPath: mapping.apiMappingKey.remainingPath(path),
+        basePathMatched: mapping.apiMappingKey.value,
       },
     };
   }

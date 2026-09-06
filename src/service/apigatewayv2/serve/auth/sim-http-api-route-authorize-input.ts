@@ -36,4 +36,10 @@ export interface SimHttpApiRouteAuthorizeInput {
    * integrated function's.
    */
   readonly iam: SimIamInterServiceAuthZ;
+  /**
+   * The id the endpoint stamped this request with, which a `REQUEST`
+   * authorizer's event reports as its own. The authorizer and the integration
+   * behind the same request name one id, as they do on real AWS.
+   */
+  readonly requestId?: string | undefined;
 }
