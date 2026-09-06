@@ -79,7 +79,12 @@ export {
   type SimWafInspectedRequest,
   simWafInspectedRequest,
 } from "./evaluate/sim-waf-inspected-request.js";
-export { simWafInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
+export { simWafHeaderInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
+export {
+  type SimWafAssociationConfigInput,
+  type SimWafBodyInspectionResourceType,
+  simWafBodyInspectionLimitBytes,
+} from "./web-acl/sim-waf-association-config.js";
 export type { SimWafRateBasedStatementInput } from "./statement/sim-waf-rate-based.type.js";
 export type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 export {

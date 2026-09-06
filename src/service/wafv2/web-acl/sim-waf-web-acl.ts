@@ -9,6 +9,10 @@ import {
   type SimWafResourceProperties,
 } from "../resource/sim-waf-resource.js";
 import type { SimWafAction } from "./sim-waf-action.js";
+import {
+  type SimWafBodyInspectionResourceType,
+  SimWafBodyInspectionLimits,
+} from "./sim-waf-association-config.js";
 import type { SimWafRule } from "./sim-waf-rule.js";
 import type { SimWafWebAclRuleScope } from "./sim-waf-rule.type.js";
 import { compileSimWafWebAclRules } from "./sim-waf-rules.js";
@@ -50,6 +54,7 @@ export class SimWafWebAcl extends SimWafResource {
   #defaultAction: SimWafAction;
   #rules: readonly SimWafRule[];
   #capacity: number;
+  #bodyInspectionLimits: SimWafBodyInspectionLimits;
 
   constructor(properties: SimWafWebAclProperties) {
     super("webacl", properties);
@@ -62,6 +67,9 @@ export class SimWafWebAcl extends SimWafResource {
       this.#scope,
     );
     this.#capacity = simWafWebAclCapacity(properties.configuration.rules);
+    this.#bodyInspectionLimits = SimWafBodyInspectionLimits.read(
+      properties.configuration.associationConfig,
+    );
     this.labelNamespace =
       `awswaf:${properties.accountRegionScope.accountId}:webacl:` +
       `${properties.name}:`;
@@ -93,6 +101,9 @@ export class SimWafWebAcl extends SimWafResource {
   ): void {
     const defaultAction = readSimWafDefaultAction(configuration);
     const rules = compileSimWafWebAclRules(configuration, this.#scope);
+    const bodyInspectionLimits = SimWafBodyInspectionLimits.read(
+      configuration.associationConfig,
+    );
 
     this.takeLock(lockToken);
     this.replaceDescription(configuration.description);
@@ -100,6 +111,20 @@ export class SimWafWebAcl extends SimWafResource {
     this.#defaultAction = defaultAction;
     this.#rules = rules;
     this.#capacity = simWafWebAclCapacity(configuration.rules);
+    this.#bodyInspectionLimits = bodyInspectionLimits;
+  }
+
+  /**
+   * How many bytes of a request body this web ACL reads in front of one
+   * resource type.
+   *
+   * `AssociationConfig` raises it per resource type, and a web ACL written
+   * without one reads the 16 KB default everything it protects has.
+   */
+  bodyInspectionLimitBytes(
+    resourceType: SimWafBodyInspectionResourceType | undefined,
+  ): number {
+    return this.#bodyInspectionLimits.bytesFor(resourceType);
   }
 
   /**

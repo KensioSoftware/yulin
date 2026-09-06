@@ -173,9 +173,22 @@ resource, and `CreateWebACL` here refuses it too.
 Matching is case sensitive, as it is on AWS. A rule that means to ignore case says so with a
 `LOWERCASE` transformation and a lower case search string.
 
-WAF stops reading a body, a header set or a cookie set at 8 KB. The rule's `OversizeHandling` says
-what content past that point counts as. `MATCH` and `NO_MATCH` settle the statement without looking,
-and `CONTINUE` inspects as much as WAF would have read.
+WAF stops reading a header set or a cookie set at 8 KB. A body runs to 16 KB, the figure
+CloudFront, API Gateway and Cognito all send for inspection, and a web ACL raises it to 32, 48 or 64
+KB with `AssociationConfig`:
+
+```typescript
+AssociationConfig: {
+  RequestBody: {
+    CLOUDFRONT: { DefaultSizeInspectionLimit: "KB_64" },
+  },
+},
+```
+
+The key is the resource type the raised limit applies to, and `CLOUDFRONT`, `API_GATEWAY` and
+`COGNITO_USER_POOL` are the three a web ACL goes in front of here. The rule's `OversizeHandling`
+says what content past the limit counts as. `MATCH` and `NO_MATCH` settle the statement without
+looking, and `CONTINUE` inspects as much as WAF would have read.
 
 ## Rate limiting
 
@@ -1363,8 +1376,9 @@ fields to match. The `Captcha` and `Challenge` actions are refused, along with t
 `ChallengeConfig` and `TokenDomains` that configure them, because a browser has to answer them.
 
 Tags, logging, sampled requests and CloudWatch metrics for a web ACL are not simulated.
-`AssociationConfig`, `DataProtectionConfig`, `OnSourceDDoSProtectionConfig` and `ApplicationConfig`
-are refused for the same reason, each naming what it would have configured.
+`DataProtectionConfig`, `OnSourceDDoSProtectionConfig` and `ApplicationConfig` are refused for the
+same reason, each naming what it would have configured. An `AssociationConfig` naming a resource
+type this simulation has no association for is refused too.
 
 ## Supported operations
 

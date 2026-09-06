@@ -1,5 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimWafActionInput } from "../../web-acl/sim-waf-action.type.js";
+import type { SimWafAssociationConfigInput } from "../../web-acl/sim-waf-association-config.js";
 import type { SimWafCustomResponseBodies } from "../../web-acl/sim-waf-custom-response.type.js";
 import type { SimWafRuleInput } from "../../web-acl/sim-waf-rule.type.js";
 
@@ -29,7 +30,7 @@ export interface SimWafWebAclWriteInput {
   readonly CaptchaConfig?: unknown;
   readonly ChallengeConfig?: unknown;
   readonly TokenDomains?: readonly string[] | undefined;
-  readonly AssociationConfig?: unknown;
+  readonly AssociationConfig?: SimWafAssociationConfigInput | undefined;
   readonly DataProtectionConfig?: unknown;
   readonly OnSourceDDoSProtectionConfig?: unknown;
   readonly ApplicationConfig?: unknown;
@@ -80,6 +81,7 @@ export interface SimWafWebAclOutput {
   readonly Rules: readonly SimWafRuleInput[];
   readonly VisibilityConfig: unknown;
   readonly CustomResponseBodies: SimWafCustomResponseBodies | undefined;
+  readonly AssociationConfig: SimWafAssociationConfigInput | undefined;
 }
 
 export interface SimGetWebAclCommandOutput {

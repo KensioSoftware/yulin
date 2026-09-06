@@ -4,7 +4,8 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { simWafStatementMatches } from "../sim-wafv2.fixture.js";
 import type { SimWafFieldToMatchInput } from "./sim-waf-field-to-match.type.js";
-import { simWafInspectionLimitBytes } from "./sim-waf-field-content.js";
+import { simWafBodyInspectionLimitBytes } from "../web-acl/sim-waf-association-config.js";
+import { simWafHeaderInspectionLimitBytes } from "./sim-waf-field-content.js";
 import type { SimWafStatementInput } from "./sim-waf-statement.type.js";
 
 /**
@@ -288,7 +289,7 @@ describe("SimWafV2 field to match", () => {
     );
     const headers = new Headers({ "x-first": "needle" });
 
-    headers.set("x-second", "y".repeat(simWafInspectionLimitBytes));
+    headers.set("x-second", "y".repeat(simWafHeaderInspectionLimitBytes));
 
     // Then a header WAF read before it stopped still matches.
     assertTrue(matches(new Request("https://example.test/", { headers })));
@@ -308,7 +309,7 @@ describe("SimWafV2 field to match", () => {
       }),
     );
     const headers = new Headers({
-      "x-first": "y".repeat(simWafInspectionLimitBytes),
+      "x-first": "y".repeat(simWafHeaderInspectionLimitBytes),
       "x-second": "needle",
     });
 
@@ -342,7 +343,7 @@ describe("SimWafV2 field to match", () => {
       contains("needle", { Body: { OversizeHandling: "CONTINUE" } }),
     );
     const body = encoder.encode(
-      `${"x".repeat(simWafInspectionLimitBytes)}needle`,
+      `${"x".repeat(simWafBodyInspectionLimitBytes)}needle`,
     );
 
     // Then it does not match, because WAF never got that far either.
@@ -355,7 +356,7 @@ describe("SimWafV2 field to match", () => {
       new SimAws().wafV2(),
       contains("needle", { Body: { OversizeHandling: "MATCH" } }),
     );
-    const body = encoder.encode("x".repeat(simWafInspectionLimitBytes + 1));
+    const body = encoder.encode("x".repeat(simWafBodyInspectionLimitBytes + 1));
 
     // Then a body over the limit matches without being looked at, which is how
     // a rule refuses to let anything past that it cannot inspect.
@@ -368,7 +369,7 @@ describe("SimWafV2 field to match", () => {
       new SimAws().wafV2(),
       contains("x", { Body: { OversizeHandling: "NO_MATCH" } }),
     );
-    const body = encoder.encode("x".repeat(simWafInspectionLimitBytes + 1));
+    const body = encoder.encode("x".repeat(simWafBodyInspectionLimitBytes + 1));
 
     // Then it does not match, even though what it was looking for is in there.
     assertFalse(matches(new Request("https://example.test/"), body));

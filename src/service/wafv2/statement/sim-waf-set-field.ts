@@ -3,6 +3,7 @@ import {
   type SimWafFieldContent,
   requiredSimWafOversizeHandling,
   simWafFieldContent,
+  simWafHeaderInspectionLimitBytes,
 } from "./sim-waf-field-content.js";
 import type {
   SimWafFieldToMatchInput,
@@ -58,6 +59,7 @@ export function compileSimWafSetField(
     simWafFieldContent(
       request.body === undefined ? [] : [decoder.decode(request.body)],
       oversize,
+      request.bodyInspectionLimitBytes,
     );
 }
 
@@ -84,5 +86,6 @@ function entriesReader(
         matchScope,
       }),
       oversize,
+      simWafHeaderInspectionLimitBytes,
     );
 }

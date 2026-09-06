@@ -1,4 +1,5 @@
 import { simAwsRequestHostname } from "../../../serve/http/url/sim-aws-request-hostname.js";
+import { simWafBodyInspectionLimitBytes } from "../web-acl/sim-waf-association-config.js";
 import { SimWafRequestLabels } from "./sim-waf-request-labels.js";
 
 /**
@@ -30,6 +31,16 @@ export interface SimWafInspectedRequest {
   /** The request body, or nothing when the request carried none. */
   readonly body: Uint8Array | undefined;
 
+  /**
+   * How many bytes of the body a rule inspecting it reads.
+   *
+   * This travels with the request because it belongs to the resource the
+   * request reached rather than to the rule. A rule is compiled once, when the
+   * web ACL is written, and the same compiled rule then runs in front of a
+   * distribution and a REST API stage with a different limit for each.
+   */
+  readonly bodyInspectionLimitBytes: number;
+
   /** The labels the rules that have run so far added to this request. */
   readonly labels: SimWafRequestLabels;
 }
@@ -45,10 +56,15 @@ export interface SimWafInspectedRequest {
  * simulated endpoint is served under `*.sim-aws.localhost`, and a rule reading
  * the raw Host header would see that suffix on every request that reached
  * anything at all.
+ *
+ * The body inspection limit defaults to the 16 KB every resource type this
+ * simulation protects reads by default. A web ACL raising it with
+ * `AssociationConfig` passes the raised figure in.
  */
 export function simWafInspectedRequest(
   request: Request,
   body?: Uint8Array,
+  bodyInspectionLimitBytes: number = simWafBodyInspectionLimitBytes,
 ): SimWafInspectedRequest {
   const url = new URL(request.url);
 
@@ -62,6 +78,7 @@ export function simWafInspectedRequest(
     headers: request.headers,
     host: simAwsRequestHostname(request),
     body,
+    bodyInspectionLimitBytes,
     labels: new SimWafRequestLabels(),
   };
 }
