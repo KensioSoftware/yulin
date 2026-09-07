@@ -2,7 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
-import type { SimDynamoDbLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
+import type { SimDynamoDbTableReach } from "../table/sim-dynamodb-table-reach.js";
 
 /**
  * What one table of a batch asks for, against the table it names.
@@ -18,12 +18,12 @@ interface SimDynamoDbBatchReach<Requested> {
   readonly caller: SimAwsCaller | undefined;
 
   /**
-   * How to read the partition key values one table of the batch is asked for.
+   * What one table of the batch is asked for.
    *
-   * Each table is authorized on its own, so each carries the keys the batch
-   * names in that table and no others.
+   * Each table is authorized on its own, so each carries the keys and the
+   * attributes the batch names in that table and no others.
    */
-  readonly leadingKeys: (requested: Requested) => SimDynamoDbLeadingKeys;
+  readonly reached: (requested: Requested) => SimDynamoDbTableReach;
 }
 
 /**
@@ -47,7 +47,7 @@ export function reachSimDynamoDbBatchTables<
       action,
       entry.reference,
       reach.caller,
-      reach.leadingKeys(entry),
+      reach.reached(entry),
     ),
     requested: entry,
   }));

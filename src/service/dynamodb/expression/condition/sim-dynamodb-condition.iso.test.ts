@@ -31,7 +31,7 @@ function holdsFor(
   values: Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined,
   subject: SimDynamoDbItemSnapshot,
 ): boolean {
-  const condition = readSimDynamoDbCondition({
+  const { condition } = readSimDynamoDbCondition({
     ConditionExpression: expression,
     ExpressionAttributeValues: values,
   });
@@ -192,7 +192,7 @@ describe("DynamoDB condition expressions", () => {
     };
 
     // When a condition reaches into both, then it reads what is there.
-    const condition = readSimDynamoDbCondition({
+    const { condition } = readSimDynamoDbCondition({
       ConditionExpression: "#a.city = :city AND lines[0] = :line",
       ExpressionAttributeNames: { "#a": "address" },
       ExpressionAttributeValues: {
@@ -213,6 +213,6 @@ describe("DynamoDB condition expressions", () => {
     // Given a request that names no condition, which is an unconditional
     // write.
     // When the condition is read, then there is none to check.
-    assertUndefined(readSimDynamoDbCondition({}));
+    assertUndefined(readSimDynamoDbCondition({}).condition);
   });
 });

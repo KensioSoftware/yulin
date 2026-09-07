@@ -1,4 +1,5 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import {
@@ -14,7 +15,7 @@ import { SimDynamoDbUpdate } from "./sim-dynamodb-update.js";
 
 interface SimDynamoDbUpdateParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 }
 

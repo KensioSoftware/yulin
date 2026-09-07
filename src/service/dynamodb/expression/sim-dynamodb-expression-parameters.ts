@@ -2,6 +2,7 @@ import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { readSimDynamoDbValue } from "../item/sim-dynamodb-value-reader.js";
 import type { SimDynamoDbValue } from "../item/sim-dynamodb-value.js";
+import { SimDynamoDbExpressionAttributes } from "./sim-dynamodb-expression-attributes.js";
 import { SimDynamoDbExpressionPlaceholders } from "./sim-dynamodb-expression-placeholders.js";
 
 /**
@@ -28,12 +29,19 @@ export class SimDynamoDbExpressionParameters {
   public readonly names: SimDynamoDbExpressionPlaceholders<string>;
   public readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 
+  /**
+   * The attribute names the request's expressions reach, gathered as they are
+   * read. Authorization asks for these as `dynamodb:Attributes`.
+   */
+  public readonly attributes: SimDynamoDbExpressionAttributes;
+
   constructor(input: SimDynamoDbExpressionParameterInput) {
     this.names = new SimDynamoDbExpressionPlaceholders({
       parameterName: "ExpressionAttributeNames",
       marker: "#",
       entries: input.ExpressionAttributeNames,
     });
+    this.attributes = new SimDynamoDbExpressionAttributes(this.names);
     this.values = new SimDynamoDbExpressionPlaceholders({
       parameterName: "ExpressionAttributeValues",
       marker: ":",

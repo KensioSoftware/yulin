@@ -43,7 +43,7 @@ export class SimDynamoDbTransactRead {
     return new this(
       request.TableName,
       readSimDynamoDbKey(request.Key),
-      readSimDynamoDbProjection(request),
+      readSimDynamoDbProjection(request).projection,
     );
   }
 

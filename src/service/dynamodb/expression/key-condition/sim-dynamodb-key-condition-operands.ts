@@ -1,4 +1,5 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { simDynamoDbKeyConditionError } from "./sim-dynamodb-key-condition-error.js";
@@ -23,7 +24,7 @@ const keyComparators: ReadonlySet<string> = new Set([
 
 interface SimDynamoDbKeyConditionOperandsProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
   readonly refusals: SimDynamoDbKeyConditionRefusals;
 }
@@ -37,13 +38,13 @@ interface SimDynamoDbKeyConditionOperandsProperties {
  */
 export class SimDynamoDbKeyConditionOperands {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly attributes: SimDynamoDbExpressionAttributes;
   private readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
   private readonly refusals: SimDynamoDbKeyConditionRefusals;
 
   constructor(properties: SimDynamoDbKeyConditionOperandsProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.attributes = properties.attributes;
     this.values = properties.values;
     this.refusals = properties.refusals;
   }
@@ -111,10 +112,13 @@ export class SimDynamoDbKeyConditionOperands {
    * The attribute a name token stands for, which may be a placeholder.
    */
   private nameOf(kind: string, text: string): string {
-    if (kind === "name") {
-      return text;
-    }
+    const name = kind === "name" ? text : this.attributes.required(text);
 
-    return this.names.required(text);
+    // A key condition reads no document paths, so the attributes it reaches
+    // are noted here rather than by the path parser. A key is scalar, and the
+    // attribute a term names is always a top-level one.
+    this.attributes.reach(name);
+
+    return name;
   }
 }

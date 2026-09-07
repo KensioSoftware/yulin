@@ -14,6 +14,9 @@ export interface SimDynamoDbQueryExpressions {
   readonly terms: SimDynamoDbKeyConditionTerms;
   readonly filter: SimDynamoDbFilter | undefined;
   readonly projection: SimDynamoDbProjection | undefined;
+
+  /** The top-level attributes the expressions named, for `dynamodb:Attributes`. */
+  readonly attributes: readonly string[];
 }
 
 /**
@@ -39,7 +42,12 @@ export function readSimDynamoDbQueryExpressions(
 
   parameters.assertAllUsed();
 
-  return { terms, filter, projection };
+  return {
+    terms,
+    filter,
+    projection,
+    attributes: parameters.attributes.topLevel,
+  };
 }
 
 /**

@@ -8,6 +8,10 @@ import type {
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { refuseUnsimulatedItemReadInput } from "./sim-dynamodb-unsimulated-item-read-input.js";
 import { readSimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection-expression.js";
+import {
+  simDynamoDbAttributesOf,
+  simDynamoDbItemAttributeNames,
+} from "../authorize/sim-dynamodb-attributes.js";
 
 interface SimDynamoDbGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -48,12 +52,21 @@ export class SimDynamoDbGetItem {
 
     // The projection is read before the table is reached, so an expression
     // DynamoDB would refuse is refused whether or not the key holds anything.
-    const projection = readSimDynamoDbProjection(input);
+    const read = readSimDynamoDbProjection(input);
+    const projection = read.projection;
     const table = this.access.required(
       "dynamodb:GetItem",
       input.TableName,
       options?.caller,
-      simDynamoDbLeadingKeysOf(() => [readSimDynamoDbKey(input.Key)]),
+      {
+        leadingKeys: simDynamoDbLeadingKeysOf(() => [
+          readSimDynamoDbKey(input.Key),
+        ]),
+        attributes: simDynamoDbAttributesOf(
+          read.attributes,
+          simDynamoDbItemAttributeNames(() => [readSimDynamoDbKey(input.Key)]),
+        ),
+      },
     );
     const found = table.getItem(readSimDynamoDbKey(input.Key));
 

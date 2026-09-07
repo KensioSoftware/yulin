@@ -63,6 +63,7 @@ export class SimDynamoDbScan {
       "dynamodb:Scan",
       input.TableName,
       options?.caller,
+      { attributes: expressions.attributes },
     );
 
     // What is being read is settled here: the table, or one of its indexes.

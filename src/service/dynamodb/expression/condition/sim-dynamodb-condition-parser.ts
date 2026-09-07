@@ -1,5 +1,6 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import {
@@ -14,7 +15,7 @@ import { SimDynamoDbConditionOperandParser } from "./sim-dynamodb-condition-oper
 
 interface SimDynamoDbConditionParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 }
 
@@ -38,7 +39,7 @@ export class SimDynamoDbConditionParser {
   constructor(properties: SimDynamoDbConditionParserProperties) {
     const operands = new SimDynamoDbConditionOperandParser({
       tokens: properties.tokens,
-      names: properties.names,
+      attributes: properties.attributes,
       values: properties.values,
     });
 

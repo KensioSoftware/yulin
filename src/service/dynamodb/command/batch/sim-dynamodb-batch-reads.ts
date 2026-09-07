@@ -3,20 +3,16 @@ import { readSimDynamoDbProjection } from "../../expression/projection/sim-dynam
 import type { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { readSimDynamoDbKey } from "../item/sim-dynamodb-key-input.js";
-import type { SimDynamoDbKeysAndAttributes } from "./batch.command.js";
 import {
-  readSimDynamoDbBatchRequestItems,
-  type SimDynamoDbBatchTableRequest,
-} from "./sim-dynamodb-batch-request-items.js";
+  simDynamoDbAttributesOf,
+  simDynamoDbItemAttributeNames,
+} from "../authorize/sim-dynamodb-attributes.js";
+import type { SimDynamoDbKeysAndAttributes } from "./batch.command.js";
+import { readSimDynamoDbBatchRequestItems } from "./sim-dynamodb-batch-request-items.js";
+import { assertSimDynamoDbBatchReadLimit } from "./sim-dynamodb-batch-read-limit.js";
 import { refuseUnsimulatedBatchKeysAndAttributes } from "./sim-dynamodb-unsimulated-batch-input.js";
 
 const operation = "BatchGetItem";
-
-/**
- * Real DynamoDB reads 100 items in one batch, counted across every table the
- * request names rather than per table.
- */
-const greatestKeys = 100;
 
 /**
  * What a batch read asks one table for.
@@ -28,6 +24,9 @@ export interface SimDynamoDbBatchTableReads {
   readonly reference: string;
   readonly keys: readonly SimDynamoDbItem[];
   readonly projection: SimDynamoDbProjection | undefined;
+
+  /** The top-level attributes this table is asked for, per table as above. */
+  readonly attributes: readonly string[];
 }
 
 /**
@@ -43,32 +42,22 @@ export function readSimDynamoDbBatchReads(
 ): readonly SimDynamoDbBatchTableReads[] {
   const tables = readSimDynamoDbBatchRequestItems(requestItems, operation);
 
-  assertWithinKeyLimit(tables);
+  assertSimDynamoDbBatchReadLimit(tables, operation);
 
-  return tables.map(({ reference, requested }) => ({
-    reference,
-    keys: readTableKeys(reference, requested),
-    projection: readSimDynamoDbProjection(requested),
-  }));
-}
+  return tables.map(({ reference, requested }) => {
+    const keys = readTableKeys(reference, requested);
+    const read = readSimDynamoDbProjection(requested);
 
-/**
- * Refuse a batch asking for more items than DynamoDB reads at once.
- */
-function assertWithinKeyLimit(
-  tables: readonly SimDynamoDbBatchTableRequest<SimDynamoDbKeysAndAttributes>[],
-): void {
-  const total = tables.reduce(
-    (count, { requested }) => count + (requested.Keys ?? []).length,
-    0,
-  );
-
-  if (total > greatestKeys) {
-    throw new SimDynamoDbValidationException(
-      `Too many items requested for the ${operation} call: ${total.toString()} ` +
-        `keys, where ${greatestKeys.toString()} is the most a batch reads`,
-    );
-  }
+    return {
+      reference,
+      keys,
+      projection: read.projection,
+      attributes: simDynamoDbAttributesOf(
+        read.attributes,
+        simDynamoDbItemAttributeNames(() => keys),
+      ),
+    };
+  });
 }
 
 /**

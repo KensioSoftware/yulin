@@ -29,7 +29,7 @@ describe("readSimDynamoDbProjection", () => {
     // Given a request asking for the whole item.
     // When the projection is read, then there is none, so nothing cuts the
     // item down.
-    assertUndefined(readSimDynamoDbProjection({}));
+    assertUndefined(readSimDynamoDbProjection({}).projection);
   });
 
   it("refuses names with no expression before it looks at their keys", () => {

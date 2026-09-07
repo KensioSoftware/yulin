@@ -11,6 +11,9 @@ import type { SimScanCommandInput } from "./scan.command.js";
 export interface SimDynamoDbScanExpressions {
   readonly filter: SimDynamoDbFilter | undefined;
   readonly projection: SimDynamoDbProjection | undefined;
+
+  /** The top-level attributes the expressions named, for `dynamodb:Attributes`. */
+  readonly attributes: readonly string[];
 }
 
 /**
@@ -39,7 +42,7 @@ export function readSimDynamoDbScanExpressions(
   ) {
     SimDynamoDbExpressionParameters.assertNoneWithout(input);
 
-    return { filter: undefined, projection: undefined };
+    return { filter: undefined, projection: undefined, attributes: [] };
   }
 
   const parameters = new SimDynamoDbExpressionParameters(input);
@@ -48,7 +51,7 @@ export function readSimDynamoDbScanExpressions(
 
   parameters.assertAllUsed();
 
-  return { filter, projection };
+  return { filter, projection, attributes: parameters.attributes.topLevel };
 }
 
 /**

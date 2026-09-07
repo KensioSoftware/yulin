@@ -6,27 +6,8 @@ import type { SimDynamoDbTableName } from "../../table/sim-dynamodb-table-name.j
 import { readSimDynamoDbTableReference } from "../../table/sim-dynamodb-table-reference.js";
 import type { SimDynamoDbTableStore } from "../../table/sim-dynamodb-table-store.js";
 import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
-import type { SimDynamoDbLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
-
-/**
- * Read the partition key values a request reaches, or none where they cannot
- * be read.
- *
- * Authorization runs ahead of the checks a command makes on what it was given,
- * as it does on AWS. A request whose key or key condition is malformed is
- * authorized carrying no values and refused by the check that follows, so
- * whatever reading them throws is dropped here.
- */
-function readLeadingKeys(
-  leadingKeys: SimDynamoDbLeadingKeys | undefined,
-  table: SimDynamoDbTable,
-): readonly string[] | undefined {
-  try {
-    return leadingKeys?.(table);
-  } catch {
-    return undefined;
-  }
-}
+import type { SimDynamoDbTableReach } from "./sim-dynamodb-table-reach.js";
+import { simDynamoDbReachedIn } from "./sim-dynamodb-table-reach.js";
 
 interface SimDynamoDbTableAccessProperties {
   readonly tables: SimDynamoDbTableStore;
@@ -73,13 +54,13 @@ export class SimDynamoDbTableAccess {
     action: string,
     tableName: string | undefined,
     caller: SimAwsCaller | undefined,
-    leadingKeys?: SimDynamoDbLeadingKeys,
+    reach: SimDynamoDbTableReach = {},
   ): SimDynamoDbTable {
     return this.requiredByName(
       action,
       this.reference(tableName),
       caller,
-      leadingKeys,
+      reach,
     );
   }
 
@@ -94,7 +75,7 @@ export class SimDynamoDbTableAccess {
     action: string,
     name: SimDynamoDbTableName,
     caller: SimAwsCaller | undefined,
-    leadingKeys?: SimDynamoDbLeadingKeys,
+    reach: SimDynamoDbTableReach = {},
   ): SimDynamoDbTable {
     const table = this.tables.find(name);
 
@@ -102,7 +83,7 @@ export class SimDynamoDbTableAccess {
       action,
       name.value,
       caller,
-      table === undefined ? undefined : readLeadingKeys(leadingKeys, table),
+      simDynamoDbReachedIn(reach, table),
     );
 
     if (table === undefined) {

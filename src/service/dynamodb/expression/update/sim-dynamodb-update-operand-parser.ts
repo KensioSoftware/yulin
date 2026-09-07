@@ -1,5 +1,6 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { SimDynamoDbArithmeticOperand } from "./sim-dynamodb-update-computed-operand.js";
@@ -18,7 +19,7 @@ const operators: ReadonlySet<string> = new Set(["+", "-"]);
 
 interface SimDynamoDbUpdateOperandParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 }
 
@@ -35,13 +36,13 @@ interface SimDynamoDbUpdateOperandParserProperties {
  */
 export class SimDynamoDbUpdateOperandParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly attributes: SimDynamoDbExpressionAttributes;
   private readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
   private readonly functions: SimDynamoDbUpdateFunctionParser;
 
   constructor(properties: SimDynamoDbUpdateOperandParserProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.attributes = properties.attributes;
     this.values = properties.values;
     this.functions = new SimDynamoDbUpdateFunctionParser({
       tokens: properties.tokens,
@@ -116,7 +117,7 @@ export class SimDynamoDbUpdateOperandParser {
     return new SimDynamoDbUpdatePathOperand(
       new SimDynamoDbDocumentPathParser({
         tokens: this.tokens,
-        names: this.names,
+        attributes: this.attributes,
       }).parse(),
     );
   }

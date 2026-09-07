@@ -1,4 +1,5 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { SimDynamoDbBeginsWithKeyTerm } from "./sim-dynamodb-begins-with-key-term.js";
@@ -10,7 +11,7 @@ import type { SimDynamoDbKeyConditionTerm } from "./sim-dynamodb-key-condition-t
 
 interface SimDynamoDbKeyConditionParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 }
 
@@ -40,7 +41,7 @@ export class SimDynamoDbKeyConditionParser {
     this.refusals = refusals;
     this.operands = new SimDynamoDbKeyConditionOperands({
       tokens: properties.tokens,
-      names: properties.names,
+      attributes: properties.attributes,
       values: properties.values,
       refusals,
     });

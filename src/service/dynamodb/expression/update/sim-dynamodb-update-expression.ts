@@ -23,7 +23,7 @@ export function parseSimDynamoDbUpdate(
       expression,
       "the expression says nothing, and an expression cannot be empty",
     ),
-    names: parameters.names,
+    attributes: parameters.attributes,
     values: parameters.values,
   }).parse();
 }

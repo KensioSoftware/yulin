@@ -68,7 +68,10 @@ export class SimDynamoDbBatchGetItem {
         access: this.access,
         operation: "BatchGetItem",
         caller: options?.caller,
-        leadingKeys: (entry) => simDynamoDbLeadingKeysOf(() => entry.keys),
+        reached: (entry) => ({
+          leadingKeys: simDynamoDbLeadingKeysOf(() => entry.keys),
+          attributes: entry.attributes,
+        }),
       },
     );
     const responses = Object.fromEntries(

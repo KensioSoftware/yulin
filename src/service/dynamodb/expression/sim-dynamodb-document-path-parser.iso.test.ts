@@ -10,6 +10,7 @@ import { describe, it } from "vitest";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { SimDynamoDbDocumentPathParser } from "./sim-dynamodb-document-path-parser.js";
 import type { SimDynamoDbDocumentPath } from "./sim-dynamodb-document-path.js";
+import { SimDynamoDbExpressionAttributes } from "./sim-dynamodb-expression-attributes.js";
 import { SimDynamoDbExpressionPlaceholders } from "./sim-dynamodb-expression-placeholders.js";
 import { SimDynamoDbExpressionTokeniser } from "./sim-dynamodb-expression-tokeniser.js";
 import { SimDynamoDbExpressionTokens } from "./sim-dynamodb-expression-tokens.js";
@@ -32,11 +33,13 @@ function parsePath(
 
   return new SimDynamoDbDocumentPathParser({
     tokens,
-    names: new SimDynamoDbExpressionPlaceholders({
-      parameterName: "ExpressionAttributeNames",
-      marker: "#",
-      entries,
-    }),
+    attributes: new SimDynamoDbExpressionAttributes(
+      new SimDynamoDbExpressionPlaceholders({
+        parameterName: "ExpressionAttributeNames",
+        marker: "#",
+        entries,
+      }),
+    ),
   }).parse();
 }
 

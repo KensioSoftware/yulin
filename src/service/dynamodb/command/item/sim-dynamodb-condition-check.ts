@@ -27,6 +27,7 @@ interface SimDynamoDbConditionCheckInput {
 interface SimDynamoDbConditionCheckProperties {
   readonly condition: SimDynamoDbCondition | undefined;
   readonly reportsItem: boolean;
+  readonly attributeNames: readonly string[];
 }
 
 /**
@@ -37,12 +38,18 @@ interface SimDynamoDbConditionCheckProperties {
  * be nothing: that is what makes `attribute_not_exists` an insert if absent.
  */
 export class SimDynamoDbConditionCheck {
+  /**
+   * The top-level attributes the condition named, for `dynamodb:Attributes`.
+   */
+  public readonly attributeNames: readonly string[];
+
   private readonly condition: SimDynamoDbCondition | undefined;
   private readonly reportsItem: boolean;
 
   private constructor(properties: SimDynamoDbConditionCheckProperties) {
     this.condition = properties.condition;
     this.reportsItem = properties.reportsItem;
+    this.attributeNames = properties.attributeNames;
   }
 
   /**
@@ -55,7 +62,9 @@ export class SimDynamoDbConditionCheck {
     input: SimDynamoDbConditionCheckInput,
     operation: string,
   ): SimDynamoDbConditionCheck {
-    return this.of(readSimDynamoDbCondition(input), input, operation);
+    const read = readSimDynamoDbCondition(input);
+
+    return this.of(read.condition, input, operation, read.attributes);
   }
 
   /**
@@ -68,10 +77,12 @@ export class SimDynamoDbConditionCheck {
     condition: SimDynamoDbCondition | undefined,
     input: SimDynamoDbConditionCheckInput,
     operation: string,
+    attributeNames: readonly string[] = [],
   ): SimDynamoDbConditionCheck {
     return new this({
       condition,
       reportsItem: this.reportsItemFor(input, operation),
+      attributeNames,
     });
   }
 
