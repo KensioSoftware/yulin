@@ -13,9 +13,14 @@ import { simIamStringValues } from "../string/sim-iam-string-values.js";
  * absent key here, ahead of the rule that a negated operator matches one.
  */
 export class SimIamNegatedForAnyValueStringOperator implements SimIamConditionOperator {
-  readonly matchesAbsentKey = false;
-
   constructor(private readonly comparison: SimIamStringComparison) {}
+
+  /**
+   * Answer for a request carrying no value for the key.
+   */
+  matchesAbsentKey(): boolean {
+    return false;
+  }
 
   /**
    * Check whether any request value differs from every policy value.

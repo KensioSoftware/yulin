@@ -91,7 +91,7 @@ export class SimIamPolicyConditionMatcher {
     const actual = this.conditionContext.get(this.normalizeContextKey(key));
 
     if (actual === undefined) {
-      return operator.matchesAbsentKey;
+      return operator.matchesAbsentKey(expected);
     }
 
     return operator.matches(actual, expected);

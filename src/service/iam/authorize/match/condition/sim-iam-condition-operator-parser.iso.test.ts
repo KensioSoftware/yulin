@@ -19,6 +19,14 @@ const positiveKeywords = ["StringEquals", "StringLike"];
 
 const setQualifiers = ["ForAnyValue", "ForAllValues"];
 
+/**
+ * A policy value to ask the absent-key question with.
+ *
+ * Only `Null` reads the value it is asked about. Every comparison operator
+ * answers the same way whatever the policy says.
+ */
+const policyValue = "arn:aws:iam::123456789012:role/OrdersService";
+
 describe("sim IAM condition operator parsing", () => {
   it("has an operator for every form of every negated keyword", () => {
     // Given the keywords a service control policy writes a carve-out with
@@ -41,11 +49,12 @@ describe("sim IAM condition operator parsing", () => {
     // Given the same keywords
     const parser = new SimIamConditionOperatorParser();
 
-    // When each form is asked whether an absent context key matches it
+    // When each form is asked whether an absent context key matches it. The
+    // policy value goes unread by every operator but `Null`
     const matchesAbsentKey = negatedKeywords.flatMap((keyword) => [
-      parser.parse(keyword)?.matchesAbsentKey,
-      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey,
-      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey,
+      parser.parse(keyword)?.matchesAbsentKey(policyValue),
+      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey(policyValue),
+      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey(policyValue),
     ]);
 
     // Then only the `ForAnyValue` forms answer false, because no request value
@@ -62,9 +71,9 @@ describe("sim IAM condition operator parsing", () => {
 
     // When each form is asked whether an absent context key matches it
     const matchesAbsentKey = positiveKeywords.flatMap((keyword) => [
-      parser.parse(keyword)?.matchesAbsentKey,
-      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey,
-      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey,
+      parser.parse(keyword)?.matchesAbsentKey(policyValue),
+      parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey(policyValue),
+      parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey(policyValue),
     ]);
 
     // Then only the `ForAllValues` forms answer true. AWS matches those where
@@ -73,6 +82,20 @@ describe("sim IAM condition operator parsing", () => {
       matchesAbsentKey,
       positiveKeywords.flatMap(() => [false, true, false]),
     );
+  });
+
+  it("reads a Null policy value rather than answering a constant", () => {
+    // Given the parser
+    const parser = new SimIamConditionOperatorParser();
+
+    // When `Null` is asked whether an absent context key matches each of the
+    // two values AWS documents for it
+    const operator = parser.parse("Null");
+
+    // Then the answer follows the policy value, which is the one operator that
+    // reads it
+    assertTrue(operator?.matchesAbsentKey("true") === true);
+    assertTrue(operator?.matchesAbsentKey("false") === false);
   });
 
   it("has no operator for a keyword it cannot evaluate", () => {
