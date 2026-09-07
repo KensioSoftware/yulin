@@ -4,6 +4,24 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simDynamoDbTableArn } from "../../table/sim-dynamodb-table-arn.js";
+import { simDynamoDbLeadingKeysConditionKey } from "./sim-dynamodb-leading-keys.js";
+
+/**
+ * The condition values a request carries for the table it names.
+ *
+ * A request reaching no partition key value supplies none rather than an empty
+ * list, leaving the key absent from the context as it is on AWS for an
+ * operation that names no item.
+ */
+function conditionContextOf(
+  leadingKeys: readonly string[] | undefined,
+): Readonly<Record<string, readonly string[]>> {
+  if (leadingKeys === undefined || leadingKeys.length === 0) {
+    return {};
+  }
+
+  return { [simDynamoDbLeadingKeysConditionKey]: leadingKeys };
+}
 
 interface SimDynamoDbAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -42,11 +60,13 @@ export class SimDynamoDbAuthorizer {
     action: string,
     tableName: string,
     caller?: SimAwsCaller,
+    leadingKeys?: readonly string[],
   ): SimAwsResolvedCaller {
     return this.authorizeResource(
       action,
       simDynamoDbTableArn(this.accountRegionScope, tableName),
       caller,
+      leadingKeys,
     );
   }
 
@@ -85,8 +105,14 @@ export class SimDynamoDbAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
+    leadingKeys?: readonly string[],
   ): SimAwsResolvedCaller {
-    const decision = this.iam.authorize({ action, resource, caller });
+    const decision = this.iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext: conditionContextOf(leadingKeys),
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({

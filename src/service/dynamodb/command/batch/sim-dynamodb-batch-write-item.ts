@@ -8,6 +8,7 @@ import { assertDistinctBatchItems } from "./sim-dynamodb-batch-request-items.js"
 import { reachSimDynamoDbBatchTables } from "./sim-dynamodb-batch-tables.js";
 import { readSimDynamoDbBatchWrites } from "./sim-dynamodb-batch-writes.js";
 import { refuseUnsimulatedBatchWriteInput } from "./sim-dynamodb-unsimulated-batch-input.js";
+import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
 
 const operation = "BatchWriteItem";
 
@@ -50,7 +51,15 @@ export class SimDynamoDbBatchWriteItem {
 
     const reached = reachSimDynamoDbBatchTables(
       readSimDynamoDbBatchWrites(input.RequestItems),
-      { access: this.access, operation, caller: options?.caller },
+      {
+        access: this.access,
+        operation,
+        caller: options?.caller,
+        leadingKeys: (entry) =>
+          simDynamoDbLeadingKeysOf(() =>
+            entry.writes.map((write) => write.names),
+          ),
+      },
     );
 
     // Marshalling every key checks it against the table's key schema, and is

@@ -2,6 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
+import type { SimDynamoDbLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
 
 /**
  * What one table of a batch asks for, against the table it names.
@@ -11,10 +12,18 @@ export interface SimDynamoDbBatchTable<Requested> {
   readonly requested: Requested;
 }
 
-interface SimDynamoDbBatchReach {
+interface SimDynamoDbBatchReach<Requested> {
   readonly access: SimDynamoDbTableAccess;
   readonly operation: string;
   readonly caller: SimAwsCaller | undefined;
+
+  /**
+   * How to read the partition key values one table of the batch is asked for.
+   *
+   * Each table is authorized on its own, so each carries the keys the batch
+   * names in that table and no others.
+   */
+  readonly leadingKeys: (requested: Requested) => SimDynamoDbLeadingKeys;
 }
 
 /**
@@ -30,11 +39,16 @@ export function reachSimDynamoDbBatchTables<
   Requested extends { readonly reference: string },
 >(
   requested: readonly Requested[],
-  reach: SimDynamoDbBatchReach,
+  reach: SimDynamoDbBatchReach<Requested>,
 ): readonly SimDynamoDbBatchTable<Requested>[] {
   const action = `dynamodb:${reach.operation}`;
   const reached = requested.map((entry) => ({
-    table: reach.access.required(action, entry.reference, reach.caller),
+    table: reach.access.required(
+      action,
+      entry.reference,
+      reach.caller,
+      reach.leadingKeys(entry),
+    ),
     requested: entry,
   }));
 
