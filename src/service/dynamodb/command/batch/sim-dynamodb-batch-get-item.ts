@@ -17,6 +17,7 @@ import {
   type SimDynamoDbBatchTable,
 } from "./sim-dynamodb-batch-tables.js";
 import { refuseUnsimulatedBatchReadInput } from "./sim-dynamodb-unsimulated-batch-input.js";
+import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
 
 interface SimDynamoDbBatchGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -67,6 +68,7 @@ export class SimDynamoDbBatchGetItem {
         access: this.access,
         operation: "BatchGetItem",
         caller: options?.caller,
+        leadingKeys: (entry) => simDynamoDbLeadingKeysOf(() => entry.keys),
       },
     );
     const responses = Object.fromEntries(

@@ -3637,6 +3637,101 @@ unauthorized caller cannot find out which names are taken.
 in the same way, each against the `dynamodb:` action of its own name. `ListTables` names no table.
 It authorizes against `*`.
 
+### Fine-grained access control with dynamodb:LeadingKeys
+
+`GetItem`, `BatchGetItem`, `Query`, `PutItem`, `UpdateItem`, `DeleteItem` and `BatchWriteItem`
+supply the partition key values they reach as `dynamodb:LeadingKeys`. A policy conditioned on that
+key restricts a caller to the items under particular partition keys. AWS scopes one user of a
+shared table to their own rows this way.
+
+The condition takes the `ForAllValues:` qualifier, as AWS requires for this key. Every partition key
+value the request reaches has to match. A batch or a write naming one item outside the allowed set
+is refused whole, and nothing it asked for is applied.
+
+```typescript sim-dynamodb-leading-keys
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const accountId = simAws.defaultAccountId;
+const region = simAws.defaultRegionName;
+
+await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "customerId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "customerId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+const roleCreation = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "CustomerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "CustomerRole",
+    PolicyName: "OwnItemsOnly",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "dynamodb:PutItem",
+        Resource: `arn:aws:dynamodb:${region}:${accountId}:table/OrdersTable`,
+        Condition: {
+          "ForAllValues:StringEquals": { "dynamodb:LeadingKeys": ["c-1"] },
+        },
+      },
+    }),
+  }),
+);
+
+const caller = { kind: "arn", arn: roleCreation.Role.Arn } as const;
+
+// The customer's own item is written.
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { customerId: { S: "c-1" }, total: { N: "25" } },
+  }),
+  { caller },
+);
+
+// Another customer's item is refused.
+try {
+  await simAws.dynamoDb().putItem(
+    new PutItemCommand({
+      TableName: "OrdersTable",
+      Item: { customerId: { S: "c-2" }, total: { N: "25" } },
+    }),
+    { caller },
+  );
+} catch (error) {
+  console.log(error instanceof Error ? error.name : "unknown error");
+  // "AccessDenied"
+}
+```
+
+Reading the partition key values needs the table's key schema. The table is found first for that,
+before the caller is authorized against it. A caller with no permission still hears `AccessDenied`
+when the table is missing, and an unauthorized caller cannot find out which table names are taken.
+
+A request carrying no readable partition key value leaves the key out of the condition context. A
+`ForAllValues:` condition matches a request carrying no value for its key, as it does on AWS. The
+condition allows such a request.
+
 A transaction is authorized as the operations it is made of rather than as itself. Each action of a
 `TransactWriteItems` needs `dynamodb:PutItem`, `dynamodb:UpdateItem`, `dynamodb:DeleteItem` or
 `dynamodb:ConditionCheckItem` against the table it names, and each `Get` of a `TransactGetItems`
@@ -3657,6 +3752,9 @@ is written.
   answering with the attributes it projects, and paging with a `LastEvaluatedKey` carrying the index
   key and the table key together. A local secondary index also answers a strongly consistent read,
   and fetches an unprojected attribute from the base table.
+- `dynamodb:LeadingKeys` on `GetItem`, `BatchGetItem`, `Query`, `PutItem`, `UpdateItem`,
+  `DeleteItem` and `BatchWriteItem`, carrying the partition key values the request reaches so a
+  `ForAllValues:` condition can scope a caller to particular items.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -3730,6 +3828,16 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 
 ## Limitations
 
+- `dynamodb:LeadingKeys` is the only DynamoDB condition key supplied. `dynamodb:Attributes`,
+  `dynamodb:Select` and `dynamodb:ReturnValues` are absent from the condition context, and a
+  statement conditioned on one of them matches no request. The transactional operations supply no
+  leading keys either, and are authorized by action and table alone.
+- A partition key value reaches a policy condition as a string for a `S` key and as its digits for
+  an `N` key. A binary partition key has no documented form for the condition key. A request
+  carrying one leaves the value out.
+- A request against a table that is not there is authorized carrying no leading keys, since there is
+  no key schema to read them with. A `ForAllValues:` condition matches such a request. A caller
+  barred only by that condition learns the table is missing.
 - The document client's PartiQL Commands go unconverted, because PartiQL is an operation this
   simulation lacks yet. `ExecuteStatementCommand`, `BatchExecuteStatementCommand` and
   `ExecuteTransactionCommand` are refused by name, never half converted.

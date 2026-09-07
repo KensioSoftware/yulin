@@ -335,6 +335,11 @@ matches instead, as AWS documents. With no value in the request there is none fo
 to equal. A `ForAnyValue:` operator answers false for an absent key whatever it wraps, because no
 request value is there to satisfy it.
 
+A `ForAllValues:` operator answers true for an absent key, which is also AWS behaviour. Every value
+the request carries matches when it carries none. AWS warns that this leaves a `ForAllValues:`
+`Allow` overly permissive, and asks for a `Null` check with a `false` value beside it. `Null` is
+absent from the operators above. A statement written that way fails closed here.
+
 ### Statements left unevaluated
 
 An operator from outside the list above fails closed. The statement holding it matches nothing, and
@@ -1684,8 +1689,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request. `decision.unevaluatedStatements` names those statements, and a
   test can assert that a decision was reached over policies read in full
-- A positive `ForAllValues:` condition fails to match a request carrying no value for the key, and
-  fails to match an empty value set. AWS matches both, and the negated form here matches both
+- A positive `ForAllValues:` condition fails to match an empty value set, where AWS matches one. An
+  absent context key matches, as it does on AWS. A service here leaves a key out where the request
+  carries no value for it, and the empty set is reached only by a caller passing one to `authorize`
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
   with the credential scope date, but is never compared to a clock. A client stamping real time can
   therefore reach a simulation keeping a different one. Session expiry _is_ enforced, against

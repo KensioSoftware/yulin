@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
+import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
 import type {
   SimUpdateItemCommand,
   SimUpdateItemCommandOutput,
@@ -54,6 +55,7 @@ export class SimDynamoDbUpdateItem {
       "dynamodb:UpdateItem",
       input.TableName,
       options?.caller,
+      simDynamoDbLeadingKeysOf(() => [readSimDynamoDbKey(input.Key)]),
     );
     const asked = SimDynamoDbReturnValues.readForUpdate(
       input.ReturnValues,

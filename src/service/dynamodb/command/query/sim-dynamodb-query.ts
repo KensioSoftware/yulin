@@ -4,6 +4,7 @@ import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
 import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
+import { simDynamoDbLeadingKeyOf } from "../authorize/sim-dynamodb-leading-keys.js";
 import type {
   SimQueryCommand,
   SimQueryCommandOutput,
@@ -53,10 +54,19 @@ export class SimDynamoDbQuery {
     refuseSimDynamoDbQuerySegment(input);
 
     const expressions = readSimDynamoDbQueryExpressions(input);
+
+    // The one partition key the query reads is what authorization needs, and
+    // reading it needs the view rather than the table, so it is read again
+    // here against whichever of the two the request names.
     const table = this.access.required(
       "dynamodb:Query",
       input.TableName,
       options?.caller,
+      (reached) =>
+        simDynamoDbLeadingKeyOf(
+          expressions.terms.forTable(reached.view(input.IndexName))
+            .partitionKeyValue,
+        ),
     );
 
     // What is being read is settled here: the table, or one of its indexes. An

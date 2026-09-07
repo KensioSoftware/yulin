@@ -17,6 +17,12 @@ import type {
  */
 export interface SimDynamoDbBatchWrite {
   /**
+   * The item or key this write names, which is where a policy condition reads
+   * its partition key value from.
+   */
+  readonly names: SimDynamoDbItem;
+
+  /**
    * The primary key this write works on, as the table marshals it.
    */
   keyIn(table: SimDynamoDbTable): string;
@@ -31,18 +37,18 @@ export interface SimDynamoDbBatchWrite {
  * A put in a batch write, which replaces the whole item as PutItem does.
  */
 class SimDynamoDbBatchPut implements SimDynamoDbBatchWrite {
-  private readonly item: SimDynamoDbItem;
+  public readonly names: SimDynamoDbItem;
 
   constructor(item: SimDynamoDbItem) {
-    this.item = item;
+    this.names = item;
   }
 
   keyIn(table: SimDynamoDbTable): string {
-    return table.keyOfItem(this.item);
+    return table.keyOfItem(this.names);
   }
 
   applyTo(table: SimDynamoDbTable): void {
-    table.putItem(this.item);
+    table.putItem(this.names);
   }
 }
 
@@ -51,18 +57,18 @@ class SimDynamoDbBatchPut implements SimDynamoDbBatchWrite {
  * that is already free is deleted successfully.
  */
 class SimDynamoDbBatchDelete implements SimDynamoDbBatchWrite {
-  private readonly key: SimDynamoDbItem;
+  public readonly names: SimDynamoDbItem;
 
   constructor(key: SimDynamoDbItem) {
-    this.key = key;
+    this.names = key;
   }
 
   keyIn(table: SimDynamoDbTable): string {
-    return table.keyOfKey(this.key);
+    return table.keyOfKey(this.names);
   }
 
   applyTo(table: SimDynamoDbTable): void {
-    table.deleteItem(this.key);
+    table.deleteItem(this.names);
   }
 }
 
