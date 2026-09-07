@@ -306,6 +306,31 @@ describe("DynamoDB dynamodb:LeadingKeys authorization", () => {
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
+  it("refuses a caller before checking the key it named", async () => {
+    // Given a caller allowed nothing, and a table it names an item of.
+    const simAws = new SimAws();
+    await simDynamoDbStockedTableFactory.make({}, simAws);
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "NoItemsRole" },
+      simAws,
+    );
+
+    // When it reads with no Key at all, which the command refuses on its own.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .dynamoDb()
+        .getItem(
+          { input: { TableName: tableName } },
+          { caller: { kind: "arn", arn: role.Arn } },
+        ),
+    );
+
+    // Then it hears AccessDenied rather than what was wrong with the request.
+    // Reading the partition key values happens before authorization, and a
+    // request too malformed to read them from is authorized carrying none.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
   it("allows a request naming no partition key value it can read", async () => {
     // Given a caller scoped to one customer and a table keyed by binary.
     const simAws = new SimAws();
