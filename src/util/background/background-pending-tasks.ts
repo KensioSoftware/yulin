@@ -66,15 +66,19 @@ export class BackgroundPendingTasks {
   }
 
   /**
-   * Wait until nothing is outstanding but work that is waiting on the clock.
+   * Wait until nothing is outstanding that can still get somewhere.
    *
-   * Work that parks part way through ends the wait rather than extending it:
-   * only moving the clock releases it, and moving the clock is what waits
-   * here. The loop then looks again at what is left running, so work that
-   * carries on is waited for again.
+   * Where simulated time stands still, work that parks on the clock ends the
+   * wait rather than extending it. Only moving the clock releases it, and
+   * moving the clock is what waits here. The loop then looks again at what is
+   * left running, so work that carries on is waited for again.
+   *
+   * A running clock reaches those instants by itself, and the work parked on
+   * them is waited for like any other. What bounds the wait is the instant
+   * itself, which arrives in the real time between here and there.
    */
-  async complete(): Promise<void> {
-    let running = this.running();
+  async complete(clockIsRunning = false): Promise<void> {
+    let running = this.running(clockIsRunning);
 
     while (running.length > 0) {
       // oxlint-disable-next-line no-await-in-loop
@@ -85,20 +89,22 @@ export class BackgroundPendingTasks {
 
       new BackgroundSettledTasks(settled).throwFirstFailure();
 
-      running = this.running();
+      running = this.running(clockIsRunning);
     }
   }
 
   /**
-   * The work completion has anything to wait for, which is whatever is
-   * neither waiting on the clock nor waiting for completion itself.
+   * The work completion has anything to wait for.
    *
    * Work that asks for the simulation to settle from inside itself is left
    * out. A handler advancing the clock is the ordinary case, and waiting for
    * the invocation it is part of would be waiting for itself.
+   *
+   * Work waiting on the clock joins it once simulated time is running, since
+   * a running clock is what brings the instant it waits for.
    */
-  running(): Promise<unknown>[] {
-    return this.#clockWaits.runnable(this.#held);
+  running(clockIsRunning = false): Promise<unknown>[] {
+    return this.#clockWaits.runnable(this.#held, clockIsRunning);
   }
 
   /**

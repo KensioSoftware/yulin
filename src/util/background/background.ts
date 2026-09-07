@@ -200,12 +200,14 @@ export class BackgroundTasks
    * Wait until all tasks currently scheduled have finished.
    * If tasks schedule more tasks, this will continue draining until idle.
    *
-   * Work waiting on the clock is not waited for: it is not outstanding, it is
-   * scheduled for a simulated instant that has not arrived. Only moving the
-   * clock releases it.
+   * What happens to work waiting on the clock follows the clock. Where
+   * simulated time stands still the work stays where it is, scheduled for an
+   * instant only a caller can bring, and this returns without it. Where
+   * simulated time runs, the instant arrives by itself and this waits for the
+   * work to get through it.
    */
   public async complete(): Promise<void> {
-    await this.pending.complete();
+    await this.pending.complete(this.clockIsRunning);
   }
 
   /**
@@ -220,5 +222,14 @@ export class BackgroundTasks
    */
   public get dueTaskCount(): number {
     return this.dueTasks.size;
+  }
+
+  /**
+   * Whether simulated time reaches a scheduled instant on its own.
+   *
+   * A clock with nothing to say about it advances, as the host clock does.
+   */
+  private get clockIsRunning(): boolean {
+    return this.clock.advances !== false;
   }
 }

@@ -24,7 +24,71 @@ import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-po
 const thumbnailerArn =
   "arn:aws:lambda:us-east-1:888888888888:function:thumbnailer";
 
+/** How long a handler in these cases waits on the clock before it works. */
+const handlerDelayMilliseconds = 5;
+
 describe("Delivering a simulated S3 event notification", () => {
+  it("settles a delivery whose handler waits on the clock", async () => {
+    // Given a configured Bucket whose function waits on a timer before it works
+    const simAws = new SimAws();
+    const thumbnailed: string[] = [];
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "thumbnailer",
+        Role: "arn:aws:iam::888888888888:role/ThumbnailerRole",
+        Code: {
+          ZipFile: makeLambdaZipFileInput(async () => {
+            await new Promise((resolve) => {
+              setTimeout(resolve, handlerDelayMilliseconds);
+            });
+            thumbnailed.push("thumbnailed");
+
+            return "thumbnailed";
+          }),
+        },
+      }),
+    );
+    await simAws.lambda().addPermission(
+      new AddPermissionCommand({
+        FunctionName: "thumbnailer",
+        StatementId: "AllowS3",
+        Action: "lambda:InvokeFunction",
+        Principal: "s3.amazonaws.com",
+        SourceArn: "arn:aws:s3:::uploads",
+      }),
+    );
+    await simAws.s3().putBucketNotificationConfiguration(
+      new PutBucketNotificationConfigurationCommand({
+        Bucket: "uploads",
+        NotificationConfiguration: {
+          LambdaFunctionConfigurations: [
+            {
+              Events: ["s3:ObjectCreated:*"],
+              LambdaFunctionArn: thumbnailerArn,
+            },
+          ],
+        },
+      }),
+    );
+
+    // When an Object is written and the simulation is asked to settle once
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "uploads",
+        Key: "cat.jpg",
+        Body: "cat",
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the handler has finished, rather than being left part way through
+    // for a later drain to catch
+    assertArrayLength(thumbnailed, 1);
+  });
+
   it("stops delivering when the permission is removed afterwards", async () => {
     // Given a configured Bucket whose function allowed S3 to invoke it
     const simAws = new SimAws();

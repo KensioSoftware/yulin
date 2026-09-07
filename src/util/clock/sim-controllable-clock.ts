@@ -51,6 +51,20 @@ export class SimControllableClock implements SimClock {
   }
 
   /**
+   * Whether simulated time moves here by itself.
+   *
+   * A frozen clock moves only where something moves it. So does a running
+   * clock over a base that stands still. The offset a running mode applies is
+   * fixed, so simulated time here moves exactly as far as the clock underneath
+   * moves, and a fixed clock underneath moves nowhere. Freezing and resuming
+   * such a clock changes which instant it reports and leaves it as still as it
+   * was.
+   */
+  get advances(): boolean {
+    return !this.mode.isFrozen && this.base.advances !== false;
+  }
+
+  /**
    * Stop simulated time where it currently reads.
    */
   freeze(): void {

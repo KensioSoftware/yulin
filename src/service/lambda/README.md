@@ -308,6 +308,34 @@ code never has its `Date` replaced at all: `Date` is a much busier global than `
 `getRemainingTimeInMillis()` reads the same clock (`sim-lambda-invoke-context-builder.ts`), so a
 stopped clock leaves a handler with a constant budget.
 
+### The timers a handler gets, and what settling does about them
+
+`invoke/timer/` puts a handler's `setTimeout`, `clearTimeout`, `setInterval` and `clearInterval` on
+the simulation's clock. Both paths from the clock section arrive here. Sandboxed zip code is handed
+the substitutes as its own globals, and an in-process handler finds them through the same
+`AsyncLocalStorage` store, resolved by `sim-lambda-process-timers.ts`. Outside an invocation the
+substitutes call the host timers and answer with what they answer.
+
+`SimLambdaClockTimer` holds one instant on two timelines. A test reaches the simulation's queue by
+moving the clock. An unreferenced host timer asks the clock again when the host gets to the delay,
+and that is what makes a running clock reach the instant without anything moving it. Whichever
+timeline arrives first takes the timer off both and runs it once.
+
+A timer with a delay above zero says the invocation is waiting on the clock
+(`SimLambdaInvocationTimers`), and that is what decides whether settling waits for it.
+`BackgroundPendingTasks.complete` leaves clock-waiting work out where simulated time stands still,
+because only a caller moving the clock brings the instant and that caller is the one waiting. A
+running clock brings it by itself, and completion waits for the invocation to get through it. A
+delay of zero is due at the instant the clock already reads and parks nothing.
+
+`SimClock.advances` is what says which of the two a clock is. A frozen mode reports `false`, and so
+does a running mode over a base that stands still, such as the `SimFixedClock` a test hands
+`SimAws`. Waiting on one of those would be waiting for an instant nothing brings.
+
+The function's `Timeout` is a `SimLambdaClockTimer` of its own. It bounds how long completion waits
+for a handler sleeping on a running clock, because the deadline arrives whether the handler does or
+not. See KensioSoftware/yulin#1320 for the drain this contract came from.
+
 ### The HTTP clients function code reaches for
 
 `function/outbound/` owns what happens when function code makes an HTTP request.
@@ -871,6 +899,4 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   variables" above), and the same limitation for a time read there or a request made there
 - outbound HTTP from any client other than `fetch`, `node:http` and `node:https`, and following a
   redirect the simulation answered with
-- timers: `setTimeout` inside a handler is a host timer, not one the simulation's clock releases
-- timeouts interrupting handler execution
 - SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function`
