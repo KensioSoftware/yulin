@@ -1103,10 +1103,17 @@ intercepted send never runs it and the conversion happens at the interception bo
   `convertWithoutMapWrapper`, amount to converting one value at a time with no top-level unwrapping,
   which is what these functions do. The `util-dynamodb` defaults would drop the `M` wrapper off a
   nested object, which is not an attribute value at all.
+- `sim-dynamodb-document-marshall-options.ts` reads the `marshallOptions` a client was built with
+  off its resolved config, where `DynamoDBDocumentClient` keeps them. `SimSdkCommandContext` carries
+  the client the Command was sent through for that. Options are resolved per send, the way the real
+  middleware resolves them. Two document clients over one simulation each convert by their own.
+  `unmarshallOptions` are not read.
 - `sim-dynamodb-document-path.ts` says where in a Command the native values sit, since a Command
   carries ordinary request values everywhere else. `-command-paths.ts` states them per Command,
   mirroring the key nodes the real client declares on its own Commands, which are `protected` and so
-  not read from it.
+  not read from it. An undefined attribute of an item, a key or a set of expression values is left
+  out here rather than in the marshaller. `lib-dynamodb` drops it in `processObj` before `marshall`
+  reaches the value, and `removeUndefinedValues` governs the marshaller alone.
 - `sim-dynamodb-document-route.ts` converts, sends to the ordinary facade method, and converts back.
   `-routes.ts` builds one per Command for the SDK router to merge in.
 
