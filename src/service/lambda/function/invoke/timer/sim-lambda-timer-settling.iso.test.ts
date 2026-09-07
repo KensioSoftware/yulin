@@ -2,6 +2,7 @@ import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertArrayEmpty,
   assertArrayLength,
+  assertNumberBetween,
   assertStringIncludes,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -17,6 +18,14 @@ const startedAt = new Date("2026-09-07T09:00:00.000Z");
 
 /** How long the handler waits on the clock before it does its work. */
 const handlerDelayMilliseconds = 5;
+
+/**
+ * The longest a drain bounded by a one second deadline should take.
+ *
+ * Well under the five second timer the handler asks for, and well over the
+ * deadline, so a loaded host stays inside it.
+ */
+const drainBoundMilliseconds = 4000;
 
 /**
  * A function that waits on the clock and then records that it worked.
@@ -110,6 +119,25 @@ describe("Settling a simulated Lambda invocation that waits on the clock", () =>
     // a fixed clock moves nowhere. The handler is left where a frozen clock
     // leaves one
     assertArrayEmpty(worked);
+  });
+
+  it("bounds the wait for an asynchronous handler by its deadline", async () => {
+    // Given a function with one second to answer in, whose handler waits five
+    // seconds before it works
+    const simAws = new SimAws();
+    const worked: string[] = [];
+    await functionWaitingOnTheClock(simAws, worked, 1, 5000);
+
+    // When it is invoked asynchronously and the simulation is asked to settle
+    const startedAt = Date.now();
+    await invokeAsynchronously(simAws);
+    await simAws.backgroundTasksComplete();
+
+    // Then the handler that ran out of time did no work, and the drain came
+    // back around the deadline rather than waiting out the five second timer.
+    // The bound is loose because it is real time on whatever host runs it
+    assertArrayEmpty(worked);
+    assertNumberBetween(Date.now() - startedAt, 0, drainBoundMilliseconds);
   });
 
   it("still ends a handler whose timer outlives its deadline", async () => {

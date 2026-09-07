@@ -328,6 +328,10 @@ because only a caller moving the clock brings the instant and that caller is the
 running clock brings it by itself, and completion waits for the invocation to get through it. A
 delay of zero is due at the instant the clock already reads and parks nothing.
 
+`SimClock.advances` is what says which of the two a clock is. A frozen mode reports `false`, and so
+does a running mode over a base that stands still, such as the `SimFixedClock` a test hands
+`SimAws`. Waiting on one of those would be waiting for an instant nothing brings.
+
 The function's `Timeout` is a `SimLambdaClockTimer` of its own. It bounds how long completion waits
 for a handler sleeping on a running clock, because the deadline arrives whether the handler does or
 not. See KensioSoftware/yulin#1320 for the drain this contract came from.

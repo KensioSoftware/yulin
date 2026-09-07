@@ -3270,10 +3270,15 @@ interval runs it five times. A delay of zero, or none at all, is due at the inst
 for, and a handler yielding with `setTimeout(resolve, 0)` gets going again without the clock moving.
 
 Where the clock is left running, the delay passes in real time and nothing has to move it.
-`simAws.backgroundTasksComplete()` waits for a handler sleeping on a running clock. An S3 event
-notification, a stream record or an asynchronous invocation whose handler uses a timer has finished
-by the time the drain returns. Under a frozen clock the drain comes back while the handler sleeps,
-and moving the clock is what releases it.
+`simAws.backgroundTasksComplete()` waits for a handler sleeping on a clock that is moving. An S3
+event notification, a stream record or an asynchronous invocation whose handler uses a timer has
+finished by the time the drain returns, and the function's `Timeout` bounds how long that wait can
+last.
+
+Two things leave a clock standing still. `freeze()`, `advanceBy(...)` and `setTo(...)` all leave it
+frozen, and a `SimAws` built on a `SimFixedClock` reports one instant however long the host runs.
+Under either the drain comes back while the handler sleeps, and moving the clock is what releases
+it.
 
 The function's `Timeout` is a deadline on the same clock. Where it arrives before the handler
 answers, the invocation ends in the error the real runtime reports.
