@@ -7,7 +7,11 @@ import {
 import { describe, it } from "vitest";
 
 import { BackgroundTasks } from "./background.js";
+import { SimFixedClock } from "../clock/sim-clock.js";
 import { NonDeterministicBackgroundTasks } from "./non-deterministic-background.js";
+
+/** How long a task in these cases waits for the host to reach an instant. */
+const timerMilliseconds = 5;
 
 describe("work a background scheduler is waiting for", () => {
   it("waits for work a caller started rather than handed over", async () => {
@@ -83,9 +87,12 @@ describe("work a background scheduler is waiting for", () => {
     assertTrue(settled);
   });
 
-  it("stops waiting for a task while it waits on the clock", async () => {
-    // Given a task that goes on to wait for something only the clock brings.
-    const tasks = new BackgroundTasks();
+  it("stops waiting for a task on a clock that stands still", async () => {
+    // Given a simulation whose time moves only where something moves it, and
+    // a task that goes on to wait for something only the clock brings.
+    const tasks = new BackgroundTasks({
+      clock: new SimFixedClock(new Date("2026-01-01T00:00:00.000Z")),
+    });
     const held = Promise.withResolvers<undefined>();
     let release = (): void => {
       //
@@ -109,6 +116,54 @@ describe("work a background scheduler is waiting for", () => {
     release();
     held.resolve(undefined);
     await tasks.complete();
+    assertTrue(finished);
+  });
+
+  it("waits for a task on the clock while simulated time runs", async () => {
+    // Given a running clock and a task waiting on it, released once the host
+    // gets to the instant, as a simulated Lambda handler timer is.
+    const tasks = new BackgroundTasks();
+    const held = Promise.withResolvers<undefined>();
+    let finished = false;
+    tasks.schedule(async () => {
+      const release = tasks.waitingOnClock();
+      setTimeout(() => {
+        release();
+        held.resolve(undefined);
+      }, timerMilliseconds);
+
+      await held.promise;
+      finished = true;
+    });
+
+    // When the simulation is asked to settle.
+    await tasks.complete();
+
+    // Then it waited for the task, because a running clock reaches the instant
+    // on its own and nothing else has to bring it.
+    assertTrue(finished);
+  });
+
+  it("waits for a running clock out of sequence too", async () => {
+    // Given the same, on the scheduler that lets work finish out of order.
+    const tasks = new NonDeterministicBackgroundTasks({ maxJitterMs: 1 });
+    const held = Promise.withResolvers<undefined>();
+    let finished = false;
+    tasks.schedule(async () => {
+      const release = tasks.waitingOnClock();
+      setTimeout(() => {
+        release();
+        held.resolve(undefined);
+      }, timerMilliseconds);
+
+      await held.promise;
+      finished = true;
+    });
+
+    // When the simulation is asked to settle.
+    await tasks.complete();
+
+    // Then it waited for the task here too.
     assertTrue(finished);
   });
 
@@ -158,9 +213,12 @@ describe("work a background scheduler is waiting for", () => {
     });
   });
 
-  it("stops waiting for a task waiting on the clock out of sequence too", async () => {
+  it("stops waiting for a still clock out of sequence too", async () => {
     // Given the same, on the scheduler that lets work finish out of order.
-    const tasks = new NonDeterministicBackgroundTasks({ maxJitterMs: 1 });
+    const tasks = new NonDeterministicBackgroundTasks({
+      maxJitterMs: 1,
+      clock: new SimFixedClock(new Date("2026-01-01T00:00:00.000Z")),
+    });
     const held = Promise.withResolvers<undefined>();
     let release = (): void => {
       //

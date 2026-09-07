@@ -36,17 +36,27 @@ export class BackgroundClockWaits {
   }
 
   /**
-   * The work in a set that is neither waiting on the clock nor the work asking
-   * about it.
+   * The work in a set that completion has anything to wait for.
+   *
+   * The work asking is always left out. Waiting for the invocation the asking
+   * code is part of would be waiting for itself.
+   *
+   * Work waiting on the clock is left out where simulated time stands still,
+   * since only a caller moving the clock brings the instant it waits for, and
+   * that caller is the one waiting here. A running clock reaches the instant on
+   * its own, and this waits for the work to get there.
    */
   runnable(
     held: ReadonlyMap<Promise<unknown>, BackgroundClockWait>,
+    clockIsRunning = false,
   ): Promise<unknown>[] {
     const own = this.storage.getStore();
 
     return held
       .entries()
-      .filter(([, wait]) => wait.count === 0 && wait !== own)
+      .filter(
+        ([, wait]) => wait !== own && (clockIsRunning || wait.count === 0),
+      )
       .map(([promise]) => promise)
       .toArray();
   }

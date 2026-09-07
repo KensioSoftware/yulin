@@ -104,9 +104,13 @@ export class NonDeterministicBackgroundTasks
   /**
    * Wait until all tasks currently scheduled have finished.
    * If tasks schedule more tasks, this will continue draining until idle.
+   *
+   * Work waiting on the clock is waited for where simulated time runs, and
+   * left where it is where simulated time stands still, exactly as it is on
+   * the deterministic scheduler.
    */
   public async complete(): Promise<void> {
-    await this.pending.complete();
+    await this.pending.complete(this.clock.advances !== false);
   }
 
   /**

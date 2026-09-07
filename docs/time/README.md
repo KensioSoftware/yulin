@@ -63,6 +63,12 @@ example, a simulation advanced by one hour continues to run one hour ahead of th
 
 Read `simAws.clock().isFrozen` to check the current mode.
 
+The mode also decides what waiting for the simulation to settle means.
+`simAws.backgroundTasksComplete()` waits for background work sleeping on a running clock, because
+the instant that work sleeps until arrives by itself. Under a frozen clock the same work is left
+where it is, and `advanceBy(...)` or `setTo(...)` is what brings the instant and waits for what
+follows from it.
+
 ## Advancing time
 
 `advanceBy(...)` accepts days, hours, minutes, seconds, and milliseconds. The values are added
