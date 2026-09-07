@@ -431,14 +431,19 @@ on an exact password.
 ## Updating a deployed secret
 
 `Name` is the only property real CloudFormation replaces a secret for. A stack update that changes
-anything else applies it to the deployed secret. The secret keeps its ARN, its versions and its
-value. That matters most for a generated password. A resource that read the secret as the stack deployed,
-such as a CloudFront origin custom header, still holds what the secret holds.
+anything else applies it to the deployed secret, which keeps its ARN and its versions.
+
+A change to the description, the tags or the KMS key leaves the value alone. That is what carries a
+generated password across an update, and it keeps a resource that read the secret as the stack
+deployed, such as a CloudFront origin custom header, holding the value the secret still has.
 
 A new version is written when the template asks for a different value, which is a changed
 `SecretString` or a changed `GenerateSecretString`. A changed `GenerateSecretString` generates a new
-password, as real CloudFormation writes a new version for one. Nothing is written for a change to
-the description or the tags.
+password, as real CloudFormation writes a new version for one. **A resource that resolved the old
+value keeps it.** Its own template entry is unchanged, so the update leaves it alone, and it goes on
+holding what it read at deploy time. A consumer that has to follow the value must read the secret
+when it runs, the way a Lambda function given the secret's ARN does, rather than take a copy through
+a `{{resolve:secretsmanager:...}}` reference.
 
 The template is the desired state. A property the new template leaves out is cleared. A dropped
 `Description` is emptied, and a dropped `KmsKeyId` puts the secret back on the `aws/secretsmanager`
@@ -447,6 +452,12 @@ readable.
 
 Changing the `Name` replaces the secret. The new one is created under the new name and the old one
 is scheduled for deletion, waiting out its recovery window.
+
+A secret is also replaced when a resource it names is replaced, because the update deletes and
+recreates that resource and the secret would otherwise be applied against the one on its way out.
+That replacement then fails, since the name is held for the recovery window. Real CloudFormation
+updates the secret in place and hands it the new physical name. Nothing is applied to the deployed
+secret before the failure.
 
 ## Reading a secret with a dynamic reference
 

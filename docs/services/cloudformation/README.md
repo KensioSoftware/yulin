@@ -454,12 +454,13 @@ every resource naming it is left standing too.
 
 `AWS::SecretsManager::Secret` is the one resource type that does this so far. `Name` is the only
 property real CloudFormation replaces a secret for. A change to anything else is applied to the
-deployed secret, which keeps its ARN, its versions and any generated password across the update.
-Whatever read the value when the stack deployed stays in step with it. See the
-[simulated Secrets Manager docs](https://yulinsim.dev/services/secretsmanager/ "Simulated Secrets Manager usage docs").
+deployed secret, which keeps its ARN and its versions across the update. See the
+[simulated Secrets Manager docs](https://yulinsim.dev/services/secretsmanager/ "Simulated Secrets Manager usage docs")
+for which changes write a new secret version and which leave the value alone.
 
 These changes are applied first, while everything the stack had is still deployed. An update that
-fails on one has deleted nothing yet.
+fails on one has deleted nothing yet. A claimed resource the replacement spread reaches is replaced
+after all, and the claim is taken back, since its dependency is being deleted and created again.
 
 ### Rolling back a failed update
 

@@ -16,6 +16,7 @@ import {
 import { describe, it } from "vitest";
 
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { CfnTemplateBodyRecord } from "../../../cloudformation/template/sim-cfn-template.js";
 import {
   deploySecretStack,
   secretUpdateSimAws,
@@ -26,6 +27,30 @@ import { secretTemplate } from "./sim-cfn-secrets-manager-secret-template.test-s
 describe("Secrets Manager CloudFormation Secret update metadata", () => {
   const secretName = (): string => `edge-credential-${faker.string.uuid()}`;
   const stackName = (): string => `edge-${faker.string.uuid()}`;
+
+  const dependentSecret = (
+    parameterName: string,
+    tag: string,
+  ): CfnTemplateBodyRecord => ({
+    Resources: {
+      EdgeParam: {
+        Type: "AWS::SSM::Parameter",
+        Properties: { Name: parameterName, Type: "String", Value: "x" },
+      },
+      EdgeCredential: {
+        Type: "AWS::SecretsManager::Secret",
+        Properties: {
+          Name: "edge-credential",
+          Description: { "Fn::Join": ["", ["for ", { Ref: "EdgeParam" }]] },
+          Tags: [{ Key: "v", Value: tag }],
+          GenerateSecretString: {
+            SecretStringTemplate: "{}",
+            GenerateStringKey: "current",
+          },
+        },
+      },
+    },
+  });
 
   const kmsAlias = async (simAws: SimAws, alias: string): Promise<void> => {
     const key = await simAws.kms().createKey(new CreateKeyCommand({}));
@@ -231,5 +256,44 @@ describe("Secrets Manager CloudFormation Secret update metadata", () => {
       .getParameter({ input: { Name: name } });
 
     assertIdentical(parameter.Parameter?.Value, "not a secret");
+  });
+  it("takes the claim back when the secret's own dependency is replaced", async () => {
+    // Given a deployed secret whose Description names another Resource.
+    const simAws = secretUpdateSimAws();
+    const stack = stackName();
+    await deploySecretStack(simAws, stack, dependentSecret("param-one", "one"));
+
+    const before = await simAws
+      .secretsManager()
+      .describeSecret(
+        new DescribeSecretCommand({ SecretId: "edge-credential" }),
+      );
+
+    // When an update replaces that Resource and changes the secret's tags, so
+    // the secret is both claimable and downstream of a replacement.
+    const updating = updateSecretStack(
+      simAws,
+      stack,
+      dependentSecret("param-two", "two"),
+    );
+
+    // Then the secret is replaced with its dependency rather than updated
+    // against the Resource on its way out, which for a named secret is the
+    // replacement Secrets Manager refuses.
+    const error = await assertThrowsErrorAsync(async () => {
+      await updating;
+    });
+
+    assertStringIncludes(error.message, "is scheduled for deletion");
+
+    // And nothing was applied to the deployed secret on the way.
+    const after = await simAws
+      .secretsManager()
+      .describeSecret(
+        new DescribeSecretCommand({ SecretId: "edge-credential" }),
+      );
+
+    assertArrayEquals(after.Tags ?? [], before.Tags ?? []);
+    assertIdentical(after.Description, before.Description);
   });
 });

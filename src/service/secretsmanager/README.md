@@ -147,7 +147,8 @@ deployed secret. A new version is written only where the template asks for a dif
 
 Replacing a secret would also fail outright. `DeleteSecret` schedules the deletion and leaves the
 name held for the recovery window. The secret taking its place would then ask for a name the deleted
-one still has.
+one still has. A secret downstream of a replaced Resource still meets this, because the replacement
+spread takes the claim back rather than applying the update against a Resource on its way out.
 
 Tags and a dropped `KmsKeyId` are applied to the secret directly. CloudFormation applies a template
 as the desired state, and `UpdateSecret` has no way to express that. It treats an omitted field as

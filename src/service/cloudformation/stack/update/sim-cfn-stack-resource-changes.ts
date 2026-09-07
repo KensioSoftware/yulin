@@ -44,8 +44,9 @@ export interface SimCfnStackResourceChanges {
  * dependency chain. Real CloudFormation hands the dependent the new physical
  * name instead, but nothing here can rewrite an already created simulated
  * Resource, and leaving the dependent alone would leave it pointing at a
- * Resource that has gone. An in-place update keeps the Resource's physical
- * name, so it spreads to nothing.
+ * Resource that has gone. That reaches a claimed Resource as well, and takes
+ * the claim back. An in-place update never starts a spread of its own, since
+ * the Resource keeps the physical name its dependents already hold.
  */
 export function simCfnStackResourceChanges(
   properties: SimCfnStackResourceChangesProperties,
@@ -70,7 +71,14 @@ export function simCfnStackResourceChanges(
     changed.values().filter((logicalId) => !updatedInPlace.has(logicalId)),
   );
 
-  spreadToDependents({ updated, current, replaced, updatedInPlace });
+  spreadToDependents({ updated, current, replaced });
+
+  // A claimed Resource the spread reached is replaced after all. Its
+  // dependency is being deleted and created again, and an update applied
+  // before that would have read the deployed Resource on its way out.
+  for (const logicalId of replaced) {
+    updatedInPlace.delete(logicalId);
+  }
 
   return { replaced, updatedInPlace };
 }
@@ -91,7 +99,6 @@ interface SpreadToDependentsProperties {
   readonly current: ReadonlyMap<string, SimCfnResource>;
   readonly updated: ReadonlyMap<string, SimCfnResource>;
   readonly replaced: Set<string>;
-  readonly updatedInPlace: ReadonlySet<string>;
 }
 
 /**
@@ -99,7 +106,7 @@ interface SpreadToDependentsProperties {
  * those.
  */
 function spreadToDependents(properties: SpreadToDependentsProperties): void {
-  const { current, updated, replaced, updatedInPlace } = properties;
+  const { current, updated, replaced } = properties;
 
   // Each pass replaces the Resources naming one already being replaced, until a
   // pass finds none, which is the end of the dependency chain.
@@ -112,7 +119,6 @@ function spreadToDependents(properties: SpreadToDependentsProperties): void {
       const spreads =
         current.has(logicalId) &&
         !replaced.has(logicalId) &&
-        !updatedInPlace.has(logicalId) &&
         resource.dependencies().some((dependency) => replaced.has(dependency));
 
       if (spreads) {
