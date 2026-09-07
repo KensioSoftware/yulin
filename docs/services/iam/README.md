@@ -236,7 +236,7 @@ repository that still says it is there.
 ## Policy conditions
 
 Policy statements can carry `Condition` blocks. Sim IAM currently supports the `StringEquals`,
-`StringLike`, `ArnLike`, `ArnEquals` and `NumericLessThanEquals` operators, along with the
+`StringLike`, `ArnLike`, `ArnEquals`, `NumericLessThanEquals` and `Null` operators, along with the
 `ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
 
 The negated operators `StringNotEquals`, `StringNotLike`, `ArnNotEquals` and `ArnNotLike` are
@@ -337,8 +337,20 @@ request value is there to satisfy it.
 
 A `ForAllValues:` operator answers true for an absent key, which is also AWS behaviour. Every value
 the request carries matches when it carries none. AWS warns that this leaves a `ForAllValues:`
-`Allow` overly permissive, and asks for a `Null` check with a `false` value beside it. `Null` is
-absent from the operators above. A statement written that way fails closed here.
+`Allow` overly permissive, and asks for a `Null` check with a `false` value beside it. Write the
+guard and sim IAM evaluates it.
+
+`Null` asks whether the request carries a value for a context key rather than comparing one. `"true"`
+matches where the key is absent and `"false"` where it is present. A key carrying an empty string or
+an empty list of values counts as absent, which is the null dataset AWS describes. The two values
+can also be written as JSON booleans. Any other policy value leaves the condition matching nothing.
+
+```json
+"Condition": {
+  "ForAllValues:StringLike": { "dynamodb:LeadingKeys": ["ORDER#*"] },
+  "Null": { "dynamodb:LeadingKeys": "false" }
+}
+```
 
 ### Statements left unevaluated
 
@@ -1689,6 +1701,8 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - Only the condition operators listed above are supported. A statement using any other operator
   fails closed, matching no request. `decision.unevaluatedStatements` names those statements, and a
   test can assert that a decision was reached over policies read in full
+- The `...IfExists` operator suffix is absent. AWS reads it as the sibling of `Null`, treating a
+  condition on a key the request leaves out as true. A statement using it fails closed here
 - A positive `ForAllValues:` condition fails to match an empty value set, where AWS matches one. An
   absent context key matches, as it does on AWS. A service here leaves a key out where the request
   carries no value for it, and the empty set is reached only by a caller passing one to `authorize`

@@ -16,7 +16,12 @@ import type { SimIamConditionOperator } from "../../sim-iam-condition-operator.j
  * are rejected rather than being converted through JavaScript coercion rules.
  */
 export class SimIamNumericLessThanEquals implements SimIamConditionOperator {
-  readonly matchesAbsentKey = false;
+  /**
+   * Answer for a request carrying no value for the key.
+   */
+  matchesAbsentKey(): boolean {
+    return false;
+  }
 
   /**
    * Compare one request value with one or more policy limits.

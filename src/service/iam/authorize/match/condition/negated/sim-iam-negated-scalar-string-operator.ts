@@ -12,9 +12,14 @@ import { simIamStringValues } from "../string/sim-iam-string-values.js";
  * three.
  */
 export class SimIamNegatedScalarStringOperator implements SimIamConditionOperator {
-  readonly matchesAbsentKey = true;
-
   constructor(private readonly comparison: SimIamStringComparison) {}
+
+  /**
+   * Answer for a request carrying no value for the key.
+   */
+  matchesAbsentKey(): boolean {
+    return true;
+  }
 
   /**
    * Check whether a request value differs from every policy value.

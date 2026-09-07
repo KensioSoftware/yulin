@@ -6,7 +6,12 @@ import { simIamStringValues } from "../sim-iam-string-values.js";
  * Base for `ForAnyValue` IAM string operators.
  */
 export abstract class SimIamForAnyValueStringConditionOperator implements SimIamConditionOperator {
-  readonly matchesAbsentKey = false;
+  /**
+   * Answer for a request carrying no value for the key.
+   */
+  matchesAbsentKey(): boolean {
+    return false;
+  }
 
   /**
    * Check whether a given value matches the expected value.

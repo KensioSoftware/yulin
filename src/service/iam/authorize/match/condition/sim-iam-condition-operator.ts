@@ -20,8 +20,12 @@ export interface SimIamConditionOperator {
    * true, because every value the request carries matches vacuously. AWS
    * documents all three rules, and warns that the `ForAllValues` rule leaves
    * an `Allow` overly permissive without a `Null` guard beside it.
+   *
+   * The policy value is passed because `Null` reads it. Every comparison
+   * operator answers the same way whatever the policy says, and takes no
+   * argument.
    */
-  readonly matchesAbsentKey: boolean;
+  matchesAbsentKey(expected: SimIamConditionValue): boolean;
 
   /**
    * Determine whether an actual request value satisfies the expected policy value.
