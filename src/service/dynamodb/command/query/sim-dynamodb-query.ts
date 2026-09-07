@@ -62,11 +62,14 @@ export class SimDynamoDbQuery {
       "dynamodb:Query",
       input.TableName,
       options?.caller,
-      (reached) =>
-        simDynamoDbLeadingKeyOf(
-          expressions.terms.forTable(reached.view(input.IndexName))
-            .partitionKeyValue,
-        ),
+      {
+        leadingKeys: (reached) =>
+          simDynamoDbLeadingKeyOf(
+            expressions.terms.forTable(reached.view(input.IndexName))
+              .partitionKeyValue,
+          ),
+        attributes: expressions.attributes,
+      },
     );
 
     // What is being read is settled here: the table, or one of its indexes. An

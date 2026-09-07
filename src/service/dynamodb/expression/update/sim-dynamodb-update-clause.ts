@@ -1,5 +1,5 @@
 import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
-import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { simDynamoDbUpdateError } from "./sim-dynamodb-update-refusal.js";
 import { SimDynamoDbUpdateTarget } from "./sim-dynamodb-update-target.js";
@@ -16,7 +16,7 @@ const clauseWords: ReadonlySet<string> = new Set([
 
 interface SimDynamoDbUpdateClausesProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
 }
 
 /**
@@ -28,12 +28,12 @@ interface SimDynamoDbUpdateClausesProperties {
  */
 export class SimDynamoDbUpdateClauses {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly attributes: SimDynamoDbExpressionAttributes;
   private readonly read = new Set<string>();
 
   constructor(properties: SimDynamoDbUpdateClausesProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.attributes = properties.attributes;
   }
 
   /**
@@ -68,7 +68,7 @@ export class SimDynamoDbUpdateClauses {
     return new SimDynamoDbUpdateTarget(
       new SimDynamoDbDocumentPathParser({
         tokens: this.tokens,
-        names: this.names,
+        attributes: this.attributes,
       }).parse(),
     );
   }

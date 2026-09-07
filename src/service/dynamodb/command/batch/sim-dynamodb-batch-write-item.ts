@@ -9,6 +9,7 @@ import { reachSimDynamoDbBatchTables } from "./sim-dynamodb-batch-tables.js";
 import { readSimDynamoDbBatchWrites } from "./sim-dynamodb-batch-writes.js";
 import { refuseUnsimulatedBatchWriteInput } from "./sim-dynamodb-unsimulated-batch-input.js";
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
+import { simDynamoDbItemAttributeNames } from "../authorize/sim-dynamodb-attributes.js";
 
 const operation = "BatchWriteItem";
 
@@ -55,10 +56,14 @@ export class SimDynamoDbBatchWriteItem {
         access: this.access,
         operation,
         caller: options?.caller,
-        leadingKeys: (entry) =>
-          simDynamoDbLeadingKeysOf(() =>
+        reached: (entry) => ({
+          leadingKeys: simDynamoDbLeadingKeysOf(() =>
             entry.writes.map((write) => write.names),
           ),
+          attributes: simDynamoDbItemAttributeNames(() =>
+            entry.writes.map((write) => write.names),
+          ),
+        }),
       },
     );
 

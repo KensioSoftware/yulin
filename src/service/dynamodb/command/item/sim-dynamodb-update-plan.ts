@@ -1,6 +1,6 @@
-import { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
-import { updateExpressionName } from "../../expression/update/sim-dynamodb-update-refusal.js";
+import type { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
 import type { SimDynamoDbUpdate } from "../../expression/update/sim-dynamodb-update.js";
+import { simDynamoDbTouchedBy } from "./sim-dynamodb-update-touched.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
 import {
@@ -15,6 +15,7 @@ interface SimDynamoDbUpdatePlanInput extends SimDynamoDbUpdateExpressionInput {
 interface SimDynamoDbUpdatePlanProperties {
   readonly update: SimDynamoDbUpdate | undefined;
   readonly check: SimDynamoDbConditionCheck;
+  readonly attributeNames: readonly string[];
 }
 
 /**
@@ -23,11 +24,19 @@ interface SimDynamoDbUpdatePlanProperties {
 export class SimDynamoDbUpdatePlan {
   public readonly check: SimDynamoDbConditionCheck;
 
+  /**
+   * The top-level attributes both expressions named, for
+   * `dynamodb:Attributes`. They share one set of placeholders, so the update
+   * and the condition guarding it are gathered together.
+   */
+  public readonly attributeNames: readonly string[];
+
   private readonly update: SimDynamoDbUpdate | undefined;
 
   private constructor(properties: SimDynamoDbUpdatePlanProperties) {
     this.update = properties.update;
     this.check = properties.check;
+    this.attributeNames = properties.attributeNames;
   }
 
   /**
@@ -43,9 +52,12 @@ export class SimDynamoDbUpdatePlan {
     const expression = input.UpdateExpression;
 
     if (expression === undefined) {
+      const check = SimDynamoDbConditionCheck.read(input, operation);
+
       return new this({
         update: undefined,
-        check: SimDynamoDbConditionCheck.read(input, operation),
+        check,
+        attributeNames: check.attributeNames,
       });
     }
 
@@ -54,6 +66,7 @@ export class SimDynamoDbUpdatePlan {
     return new this({
       update: read.update,
       check: SimDynamoDbConditionCheck.of(read.condition, input, operation),
+      attributeNames: read.attributes,
     });
   }
 
@@ -65,20 +78,10 @@ export class SimDynamoDbUpdatePlan {
   }
 
   /**
-   * The parts of an item this update touched, for the reporting modes that
-   * answer with those and nothing else.
-   *
-   * A request that says nothing to change touched nothing, so the projection it
-   * answers with finds nothing in either item.
+   * The parts of an item this update touched.
    */
   touched(): SimDynamoDbProjection {
-    return (
-      this.update?.touched() ??
-      new SimDynamoDbProjection({
-        expressionName: updateExpressionName,
-        paths: [],
-      })
-    );
+    return simDynamoDbTouchedBy(this.update);
   }
 
   /**

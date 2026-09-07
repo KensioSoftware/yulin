@@ -10,6 +10,16 @@ interface SimDynamoDbConditionRequest extends SimDynamoDbExpressionParameterInpu
 }
 
 /**
+ * What a request's ConditionExpression said, once it has been read.
+ */
+export interface SimDynamoDbConditionRead {
+  readonly condition: SimDynamoDbCondition | undefined;
+
+  /** The top-level attributes the expression named, for `dynamodb:Attributes`. */
+  readonly attributes: readonly string[];
+}
+
+/**
  * Read the condition a write is guarded by, if it names one.
  *
  * A request with no ConditionExpression is an unconditional write, so there is
@@ -17,13 +27,13 @@ interface SimDynamoDbConditionRequest extends SimDynamoDbExpressionParameterInpu
  */
 export function readSimDynamoDbCondition(
   request: SimDynamoDbConditionRequest,
-): SimDynamoDbCondition | undefined {
+): SimDynamoDbConditionRead {
   const expression = request.ConditionExpression;
 
   if (expression === undefined) {
     SimDynamoDbExpressionParameters.assertNoneWithout(request);
 
-    return undefined;
+    return { condition: undefined, attributes: [] };
   }
 
   const parameters = new SimDynamoDbExpressionParameters(request);
@@ -31,7 +41,7 @@ export function readSimDynamoDbCondition(
 
   parameters.assertAllUsed();
 
-  return condition;
+  return { condition, attributes: parameters.attributes.topLevel };
 }
 
 /**

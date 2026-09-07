@@ -3648,6 +3648,22 @@ The condition takes the `ForAllValues:` qualifier, as AWS requires for this key.
 value the request reaches has to match. A batch or a write naming one item outside the allowed set
 is refused whole, and nothing it asked for is applied.
 
+The same commands, along with `Scan`, supply the top-level attribute names they reach as
+`dynamodb:Attributes`. A name reaches the condition wherever the request writes one, in a
+`ProjectionExpression`, an `UpdateExpression`, a `ConditionExpression`, a `FilterExpression`, a
+`KeyConditionExpression`, and in the `Key` or `Item` a request names outright. A `#` placeholder is
+resolved first, so the policy is matched against the attribute rather than the alias. A nested path
+counts as the attribute it starts at, so `address.city` reaches `address`.
+
+A policy conditioned on `dynamodb:Attributes` has to name every primary key and index key attribute
+of the table alongside the attributes it is restricting, as AWS requires. A request names its key,
+and a policy leaving the key attributes out refuses every request that reads or writes an item.
+
+A request reaching no attribute at all leaves the key out of the condition context, which a
+`ForAllValues:` condition matches. A `Scan` carrying no expression is the case to watch. AWS asks
+for a `Null` check beside such a statement to close it, covered under
+[policy conditions](https://yulinsim.dev/services/iam/#policy-conditions).
+
 ```typescript sim-dynamodb-leading-keys
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
@@ -3755,6 +3771,8 @@ is written.
 - `dynamodb:LeadingKeys` on `GetItem`, `BatchGetItem`, `Query`, `PutItem`, `UpdateItem`,
   `DeleteItem` and `BatchWriteItem`, carrying the partition key values the request reaches so a
   `ForAllValues:` condition can scope a caller to particular items.
+- `dynamodb:Attributes` on those seven and on `Scan`, carrying the top-level attribute names the
+  request reaches, read from every expression it carries and from its `Key` or `Item`.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -3828,10 +3846,11 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 
 ## Limitations
 
-- `dynamodb:LeadingKeys` is the only DynamoDB condition key supplied. `dynamodb:Attributes`,
-  `dynamodb:Select` and `dynamodb:ReturnValues` are absent from the condition context, and a
-  statement conditioned on one of them matches no request. The transactional operations supply no
-  leading keys either, and are authorized by action and table alone.
+- `dynamodb:LeadingKeys` and `dynamodb:Attributes` are the DynamoDB condition keys supplied.
+  `dynamodb:Select`, `dynamodb:ReturnValues`, `dynamodb:ReturnConsumedCapacity` and the numbered
+  partition key families are absent from the condition context, and a statement conditioned on one
+  of them matches no request. The transactional operations supply neither key, and are authorized by
+  action and table alone.
 - A partition key value reaches a policy condition as a string for a `S` key and as its digits for
   an `N` key. A binary partition key has no documented form for the condition key. A request
   carrying one leaves the value out.

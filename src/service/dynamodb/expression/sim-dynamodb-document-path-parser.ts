@@ -1,8 +1,9 @@
 import {
   SimDynamoDbDocumentPath,
+  type SimDynamoDbAttributeSegment,
   type SimDynamoDbDocumentPathSegment,
 } from "./sim-dynamodb-document-path.js";
-import type { SimDynamoDbExpressionPlaceholders } from "./sim-dynamodb-expression-placeholders.js";
+import type { SimDynamoDbExpressionAttributes } from "./sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionTokens } from "./sim-dynamodb-expression-tokens.js";
 
 /**
@@ -13,7 +14,7 @@ const greatestDepth = 32;
 
 interface SimDynamoDbDocumentPathParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
 }
 
 /**
@@ -26,19 +27,24 @@ interface SimDynamoDbDocumentPathParserProperties {
  */
 export class SimDynamoDbDocumentPathParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly attributes: SimDynamoDbExpressionAttributes;
   private readonly segments: SimDynamoDbDocumentPathSegment[] = [];
 
   constructor(properties: SimDynamoDbDocumentPathParserProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.attributes = properties.attributes;
   }
 
   /**
    * Read a path, from its first attribute to the last thing it dereferences.
    */
   parse(): SimDynamoDbDocumentPath {
-    this.segments.push(this.attribute());
+    const first = this.attribute();
+
+    // The path starts here, so this is the top-level attribute it reaches.
+    // Whatever it dereferences afterwards is inside this one.
+    this.attributes.reach(first.name);
+    this.segments.push(first);
 
     while (this.continues()) {
       this.assertWithinDepth();
@@ -70,7 +76,7 @@ export class SimDynamoDbDocumentPathParser {
    * Read an attribute name, which the request may have written as a
    * placeholder.
    */
-  private attribute(): SimDynamoDbDocumentPathSegment {
+  private attribute(): SimDynamoDbAttributeSegment {
     const token = this.tokens.next("an attribute name");
 
     if (token.kind === "name") {
@@ -78,7 +84,7 @@ export class SimDynamoDbDocumentPathParser {
     }
 
     if (token.kind === "namePlaceholder") {
-      return { kind: "attribute", name: this.names.required(token.text) };
+      return { kind: "attribute", name: this.attributes.required(token.text) };
     }
 
     throw this.tokens.error(

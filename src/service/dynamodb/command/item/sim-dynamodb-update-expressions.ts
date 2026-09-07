@@ -19,6 +19,9 @@ export interface SimDynamoDbUpdateExpressionInput extends SimDynamoDbExpressionP
 export interface SimDynamoDbUpdateExpressions {
   readonly update: SimDynamoDbUpdate;
   readonly condition: SimDynamoDbCondition | undefined;
+
+  /** The top-level attributes the expressions named, for `dynamodb:Attributes`. */
+  readonly attributes: readonly string[];
 }
 
 /**
@@ -38,7 +41,7 @@ export function readSimDynamoDbUpdateExpressions(
 
   parameters.assertAllUsed();
 
-  return { update, condition };
+  return { update, condition, attributes: parameters.attributes.topLevel };
 }
 
 /**

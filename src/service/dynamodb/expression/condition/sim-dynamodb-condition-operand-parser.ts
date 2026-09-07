@@ -1,6 +1,7 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import {
@@ -19,7 +20,7 @@ const sizeFunctionName = "size";
 
 interface SimDynamoDbConditionOperandParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
-  readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  readonly attributes: SimDynamoDbExpressionAttributes;
   readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
 }
 
@@ -32,13 +33,13 @@ interface SimDynamoDbConditionOperandParserProperties {
  */
 export class SimDynamoDbConditionOperandParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly attributes: SimDynamoDbExpressionAttributes;
   private readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
   private readonly read: SimDynamoDbDocumentPath[] = [];
 
   constructor(properties: SimDynamoDbConditionOperandParserProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.attributes = properties.attributes;
     this.values = properties.values;
   }
 
@@ -130,7 +131,7 @@ export class SimDynamoDbConditionOperandParser {
   private path(): SimDynamoDbPathOperand {
     const path = new SimDynamoDbDocumentPathParser({
       tokens: this.tokens,
-      names: this.names,
+      attributes: this.attributes,
     }).parse();
 
     this.read.push(path);

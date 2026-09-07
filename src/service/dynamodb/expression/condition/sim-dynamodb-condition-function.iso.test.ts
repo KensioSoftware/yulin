@@ -38,7 +38,7 @@ function holds(
   expression: string,
   values?: Readonly<Record<string, SimDynamoDbAttributeValue>>,
 ): boolean {
-  const condition = readSimDynamoDbCondition({
+  const { condition } = readSimDynamoDbCondition({
     ConditionExpression: expression,
     ExpressionAttributeValues: values,
   });
@@ -205,7 +205,7 @@ describe("DynamoDB condition expression functions", () => {
     // Given a status of seven ASCII characters, and the item's other text.
     // When size is compared against the character count of something outside
     // ASCII, then the bytes win: DynamoDB measures a string in bytes.
-    const condition = readSimDynamoDbCondition({
+    const { condition } = readSimDynamoDbCondition({
       ConditionExpression: "size(city) = :three",
       ExpressionAttributeValues: { ":three": { N: "3" } },
     });
@@ -217,7 +217,7 @@ describe("DynamoDB condition expression functions", () => {
   it("reads a function name as an attribute when it is not a call", () => {
     // Given an item with an attribute named after a function, which is not a
     // reserved word.
-    const condition = readSimDynamoDbCondition({
+    const { condition } = readSimDynamoDbCondition({
       ConditionExpression: "contains = :yes",
       ExpressionAttributeValues: { ":yes": { S: "yes" } },
     });

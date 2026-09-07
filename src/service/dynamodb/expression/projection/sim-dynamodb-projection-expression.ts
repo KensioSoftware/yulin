@@ -3,7 +3,7 @@ import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import { simDynamoDbExpressionError } from "../sim-dynamodb-expression-error.js";
 import type { SimDynamoDbExpressionParameterInput } from "../sim-dynamodb-expression-parameters.js";
 import { SimDynamoDbExpressionParameters } from "../sim-dynamodb-expression-parameters.js";
-import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
+import type { SimDynamoDbExpressionAttributes } from "../sim-dynamodb-expression-attributes.js";
 import { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { SimDynamoDbProjection } from "./sim-dynamodb-projection.js";
 
@@ -11,6 +11,16 @@ const expressionName = "ProjectionExpression";
 
 interface SimDynamoDbProjectionRequest extends SimDynamoDbExpressionParameterInput {
   readonly ProjectionExpression?: string | undefined;
+}
+
+/**
+ * What a request's ProjectionExpression said, once it has been read.
+ */
+export interface SimDynamoDbProjectionRead {
+  readonly projection: SimDynamoDbProjection | undefined;
+
+  /** The top-level attributes the expression named, for `dynamodb:Attributes`. */
+  readonly attributes: readonly string[];
 }
 
 /**
@@ -26,13 +36,13 @@ interface SimDynamoDbProjectionRequest extends SimDynamoDbExpressionParameterInp
  */
 export function readSimDynamoDbProjection(
   request: SimDynamoDbProjectionRequest,
-): SimDynamoDbProjection | undefined {
+): SimDynamoDbProjectionRead {
   const expression = request.ProjectionExpression;
 
   if (expression === undefined) {
     SimDynamoDbExpressionParameters.assertNoneWithout(request);
 
-    return undefined;
+    return { projection: undefined, attributes: [] };
   }
 
   const parameters = new SimDynamoDbExpressionParameters(request);
@@ -40,7 +50,7 @@ export function readSimDynamoDbProjection(
 
   parameters.assertAllUsed();
 
-  return projection;
+  return { projection, attributes: parameters.attributes.topLevel };
 }
 
 /**
@@ -61,7 +71,7 @@ export function parseSimDynamoDbProjection(
       expression,
       "the expression names no attributes, and an expression cannot be empty",
     ),
-    parameters.names,
+    parameters.attributes,
   );
 
   return new SimDynamoDbProjection({ expressionName, paths });
@@ -72,12 +82,14 @@ export function parseSimDynamoDbProjection(
  */
 function projectedPaths(
   tokens: SimDynamoDbExpressionTokens,
-  names: SimDynamoDbExpressionPlaceholders<string>,
+  attributes: SimDynamoDbExpressionAttributes,
 ): readonly SimDynamoDbDocumentPath[] {
   const paths: SimDynamoDbDocumentPath[] = [];
 
   do {
-    paths.push(new SimDynamoDbDocumentPathParser({ tokens, names }).parse());
+    paths.push(
+      new SimDynamoDbDocumentPathParser({ tokens, attributes }).parse(),
+    );
   } while (tokens.takeSymbol(","));
 
   assertReadToEnd(tokens);

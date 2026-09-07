@@ -3,6 +3,10 @@ import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
+import {
+  simDynamoDbAttributesOf,
+  simDynamoDbItemAttributeNames,
+} from "../authorize/sim-dynamodb-attributes.js";
 import type {
   SimPutItemCommand,
   SimPutItemCommandInput,
@@ -66,7 +70,13 @@ export class SimDynamoDbPutItem {
       "dynamodb:PutItem",
       input.TableName,
       options?.caller,
-      simDynamoDbLeadingKeysOf(() => [readItem(input)]),
+      {
+        leadingKeys: simDynamoDbLeadingKeysOf(() => [readItem(input)]),
+        attributes: simDynamoDbAttributesOf(
+          check.attributeNames,
+          simDynamoDbItemAttributeNames(() => [readItem(input)]),
+        ),
+      },
     );
     const asked = SimDynamoDbReturnValues.read(input.ReturnValues, "PutItem");
     const item = readItem(input);
