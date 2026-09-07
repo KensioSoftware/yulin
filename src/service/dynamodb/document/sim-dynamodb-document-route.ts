@@ -4,6 +4,7 @@ import {
 } from "../../../sdk/index.js";
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import type { SimDynamoDbRequestOptions } from "../sim-dynamodb.types.js";
+import { simDynamoDbDocumentMarshallOptions } from "./sim-dynamodb-document-marshall-options.js";
 import { simDynamoDbDocumentAttributeValue } from "./sim-dynamodb-document-marshall.js";
 import type { SimDynamoDbDocumentPath } from "./sim-dynamodb-document-path.js";
 import { simDynamoDbDocumentNativeValue } from "./sim-dynamodb-document-unmarshall.js";
@@ -46,9 +47,14 @@ export class SimDynamoDbDocumentRoute {
    */
   route(): SimSdkCommandRoute {
     return async (command, context): Promise<unknown> => {
+      // Read per send, as the real middleware reads it, so the same route
+      // serves document clients built with different options.
+      const options = simDynamoDbDocumentMarshallOptions(context.client);
+
       const input = this.input.convert(
         command.input,
-        (value, path) => simDynamoDbDocumentAttributeValue(value, path),
+        (value, path) =>
+          simDynamoDbDocumentAttributeValue(value, path, options),
         "input",
       );
 

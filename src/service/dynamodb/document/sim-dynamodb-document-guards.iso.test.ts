@@ -5,6 +5,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
+import { simDynamoDbDocumentMarshallDefaults } from "./sim-dynamodb-document-marshall-options.js";
 import { simDynamoDbDocumentSetAttribute } from "./sim-dynamodb-document-set.js";
 import { simDynamoDbDocumentNativeValue } from "./sim-dynamodb-document-unmarshall.js";
 
@@ -20,7 +21,11 @@ describe("simulated DynamoDB document conversion guards", () => {
   it("refuses a Set holding undefined", () => {
     // When a Set carrying an undefined member is converted.
     const error = assertThrowsError(() =>
-      simDynamoDbDocumentSetAttribute(new Set([undefined]), "input.Item.tags"),
+      simDynamoDbDocumentSetAttribute(
+        new Set([undefined]),
+        "input.Item.tags",
+        simDynamoDbDocumentMarshallDefaults,
+      ),
     );
 
     // Then it is refused as an undefined value rather than as an empty set,

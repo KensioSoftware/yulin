@@ -1,5 +1,6 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
+import type { SimDynamoDbDocumentMarshallOptions } from "./sim-dynamodb-document-marshall-options.js";
 
 /**
  * A value carrying its own Number attribute, which is what lib-dynamodb's
@@ -34,11 +35,13 @@ export function isSimDynamoDbDocumentNumberValue(
  * than storing one that has already lost digits. A simulated table holds the
  * digits it is given exactly, so this refusal is the only thing standing
  * between an application and a silently rounded identifier, which is why it is
- * kept rather than relaxed. A decimal inside the range is written as it stands.
+ * kept until a client asks for `allowImpreciseNumbers` and takes the rounding
+ * on. A decimal inside the range is written as it stands.
  */
 export function simDynamoDbDocumentNumberAttribute(
   value: number,
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue {
   if (!Number.isFinite(value)) {
     throw new SimDynamoDbDocumentValueError(
@@ -46,7 +49,10 @@ export function simDynamoDbDocumentNumberAttribute(
     );
   }
 
-  if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+  if (
+    !options.allowImpreciseNumbers &&
+    (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)
+  ) {
     throw new SimDynamoDbDocumentValueError(
       `${path} is ${value.toString()}, which is outside the range a ` +
         `JavaScript number holds exactly. Write it as a bigint, or as a ` +

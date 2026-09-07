@@ -24,6 +24,16 @@ export interface SimSdkCommandContext {
    * session needs that split, because its session ARN owns no policies.
    */
   readonly caller?: SimAwsCaller | undefined;
+
+  /**
+   * The SDK client the Command was sent through, when the send came from one.
+   *
+   * A route needs it only for configuration the Command itself does not
+   * carry, such as the marshalling options a `DynamoDBDocumentClient` was
+   * built with. A request bridged from the wire has no client object behind
+   * it, so this is left out there.
+   */
+  readonly client?: unknown;
 }
 
 /**

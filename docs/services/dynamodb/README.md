@@ -3040,6 +3040,84 @@ Intercept the document client itself. `DynamoDBDocumentClient.from(client)` buil
 outside the `DynamoDBClient` class, so intercepting the base client leaves Commands sent through the
 document one untouched. See [the SDK docs](https://yulinsim.dev/sdk/#the-dynamodb-document-client).
 
+### Marshalling options
+
+`DynamoDBDocumentClient.from(client, { marshallOptions })` changes what the conversion does with a
+value the defaults refuse. Yulin reads those options off the client each Command was sent through.
+Two document clients over one simulation each convert by their own.
+
+- `removeUndefinedValues` drops an `undefined` out of a map, a list or a `Set`. Without it, an
+  `undefined` in any of the three is refused. The real client refuses it in the same place.
+- `convertEmptyValues` writes an empty string, an empty binary value and an empty `Set` as `NULL`.
+- `convertClassInstanceToMap` reads an object with behaviour as a map of its own properties.
+- `allowImpreciseNumbers` writes a number past `Number.MAX_SAFE_INTEGER` with the digits it has
+  already been rounded to.
+
+An `undefined` attribute of an item, a key or a set of expression values is left out whatever the
+client was built with. `removeUndefinedValues` governs the values held inside an attribute, and the
+attributes of an item sit a level above that (the real client drops an undefined one there without
+being asked to).
+
+```typescript sim-dynamodb-document-marshall-options
+/**
+ * Writing a partly filled object through a document client that drops
+ * undefined values.
+ */
+
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+} from "@aws-sdk/lib-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+
+const documents = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "eu-west-2" }),
+  { marshallOptions: { removeUndefinedValues: true } },
+);
+simSdk.intercept(documents);
+
+await documents.send(
+  new CreateTableCommand({
+    TableName: "PagesTable",
+    KeySchema: [{ AttributeName: "pageId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "pageId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simSdk.simAws.backgroundTasksComplete();
+
+// The summary was never filled in, and one section is still to be written.
+await documents.send(
+  new PutCommand({
+    TableName: "PagesTable",
+    Item: {
+      pageId: "page-1",
+      meta: { title: "Home", summary: undefined },
+      sections: ["intro", undefined, "outro"],
+    },
+  }),
+);
+
+const read = await documents.send(
+  new GetCommand({ TableName: "PagesTable", Key: { pageId: "page-1" } }),
+);
+
+const meta = read.Item?.["meta"] as Record<string, string>;
+console.log(Object.keys(meta)); // [ 'title' ]
+
+// A dropped member takes its position with it.
+const sections = read.Item?.["sections"] as string[];
+console.log(sections); // [ 'intro', 'outro' ]
+```
+
+`unmarshallOptions` are ignored. A stored value comes back the way a document client built with no
+options of its own reads it.
+
 ### Querying and scanning through the document client
 
 `@aws-sdk/lib-dynamodb` names its `QueryCommand` and `ScanCommand` exactly as

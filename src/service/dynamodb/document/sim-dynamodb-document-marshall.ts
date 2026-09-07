@@ -1,10 +1,7 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
-import { isSimDynamoDbDocumentBinary } from "./sim-dynamodb-document-binary.js";
-import {
-  isSimDynamoDbDocumentNumberValue,
-  simDynamoDbDocumentNumberAttribute,
-} from "./sim-dynamodb-document-number.js";
+import type { SimDynamoDbDocumentMarshallOptions } from "./sim-dynamodb-document-marshall-options.js";
+import { simDynamoDbDocumentScalarAttribute } from "./sim-dynamodb-document-scalar.js";
 import { simDynamoDbDocumentSetAttribute } from "./sim-dynamodb-document-set.js";
 
 /**
@@ -15,20 +12,21 @@ import { simDynamoDbDocumentSetAttribute } from "./sim-dynamodb-document-set.js"
  * order, so a value that reaches a simulated table through the document client
  * is the value that would have reached the real one.
  *
- * `undefined` is refused rather than dropped. The real document client drops it
- * when the client was built with `removeUndefinedValues`, which is a translate
- * config this simulation does not read yet, so refusing is what keeps a test
- * from passing against an item AWS would have written differently.
+ * The options are the ones the document client was built with. They decide
+ * what happens to a value the defaults refuse: an undefined member, an empty
+ * string or binary value, a class instance, and a number past the range a
+ * JavaScript number holds exactly.
  */
 export function simDynamoDbDocumentAttributeValue(
   value: unknown,
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue {
   if (value === undefined) {
     throw new SimDynamoDbDocumentValueError(
-      `${path} is undefined. The real document client drops it only when it ` +
-        `was built with removeUndefinedValues, which simulated DynamoDB does ` +
-        `not read yet, so leave the attribute out instead`,
+      `${path} is undefined. Build the document client with ` +
+        `removeUndefinedValues to drop it, which is what the real one asks ` +
+        `for, or leave the attribute out instead`,
     );
   }
 
@@ -37,10 +35,10 @@ export function simDynamoDbDocumentAttributeValue(
   }
 
   if (Array.isArray(value)) {
-    return { L: listMembers(value, path) };
+    return { L: listMembers(value, path, options) };
   }
 
-  return containerOrScalar(value, path);
+  return containerOrScalar(value, path, options);
 }
 
 /**
@@ -49,48 +47,31 @@ export function simDynamoDbDocumentAttributeValue(
 function containerOrScalar(
   value: unknown,
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue {
   if (value instanceof Set) {
-    return simDynamoDbDocumentSetAttribute(value, path);
+    return simDynamoDbDocumentSetAttribute(value, path, options);
   }
 
   if (value instanceof Map) {
-    return { M: mapEntries([...value], path) };
+    return { M: mapEntries([...value], path, options) };
   }
 
   if (isPlainObject(value)) {
-    return { M: mapEntries(Object.entries(value), path) };
+    return { M: mapEntries(Object.entries(value), path, options) };
   }
 
-  return scalar(value, path);
-}
-
-/**
- * Read a value that stands for one attribute on its own.
- */
-function scalar(value: unknown, path: string): SimDynamoDbAttributeValue {
-  if (isSimDynamoDbDocumentBinary(value)) {
-    return { B: value as Uint8Array };
+  const scalar = simDynamoDbDocumentScalarAttribute(value, path, options);
+  if (scalar !== undefined) {
+    return scalar;
   }
 
-  if (typeof value === "boolean") {
-    return { BOOL: value };
-  }
-
-  if (typeof value === "number") {
-    return simDynamoDbDocumentNumberAttribute(value, path);
-  }
-
-  if (isSimDynamoDbDocumentNumberValue(value)) {
-    return { N: value.toAttributeValue().N };
-  }
-
-  if (typeof value === "bigint") {
-    return { N: value.toString() };
-  }
-
-  if (typeof value === "string") {
-    return { S: value };
+  // A class instance is read as a map only when the client asked for it, which
+  // is the last thing the real conversion tries before giving up. Null reached
+  // an answer of its own before any of this.
+  if (typeof value === "object" && options.convertClassInstanceToMap) {
+    const instance = value as Record<string, unknown>;
+    return { M: mapEntries(Object.entries(instance), path, options) };
   }
 
   throw new SimDynamoDbDocumentValueError(
@@ -102,15 +83,28 @@ function scalar(value: unknown, path: string): SimDynamoDbAttributeValue {
 /**
  * The members of a list, with the functions left out as the real one leaves
  * them out.
+ *
+ * A dropped undefined member takes its position with it, so the members after
+ * it move up. That is what the real conversion does: it filters before it
+ * converts, rather than writing a NULL where the member was.
  */
 function listMembers(
   values: readonly unknown[],
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue[] {
   return values
-    .filter((member) => typeof member !== "function")
+    .filter(
+      (member) =>
+        typeof member !== "function" &&
+        !(member === undefined && options.removeUndefinedValues),
+    )
     .map((member, index) =>
-      simDynamoDbDocumentAttributeValue(member, `${path}[${index.toString()}]`),
+      simDynamoDbDocumentAttributeValue(
+        member,
+        `${path}[${index.toString()}]`,
+        options,
+      ),
     );
 }
 
@@ -120,11 +114,16 @@ function listMembers(
 function mapEntries(
   entries: readonly (readonly [unknown, unknown])[],
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): Record<string, SimDynamoDbAttributeValue> {
   const attributes: Record<string, SimDynamoDbAttributeValue> = {};
 
   for (const [name, member] of entries) {
     if (typeof member === "function") {
+      continue;
+    }
+
+    if (member === undefined && options.removeUndefinedValues) {
       continue;
     }
 
@@ -134,7 +133,11 @@ function mapEntries(
     // an ordinary attribute instead of reaching the prototype setter. The real
     // document client assigns, and so loses that attribute.
     Object.defineProperty(attributes, key, {
-      value: simDynamoDbDocumentAttributeValue(member, `${path}.${key}`),
+      value: simDynamoDbDocumentAttributeValue(
+        member,
+        `${path}.${key}`,
+        options,
+      ),
       enumerable: true,
       writable: true,
       configurable: true,

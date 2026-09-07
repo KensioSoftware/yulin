@@ -75,7 +75,7 @@ export class SimSdkCommandDispatcher {
       );
     }
 
-    return await route(command, { caller });
+    return await route(command, { caller, client });
   }
 
   /**

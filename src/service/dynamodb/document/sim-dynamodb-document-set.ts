@@ -1,6 +1,7 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
 import { isSimDynamoDbDocumentBinary } from "./sim-dynamodb-document-binary.js";
+import type { SimDynamoDbDocumentMarshallOptions } from "./sim-dynamodb-document-marshall-options.js";
 import {
   isSimDynamoDbDocumentNumberValue,
   simDynamoDbDocumentNumberAttribute,
@@ -15,28 +16,40 @@ import {
  * further down, where the table reads the value. That is what the real one
  * does, so a set written this way behaves the same either side.
  *
- * DynamoDB has no empty set, so an empty one is refused rather than written as
- * something else.
+ * An undefined member is dropped when the client was built with
+ * `removeUndefinedValues`, and refused otherwise. DynamoDB has no empty set, so
+ * a set with nothing left in it is written as NULL when the client was built
+ * with `convertEmptyValues`, and refused otherwise. The two are read in that
+ * order, so a set holding nothing but undefined is an empty set by the time its
+ * size is looked at, which is where the real conversion looks at it too.
  */
 export function simDynamoDbDocumentSetAttribute(
   set: ReadonlySet<unknown>,
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue {
-  if (set.size === 0) {
+  const members = [...set].filter(
+    (member) => !(member === undefined && options.removeUndefinedValues),
+  );
+
+  if (!options.removeUndefinedValues && set.has(undefined)) {
+    throw new SimDynamoDbDocumentValueError(
+      `${path} is a Set holding undefined. Build the document client with ` +
+        `removeUndefinedValues to drop it, which is what the real one asks for`,
+    );
+  }
+
+  if (members.length === 0) {
+    if (options.convertEmptyValues) {
+      return { NULL: true };
+    }
+
     throw new SimDynamoDbDocumentValueError(
       `${path} is an empty Set, and DynamoDB has no empty set`,
     );
   }
 
-  if (set.has(undefined)) {
-    throw new SimDynamoDbDocumentValueError(
-      `${path} is a Set holding undefined. The real document client drops it ` +
-        `only when it was built with removeUndefinedValues, which simulated ` +
-        `DynamoDB does not read yet`,
-    );
-  }
-
-  return membersAttribute([...set], path);
+  return membersAttribute(members, path, options);
 }
 
 /**
@@ -45,6 +58,7 @@ export function simDynamoDbDocumentSetAttribute(
 function membersAttribute(
   members: readonly unknown[],
   path: string,
+  options: SimDynamoDbDocumentMarshallOptions,
 ): SimDynamoDbAttributeValue {
   const first = members[0];
 
@@ -54,7 +68,9 @@ function membersAttribute(
 
   if (isNumberMember(first)) {
     return {
-      NS: members.map((member, index) => numberText(member, path, index)),
+      NS: members.map((member, index) =>
+        numberText(member, path, index, options),
+      ),
     };
   }
 
@@ -85,7 +101,12 @@ function isNumberMember(member: unknown): boolean {
 /**
  * The digits one member of a number set is written with.
  */
-function numberText(member: unknown, path: string, index: number): string {
+function numberText(
+  member: unknown,
+  path: string,
+  index: number,
+  options: SimDynamoDbDocumentMarshallOptions,
+): string {
   if (typeof member === "bigint") {
     return member.toString();
   }
@@ -97,6 +118,7 @@ function numberText(member: unknown, path: string, index: number): string {
   const attribute = simDynamoDbDocumentNumberAttribute(
     Number(member),
     `${path}[${index.toString()}]`,
+    options,
   );
 
   // A number attribute is the only thing that function answers with.

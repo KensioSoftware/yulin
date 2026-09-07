@@ -174,26 +174,26 @@ describe("simulated DynamoDB document values", () => {
     assertArrayEquals([...read], [1, 2, 3]);
   });
 
-  it("refuses an undefined attribute rather than dropping it", async () => {
-    // Given an item carrying an undefined value.
+  it("leaves out an undefined attribute of an item", async () => {
+    // Given an item carrying an undefined value alongside a defined one.
     using simSdk = new SimSdk();
     const documents = await interceptedDocuments(simSdk);
 
-    // When it is written.
-    const error = await assertThrowsErrorAsync(async () => {
-      await documents.send(
-        new PutCommand({
-          TableName: "ValuesTable",
-          Item: { id: "a", value: undefined },
-        }),
-      );
-    });
+    // When it is written, then read back.
+    await documents.send(
+      new PutCommand({
+        TableName: "ValuesTable",
+        Item: { id: "a", value: undefined, kept: "here" },
+      }),
+    );
+    const read = await documents.send(
+      new GetCommand({ TableName: "ValuesTable", Key: { id: "a" } }),
+    );
 
-    // Then it is refused, naming where it sat and why the real client would
-    // have dropped it.
-    assertInstanceOf(error, SimDynamoDbDocumentValueError);
-    assertStringIncludes(error.message, "input.Item.value is undefined");
-    assertStringIncludes(error.message, "removeUndefinedValues");
+    // Then the attribute is not there, and the rest of the item is. The real
+    // client drops it here whatever it was built with: removeUndefinedValues
+    // governs the values inside an attribute, and an item is not one of them.
+    assertObjectEquals(read.Item, { id: "a", kept: "here" });
   });
 
   it("refuses an empty Set, as DynamoDB has no empty set", async () => {

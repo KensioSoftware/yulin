@@ -282,7 +282,8 @@ service throws `SimSdkUnknownServiceError`.
 - Simulated errors have SDK-shaped `name` and `$metadata` fields. They are separate classes from the
   SDK exceptions, so match them by `error.name` instead of `instanceof`.
 - The callback form of `send(command, callback)` is not supported. Use the promise form.
-- Yulin ignores the translation options in
-  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`. The conversion uses
-  the defaults. `removeUndefinedValues: true` has no effect. Yulin refuses an `undefined` attribute
-  that the configured document client would otherwise remove.
+- Yulin reads the `marshallOptions` in
+  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })` and ignores the
+  `unmarshallOptions`. A stored value comes back the way a document client built with no options of
+  its own reads it. See
+  [the DynamoDB docs](https://yulinsim.dev/services/dynamodb/#marshalling-options).

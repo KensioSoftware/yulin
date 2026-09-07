@@ -28,15 +28,34 @@ export interface SimDynamoDbDocumentPath {
 }
 
 /**
- * One attribute value, converted where it stands.
+ * Every attribute value of an item, a key or a set of expression values.
+ *
+ * An attribute whose value is undefined is left out rather than converted, and
+ * that happens whatever the document client was built with. The real client
+ * drops it in the same place: `removeUndefinedValues` governs the values
+ * inside an attribute, and an item is not itself one of them.
  */
-class SimDynamoDbDocumentValuePath implements SimDynamoDbDocumentPath {
+class SimDynamoDbDocumentValuesPath implements SimDynamoDbDocumentPath {
   convert(
     value: unknown,
     conversion: SimDynamoDbDocumentConversion,
     path: string,
   ): unknown {
-    return conversion(value, path);
+    if (Array.isArray(value)) {
+      return value.map((member, index) =>
+        conversion(member, `${path}[${index.toString()}]`),
+      );
+    }
+
+    if (!isRecord(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, member]) => member !== undefined)
+        .map(([name, member]) => [name, conversion(member, `${path}.${name}`)]),
+    );
   }
 }
 
@@ -113,18 +132,11 @@ class SimDynamoDbDocumentFieldsPath implements SimDynamoDbDocumentPath {
 }
 
 /**
- * A path to one attribute value.
- */
-export function simDynamoDbDocumentValue(): SimDynamoDbDocumentPath {
-  return new SimDynamoDbDocumentValuePath();
-}
-
-/**
  * A path to a record or list whose every member is one attribute value, which
  * is what an Item, a Key and a set of expression values are.
  */
 export function simDynamoDbDocumentValues(): SimDynamoDbDocumentPath {
-  return simDynamoDbDocumentEach(simDynamoDbDocumentValue());
+  return new SimDynamoDbDocumentValuesPath();
 }
 
 /**
