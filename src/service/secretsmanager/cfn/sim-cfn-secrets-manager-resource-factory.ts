@@ -4,11 +4,17 @@ import type {
   SimCloudFormationResourceCreateContext,
   SimCloudFormationResourceDeleteContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCloudFormationResourceInPlaceUpdateContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 import type { SimSecretsManager } from "../sim-secrets-manager.js";
 import { SimCfnSecretsManagerSecretCreator } from "./secret/sim-cfn-secrets-manager-secret-creator.js";
-import type { SimSecretsManagerSecret } from "../secret/sim-secrets-manager-secret.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
+import { SimCfnSecretsManagerSecretDeleter } from "./secret/sim-cfn-secrets-manager-secret-deleter.js";
+import { SimCfnSecretsManagerSecretUpdater } from "./secret/sim-cfn-secrets-manager-secret-updater.js";
+import { simCfnSecretsManagerSecretReplaced } from "./secret/sim-cfn-secrets-manager-secret-change.js";
+import {
+  isSimCfnSecretsManagerSecret,
+  requireSimCfnSecretsManagerSecret,
+} from "./sim-cfn-secrets-manager-resource-type.js";
 
 interface SimSecretsManagerCfnResourceFactoryProperties {
   readonly secretsManager: SimSecretsManager;
@@ -16,75 +22,94 @@ interface SimSecretsManagerCfnResourceFactoryProperties {
 
 /**
  * CloudFormation Resource factory for simulated Secrets Manager resources.
+ *
+ * Only `Secret` is deployed. Rotation, resource policies and target
+ * attachments are not simulated, so their Resource types are reported as
+ * unsupported and skipped rather than quietly treated as deployed.
  */
 export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourceFactory {
-  private readonly secretsManager: SimSecretsManager;
   private readonly secretCreator: SimCfnSecretsManagerSecretCreator;
+  private readonly secretUpdater: SimCfnSecretsManagerSecretUpdater;
+  private readonly secretDeleter: SimCfnSecretsManagerSecretDeleter;
 
   constructor(properties: SimSecretsManagerCfnResourceFactoryProperties) {
-    this.secretsManager = properties.secretsManager;
+    const { secretsManager } = properties;
+
     this.secretCreator = new SimCfnSecretsManagerSecretCreator({
-      secretsManager: properties.secretsManager,
+      secretsManager,
+    });
+    this.secretUpdater = new SimCfnSecretsManagerSecretUpdater({
+      secretsManager,
+    });
+    this.secretDeleter = new SimCfnSecretsManagerSecretDeleter({
+      secretsManager,
     });
   }
 
   /**
    * Create a simulated Secrets Manager resource from a CloudFormation
    * Resource.
-   *
-   * Rotation, resource policies and target attachments are not simulated, so
-   * their Resource types are reported as unsupported and skipped rather than
-   * quietly treated as deployed.
    */
   async create(
     resourceTypeName: string,
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
-    switch (resourceTypeName) {
-      case "Secret": {
-        return await this.secretCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-          simCfnResourceCallerOptions(context.caller),
-        );
-      }
-      default: {
-        throw new Error(
-          `Unsupported sim Secrets Manager CloudFormation Resource ${resourceTypeName}`,
-        );
-      }
-    }
+    requireSimCfnSecretsManagerSecret(resourceTypeName);
+
+    return await this.secretCreator.create(
+      resource,
+      context.resolvedProperties ?? resource.properties,
+      simCfnResourceCallerOptions(context.caller),
+    );
+  }
+
+  /**
+   * Whether a changed secret can be applied to the deployed one.
+   *
+   * Name is the only property real CloudFormation replaces a secret for.
+   * Everything else is applied with no interruption, which is what keeps a
+   * generated value across a change to the secret's description or tags.
+   */
+  updatesInPlace(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+  ): boolean {
+    return (
+      isSimCfnSecretsManagerSecret(resourceTypeName) &&
+      !simCfnSecretsManagerSecretReplaced(current, updated)
+    );
+  }
+
+  /**
+   * Apply a changed AWS::SecretsManager::Secret Resource to the deployed
+   * secret.
+   */
+  async updateInPlace(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+    context: SimCloudFormationResourceInPlaceUpdateContext,
+  ): Promise<object | undefined> {
+    requireSimCfnSecretsManagerSecret(resourceTypeName, "update");
+
+    return await this.secretUpdater.update(current, updated, context);
   }
 
   /**
    * Delete a simulated Secrets Manager resource created from a CloudFormation
    * Resource.
-   *
-   * DeleteSecret schedules the deletion rather than carrying it out, so a torn
-   * down Stack leaves a secret waiting out its recovery window. That is what
-   * CloudFormation does: the secret is recoverable afterwards, which is the
-   * point of the window.
    */
   async delete(
     resourceTypeName: string,
     resource: SimCfnResource,
     context: SimCloudFormationResourceDeleteContext,
   ): Promise<void> {
-    if (resourceTypeName !== "Secret") {
-      throw new Error(
-        `Unsupported sim Secrets Manager CloudFormation Resource ${resourceTypeName} deletion`,
-      );
-    }
+    requireSimCfnSecretsManagerSecret(resourceTypeName, "deletion");
 
-    const secret = resource.simResource as SimSecretsManagerSecret | undefined;
-    assertDefined(
-      secret,
-      `sim Secrets Manager secret for CloudFormation Resource ${resource.logicalId}`,
-    );
-
-    await this.secretsManager.deleteSecret(
-      { input: { SecretId: secret.arn.value } },
+    await this.secretDeleter.delete(
+      resource,
       simCfnResourceCallerOptions(context.caller),
     );
   }

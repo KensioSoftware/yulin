@@ -7,7 +7,6 @@ import type { SimCfnStackResourceOperations } from "../sim-cfn-stack-resource-op
 import { makeSimCfnStackResourceMap } from "../resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackUpdatePlan } from "./sim-cfn-stack-update-plan.js";
 import { simCfnStackTemplateChanged } from "./sim-cfn-stack-template-changes.js";
-import { SimCfnResourceRetention } from "../../resource/delete/sim-cfn-resource-retention.js";
 
 /**
  * What CloudFormation answers an update that would change nothing.
@@ -30,11 +29,13 @@ interface SimCfnStackUpdaterProperties {
 /**
  * Applies a changed template to a Stack that is already deployed.
  *
- * The Resources the new template drops or replaces go first, in the reverse of
- * the order they were created in, and the ones it adds or replaces are created
- * after, in dependency order. Everything else is left where it is, which is the
- * point of updating a Stack rather than replacing it: what a Bucket holds and
- * what a Table has in it survive a change elsewhere in the template.
+ * The Resources a service can change where they are go first, while everything
+ * the Stack had is still deployed. Then the Resources the new template drops or
+ * replaces, in the reverse of the order they were created in, and last the ones
+ * it adds or replaces, in dependency order. Everything else is left where it
+ * is, which is the point of updating a Stack rather than replacing it: what a
+ * Bucket holds and what a Table has in it survive a change elsewhere in the
+ * template.
  *
  * It does not own Stack status or the Stack's visible template.
  * SimCfnStackUpdateLifecycle owns the first and SimCfnStack the second.
@@ -54,6 +55,7 @@ export class SimCfnStackUpdater {
         background,
         template: updated,
       }),
+      inPlaceUpdates: properties.operations,
     });
   }
 
@@ -88,11 +90,11 @@ export class SimCfnStackUpdater {
       plan.replacements,
     );
 
-    await operations.delete(
-      resources,
-      plan.deletions,
-      new SimCfnResourceRetention({ replaced: plan.replacementRetentions() }),
-    );
+    // Before anything comes down. An update that fails here has changed some
+    // of the Stack's Resources and deleted none of them.
+    await operations.updateInPlace(resources, plan.updates);
+
+    await operations.delete(resources, plan.deletions, plan.retention());
 
     plan.applyTo(resources);
 

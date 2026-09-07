@@ -1,10 +1,7 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import type { SimCfnResource } from "../sim-cfn-resource.js";
-import { parseSimCloudFormationResourceType } from "../parser/sim-cfn-resource-parser.js";
-import { resolveSimCloudFormationServiceResourceFactory } from "../resolve/service/sim-cfn-service-resolver.js";
-import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
+import { simCfnResourceServiceFactory } from "../resolve/service/sim-cfn-resource-service-factory.js";
 
 interface SimCfnResourceUpdateValidatorProperties {
   readonly current: SimCfnResource;
@@ -38,35 +35,19 @@ export class SimCfnResourceUpdateValidator {
   ): Promise<void> {
     const { current, updated } = this;
     const { simAws, currentResources, updatedResources, caller } = properties;
-    const { type } = updated;
 
-    if (type === undefined || current.type !== type) {
+    if (updated.type === undefined || current.type !== updated.type) {
       return;
     }
 
-    const resourceType = parseSimCloudFormationResourceType(type);
-    let factory: SimCfnServiceResourceFactory;
+    const service = simCfnResourceServiceFactory(simAws, updated);
 
-    try {
-      factory = resolveSimCloudFormationServiceResourceFactory(
-        simAws,
-        updated.accountRegionScope,
-        resourceType,
-      );
-    } catch (error) {
-      if (isSimCfnUnsupportedResourceError(error)) {
-        return;
-      }
-
-      throw error;
-    }
-
-    if (factory.assertUpdateAllowed === undefined) {
+    if (service?.factory.assertUpdateAllowed === undefined) {
       return;
     }
 
-    await factory.assertUpdateAllowed(
-      resourceType.resourceTypeName,
+    await service.factory.assertUpdateAllowed(
+      service.resourceTypeName,
       current,
       updated,
       {

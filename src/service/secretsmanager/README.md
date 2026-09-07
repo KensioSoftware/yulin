@@ -140,6 +140,20 @@ a contradiction such as four required character types in a three-character passw
 before anything is generated. The randomness is real rather than seedable: a test that wants the
 generated value reads it back out of the simulation, as a deployed application does.
 
+`SimCfnSecretsManagerSecretUpdater` is the update half, and is why a stack update leaves a secret
+where it is. `Name` is the only property real CloudFormation replaces a secret for, and the only one
+the updater reports as a replacement. Everything else goes through `UpdateSecret` against the
+deployed secret. A new version is written only where the template asks for a different value.
+
+Replacing a secret would also fail outright. `DeleteSecret` schedules the deletion and leaves the
+name held for the recovery window. The secret taking its place would then ask for a name the deleted
+one still has.
+
+Tags and a dropped `KmsKeyId` are applied to the secret directly. CloudFormation applies a template
+as the desired state, and `UpdateSecret` has no way to express that. It treats an omitted field as
+unchanged, and Secrets Manager changes tags through `TagResource` (which this simulation leaves
+out).
+
 `Ref` and `Fn::GetAtt … Id` both give the full ARN, through `SimSecretsManagerSecretCfn`. That
 carries the random suffix, which is what makes a `Ref` into an IAM policy resource behave here the
 way it does on real AWS.

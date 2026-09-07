@@ -428,6 +428,26 @@ console.log(credentials.password?.length); // 24
 Generated passwords are random. Read the deployed value through Secrets Manager instead of asserting
 on an exact password.
 
+## Updating a deployed secret
+
+`Name` is the only property real CloudFormation replaces a secret for. A stack update that changes
+anything else applies it to the deployed secret. The secret keeps its ARN, its versions and its
+value. That matters most for a generated password. A resource that read the secret as the stack deployed,
+such as a CloudFront origin custom header, still holds what the secret holds.
+
+A new version is written when the template asks for a different value, which is a changed
+`SecretString` or a changed `GenerateSecretString`. A changed `GenerateSecretString` generates a new
+password, as real CloudFormation writes a new version for one. Nothing is written for a change to
+the description or the tags.
+
+The template is the desired state. A property the new template leaves out is cleared. A dropped
+`Description` is emptied, and a dropped `KmsKeyId` puts the secret back on the `aws/secretsmanager`
+key. Versions already written keep the key they were made with and stay
+readable.
+
+Changing the `Name` replaces the secret. The new one is created under the new name and the old one
+is scheduled for deletion, waiting out its recovery window.
+
 ## Reading a secret with a dynamic reference
 
 A `{{resolve:secretsmanager:...}}` dynamic reference reads an existing secret while CloudFormation
@@ -641,7 +661,10 @@ code into the simulation, served in process. See
   empty page.
 - Tags are stored and reported by `DescribeSecret` and `ListSecrets`, but `TagResource` and
   `UntagResource` are absent, and the `secretsmanager:ResourceTag` and `aws:ResourceTag` condition
-  keys are left underived.
+  keys are left underived. A stack update applies the tags its template declares to the deployed
+  secret, since there is no command to ask for it with.
+- A stack update authorizes the whole change as `secretsmanager:UpdateSecret`. Real CloudFormation
+  needs `secretsmanager:TagResource` as well for a change to the tags.
 - Other Secrets Manager condition keys, such as `secretsmanager:SecretId` and
   `secretsmanager:VersionStage`, are left underived too, and a policy relying on them fails to match.
   Ordinary condition operators on values sim IAM does supply work as usual.

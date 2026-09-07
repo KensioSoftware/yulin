@@ -493,11 +493,12 @@ applies a different template.
 `SimCfnStackUpdater` works out and applies the difference:
 
 - `SimCfnStackUpdatePlan` compares the deployed resources with the ones the new template describes,
-  and says which to delete, which to create, and what the stack holds afterwards.
-- `simCfnStackReplacedLogicalIds` decides what changed, by comparing each resource's resolved
-  template entry through `simCfnTemplateSignature`. Comparing resolved entries rather than template
-  text is what makes a changed parameter value a changed resource, and a reordered template no
-  change at all.
+  and says which to change where they are, which to delete, which to create, and what the stack
+  holds afterwards.
+- `simCfnStackResourceChanges` decides what changed, by comparing each resource's resolved template
+  entry through `simCfnTemplateSignature`. Comparing resolved entries rather than template text is
+  what makes a changed parameter value a changed resource, and a reordered template no change at
+  all. It also decides how each change is applied, by asking the service that owns the resource.
 - `simCfnStackOutputsChanged` answers the same question for the `Outputs` section, because an update
   that only changes an output is still an update. A template that changes nothing raises the
   `ValidationError` CloudFormation raises.
@@ -508,6 +509,23 @@ and the added and replaced resources are created in dependency order. This is wh
 `SimCfnStackResourceCreator` and `SimCfnStackResourceDeleter` each take the resources to work on
 alongside the whole stack: dependencies are read across every resource, while only some of them are
 being changed.
+
+### Changes a service applies to the deployed resource
+
+A service factory can implement `updatesInPlace` and `updateInPlace`, for the property changes real
+CloudFormation applies with no interruption. `updatesInPlace` answers at plan time, before anything
+is touched. A resource it claims is left out of the deletions and the creations, and keeps its
+physical name. The replacement therefore never spreads to a resource naming it.
+
+`SimCfnResourceInPlaceUpdater` runs one of them. The new resource record takes the deployed
+simulated AWS object on from the one it replaces in the stack's map. That carries the resource's
+contents across the update and leaves it reporting `CREATE_COMPLETE`. Both sets of resolved
+properties are handed to the service, because a service usually has to know which property changed.
+Secrets Manager writes a new secret version for a changed value, and leaves the version alone for a
+changed description.
+
+These run before the deletions. An update that fails on one has deleted nothing yet.
+`AWS::SecretsManager::Secret` is the only resource type implementing them so far.
 
 Sim CloudFormation has no in-place resource update, so a changed resource is deleted and created
 again. That diverges from CloudFormation, which updates most properties in place and keeps what the
