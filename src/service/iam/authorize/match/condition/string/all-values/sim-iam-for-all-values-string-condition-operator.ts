@@ -4,9 +4,13 @@ import { simIamStringValues } from "../sim-iam-string-values.js";
 
 /**
  * Base for `ForAllValues` IAM string operators.
+ *
+ * An absent context key matches. AWS answers true where the request carries
+ * no value for the key. A `ForAllValues` `Allow` therefore needs a `Null`
+ * guard beside it to stay tight.
  */
 export abstract class SimIamForAllValuesStringConditionOperator implements SimIamConditionOperator {
-  readonly matchesAbsentKey = false;
+  readonly matchesAbsentKey = true;
 
   /**
    * Check whether a given value matches the expected value.

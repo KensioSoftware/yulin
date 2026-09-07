@@ -148,7 +148,7 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     assertTrue(decision.isImplicitDeny);
   });
 
-  it("implicitly denies a request when the required context key is absent", () => {
+  it("allows a request when the context key is absent", () => {
     // Given a policy requiring every tag key to match an app pattern.
     const simIam = new SimIam();
     const policy = simIamAuthZResourcePolicySourceFactory.make({
@@ -167,7 +167,7 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
       },
     });
 
-    // When authorization omits the required tag-key context.
+    // When authorization omits the tag-key context.
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
@@ -177,8 +177,8 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
       resourcePolicies: [policy],
     });
 
-    // Then the incomplete context does not allow the request.
-    assertTrue(decision.isImplicitDeny);
+    // Then the condition matches vacuously, as it does in AWS.
+    assertTrue(decision.isAllowed);
   });
 
   it("matches a pattern against the principal ARN derived from the caller", () => {
