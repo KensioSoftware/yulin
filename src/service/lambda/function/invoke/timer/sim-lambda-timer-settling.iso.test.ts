@@ -7,6 +7,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimFixedClock } from "../../../../../util/clock/sim-clock.js";
 import { makeLambdaZipFileInput } from "../../code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../../sim-lambda-handler.type.js";
 
@@ -91,6 +92,24 @@ describe("Settling a simulated Lambda invocation that waits on the clock", () =>
     // And moving the clock is what releases it
     await simAws.clock().advanceBy(handlerDelayMilliseconds);
     assertArrayLength(worked, 1);
+  });
+
+  it("comes back from a clock that stands still under a running mode", async () => {
+    // Given the same function in a simulation built on a fixed clock, which
+    // reports one instant however long the host runs
+    const simAws = new SimAws({ clock: new SimFixedClock(startedAt) });
+    const worked: string[] = [];
+    await functionWaitingOnTheClock(simAws, worked);
+
+    // When it is invoked asynchronously and the simulation is asked to settle
+    await invokeAsynchronously(simAws);
+    await simAws.backgroundTasksComplete();
+
+    // Then it came back rather than waiting for an instant nothing brings.
+    // Simulated time here moves only as far as the clock underneath moves, and
+    // a fixed clock moves nowhere. The handler is left where a frozen clock
+    // leaves one
+    assertArrayEmpty(worked);
   });
 
   it("still ends a handler whose timer outlives its deadline", async () => {
