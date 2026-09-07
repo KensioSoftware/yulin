@@ -3,7 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
 import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
 import { makeSimCfnStackResourceMap } from "../stack/resource-map/sim-cfn-stack-resource-map.js";
-import { simCfnStackReplacedLogicalIds } from "../stack/update/sim-cfn-stack-replaced-resources.js";
+import { simCfnStackReplacedLogicalIds } from "../stack/update/sim-cfn-stack-resource-changes.js";
 import type { SimCfnTemplate } from "../template/sim-cfn-template.js";
 import type {
   SimCfnChangeSetType,

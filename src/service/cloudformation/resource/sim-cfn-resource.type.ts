@@ -114,6 +114,26 @@ export interface SimCloudFormationResourceDeleteContext {
 }
 
 /**
+ * What a service is given to apply a change to a Resource it created, without
+ * replacing it.
+ *
+ * Both property sets are resolved against the Resources the Stack holds now,
+ * so a Ref reaches the physical name of a deployed Resource. The old set is
+ * there because a service often has to know which property changed. Secrets
+ * Manager writes a new secret version for a changed value and leaves the
+ * version alone for a changed description.
+ */
+export interface SimCloudFormationResourceInPlaceUpdateContext {
+  readonly simAws: SimAws;
+  readonly resources: ReadonlyMap<string, SimCfnResource>;
+  readonly currentResolvedProperties: SimCfnTemplateValueRecord;
+  readonly updatedResolvedProperties: SimCfnTemplateValueRecord;
+
+  /** The principal the update runs as, as creation carries it. */
+  readonly caller?: SimAwsCaller | undefined;
+}
+
+/**
  * The two resolved Resource definitions available to update validation.
  */
 export interface SimCloudFormationResourceUpdateContext {

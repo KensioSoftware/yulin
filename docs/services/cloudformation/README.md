@@ -446,6 +446,22 @@ Replacement also affects dependencies and retention policies:
   The deployed one was deleted to make room for the replacement, and there is nothing left to put
   back. See [rolling back a failed update](#rolling-back-a-failed-update) below.
 
+### Resources a service changes where they are
+
+A service can claim a change for the properties real CloudFormation applies with no interruption.
+The resource is then left where it is. It keeps its physical name and everything it holds, and
+every resource naming it is left standing too.
+
+`AWS::SecretsManager::Secret` is the one resource type that does this so far. `Name` is the only
+property real CloudFormation replaces a secret for. A change to anything else is applied to the
+deployed secret, which keeps its ARN and its versions across the update. See the
+[simulated Secrets Manager docs](https://yulinsim.dev/services/secretsmanager/ "Simulated Secrets Manager usage docs")
+for which changes write a new secret version and which leave the value alone.
+
+These changes are applied first, while everything the stack had is still deployed. An update that
+fails on one has deleted nothing yet. A claimed resource the replacement spread reaches is replaced
+after all, and the claim is taken back, since its dependency is being deleted and created again.
+
 ### Rolling back a failed update
 
 A failed update is rolled back onto the template the stack was deployed from. The stack moves to
@@ -4393,13 +4409,15 @@ Each service's own docs describe what its resource types support.
   [properties a Resource was created without](#properties-a-resource-was-created-without) for what
   is still refused outright.
 - A stack update replaces a changed resource rather than updating it in place, so what the resource
-  held is lost. See [changed resources are replaced](#changed-resources-are-replaced).
+  held is lost. `AWS::SecretsManager::Secret` is the exception. See
+  [changed resources are replaced](#changed-resources-are-replaced) and
+  [resources a service changes where they are](#resources-a-service-changes-where-they-are).
 - A watched template file updates its stack in place. That makes the update itself no gentler. A
   changed resource is still replaced and loses what it holds, the same as any other update.
 - Yulin never synthesizes a CDK app. It watches the synthesized output template. A change to the app
   itself reaches the stack once something has run `cdk synth` over it.
-- A change set reports every `Modify` as `Replacement: True`, because a changed resource is replaced
-  rather than updated in place. `ChangeSetType: IMPORT` is refused, and so is a `CREATE` change set
+- A change set reports every `Modify` as `Replacement: True`, even for a resource an update would
+  change where it is. `ChangeSetType: IMPORT` is refused, and so is a `CREATE` change set
   naming a stack that is already there, where CloudFormation allows a second one against a stack
   still in review. Drift detection is outside the simulation.
 - A rolled-back update recreates a resource it had already replaced, and the resource comes back

@@ -428,6 +428,37 @@ console.log(credentials.password?.length); // 24
 Generated passwords are random. Read the deployed value through Secrets Manager instead of asserting
 on an exact password.
 
+## Updating a deployed secret
+
+`Name` is the only property real CloudFormation replaces a secret for. A stack update that changes
+anything else applies it to the deployed secret, which keeps its ARN and its versions.
+
+A change to the description, the tags or the KMS key leaves the value alone. That is what carries a
+generated password across an update, and it keeps a resource that read the secret as the stack
+deployed, such as a CloudFront origin custom header, holding the value the secret still has.
+
+A new version is written when the template asks for a different value, which is a changed
+`SecretString` or a changed `GenerateSecretString`. A changed `GenerateSecretString` generates a new
+password, as real CloudFormation writes a new version for one. **A resource that resolved the old
+value keeps it.** Its own template entry is unchanged, so the update leaves it alone, and it goes on
+holding what it read at deploy time. A consumer that has to follow the value must read the secret
+when it runs, the way a Lambda function given the secret's ARN does, rather than take a copy through
+a `{{resolve:secretsmanager:...}}` reference.
+
+The template is the desired state. A property the new template leaves out is cleared. A dropped
+`Description` is emptied, and a dropped `KmsKeyId` puts the secret back on the `aws/secretsmanager`
+key. Versions already written keep the key they were made with and stay
+readable.
+
+Changing the `Name` replaces the secret. The new one is created under the new name and the old one
+is scheduled for deletion, waiting out its recovery window.
+
+A secret is also replaced when a resource it names is replaced, because the update deletes and
+recreates that resource and the secret would otherwise be applied against the one on its way out.
+That replacement then fails, since the name is held for the recovery window. Real CloudFormation
+updates the secret in place and hands it the new physical name. Nothing is applied to the deployed
+secret before the failure.
+
 ## Reading a secret with a dynamic reference
 
 A `{{resolve:secretsmanager:...}}` dynamic reference reads an existing secret while CloudFormation
@@ -641,7 +672,10 @@ code into the simulation, served in process. See
   empty page.
 - Tags are stored and reported by `DescribeSecret` and `ListSecrets`, but `TagResource` and
   `UntagResource` are absent, and the `secretsmanager:ResourceTag` and `aws:ResourceTag` condition
-  keys are left underived.
+  keys are left underived. A stack update applies the tags its template declares to the deployed
+  secret, since there is no command to ask for it with.
+- A stack update authorizes the whole change as `secretsmanager:UpdateSecret`. Real CloudFormation
+  needs `secretsmanager:TagResource` as well for a change to the tags.
 - Other Secrets Manager condition keys, such as `secretsmanager:SecretId` and
   `secretsmanager:VersionStage`, are left underived too, and a policy relying on them fails to match.
   Ordinary condition operators on values sim IAM does supply work as usual.

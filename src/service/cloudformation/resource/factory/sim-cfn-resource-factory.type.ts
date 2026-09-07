@@ -3,7 +3,10 @@ import type {
   SimCloudFormationResourceCreateContext,
   SimCloudFormationResourceDeleteContext,
 } from "../sim-cfn-resource.js";
-import type { SimCloudFormationResourceUpdateContext } from "../sim-cfn-resource.type.js";
+import type {
+  SimCloudFormationResourceInPlaceUpdateContext,
+  SimCloudFormationResourceUpdateContext,
+} from "../sim-cfn-resource.type.js";
 
 export interface SimCfnServiceResourceFactory {
   create(
@@ -44,6 +47,41 @@ export interface SimCfnServiceResourceFactory {
     updated: SimCfnResource,
     context: SimCloudFormationResourceUpdateContext,
   ): Promise<void> | void;
+
+  /**
+   * Whether a change between two definitions of this Resource can be applied
+   * to the deployed Resource, leaving it where it is.
+   *
+   * Sim CloudFormation replaces a changed Resource unless a service says
+   * otherwise, which is the safe reading for one with no way to change a
+   * deployed Resource. A service answers true for the changes real
+   * CloudFormation applies with no interruption, and carries them out in
+   * `updateInPlace`.
+   *
+   * Answering true keeps the Resource's physical name, so nothing naming it is
+   * replaced either.
+   */
+  updatesInPlace?(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+  ): boolean;
+
+  /**
+   * Apply a change to the deployed Resource.
+   *
+   * Called only for a change `updatesInPlace` claimed, and before the update
+   * deletes or creates anything. The deployed simulated AWS object is on
+   * `current`, and `updated` carries the new definition. What it returns
+   * becomes the Resource's simulated AWS object, which is usually the deployed
+   * one it was given.
+   */
+  updateInPlace?(
+    resourceTypeName: string,
+    current: SimCfnResource,
+    updated: SimCfnResource,
+    context: SimCloudFormationResourceInPlaceUpdateContext,
+  ): Promise<object | undefined>;
 }
 
 export interface SimCloudFormationParsedResourceType {

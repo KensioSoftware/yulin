@@ -17,8 +17,8 @@ import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-crea
 import type { SimCfnResourceOrder } from "./deploy/sim-cfn-resource-order.js";
 import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
 import { SimCfnStackUpdater } from "./update/sim-cfn-stack-updater.js";
-import type { SimCfnStackResourceReplacement } from "./update/sim-cfn-stack-update-plan.js";
-import { SimCfnResourceUpdateValidator } from "../resource/update/sim-cfn-resource-update-validator.js";
+import type { SimCfnStackResourceChange } from "./update/sim-cfn-stack-resource-change-pairs.js";
+import { SimCfnStackResourceUpdates } from "./update/sim-cfn-stack-resource-updates.js";
 import type { SimCloudFormationStackName } from "./sim-cfn-stack.js";
 
 interface SimCfnStackUpdateProperties {
@@ -178,21 +178,26 @@ export class SimCfnStackResourceOperations {
   async assertUpdatesAllowed(
     currentResources: ReadonlyMap<string, SimCfnResource>,
     updatedResources: ReadonlyMap<string, SimCfnResource>,
-    replacements: readonly SimCfnStackResourceReplacement[],
+    replacements: readonly SimCfnStackResourceChange[],
   ): Promise<void> {
-    await Promise.all(
-      replacements.map(async ({ current, updated }) => {
-        await new SimCfnResourceUpdateValidator({
-          current,
-          updated,
-        }).assertAllowed({
-          simAws: this.simAws,
-          currentResources,
-          updatedResources,
-          caller: this.context.caller,
-        });
-      }),
+    await this.resourceUpdates().assertAllowed(
+      currentResources,
+      updatedResources,
+      replacements,
     );
+  }
+
+  /** Whether the service owning a Resource can apply this change to it. */
+  updatesInPlace(current: SimCfnResource, updated: SimCfnResource): boolean {
+    return this.resourceUpdates().claimed(current, updated);
+  }
+
+  /** Apply the given Resource changes to the deployed Resources. */
+  async updateInPlace(
+    resources: ReadonlyMap<string, SimCfnResource>,
+    updates: readonly SimCfnStackResourceChange[],
+  ): Promise<void> {
+    await this.resourceUpdates().apply(resources, updates);
   }
 
   /**
@@ -254,6 +259,13 @@ export class SimCfnStackResourceOperations {
       cdkOutContext: this.context.cdkOutContext,
       assetsCaller: this.context.publishingCaller(),
     }).publish();
+  }
+
+  private resourceUpdates(): SimCfnStackResourceUpdates {
+    return new SimCfnStackResourceUpdates({
+      simAws: this.simAws,
+      caller: this.context.caller,
+    });
   }
 
   private creator(

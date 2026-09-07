@@ -1,14 +1,18 @@
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
-import { simCfnStackReplacedLogicalIds } from "./sim-cfn-stack-replaced-resources.js";
+import { SimCfnResourceRetention } from "../../resource/delete/sim-cfn-resource-retention.js";
+import {
+  simCfnStackResourceChanges,
+  type SimCfnStackInPlaceUpdates,
+} from "./sim-cfn-stack-resource-changes.js";
+import {
+  simCfnStackResourceChangePairs,
+  type SimCfnStackResourceChange,
+} from "./sim-cfn-stack-resource-change-pairs.js";
 
 interface SimCfnStackUpdatePlanProperties {
   readonly current: ReadonlyMap<string, SimCfnResource>;
   readonly updated: ReadonlyMap<string, SimCfnResource>;
-}
-
-export interface SimCfnStackResourceReplacement {
-  readonly current: SimCfnResource;
-  readonly updated: SimCfnResource;
+  readonly inPlaceUpdates?: SimCfnStackInPlaceUpdates | undefined;
 }
 
 /**
@@ -16,17 +20,23 @@ export interface SimCfnStackResourceReplacement {
  * happens.
  *
  * The plan compares the Resources the Stack has with the ones its new template
- * describes, and says which to delete, which to create, and what the Stack
- * holds afterwards. A Resource the template still describes unchanged is left
- * alone, keeping whatever it holds in simulated AWS.
+ * describes, and says which to update where they are, which to delete, which to
+ * create, and what the Stack holds afterwards. A Resource the template still
+ * describes unchanged is left alone, keeping whatever it holds in simulated
+ * AWS.
  *
- * It does not delete or create anything, order the work, or decide what counts
- * as a changed Resource. SimCfnStackUpdater runs the plan, and
- * simCfnStackReplacedLogicalIds decides what changed.
+ * It does not delete, create or update anything, order the work, or decide what
+ * counts as a changed Resource. SimCfnStackUpdater runs the plan, and
+ * simCfnStackResourceChanges decides what changed and how.
  */
 export class SimCfnStackUpdatePlan {
   /** The current and updated halves of each Resource replacement. */
-  public readonly replacements: readonly SimCfnStackResourceReplacement[];
+  public readonly replacements: readonly SimCfnStackResourceChange[];
+
+  /**
+   * The Resources to change where they are, rather than by replacing them.
+   */
+  public readonly updates: readonly SimCfnStackResourceChange[];
 
   /**
    * The deployed Resources to delete: the ones the new template drops, and the
@@ -43,25 +53,24 @@ export class SimCfnStackUpdatePlan {
   public readonly updated: ReadonlyMap<string, SimCfnResource>;
 
   constructor(properties: SimCfnStackUpdatePlanProperties) {
-    const { current, updated } = properties;
-    const replaced = simCfnStackReplacedLogicalIds({ current, updated });
+    const { current, updated, inPlaceUpdates } = properties;
+    const { replaced, updatedInPlace } = simCfnStackResourceChanges({
+      current,
+      updated,
+      inPlaceUpdates,
+    });
 
     this.updated = updated;
-    this.replacements = replaced
-      .values()
-      .map((logicalId) => {
-        const currentResource = current.get(logicalId);
-        const updatedResource = updated.get(logicalId);
-
-        if (currentResource === undefined || updatedResource === undefined) {
-          throw new Error(
-            `CloudFormation replacement ${logicalId} is missing one of its Resource definitions`,
-          );
-        }
-
-        return { current: currentResource, updated: updatedResource };
-      })
-      .toArray();
+    this.replacements = simCfnStackResourceChangePairs(
+      current,
+      updated,
+      replaced,
+    );
+    this.updates = simCfnStackResourceChangePairs(
+      current,
+      updated,
+      updatedInPlace,
+    );
 
     // Both lists are worked out now rather than on demand, because the Stack's
     // Resource map is the current one and applying the plan changes it.
@@ -84,20 +93,22 @@ export class SimCfnStackUpdatePlan {
   }
 
   /**
-   * For each logical ID the update is replacing, whether the definition taking
-   * its place says to keep the deployed Resource.
+   * What the update's deletions are to leave in simulated AWS.
    *
-   * The new half answers it because CloudFormation reads UpdateReplacePolicy
-   * off the template it is applying. An update that adds the attribute keeps
-   * the Resource it replaces, and one that drops it deletes that Resource.
+   * A replacement's new half answers for it, because CloudFormation reads
+   * UpdateReplacePolicy off the template it is applying. An update that adds
+   * the attribute keeps the Resource it replaces, and one that drops it
+   * deletes that Resource.
    */
-  replacementRetentions(): ReadonlyMap<string, boolean> {
-    return new Map(
-      this.replacements.map(({ current, updated }) => [
-        current.logicalId,
-        updated.retainedOnReplace,
-      ]),
-    );
+  retention(): SimCfnResourceRetention {
+    return new SimCfnResourceRetention({
+      replaced: new Map(
+        this.replacements.map(({ current, updated }) => [
+          current.logicalId,
+          updated.retainedOnReplace,
+        ]),
+      ),
+    });
   }
 
   /**
@@ -107,7 +118,11 @@ export class SimCfnStackUpdatePlan {
    * updates the Stack, so this is not the whole no-op question.
    */
   public get changesResources(): boolean {
-    return this.deletions.length > 0 || this.creations.length > 0;
+    return (
+      this.deletions.length > 0 ||
+      this.creations.length > 0 ||
+      this.updates.length > 0
+    );
   }
 
   /**
@@ -116,7 +131,9 @@ export class SimCfnStackUpdatePlan {
    * The map is changed in place rather than replaced, so anything already
    * holding the Stack's Resources sees the update. A Resource the template
    * leaves alone keeps the object it already had, which is what keeps its
-   * simulated AWS Resource and its creation status.
+   * simulated AWS Resource and its creation status. A Resource updated where it
+   * is takes the new record, which the update has already moved on to the
+   * deployed simulated AWS Resource.
    */
   applyTo(resources: Map<string, SimCfnResource>): void {
     const dropped = resources
@@ -130,6 +147,10 @@ export class SimCfnStackUpdatePlan {
 
     for (const resource of this.creations) {
       resources.set(resource.logicalId, resource);
+    }
+
+    for (const { updated } of this.updates) {
+      resources.set(updated.logicalId, updated);
     }
   }
 }
