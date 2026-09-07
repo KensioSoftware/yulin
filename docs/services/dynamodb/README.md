@@ -3230,8 +3230,9 @@ A simulated table holds a number's digits exactly, but the document client conve
 JavaScript numbers, and that is where digits are lost. It is the same loss AWS has. A test that
 passes here is telling you something true about the real thing.
 
-- Writing a `number` outside the safe integer range is refused, never stored already rounded. Write
-  a `bigint`, or a `NumberValue` from `@aws-sdk/lib-dynamodb`, to keep the digits.
+- Writing a `number` outside the safe integer range is refused unless the client was built with
+  `allowImpreciseNumbers`. Write a `bigint`, or a `NumberValue` from `@aws-sdk/lib-dynamodb`, to keep
+  the digits.
 - Reading a stored number outside the safe integer range gives a `bigint`.
 - Reading a stored decimal with more digits than a JavaScript number carries gives a rounded
   `number`. The table still holds every digit, and the rounding is the document client's. Read
