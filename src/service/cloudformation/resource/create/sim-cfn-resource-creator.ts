@@ -6,6 +6,7 @@ import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-f
 import { parseSimCloudFormationResourceType } from "../parser/sim-cfn-resource-parser.js";
 import { resolveSimCloudFormationServiceResourceFactory } from "../resolve/service/sim-cfn-service-resolver.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { authorizeSimCdkProviderInvoke } from "../../cdk/provider/sim-cdk-provider-invoke-auth-z.js";
 
 interface SimCfnResourceCreatorProperties<T extends object> {
   readonly resource: SimCfnResource<T>;
@@ -60,9 +61,20 @@ export class SimCfnResourceCreator<T extends object = object> {
         resourceType,
       );
 
+    const resolvedProperties = await this.resource.resolvedProperties(context);
+
+    authorizeSimCdkProviderInvoke({
+      resourceType,
+      resource: this.resource,
+      resolvedProperties,
+      resources: context.resources,
+      simAws: context.simAws,
+      caller: context.caller,
+    });
+
     const resolvedContext: SimCloudFormationResourceCreateContext = {
       ...context,
-      resolvedProperties: await this.resource.resolvedProperties(context),
+      resolvedProperties,
     };
 
     return await factory.create(

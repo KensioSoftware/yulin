@@ -4,6 +4,7 @@ import type {
 } from "../../../resource/sim-cfn-resource.js";
 import { bucketNotificationsError } from "./error/sim-cdk-bucket-notification-error.js";
 import { SimCdkBucketNotificationProperties } from "./property/sim-cdk-bucket-notification-properties.js";
+import { simCfnResourceCallerOptions } from "../../../resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * Removes the notification configuration a Custom::S3BucketNotifications
@@ -44,11 +45,14 @@ export class SimCdkBucketNotificationsRemover {
         resource.accountRegionScope.regionName,
       )
       .s3()
-      .putBucketNotificationConfiguration({
-        input: {
-          Bucket: properties.bucketName,
-          NotificationConfiguration: {},
+      .putBucketNotificationConfiguration(
+        {
+          input: {
+            Bucket: properties.bucketName,
+            NotificationConfiguration: {},
+          },
         },
-      });
+        simCfnResourceCallerOptions(context.caller),
+      );
   }
 }

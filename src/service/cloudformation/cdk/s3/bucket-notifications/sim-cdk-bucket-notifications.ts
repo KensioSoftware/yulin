@@ -8,6 +8,7 @@ import { SimCdkBucketNotificationConfiguration } from "./configuration/sim-cdk-b
 import { bucketNotificationsError } from "./error/sim-cdk-bucket-notification-error.js";
 import { SimCdkBucketNotificationProperties } from "./property/sim-cdk-bucket-notification-properties.js";
 import { SimCdkBucketNotificationsRemover } from "./sim-cdk-bucket-notifications-remover.js";
+import { simCfnResourceCallerOptions } from "../../../resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * CloudFormation Resource factory for CDK Bucket event notifications.
@@ -25,10 +26,13 @@ import { SimCdkBucketNotificationsRemover } from "./sim-cdk-bucket-notifications
  * bucket alongside the function's `AWS::Lambda::Permission` is the circular
  * dependency this Resource type exists to break.
  *
- * `ServiceToken` is read for the provider function it names, and otherwise
- * ignored. That function is declined on its runtime, as CDK's BucketDeployment
- * provider is, and recorded as inert rather than as a gap, since this factory
- * has already made the call it would have made.
+ * `ServiceToken` is read for the provider function it names. That function is
+ * declined on its runtime, as CDK's BucketDeployment provider is, and recorded
+ * as inert rather than as a gap, since this factory has already made the call
+ * it would have made. The deployment still pays for the invoke real
+ * CloudFormation makes, which
+ * {@link import("../../provider/sim-cdk-provider-invoke-auth-z.js").authorizeSimCdkProviderInvoke}
+ * authorizes for every custom Resource ahead of its factory.
  */
 export class SimCdkBucketNotificationsResourceFactory implements SimCfnServiceResourceFactory {
   /**
@@ -67,13 +71,16 @@ export class SimCdkBucketNotificationsResourceFactory implements SimCfnServiceRe
         resource.accountRegionScope.regionName,
       )
       .s3()
-      .putBucketNotificationConfiguration({
-        input: {
-          Bucket: properties.bucketName,
-          NotificationConfiguration: configuration,
-          SkipDestinationValidation: properties.skipDestinationValidation,
+      .putBucketNotificationConfiguration(
+        {
+          input: {
+            Bucket: properties.bucketName,
+            NotificationConfiguration: configuration,
+            SkipDestinationValidation: properties.skipDestinationValidation,
+          },
         },
-      });
+        simCfnResourceCallerOptions(context.caller),
+      );
 
     return undefined;
   }
