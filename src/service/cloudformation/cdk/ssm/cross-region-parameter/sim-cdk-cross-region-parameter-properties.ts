@@ -8,9 +8,10 @@ import { crossRegionParameterError } from "./sim-cdk-cross-region-parameter-erro
  * The properties CDK puts on a Custom::CrossRegionStringParameterReader
  * Resource.
  *
- * `ServiceToken` is read and ignored. It points at CDK's own provider
- * function, whose whole job is the GetParameter call this factory makes
- * instead. `RefreshToken` is the logical ID of the function version the
+ * `ServiceToken` is accepted and read no further here. It points at CDK's own
+ * provider function, whose whole job is the GetParameter call this factory
+ * makes instead, and the deployment reads it once more to authorize the invoke
+ * real CloudFormation makes of that function. `RefreshToken` is the logical ID of the function version the
  * parameter was written from, and CDK puts it there so that publishing a new
  * version makes CloudFormation run the reader again. The reader here runs on
  * every deployment either way, so the token has nothing left to say.

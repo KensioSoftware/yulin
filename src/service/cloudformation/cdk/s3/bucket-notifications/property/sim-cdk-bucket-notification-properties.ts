@@ -7,9 +7,11 @@ import { bucketNotificationsError } from "../error/sim-cdk-bucket-notification-e
 /**
  * The properties CDK puts on a Custom::S3BucketNotifications Resource.
  *
- * `ServiceToken` is read and ignored. It points at CDK's own Python provider
- * function, whose whole job is the PutBucketNotificationConfiguration call this
- * factory makes instead.
+ * `ServiceToken` is accepted and read no further here. It points at CDK's own
+ * Python provider function, whose whole job is the
+ * PutBucketNotificationConfiguration call this factory makes instead. The
+ * deployment reads it once more, to authorize the invoke real CloudFormation
+ * makes of that function.
  */
 const knownPropertyNames: ReadonlySet<string> = new Set([
   "BucketName",

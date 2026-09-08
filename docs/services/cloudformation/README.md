@@ -2549,6 +2549,94 @@ working simulation with a hand-written one.
 The provider is found through the `ServiceToken` its custom resource names it by, not by the logical
 ID CDK generated for it. That ID is a hash of the construct path, and no kind of thing to match on.
 
+### What a custom resource costs the deploy Role
+
+Real CloudFormation answers a `Custom::` resource by invoking the provider function its `ServiceToken`
+names, as the stack's execution role. Yulin carries several of these out itself instead of running the
+provider, and it authorizes that invoke anyway. A deploy Role holding no `lambda:InvokeFunction` on the
+provider fails the stack where the real deployment fails.
+
+The `ServiceToken` decides the ARN. A token written as an ARN is taken as it stands. CDK's `Fn::GetAtt`
+for the provider's `Arn` is resolved back to the function the stack declares, since the provider is
+left uncreated and has no ARN of its own to give.
+
+The work the resource does is authorized too, as the deployment's principal.
+`Custom::S3BucketNotifications` costs `s3:PutBucketNotification` and
+`Custom::CrossRegionStringParameterReader` costs `ssm:GetParameter`. `Custom::CDKBucketDeployment`
+writes its Objects into the simulated Bucket without sending `PutObject`, so nothing there reaches IAM.
+
+```typescript sim-cloudformation-custom-resource-invoke
+/**
+ * A deploy Role refused the provider invoke its custom resource needs.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const { Role } = await simAws.iam().createRole({
+  input: {
+    RoleName: "DeployRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "cloudformation.amazonaws.com" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  },
+});
+
+// Everything the template needs apart from the invoke of the provider.
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "DeployRole",
+    PolicyName: "DeployPolicy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: ["cloudformation:*", "s3:*"],
+          Resource: "*",
+        },
+      ],
+    }),
+  },
+});
+
+try {
+  await simAws.cloudFormation().deployTemplate({
+    stackName: "uploads-stack",
+    caller: { kind: "arn", arn: Role.Arn },
+    template: {
+      Resources: {
+        Bucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "uploads" },
+        },
+        BucketNotifications: {
+          Type: "Custom::S3BucketNotifications",
+          Properties: {
+            ServiceToken: "arn:aws:lambda:us-east-1:888888888888:function:cdk",
+            BucketName: { Ref: "Bucket" },
+            NotificationConfiguration: {},
+            Managed: true,
+          },
+        },
+      },
+    },
+  });
+} catch (error) {
+  // is not authorized to perform: lambda:InvokeFunction on resource:
+  // arn:aws:lambda:us-east-1:888888888888:function:cdk
+  console.log((error as Error).message);
+}
+```
+
 ## S3 Bucket notifications
 
 The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the ordinary

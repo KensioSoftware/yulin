@@ -11,6 +11,7 @@ import {
 } from "./sim-cdk-cross-region-parameter-error.js";
 import { SimCdkCrossRegionParameterProperties } from "./sim-cdk-cross-region-parameter-properties.js";
 import { SimCdkCrossRegionParameterReading } from "./sim-cdk-cross-region-parameter-reading.js";
+import { simCfnResourceCallerOptions } from "../../../resource/caller/sim-cfn-resource-caller-options.js";
 
 /**
  * CloudFormation Resource factory for CDK's cross-Region parameter reader.
@@ -100,7 +101,10 @@ export class SimCdkCrossRegionParameterReaderResourceFactory implements SimCfnSe
       const output = await context.simAws
         .accountRegionScope(resource.accountRegionScope.accountId, regionName)
         .ssm()
-        .getParameter({ input: { Name: parameterName } });
+        .getParameter(
+          { input: { Name: parameterName } },
+          simCfnResourceCallerOptions(context.caller),
+        );
 
       return output.Parameter?.Value;
     } catch (error) {
