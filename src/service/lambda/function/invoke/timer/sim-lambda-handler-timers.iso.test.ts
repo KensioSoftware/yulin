@@ -1,9 +1,9 @@
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertFalse,
+  assertGreaterThan,
   assertIdentical,
   assertNonNullable,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -345,6 +345,6 @@ describe("the timers a sim Lambda handler is given", () => {
 
     // Then they ran in real time, as they would have without a simulation in
     // the process at all.
-    assertTrue(ticks > 0, "the host's own interval kept its own time");
+    assertGreaterThan(ticks, 0, "the host's own interval kept its own time");
   });
 });

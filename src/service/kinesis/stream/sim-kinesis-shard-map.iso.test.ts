@@ -2,6 +2,7 @@ import { DescribeStreamCommand } from "@aws-sdk/client-kinesis";
 import {
   assertArrayLength,
   assertFalse,
+  assertGreaterThan,
   assertIdentical,
   assertTrue,
   assertUndefined,
@@ -72,7 +73,7 @@ describe("The shard map of a simulated Kinesis stream", () => {
     // Then the shard reports where it started and nothing about where it ends,
     // which is how a reader tells a shard that is still taking records.
     const range = described.StreamDescription.Shards[0]?.SequenceNumberRange;
-    assertTrue((range?.StartingSequenceNumber ?? "").length > 0);
+    assertGreaterThan((range?.StartingSequenceNumber ?? "").length, 0);
     assertUndefined(range?.EndingSequenceNumber);
   });
 

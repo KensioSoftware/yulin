@@ -2,7 +2,7 @@ import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
   assertArrayLength,
   assertIdentical,
-  assertTrue,
+  assertLessThanOrEqual,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -33,7 +33,7 @@ describe("What a simulated ECS container's queue batches carry", () => {
     assertArrayLength(handled, 5);
 
     for (const batch of batches) {
-      assertTrue(batch.length <= 2);
+      assertLessThanOrEqual(batch.length, 2);
     }
   });
 

@@ -4,6 +4,7 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertLessThan,
   assertNonNullable,
   assertThrowsErrorAsync,
   assertTrue,
@@ -121,7 +122,7 @@ describe("background sequencing", () => {
 
       // When the scheduler is asked for the time
       // Then it reports the real system time
-      assertTrue(Math.abs(tasks.now().getTime() - Date.now()) < 1000);
+      assertLessThan(Math.abs(tasks.now().getTime() - Date.now()), 1000);
     });
 
     it("holds work scheduled for a simulated instant until time reaches it", async () => {
