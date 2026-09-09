@@ -149,7 +149,7 @@ same shape of thing under its delivery stream's role. A write that fails leaves 
 `engine/` holds it. `SimAthenaQueryEngine` is the whole of the public surface. A query it cannot run is turned down,
 and the declared result answers instead.
 
-Three decisions shape the rest of the directory.
+Four decisions shape the rest of the directory.
 
 **It is opt-in.** A project holding `node-sql-parser` for a reason of its own would otherwise find
 simulated Athena answering differently from the version before it. `enable()` loads the parser there and then. A project without
@@ -167,6 +167,25 @@ required one, and a failure to resolve it is reported as something to go and add
 in a format there is no reader for, an object the caller cannot open and a statement SQLite will not
 run all end with no result and the declared result answering. `sim-athena-engine-run.ts` is where
 that catch sits.
+
+**A statement Athena refuses fails the query, strict or not.** This is the one outcome that skips
+the fallback, and `sim-athena-rejected-statement.ts` holds it. A turn-down says the engine reached
+its limits, and a declaration is a fair answer to that. A rejection says the statement is SQL the
+service would have refused, and falling back would leave the test green on a query that fails
+against AWS. The engine has to be on for any of this, so a project that never enables it sees no
+change.
+
+The shape it catches is an `ORDER BY` aggregate over an output alias that is itself an aggregate.
+`SELECT sku, coalesce(sum(qty), 0) AS qty ... ORDER BY sum(qty) DESC` is the statement that reached
+production. Trino resolves the bare `qty` against the select list before the table. It reads as
+`sum(<the aggregate>)`, and Athena answers `COLUMN_NOT_FOUND: Invalid reference to output projection
+attribute from ORDER BY aggregation`. SQLite resolves the same name against the table column, runs
+it, and orders correctly. `ORDER BY qty DESC` is the form Athena takes, and it is what the engine
+leaves alone, along with `ORDER BY sum(revenue_total)` beside `sum(revenue_total) AS revenue`, where
+the two names differ and nothing shadows.
+
+Trino and SQLite part company over name resolution in more places than this one. The shape above is
+the one seen reaching production, and the file is where the next one goes.
 
 ### The seam
 

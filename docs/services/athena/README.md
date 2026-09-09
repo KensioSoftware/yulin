@@ -381,6 +381,36 @@ Strict mode is off unless a test asks for it, and `disable()` takes it off with 
 declaration written against one exact query text still answers, with no failure, because that is a
 test's own statement about a query the engine gets wrong.
 
+### Failing a statement Athena refuses
+
+One failure ignores strict mode. Where the engine can see that Athena would refuse a statement
+outright, the query fails whether strict mode is on or off. A turn-down means the engine reached its
+limits, and a declaration is a fair answer to that. A rejection means the SQL is invalid, and
+answering from a declaration would leave a test green on a query that fails against AWS.
+
+The one shape it catches today is an `ORDER BY` that aggregates over an output alias which is itself
+an aggregate.
+
+```sql
+SELECT sku, coalesce(sum(qty), 0) AS qty
+FROM rainlytics.lines
+GROUP BY sku
+ORDER BY sum(qty) DESC
+```
+
+Trino resolves the bare `qty` in `ORDER BY` against the select list before the table. The sort then
+asks for an aggregate over an aggregate, and Athena answers `COLUMN_NOT_FOUND: Invalid reference to
+output projection attribute from ORDER BY aggregation`. SQLite resolves the same name against the
+table's column, runs the statement and orders it correctly. That is how a green test shipped a
+command that failed against the service.
+
+`ORDER BY qty DESC` over the same select list is the form Athena takes, and it is what to write.
+`ORDER BY sum(revenue_total) DESC` beside `coalesce(sum(revenue_total), 0) AS revenue` is fine as
+well, since the two names differ and nothing shadows.
+
+Trino and SQLite resolve names by different rules in other places too, and the engine catches this
+one. A statement that behaves differently under the two is worth reporting.
+
 ### The objects it reads
 
 The SerDe class name in the table's storage descriptor says how its objects are decoded.
