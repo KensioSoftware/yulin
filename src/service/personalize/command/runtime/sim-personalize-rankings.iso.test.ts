@@ -8,11 +8,11 @@ import { GetPersonalizedRankingCommand } from "@aws-sdk/client-personalize-runti
 import {
   assertArrayEquals,
   assertIdentical,
+  assertLessThan,
   assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -189,7 +189,7 @@ describe("Personalize GetPersonalizedRanking", () => {
       (sum, item) => sum + (item.score ?? 0),
       0,
     );
-    assertTrue(Math.abs(total - 1) < 0.000001);
+    assertLessThan(Math.abs(total - 1), 0.000001);
   });
 
   it("answers a user no rule matches from the default", async () => {

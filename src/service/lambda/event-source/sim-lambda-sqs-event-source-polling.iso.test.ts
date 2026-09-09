@@ -3,7 +3,7 @@ import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
   assertArrayLength,
   assertIdentical,
-  assertTrue,
+  assertLessThanOrEqual,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -41,7 +41,7 @@ describe("sim Lambda SQS event source polling", () => {
     assertArrayLength(delivered, 5);
 
     for (const event of events) {
-      assertTrue(event.Records.length <= 2);
+      assertLessThanOrEqual(event.Records.length, 2);
     }
   });
 

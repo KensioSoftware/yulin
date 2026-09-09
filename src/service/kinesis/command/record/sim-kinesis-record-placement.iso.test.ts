@@ -6,8 +6,8 @@ import {
 } from "@aws-sdk/client-kinesis";
 import {
   assertArrayLength,
+  assertGreaterThan,
   assertIdentical,
-  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -101,7 +101,7 @@ describe("Where a record lands on a simulated Kinesis stream", () => {
     }
 
     // Then they did not all land on one shard.
-    assertTrue(shardIds.size > 1);
+    assertGreaterThan(shardIds.size, 1);
   });
 
   it("places a record by its explicit hash key rather than its partition key", async () => {
