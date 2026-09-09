@@ -9,12 +9,26 @@ import {
   simAthenaUnrewrittenUnnest,
   simAthenaUnwrittenStatement,
 } from "./sim-athena-turn-down.js";
+import { simAthenaRejectedStatement } from "./sim-athena-rejected-statement.js";
 import { simAthenaRewriteUnnest } from "./sim-athena-unnest-rewrite.js";
 
-/** One statement translated for SQLite, or why it could not be. */
+/** One statement translated for SQLite, or why it was not. */
 export type SimAthenaTranslatedSql =
-  | { readonly sql: string; readonly turnedDown: undefined }
-  | { readonly sql: undefined; readonly turnedDown: string };
+  | {
+      readonly sql: string;
+      readonly turnedDown: undefined;
+      readonly rejected: undefined;
+    }
+  | {
+      readonly sql: undefined;
+      readonly turnedDown: string;
+      readonly rejected: undefined;
+    }
+  | {
+      readonly sql: undefined;
+      readonly turnedDown: undefined;
+      readonly rejected: string;
+    };
 
 interface SimAthenaSqlTranslationRequest {
   readonly parser: SimAthenaSqlParser;
@@ -25,13 +39,18 @@ interface SimAthenaSqlTranslationRequest {
 }
 
 /**
- * One Athena statement written back out for SQLite, or why it cannot be.
+ * One Athena statement written back out for SQLite, or why it is not.
  *
- * Three things stop it, and each is told apart because a strict engine fails
- * the query with the reason. The Athena grammar can refuse the statement, an
- * `UNNEST` in it can have no `json_each` to become, and the parser can decline
- * to write the statement back out. A lenient engine answers all three the same
- * way, by turning the query down and letting the declared result take it.
+ * Three things turn the query down, and each is told apart because a strict
+ * engine fails the query with the reason. The Athena grammar can refuse the
+ * statement, an `UNNEST` in it can have no `json_each` to become, and the
+ * parser can decline to write the statement back out. A lenient engine answers
+ * all three the same way, by letting the declared result take the query.
+ *
+ * A rejection is the fourth outcome and a different thing. The statement
+ * parsed, and Athena would still refuse to run it. That fails the query
+ * whether or not the engine is strict, since falling back would leave a test
+ * green on SQL the service rejects.
  */
 export function simAthenaSqliteSql(
   request: SimAthenaSqlTranslationRequest,
@@ -45,6 +64,12 @@ export function simAthenaSqliteSql(
     ast = parser.astify(read.sql, { database: "athena" });
   } catch {
     return turnedDown(simAthenaUnparsedStatement);
+  }
+
+  const rejected = simAthenaRejectedStatement(ast);
+
+  if (rejected !== undefined) {
+    return { sql: undefined, turnedDown: undefined, rejected };
   }
 
   try {
@@ -61,6 +86,7 @@ export function simAthenaSqliteSql(
     return {
       sql: simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" })),
       turnedDown: undefined,
+      rejected: undefined,
     };
   } catch {
     return turnedDown(simAthenaUnwrittenStatement);
@@ -68,5 +94,5 @@ export function simAthenaSqliteSql(
 }
 
 function turnedDown(reason: string): SimAthenaTranslatedSql {
-  return { sql: undefined, turnedDown: reason };
+  return { sql: undefined, turnedDown: reason, rejected: undefined };
 }

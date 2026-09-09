@@ -1,10 +1,12 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaPlannedTable } from "../execution/sim-athena-query-refusal.js";
 import {
-  simAthenaEngineRun,
+  simAthenaEngineRejected,
+  simAthenaEngineSilent,
   simAthenaEngineTurnedDown,
   type SimAthenaEngineAnswer,
-} from "./sim-athena-engine-run.js";
+} from "./sim-athena-engine-answer.js";
+import { simAthenaEngineRun } from "./sim-athena-engine-run.js";
 import {
   simAthenaSqlParser,
   type SimAthenaSqlParser,
@@ -109,7 +111,7 @@ export class SimAthenaQueryEngine {
     const { objects } = request;
 
     if (parser === undefined || sqlite === undefined) {
-      return { result: undefined, turnedDown: undefined };
+      return simAthenaEngineSilent();
     }
 
     if (objects === undefined) {
@@ -121,6 +123,10 @@ export class SimAthenaQueryEngine {
       athenaSql: request.queryString,
       tables: request.tables.map((planned) => planned.table),
     });
+
+    if (translated.rejected !== undefined) {
+      return simAthenaEngineRejected(translated.rejected);
+    }
 
     return translated.sql === undefined
       ? simAthenaEngineTurnedDown(translated.turnedDown)

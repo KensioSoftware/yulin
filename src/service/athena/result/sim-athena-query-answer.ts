@@ -57,6 +57,10 @@ interface SimAthenaQueryAnswerRequest {
  * A strict engine is the exception, and it fails the query it turned down.
  * The declaration keeps its place ahead of that, since a test writing one
  * against this exact statement has already said what the engine gets wrong.
+ *
+ * A statement Athena refuses fails whichever mode the engine is in. That is
+ * SQL the service would never have run, and falling back would leave the query
+ * green on it.
  */
 export async function simAthenaQueryAnswer(
   request: SimAthenaQueryAnswerRequest,
@@ -83,7 +87,8 @@ export async function simAthenaQueryAnswer(
   return {
     result: request.declared,
     source: "declaration",
-    refusal: strictRefusal(request.engine, computed.turnedDown),
+    refusal:
+      computed.rejected ?? strictRefusal(request.engine, computed.turnedDown),
   };
 }
 
