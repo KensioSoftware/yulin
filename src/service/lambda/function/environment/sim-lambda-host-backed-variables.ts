@@ -1,4 +1,5 @@
 import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
+import { withoutHostAwsCredentialVariables } from "./sim-lambda-execution-credentials.js";
 
 /**
  * The environment of a function that declares no variables of its own.
@@ -7,6 +8,11 @@ import { simProcessEnvironment } from "../../../../util/process/sim-process-envi
  * laid over it. The host variables are read for each invocation rather than
  * merged once, so a variable the test process sets between two invocations
  * reaches the second of them.
+ *
+ * The host's own AWS credential variables are left out. An invocation is
+ * attributed to the function's execution Role, and a name pointing an SDK at
+ * the credentials of whoever started the test process would make the
+ * invocation depend on them. See `hostAwsCredentialVariableNames`.
  *
  * What the handler itself wrote is kept and laid over both, which is the warm
  * execution environment semantics a function declaring variables gets from
@@ -24,7 +30,9 @@ export class SimLambdaHostBackedVariables {
     run: () => Promise<T>,
   ): Promise<T> {
     const merged = {
-      ...simProcessEnvironment.definedHostVariables(),
+      ...withoutHostAwsCredentialVariables(
+        simProcessEnvironment.definedHostVariables(),
+      ),
       ...functionVariables,
       ...Object.fromEntries(this.written),
     };
