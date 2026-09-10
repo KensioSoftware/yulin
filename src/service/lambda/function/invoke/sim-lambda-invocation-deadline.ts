@@ -1,7 +1,10 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { SimLambdaClockTimer } from "./timer/sim-lambda-clock-timer.js";
 import { SimLambdaInvocationTimers } from "./timer/sim-lambda-invocation-timers.js";
+import type { SimLambdaPendingTimer } from "./timer/sim-lambda-pending-timer.js";
 import { simLambdaProcessTimers } from "./timer/sim-lambda-process-timers.js";
+import { SimLambdaStallWatch } from "./sim-lambda-stall-watch.js";
+import { simLambdaStalledError } from "./sim-lambda-stalled.error.js";
 import { simLambdaTimedOutError } from "./sim-lambda-timed-out.error.js";
 
 const millisecondsPerSecond = 1000;
@@ -22,6 +25,10 @@ interface SimLambdaInvocationDeadlineProperties {
  * waits for a handler that has been timed out, and what it goes on to do
  * reaches nobody, which is the closest an in-process simulation gets to an
  * execution environment being taken away.
+ *
+ * Simulated time standing still holds the handler's timers and the deadline
+ * alike. A stall watch on host time ends an invocation neither of them can
+ * reach, with an error saying why.
  */
 export class SimLambdaInvocationDeadline {
   readonly #properties: SimLambdaInvocationDeadlineProperties;
@@ -53,6 +60,7 @@ export class SimLambdaInvocationDeadline {
     const ending = (): void => {
       timers.cancelAll();
       deadline.cancel();
+      stall.cancel();
     };
     const failing = (error: unknown): void => {
       ending();
@@ -75,11 +83,28 @@ export class SimLambdaInvocationDeadline {
       },
     });
 
+    const stall = new SimLambdaStallWatch({
+      background,
+      timeoutSeconds,
+      waitingOn: (): SimLambdaPendingTimer | undefined => timers.pending(),
+      stalled: (waitingOn, waitedMilliseconds): void => {
+        failing(
+          simLambdaStalledError({
+            awsRequestId,
+            at: background.now(),
+            waitingOn,
+            waitedMilliseconds,
+          }),
+        );
+      },
+    });
+
     deadline.startAt(
       new Date(
         background.now().getTime() + timeoutSeconds * millisecondsPerSecond,
       ),
     );
+    stall.start();
 
     try {
       return await background.outstanding(

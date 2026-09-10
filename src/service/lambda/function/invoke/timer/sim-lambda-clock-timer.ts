@@ -48,6 +48,16 @@ export class SimLambdaClockTimer {
     this.#dueTime = properties.background.now();
   }
 
+  /** The delay this timer was last started with, in milliseconds. */
+  get delay(): number {
+    return this.#delay;
+  }
+
+  /** The simulated instant this timer's work is due to run at. */
+  get dueTime(): Date {
+    return new Date(this.#dueTime);
+  }
+
   /**
    * Wait a delay of simulated time, and answer with how long that turned out
    * to be. A delay of nothing leaves the timer due where the clock already
