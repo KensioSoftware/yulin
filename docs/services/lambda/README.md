@@ -3158,6 +3158,16 @@ that is where such a handler's configuration comes from when nothing declares it
 variables on the function keeps the test explicit about where they came from. Zip-packaged code in
 the vm runtime gets the function's own variables either way, and never the test process's.
 
+One group of host variables is masked whatever the function declares. `AWS_PROFILE`,
+`AWS_DEFAULT_PROFILE`, `AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE`,
+`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME` and the
+`AWS_CONTAINER_CREDENTIALS_*` and `AWS_CONTAINER_AUTHORIZATION_*` names go unset for the length of
+an invocation. Each of them points an AWS SDK at credentials held by whoever started the test
+process, and a client built in a handler follows one straight out of the simulation. `AWS_PROFILE`
+does that even with the placeholder credentials above in place, because the Node.js credential
+provider chain skips its environment-variable provider whenever a profile is named. Masking them
+keeps a test independent of the machine running it, and real Lambda sets none of them anyway.
+
 This is also how a function reaches something outside the simulation, such as a Redis or a
 Postgres. See [non-AWS dependencies](https://yulinsim.dev/non-aws-dependencies/).
 
