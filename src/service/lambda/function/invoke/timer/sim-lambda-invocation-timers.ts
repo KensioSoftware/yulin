@@ -1,5 +1,6 @@
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
 import { SimLambdaClockTimer } from "./sim-lambda-clock-timer.js";
+import type { SimLambdaPendingTimer } from "./sim-lambda-pending-timer.js";
 import {
   type SimLambdaTimerCallback,
   SimLambdaTimerHandle,
@@ -69,6 +70,31 @@ export class SimLambdaInvocationTimers
       timer.again();
       this.#call(callback, arguments_);
     });
+  }
+
+  /**
+   * The timer this invocation is waiting on, the earliest due one where it
+   * has several.
+   *
+   * A timer due at the instant the clock already reads is waiting for nothing:
+   * the next turn of the host event loop runs it. Only a timer the clock has
+   * yet to reach counts.
+   */
+  pending(): SimLambdaPendingTimer | undefined {
+    const now = this.#background.now().getTime();
+    let earliest: SimLambdaClockTimer | undefined;
+
+    for (const timer of this.#running.values()) {
+      if (timer.dueTime.getTime() > now && isEarlier(timer, earliest)) {
+        earliest = timer;
+      }
+    }
+
+    if (earliest === undefined) {
+      return undefined;
+    }
+
+    return { delay: earliest.delay, dueTime: earliest.dueTime };
   }
 
   /**
@@ -150,4 +176,15 @@ export class SimLambdaInvocationTimers
     this.#released?.();
     this.#released = undefined;
   }
+}
+
+/**
+ * Whether a timer comes due before the earliest one found so far. The first
+ * timer looked at has nothing to beat.
+ */
+function isEarlier(
+  timer: SimLambdaClockTimer,
+  earliest: SimLambdaClockTimer | undefined,
+): boolean {
+  return earliest === undefined || timer.dueTime < earliest.dueTime;
 }

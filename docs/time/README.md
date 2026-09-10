@@ -197,6 +197,12 @@ simulation's clock during an invocation. Start an invocation without awaiting it
 clock past the timer delay, then await the invocation. Lambda's configured timeout and
 `context.getRemainingTimeInMillis()` use the same clock.
 
+An invocation left waiting on one of those timers while simulated time stands still has nothing to
+end it, because the function's own timeout waits on the same clock. Yulin fails it after a second or
+two of real time with a `Yulin.StalledInvocation` error naming the timer and its delay. Advancing
+the clock resets that wait, in one step or several, so the pattern above keeps working. A handler
+busy with something other than a timer is left alone for as long as it takes.
+
 ### Where real AWS gets the time
 
 Real Lambda has no current-time API. A production handler gets the current time from the machine
