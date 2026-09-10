@@ -15,8 +15,8 @@ import {
 import {
   assertArrayEmpty,
   assertArrayLength,
-  assertGreaterThan,
   assertIdentical,
+  assertStringNotEmpty,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -115,7 +115,7 @@ describe("Kinesis SDK interception", () => {
     // Then both records are on the stream.
     assertIdentical(put.FailedRecordCount, 0);
     assertArrayLength(put.Records ?? [], 2);
-    assertGreaterThan((put.Records?.[0]?.SequenceNumber ?? "").length, 0);
+    assertStringNotEmpty(put.Records?.[0]?.SequenceNumber);
   });
 
   it("routes a stream deletion an intercepted client sends", async () => {

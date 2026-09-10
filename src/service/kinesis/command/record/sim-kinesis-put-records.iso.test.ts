@@ -1,8 +1,8 @@
 import { PutRecordsCommand } from "@aws-sdk/client-kinesis";
 import {
   assertArrayLength,
-  assertGreaterThan,
   assertIdentical,
+  assertStringNotEmpty,
   assertStringStartsWith,
   assertUndefined,
 } from "@kensio/smartass";
@@ -42,7 +42,7 @@ describe("Putting a batch of records onto a simulated Kinesis stream", () => {
 
     for (const record of put.Records) {
       assertStringStartsWith(record.ShardId ?? "", "shardId-");
-      assertGreaterThan((record.SequenceNumber ?? "").length, 0);
+      assertStringNotEmpty(record.SequenceNumber);
       assertUndefined(record.ErrorCode);
     }
   });
