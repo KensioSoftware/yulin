@@ -3,6 +3,7 @@ import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-
 import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
 import { SimLambdaStreamCascadeGuard } from "../../stream/sim-lambda-stream-cascade-guard.js";
+import { SimLambdaStreamHalt } from "../../stream/sim-lambda-stream-halt.js";
 import { countSimLambdaKinesisIteratorAge } from "../sim-lambda-stream-iterator-age.js";
 import { simLambdaKinesisStreamRecordTimes } from "../sim-lambda-stream-record-times.js";
 import type { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
@@ -31,6 +32,7 @@ export class SimLambdaKinesisStreamDelivery {
   private readonly eventBuilder: SimLambdaKinesisStreamEventBuilder;
   private readonly batchResponse: SimLambdaStreamBatchResponse;
   private readonly cascade: SimLambdaStreamCascadeGuard;
+  private readonly halt = new SimLambdaStreamHalt();
 
   constructor(properties: SimLambdaKinesisStreamDeliveryProperties) {
     const { eventSourceArn } = properties;
@@ -45,6 +47,7 @@ export class SimLambdaKinesisStreamDelivery {
     );
     this.cascade = new SimLambdaStreamCascadeGuard({
       mapping: properties.mapping,
+      halt: this.halt,
       source: {
         streamArn: eventSourceArn.value,
         wroteTo: `put a record onto the stream ${eventSourceArn.streamName}`,
@@ -67,11 +70,26 @@ export class SimLambdaKinesisStreamDelivery {
   }
 
   /**
-   * Note a record put onto the polled stream, answering with whether this
-   * mapping's own function put it.
+   * Whether this shard has finished polling, which stopping it and refusing it
+   * both settle.
    */
-  noteRecordWritten(): boolean {
-    return this.cascade.noteRecordWritten();
+  get stopped(): boolean {
+    return this.halt.stopped;
+  }
+
+  /**
+   * Finish this shard, as stopping the mapping does.
+   */
+  stop(): void {
+    this.halt.stop();
+  }
+
+  /**
+   * Note a record put onto the polled stream, which counts only while this
+   * mapping's own function is running.
+   */
+  noteRecordWritten(): void {
+    this.cascade.noteRecordWritten();
   }
 
   private async handled(

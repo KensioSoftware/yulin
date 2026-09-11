@@ -43,8 +43,6 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
   private readonly progress: SimLambdaStreamProgress;
   private readonly turn = new SimLambdaEventSourcePollTurn(this);
 
-  private stopped = false;
-
   constructor(properties: SimLambdaDynamoDbStreamEventSourcePollerProperties) {
     const { eventSourceArn, mapping } = properties;
 
@@ -96,7 +94,7 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
    * Stop polling, as deleting the mapping does.
    */
   stop(): void {
-    this.stopped = true;
+    this.delivery.stop();
     this.stream.unwatch(this);
   }
 
@@ -104,16 +102,12 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
    * Take a record arriving on the stream as something to poll for.
    *
    * A record written while this mapping's own function is running is the
-   * function writing back into its own source table. That never settles, so the
-   * mapping stops here and the delivery refuses once it is over.
+   * function writing back into its own source table. The delivery it brings on
+   * is what settles the work or carries the chain on, so the mapping polls for
+   * it either way and the guard counts the chain.
    */
   recordsAvailable(): void {
-    if (this.delivery.noteRecordWritten()) {
-      this.stopped = true;
-
-      return;
-    }
-
+    this.delivery.noteRecordWritten();
     this.progress.pollNow();
   }
 
@@ -122,8 +116,12 @@ export class SimLambdaDynamoDbStreamEventSourcePoller
    *
    * Only ever called through the turn, which is what keeps two polls from
    * reading the same records.
+   *
+   * A refused mapping polls no further. Its checkpoint stayed where the refused
+   * delivery found it, and reading on from there would deliver those records
+   * again.
    */
   async poll(): Promise<void> {
-    await this.polling.poll(this.stopped);
+    await this.polling.poll(this.delivery.stopped);
   }
 }
