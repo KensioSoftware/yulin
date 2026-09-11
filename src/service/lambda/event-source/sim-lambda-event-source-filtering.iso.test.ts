@@ -178,8 +178,9 @@ describe("sim Lambda event source mapping filter criteria", () => {
     );
     await simAws.backgroundTasksComplete();
 
-    // Then the checkpoint moved past the excluded record and the matching one
-    // arrived behind it.
+    // Then the excluded record was never handed over at all, the checkpoint
+    // moved past it, and the matching one arrived behind it.
+    assertArrayLength(events, 1);
     assertArrayEquals(events.flatMap(streamedOrderIds), ["order-2"]);
   });
 

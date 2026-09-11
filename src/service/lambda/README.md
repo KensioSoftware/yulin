@@ -461,7 +461,8 @@ that differs from an `Invoke`.
 
 ## Event source mappings
 
-`event-source/` owns delivery from a simulated SQS queue or DynamoDB stream to a function.
+`event-source/` owns delivery from a simulated SQS queue, DynamoDB stream or Kinesis stream to a
+function.
 
 The machinery is split by event source kind rather than assuming one.
 `sim-lambda-event-source-arn.ts` reads the ARN a mapping names into a union discriminated by `kind`,
