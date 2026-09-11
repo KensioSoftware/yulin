@@ -3,6 +3,7 @@ import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-map
 import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda-dynamodb-stream-event-source-arn.js";
 import type { SimLambdaEventSourceStreamRecord } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaStreamCascadeGuard } from "../stream/sim-lambda-stream-cascade-guard.js";
+import { SimLambdaStreamHalt } from "../stream/sim-lambda-stream-halt.js";
 import { SimLambdaDynamoDbStreamEventBuilder } from "./sim-lambda-dynamodb-stream-event.js";
 import { countSimLambdaDynamoDbIteratorAge } from "./sim-lambda-stream-iterator-age.js";
 import { simLambdaDynamoDbStreamRecordTimes } from "./sim-lambda-stream-record-times.js";
@@ -26,13 +27,15 @@ interface SimLambdaDynamoDbStreamDeliveryProperties {
  * what the function said, so the batch response decides it.
  *
  * What the function did with the table while it ran is part of the same
- * question, so the cascade guard belongs here too: a handler writing back into
- * its own source table is refused rather than handled.
+ * question, so the cascade guard belongs here too. It counts the deliveries a
+ * handler's own writes bring on, and refuses the mapping once that chain is
+ * long enough to say the simulation will never settle.
  */
 export class SimLambdaDynamoDbStreamDelivery {
   private readonly eventBuilder: SimLambdaDynamoDbStreamEventBuilder;
   private readonly batchResponse: SimLambdaStreamBatchResponse;
   private readonly cascade: SimLambdaStreamCascadeGuard;
+  private readonly halt = new SimLambdaStreamHalt();
 
   constructor(properties: SimLambdaDynamoDbStreamDeliveryProperties) {
     this.eventBuilder = new SimLambdaDynamoDbStreamEventBuilder(
@@ -43,6 +46,7 @@ export class SimLambdaDynamoDbStreamDelivery {
     );
     this.cascade = new SimLambdaStreamCascadeGuard({
       mapping: properties.mapping,
+      halt: this.halt,
       source: {
         streamArn: properties.eventSourceArn.value,
         wroteTo: `wrote to the table ${properties.eventSourceArn.tableName}`,
@@ -65,11 +69,26 @@ export class SimLambdaDynamoDbStreamDelivery {
   }
 
   /**
-   * Note a record written to the polled stream, answering with whether this
-   * mapping's own function wrote it.
+   * Whether this mapping has finished polling, which deleting it and refusing
+   * it both settle.
    */
-  noteRecordWritten(): boolean {
-    return this.cascade.noteRecordWritten();
+  get stopped(): boolean {
+    return this.halt.stopped;
+  }
+
+  /**
+   * Finish this mapping, as deleting it does.
+   */
+  stop(): void {
+    this.halt.stop();
+  }
+
+  /**
+   * Note a record written to the polled stream, which counts only while this
+   * mapping's own function is running.
+   */
+  noteRecordWritten(): void {
+    this.cascade.noteRecordWritten();
   }
 
   private async handled(

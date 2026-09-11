@@ -1738,8 +1738,8 @@ const { TableDescription } = await simAws.dynamoDb().createTable(
 const streamArn = TableDescription?.LatestStreamArn;
 
 // The projection goes into a second table. A function writing back into the
-// table whose stream invoked it would be delivered its own writes, which the
-// simulator refuses rather than looping on.
+// table whose stream invoked it is delivered its own writes, and the simulator
+// refuses a chain of those that keeps going.
 await simAws.dynamoDb().createTable(
   new CreateTableCommand({
     TableName: "order-totals",
@@ -2161,12 +2161,16 @@ created without `FunctionResponseTypes` ignores a report entirely.
 
 ### Writing back to the source table
 
-A handler that writes into the table whose stream invoked it is delivered its own write, which
-writes again. Real Lambda runs that loop for as long as the account is willing to pay for it. The
-simulation refuses instead, with an error naming the function, the stream and the table, before the
-test times out.
+A handler that writes into the table whose stream invoked it is delivered its own write. Where that
+write brings on another, and that one another, the simulation is going round a loop. Real Lambda
+runs the loop for as long as the account is willing to pay for it. Yulin counts the deliveries a
+handler's own writes bring on and refuses after ten of them in a row, with an error naming the
+function, the stream, the table and the count.
 
-The write itself succeeds. The refusal comes afterwards, from whatever is waiting for the simulation
+A handler that settles is left to finish. Writing back once and then finding the work already done
+ends the chain at one link, and the delivery that link caused writes nothing.
+
+The write itself succeeds. A refusal comes afterwards, from whatever is waiting for the simulation
 to settle:
 
 ```typescript
@@ -2177,7 +2181,7 @@ Only the handler's own writes count. Items written at the same time by the test,
 in the simulation, are an ordinary batch however many of them there are, because the guard tells them
 apart by where the write came from, and never by when it landed.
 
-Writing the projection into a second table is what the guard is asking for, and is what a real
+A projection that writes back on every delivery belongs in a second table. That is what a real
 aggregation or search index does anyway.
 
 ### Making a stream event without a table
@@ -4377,9 +4381,10 @@ Current documented limitations:
   AWS counts a bisected batch's deliveries against the same quota. Without that, the simulator's own
   cap of five attempts would discard a batch of a hundred long before it was down to one record. The
   splitting still ends on its own, because a batch halves at every step.
-- A handler writing into the table whose stream invoked it is refused with
-  `SimLambdaStreamCascadeError` rather than being delivered its own writes forever. Real Lambda runs
-  that loop.
+- Ten deliveries in a row, each one brought on by the handler's own writes to the source that
+  invoked it, are refused with `SimLambdaStreamCascadeError`. Real Lambda runs that loop for as long
+  as it is paid for. A handler that writes back and then settles is delivered its own writes and
+  finishes.
 - A shard iterator never expires, where a real one is good for 15 minutes.
 - `MaximumBatchingWindowInSeconds` is only simulated as 0. A partial batch is delivered as soon as
   anything is on the event source, leaving a batching window nothing to wait for. A non-zero value

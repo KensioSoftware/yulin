@@ -597,14 +597,18 @@ records twice. `SimLambdaEventSourcePollTurn` is the one-at-a-time guard, and it
 its `finally` block rather than dropping a poll that was asked for mid-turn, because `PollSchedule`
 clears its own flag when the task starts.
 
-`SimLambdaStreamCascadeGuard` is what stops a function writing back into the table whose stream
-invoked it. The delivery runs inside an asynchronous context
+`SimLambdaStreamCascadeGuard` is what stops a function feeding the table whose stream invoked it
+round a loop. The delivery runs inside an asynchronous context
 (`sim-lambda-event-source-delivery-context.ts`), so a record written by the handler is told apart
 from one written by anything else that happened to be running at the same time. Several items
 written in one `Promise.all` by a test, or by anything other than this mapping's own handler, are an
-ordinary batch. Writes the handler itself makes to its own source are the loop, however many of them
-it makes and however it makes them, and are refused with `SimLambdaStreamCascadeError` once the
-delivery is over rather than left to spin.
+ordinary batch.
+
+What the guard counts is the chain, and never the shape of one write. A delivery the handler fed
+takes the count up by one, and any other delivery puts it back to zero. A handler that writes back
+and then finds its own work done settles at one link. `simLambdaStreamCascadeLimit` links in a row
+are refused with `SimLambdaStreamCascadeError` once the delivery is over, and the guard's
+`refused` is what stops the mapping polling on from a checkpoint the refusal left where it was.
 
 `SimDynamoDbEventSourceStreams` implements the port over the DynamoDB Streams commands, as the
 execution role. `SimDynamoDbEventSourceStreamShard` is the part that finds the table and the shard,

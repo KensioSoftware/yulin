@@ -37,8 +37,8 @@ const { TableDescription } = await simAws.dynamoDb().createTable(
 const streamArn = TableDescription?.LatestStreamArn;
 
 // The projection goes into a second table. A function writing back into the
-// table whose stream invoked it would be delivered its own writes, which the
-// simulator refuses rather than looping on.
+// table whose stream invoked it is delivered its own writes, and the simulator
+// refuses a chain of those that keeps going.
 await simAws.dynamoDb().createTable(
   new CreateTableCommand({
     TableName: "order-totals",

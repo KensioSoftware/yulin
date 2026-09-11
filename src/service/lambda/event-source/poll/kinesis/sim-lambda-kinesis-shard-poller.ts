@@ -41,8 +41,6 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
   private readonly progress: SimLambdaStreamProgress;
   private readonly turn = new SimLambdaEventSourcePollTurn(this);
 
-  private stopped = false;
-
   constructor(properties: SimLambdaKinesisShardPollerProperties) {
     this.mapping = properties.mapping;
     this.functions = properties.functions;
@@ -64,15 +62,15 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
 
   /** Stop polling this shard. */
   stop(): void {
-    this.stopped = true;
+    this.delivery.stop();
   }
 
   /**
-   * Note a record put onto the stream, answering with whether this mapping's
-   * own function put it.
+   * Note a record put onto the stream, which counts only while this shard is
+   * mid-delivery.
    */
-  noteRecordWritten(): boolean {
-    return this.delivery.noteRecordWritten();
+  noteRecordWritten(): void {
+    this.delivery.noteRecordWritten();
   }
 
   /**
@@ -80,12 +78,16 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
    *
    * Only ever called through the turn, which is what keeps two polls from
    * reading the same records.
+   *
+   * A refused shard polls no further. Its checkpoint stayed where the refused
+   * delivery found it, and reading on from there would deliver those records
+   * again.
    */
   async poll(): Promise<void> {
     const simFunction = simLambdaEventSourceFunction(
       this.functions,
       this.mapping,
-      this.stopped,
+      this.delivery.stopped,
     );
 
     if (simFunction === undefined) {

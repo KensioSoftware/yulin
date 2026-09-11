@@ -78,19 +78,14 @@ export class SimLambdaKinesisStreamEventSourcePoller implements SimLambdaEventSo
    * Take a record arriving on the stream as something to poll for.
    *
    * A record put while this mapping's own function is running is the function
-   * writing back into its own source stream. That never settles, so the mapping
-   * stops here and the delivery refuses once it is over. Only the shard that is
-   * mid-delivery answers, since only it is inside the delivery.
+   * writing back into its own source stream. The delivery it brings on is what
+   * settles the work or carries the chain on, so the mapping polls for it
+   * either way and the guard counts the chain. Every shard is told, and only
+   * the one that is mid-delivery counts it.
    */
   recordsAvailable(): void {
-    const cascading = this.shardPollers.made.some((shardPoller) =>
-      shardPoller.noteRecordWritten(),
-    );
-
-    if (cascading) {
-      this.stop();
-
-      return;
+    for (const shardPoller of this.shardPollers.made) {
+      shardPoller.noteRecordWritten();
     }
 
     this.schedule.now();
