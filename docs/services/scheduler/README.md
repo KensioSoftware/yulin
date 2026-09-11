@@ -61,10 +61,38 @@ Scheduler accepts three expression forms:
 - `rate(<value> <unit>)` runs from when the schedule was created. The unit is `minute`, `hour` or
   `day`, and Scheduler lets it disagree with its value. `rate(1 hours)` is an hour here and a
   refusal on an EventBridge rule.
-- `cron(<six fields>)` names absolute instants in UTC. Minutes, hours, day-of-month, month,
-  day-of-week and year, so every day at two in the morning is `cron(0 2 * * ? *)`. The day-of-month
-  and day-of-week fields cannot both say something. Whichever is not deciding the day is written
-  `?`.
+- `cron(<six fields>)` names a wall-clock time. Minutes, hours, day-of-month, month, day-of-week and
+  year, so every day at two in the morning is `cron(0 2 * * ? *)`. The day-of-month and day-of-week
+  fields cannot both say something. Whichever is not deciding the day is written `?`.
+
+### The zone a schedule runs in
+
+`ScheduleExpressionTimezone` says which zone the wall-clock time belongs to, and a schedule created
+without one runs in UTC. Any IANA name the host's own `Intl` timezone data recognises works, and a
+name it does not is refused when the schedule is created.
+
+```typescript
+await simAws.scheduler().createSchedule(
+  new CreateScheduleCommand({
+    Name: "nightly-rollup",
+    ScheduleExpression: "cron(0 2 * * ? *)",
+    ScheduleExpressionTimezone: "Europe/London",
+    FlexibleTimeWindow: { Mode: "OFF" },
+    Target: { Arn: functionArn, RoleArn: roleArn },
+  }),
+);
+```
+
+That schedule is due at 01:00 UTC through British Summer Time and at 02:00 UTC through the winter,
+which is what a nightly job written for a zone actually does. The two days a year a zone changes
+offset are read the same way. A schedule keeps its hour on the clock across both.
+
+The hour the clocks move takes the rule real Scheduler uses. A wall-clock time inside the hour that
+never happens falls due at the first instant after it (02:30 on the morning the clocks go forward
+fires at 03:30). A wall-clock time the clocks read twice falls due once, at the first of the two
+readings.
+
+`GetSchedule` reports the zone back as it was written.
 
 ## Firing a schedule
 
@@ -819,8 +847,9 @@ Resources of the same stack.
 - `FlexibleTimeWindow` with `Mode: "FLEXIBLE"` is refused. Real Scheduler invokes the target at an
   unpredictable moment inside the window, and firing at the exact due time instead would let a test
   rely on timing AWS leaves unpromised.
-- `ScheduleExpressionTimezone` other than `UTC` is refused outright, since running a schedule in the
-  wrong zone fires it at the wrong hour.
+- `ScheduleExpressionTimezone` is read from the host's own timezone data through `Intl`, so a zone
+  the host has never heard of is refused even where AWS would take it. A schedule that names none
+  runs in UTC.
 - `StartDate` and `EndDate` are refused outright.
 - Targets are Lambda, SQS, SNS and ECS. The universal target
   (`arn:aws:scheduler:::aws-sdk:<service>:<action>`) and every other target service are refused when

@@ -50,7 +50,11 @@ export class SimSchedulerScheduleWriter {
       name: requested.name,
       groupName: requested.groupName,
       accountRegionScope: this.accountRegionScope,
-      schedule: schedulerSchedule(input.ScheduleExpression),
+      schedule: schedulerSchedule(
+        input.ScheduleExpression,
+        input.ScheduleExpressionTimezone,
+      ),
+      timeZone: input.ScheduleExpressionTimezone,
       target: SimSchedulerTarget.of(input.Target),
       state: SimSchedulerScheduleState.of(input.State),
       actionAfterCompletion: actionAfterCompletionIn(

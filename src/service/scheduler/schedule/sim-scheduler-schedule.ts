@@ -25,6 +25,9 @@ interface SimSchedulerScheduleProperties {
   readonly state: SimSchedulerScheduleState;
   readonly actionAfterCompletion: SimSchedulerActionAfterCompletion;
   readonly description?: string | undefined;
+
+  /** The timezone the request named, which a describe reports back. */
+  readonly timeZone?: string | undefined;
   readonly createdAt: Date;
 }
 
@@ -59,6 +62,14 @@ export class SimSchedulerSchedule {
   public readonly target: SimSchedulerTarget;
   public readonly actionAfterCompletion: SimSchedulerActionAfterCompletion;
   public readonly description: string | undefined;
+
+  /**
+   * The timezone the schedule was created with, if it named one.
+   *
+   * A schedule created without one runs in UTC, and reports no timezone rather
+   * than reporting the one it fell back to.
+   */
+  public readonly timeZone: string | undefined;
   public readonly creationDate: Date;
 
   /**
@@ -86,6 +97,7 @@ export class SimSchedulerSchedule {
     this.target = properties.target;
     this.actionAfterCompletion = properties.actionAfterCompletion;
     this.description = properties.description;
+    this.timeZone = properties.timeZone;
     this.creationDate = properties.createdAt;
     this.modified = properties.createdAt;
     this.held = properties.state;

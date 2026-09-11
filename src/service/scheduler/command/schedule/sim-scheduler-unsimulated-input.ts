@@ -2,15 +2,30 @@ import {
   SimSchedulerUnsimulatedInputException,
   SimSchedulerValidationException,
 } from "../../error/sim-scheduler.error.js";
+import { SimScheduleZone } from "../../../../util/schedule/sim-schedule-zone.js";
 import { refuseUnsimulatedTarget } from "./sim-scheduler-unsimulated-target.js";
 import type { SimSchedulerScheduleInput } from "./schedule.command.js";
 
 const maximumDescriptionLength = 512;
 
 /**
- * The timezone every simulated schedule runs in.
+ * Refuse a timezone no zone answers to, naming the parameter it came in on.
  */
-const simulatedTimezone = "UTC";
+function refuseUnknownTimezone(timezone: string | undefined): void {
+  if (timezone === undefined) {
+    return;
+  }
+
+  try {
+    SimScheduleZone.of(timezone);
+  } catch {
+    throw new SimSchedulerValidationException(
+      `Invalid parameter: ScheduleExpressionTimezone Reason: ` +
+        `'${timezone}' is not a timezone. A timezone is an IANA name such ` +
+        `as 'Europe/London', or 'UTC'`,
+    );
+  }
+}
 
 /**
  * Read the flexible time window, which AWS requires on every request.
@@ -49,9 +64,9 @@ function refuseFlexibleWindow(input: SimSchedulerScheduleInput): void {
 /**
  * Refuse the schedule request inputs this simulation does not model.
  *
- * A timezone is refused rather than ignored: a schedule whose cron expression
- * quietly ran in UTC when it was written for another zone would fire at the
- * wrong hour, which is precisely the thing a test of a nightly job is checking.
+ * A timezone is one it does model. A name no zone answers to is refused here
+ * rather than left to the expression reader, which would report it against
+ * `ScheduleExpression` and send the caller to the wrong parameter.
  */
 export function refuseUnsimulatedScheduleInput(
   input: SimSchedulerScheduleInput,
@@ -59,15 +74,7 @@ export function refuseUnsimulatedScheduleInput(
   refuseFlexibleWindow(input);
   refuseUnsimulatedTarget(input.Target);
 
-  const timezone = input.ScheduleExpressionTimezone;
-
-  if (timezone !== undefined && timezone !== simulatedTimezone) {
-    throw new SimSchedulerUnsimulatedInputException(
-      `ScheduleExpressionTimezone '${timezone}' is not simulated. Every ` +
-        `simulated schedule runs in ${simulatedTimezone}, and running this ` +
-        `one there anyway would fire it at the wrong hour.`,
-    );
-  }
+  refuseUnknownTimezone(input.ScheduleExpressionTimezone);
 
   if (input.StartDate !== undefined || input.EndDate !== undefined) {
     throw new SimSchedulerUnsimulatedInputException(

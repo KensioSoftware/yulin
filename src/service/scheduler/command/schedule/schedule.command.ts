@@ -107,6 +107,7 @@ export interface SimGetScheduleCommandOutput {
   readonly Name?: string | undefined;
   readonly GroupName?: string | undefined;
   readonly ScheduleExpression?: string | undefined;
+  readonly ScheduleExpressionTimezone?: string | undefined;
   readonly State?: string | undefined;
   readonly Description?: string | undefined;
   readonly ActionAfterCompletion?: string | undefined;

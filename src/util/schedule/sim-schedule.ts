@@ -2,6 +2,7 @@ import { SimAtExpression } from "./at/sim-at-expression.js";
 import { SimCronExpression } from "./cron/sim-cron-expression.js";
 import { SimRateExpression } from "./rate/sim-rate-expression.js";
 import type { SimScheduleDialect } from "./sim-schedule-dialect.js";
+import { SimScheduleZone } from "./sim-schedule-zone.js";
 import { SimScheduleExpressionError } from "./sim-schedule.error.js";
 
 /**
@@ -40,7 +41,11 @@ export class SimSchedule {
   /**
    * Read a schedule expression under a dialect's rules.
    */
-  static of(source: string, dialect: SimScheduleDialect): SimSchedule {
+  static of(
+    source: string,
+    dialect: SimScheduleDialect,
+    timeZone?: string,
+  ): SimSchedule {
     const read = expression.exec(source.trim())?.groups;
 
     if (read === undefined) {
@@ -50,7 +55,10 @@ export class SimSchedule {
       );
     }
 
-    return new this(source, this.occurrencesOf(read, dialect));
+    return new this(
+      source,
+      this.occurrencesOf(read, dialect, SimScheduleZone.of(timeZone)),
+    );
   }
 
   /**
@@ -59,6 +67,7 @@ export class SimSchedule {
   private static occurrencesOf(
     read: Partial<Record<string, string>>,
     dialect: SimScheduleDialect,
+    zone: SimScheduleZone,
   ): SimScheduleOccurrences {
     const body = read["body"] ?? "";
 
@@ -67,11 +76,11 @@ export class SimSchedule {
     }
 
     if (read["kind"] === "cron") {
-      return SimCronExpression.of(dialect.cronFields, body);
+      return SimCronExpression.of(dialect.cronFields, body, zone);
     }
 
     if (read["kind"] === "at" && dialect.allowsOneTime) {
-      return SimAtExpression.of(body);
+      return SimAtExpression.of(body, zone);
     }
 
     const forms = dialect.allowsOneTime
