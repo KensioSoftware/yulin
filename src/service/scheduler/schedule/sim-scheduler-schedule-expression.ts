@@ -31,13 +31,18 @@ export const schedulerScheduleDialect: SimScheduleDialect = {
 };
 
 /**
- * Read the `ScheduleExpression` a request carried.
+ * Read the `ScheduleExpression` a request carried, in the zone it named.
  *
  * The shared parser knows nothing about Scheduler, so its refusals become this
  * service's own errors here. Which of the two a caller gets tells them whether
- * the expression is wrong or whether it is right and unsimulated.
+ * the expression is wrong or whether it is right and unsimulated. A timezone no
+ * zone answers to is refused the same way, since the parser is what knows which
+ * names there are.
  */
-export function schedulerSchedule(source: string | undefined): SimSchedule {
+export function schedulerSchedule(
+  source: string | undefined,
+  timeZone?: string,
+): SimSchedule {
   if (source === undefined || source === "") {
     throw new SimSchedulerValidationException("ScheduleExpression is required");
   }
@@ -50,7 +55,7 @@ export function schedulerSchedule(source: string | undefined): SimSchedule {
   }
 
   try {
-    return SimSchedule.of(source, schedulerScheduleDialect);
+    return SimSchedule.of(source, schedulerScheduleDialect, timeZone);
   } catch (error) {
     if (error instanceof SimUnsimulatedScheduleExpressionError) {
       throw new SimSchedulerUnsimulatedInputException(

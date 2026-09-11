@@ -20,6 +20,7 @@ export function describedSchedule(
     Name: schedule.name.value,
     GroupName: schedule.groupName,
     ScheduleExpression: schedule.schedule.source,
+    ScheduleExpressionTimezone: schedule.timeZone,
     State: schedule.state.value,
     Description: schedule.description,
     ActionAfterCompletion: schedule.actionAfterCompletion,

@@ -1,4 +1,5 @@
 import { SimScheduleExpressionError } from "../sim-schedule.error.js";
+import type { SimScheduleZone } from "../sim-schedule-zone.js";
 
 /**
  * The instant an `at()` expression names, written without a timezone.
@@ -8,6 +9,8 @@ import { SimScheduleExpressionError } from "../sim-schedule.error.js";
  * schedule rather than part of the expression, which is why one written here
  * would be ambiguous rather than helpful.
  */
+const millisecondsPerSecond = 1000;
+
 const atInstant =
   /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})$/u;
 
@@ -31,7 +34,7 @@ export class SimAtExpression {
   /**
    * Read the instant inside an `at(...)`.
    */
-  static of(source: string): SimAtExpression {
+  static of(source: string, zone: SimScheduleZone): SimAtExpression {
     const read = atInstant.exec(source.trim())?.groups;
 
     if (read === undefined) {
@@ -57,14 +60,27 @@ export class SimAtExpression {
     // JavaScript rolls an impossible date over rather than refusing it, so the
     // thirtieth of February quietly becomes the second of March and half past
     // twenty-five becomes tomorrow morning. Writing the instant back out is
-    // what catches every one of those in one comparison.
+    // what catches every one of those in one comparison. The calendar is read
+    // in UTC for this, since which instant the wall-clock time is depends on
+    // the zone and whether it is a real time of day does not.
     if (!at.toISOString().startsWith(written)) {
       throw new SimScheduleExpressionError(
         `an at expression names a real instant, and '${source}' is not one`,
       );
     }
 
-    return new this(source, at);
+    const minuteStart = zone.instantOf(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+    );
+
+    return new this(
+      source,
+      new Date(minuteStart + Number(second) * millisecondsPerSecond),
+    );
   }
 
   /**

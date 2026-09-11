@@ -80,16 +80,16 @@ describe("Scheduler schedule validation", () => {
     assertStringIncludes(error.message, "Schedule group reporting");
   });
 
-  it("refuses a timezone rather than running the schedule in UTC anyway", async () => {
-    // Given a nightly schedule written for London.
+  it("refuses a timezone no zone answers to, naming the parameter", async () => {
+    // Given a schedule written for a zone that does not exist.
     const error = await refusedSchedule({
-      ScheduleExpressionTimezone: "Europe/London",
+      ScheduleExpressionTimezone: "Europe/Nowhere",
     });
 
-    // Then it is refused: running it in UTC would fire it at the wrong hour,
-    // which is the thing a test of a nightly job is checking.
-    assertInstanceOf(error, SimSchedulerUnsimulatedInputException);
-    assertStringIncludes(error.message, "wrong hour");
+    // Then it is refused against the parameter it came in on, naming the zone.
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "ScheduleExpressionTimezone");
+    assertStringIncludes(error.message, "Europe/Nowhere");
   });
 
   it("refuses a target service it cannot invoke", async () => {
