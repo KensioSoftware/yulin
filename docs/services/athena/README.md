@@ -1107,6 +1107,11 @@ Current documented limitations:
 - A null in a result row reads as an empty string. Real Athena leaves the value out of the row.
 - A computed boolean reads as `1` and `0`. The Glue column type is what makes a boolean column read
   as `true` and `false`, and an expression has no column type behind it.
+- `round(x, 1)` keeps the one decimal place it was asked for, so `25` reads as `25.0` the way Trino
+  renders it, and the column reports `double`. The scale is read off the statement, so a `round`
+  whose scale is an expression rather than a number keeps none of it. Real Athena reports `decimal`
+  where the value being rounded came from a decimal literal, and nothing here tracks decimal
+  precision.
 - An expression nobody named is called `_col0` upward, as Athena calls one. An alias that needed
   quotes around it is renamed the same way.
 - The engine reads every object under the prefixes a query reaches and holds the rows in memory.

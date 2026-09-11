@@ -136,6 +136,7 @@ export class SimAthenaQueryEngine {
           sqlite,
           objects,
           sql: translated.sql,
+          scales: translated.scales,
         });
   }
 }
