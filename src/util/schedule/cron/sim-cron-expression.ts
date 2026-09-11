@@ -1,8 +1,6 @@
 import { SimScheduleExpressionError } from "../sim-schedule.error.js";
-import type {
-  SimScheduleZone,
-  SimScheduleZoneParts,
-} from "../sim-schedule-zone.js";
+import type { SimScheduleZone } from "../sim-schedule-zone.js";
+import type { SimScheduleZoneParts } from "../sim-schedule-zone-clock.js";
 import type { SimCronFieldSpec } from "./sim-cron-field-spec.js";
 import { readFields, type SimCronFields } from "./sim-cron-fields.js";
 
@@ -78,11 +76,6 @@ export class SimCronExpression {
    *
    * Nothing comes back once the search has run past the last year the dialect
    * has, since a cron expression naming only years in the past falls due never.
-   *
-   * A skip that does not move the search on is taken as a minute instead. The
-   * hour a zone skips over when the clocks go forward is a wall-clock time that
-   * never happens, and asking for the instant of one answers with the moment
-   * the clocks moved, which can be behind where the search already is.
    */
   nextAfter(instant: Date): Date | undefined {
     const end = this.zone.instantOf(this.fields.year.maximum + 1, 0, 1);
@@ -95,8 +88,7 @@ export class SimCronExpression {
         return new Date(candidate);
       }
 
-      candidate =
-        skipTo > candidate ? skipTo : candidate + millisecondsPerMinute;
+      candidate = skipTo;
     }
 
     return undefined;
@@ -135,7 +127,10 @@ export class SimCronExpression {
       return at + millisecondsPerMinute;
     }
 
-    return undefined;
+    // The second of a repeated hour reads the same wall clock as the first and
+    // has already been answered with. Real Scheduler fires once when the clocks
+    // go back, rather than twice.
+    return this.zone.isCanonical(at) ? undefined : at + millisecondsPerMinute;
   }
 
   /**

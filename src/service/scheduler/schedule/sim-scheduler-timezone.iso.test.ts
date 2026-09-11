@@ -109,6 +109,51 @@ describe("Scheduler firing in the zone a schedule names", () => {
     await simAws.close();
   });
 
+  it("falls due once on the day the clocks go back", async () => {
+    // Given a schedule due at 01:30 in New York, which the clocks read twice
+    // on the first Sunday of November.
+    const { simAws } = await aSimulationFrom("2026-10-31T12:00:00Z");
+
+    await simAws
+      .scheduler()
+      .createSchedule(
+        new CreateScheduleCommand(
+          nightlyIn("America/New_York", "cron(30 1 * * ? *)"),
+        ),
+      );
+
+    // Then it is due at the first of the two readings and then not again until
+    // the next day, as real Scheduler fires it once.
+    assertArrayEquals(dueInstants(simAws, "2026-10-31T12:00:00Z", 2), [
+      "2026-11-01T05:30:00.000Z",
+      "2026-11-02T06:30:00.000Z",
+    ]);
+
+    await simAws.close();
+  });
+
+  it("falls due after the hour the clocks skip over", async () => {
+    // Given a one-time schedule for 02:30 in New York on the morning the
+    // clocks go forward, which is a wall-clock time that never happens.
+    const { simAws } = await aSimulationFrom("2026-03-07T12:00:00Z");
+
+    await simAws
+      .scheduler()
+      .createSchedule(
+        new CreateScheduleCommand(
+          nightlyIn("America/New_York", "at(2026-03-08T02:30:00)"),
+        ),
+      );
+
+    // Then it is due at the first instant after the missing hour rather than
+    // at one inside the hour before it.
+    assertArrayEquals(dueInstants(simAws, "2026-03-07T12:00:00Z", 1), [
+      "2026-03-08T07:30:00.000Z",
+    ]);
+
+    await simAws.close();
+  });
+
   it("reports the timezone a schedule was created with", async () => {
     // Given a schedule created in a named zone.
     const { simAws } = await aSimulationFrom("2026-06-30T12:00:00Z");

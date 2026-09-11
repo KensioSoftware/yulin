@@ -1,30 +1,10 @@
-import { SimScheduleExpressionError } from "./sim-schedule.error.js";
+import {
+  simScheduleZoneClock,
+  type SimScheduleZoneClock,
+  type SimScheduleZoneParts,
+} from "./sim-schedule-zone-clock.js";
 
-/**
- * The wall-clock reading of one instant, as a schedule expression names it.
- */
-export interface SimScheduleZoneParts {
-  readonly year: number;
-
-  /** The month as a JavaScript `Date` numbers it, January being zero. */
-  readonly month: number;
-  readonly day: number;
-  readonly hour: number;
-  readonly minute: number;
-
-  /** The day of the week, Sunday being zero. */
-  readonly weekday: number;
-}
-
-const weekdays: readonly string[] = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-];
+const minuteMs = 60_000;
 
 /**
  * The zone a schedule expression is read in.
@@ -34,9 +14,6 @@ const weekdays: readonly string[] = [
  * with a calendar therefore goes through one of these, and a schedule created
  * without a timezone gets the UTC one, which is what every schedule used to
  * get.
- *
- * `Intl.DateTimeFormat` is what knows the offsets, including the two days a
- * year a zone changes one, so no timezone database travels with this.
  */
 export class SimScheduleZone {
   /**
@@ -44,62 +21,36 @@ export class SimScheduleZone {
    */
   public readonly name: string;
 
-  private readonly format: Intl.DateTimeFormat;
+  private readonly clock: SimScheduleZoneClock;
 
-  private constructor(name: string, format: Intl.DateTimeFormat) {
+  private constructor(name: string, clock: SimScheduleZoneClock) {
     this.name = name;
-    this.format = format;
+    this.clock = clock;
   }
 
   /**
    * The zone a name calls for, refusing a name no zone answers to.
    */
   static of(name = "UTC"): SimScheduleZone {
-    try {
-      return new this(
-        name,
-        new Intl.DateTimeFormat("en-US", {
-          timeZone: name,
-          hourCycle: "h23",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          weekday: "short",
-        }),
-      );
-    } catch {
-      throw new SimScheduleExpressionError(
-        `'${name}' is not a timezone. A timezone is an IANA name such as ` +
-          `'Europe/London', or 'UTC'`,
-      );
-    }
+    return new this(name, simScheduleZoneClock(name));
   }
 
   /**
    * What a clock in this zone reads at an instant.
    */
   partsAt(instant: number): SimScheduleZoneParts {
-    const read = this.read(instant);
-
-    return {
-      year: read.year,
-      month: read.month - 1,
-      day: read.day,
-      hour: read.hour,
-      minute: read.minute,
-      weekday: read.weekday,
-    };
+    return this.clock(instant);
   }
 
   /**
    * The instant a clock in this zone reads a wall-clock time at.
    *
-   * The offset is read at a first guess and then at the instant that guess
-   * gives, which is what carries a time across the day a zone changes offset. A
-   * wall-clock time the zone skips over lands on the instant the clocks went
-   * forward, and one it reads twice lands on the first of the two.
+   * Two offsets are in play on the day a zone changes one, so both are tried
+   * and the answer is whichever of them the zone actually reads back. A time
+   * the clocks read twice has two, and the earlier is the answer, which is the
+   * one real Scheduler fires at. A time the clocks skip over has neither, and
+   * the answer is the later of the two, which is the first instant after the
+   * hour that never happened.
    */
   instantOf(
     year: number,
@@ -109,48 +60,61 @@ export class SimScheduleZone {
     minute = 0,
   ): number {
     const wanted = Date.UTC(year, month, day, hour, minute);
-    const guessed = wanted - this.offsetAt(wanted);
+    const candidates = this.candidatesFor(wanted);
+    const read = candidates.filter(
+      (candidate) => this.wallClockOf(candidate) === wanted,
+    );
 
-    return wanted - this.offsetAt(guessed);
+    return read.length === 0 ? Math.max(...candidates) : Math.min(...read);
+  }
+
+  /**
+   * Whether an instant is the one this zone puts its own wall-clock reading at.
+   *
+   * The second of a repeated hour reads the same as the first and is not the
+   * instant that reading resolves to, which is what tells the two apart.
+   */
+  isCanonical(instant: number): boolean {
+    const read = this.clock(instant);
+
+    return (
+      this.instantOf(
+        read.year,
+        read.month,
+        read.day,
+        read.hour,
+        read.minute,
+      ) === instant
+    );
+  }
+
+  /**
+   * The instants a wall-clock time could be, under the offsets either side of
+   * a change.
+   */
+  private candidatesFor(wanted: number): readonly number[] {
+    const first = wanted - this.offsetAt(wanted);
+    const second = wanted - this.offsetAt(first);
+
+    return first === second ? [first] : [first, second];
   }
 
   /**
    * How far ahead of UTC this zone is at an instant, in milliseconds.
    */
   private offsetAt(instant: number): number {
-    const read = this.read(instant);
-
     return (
-      Date.UTC(read.year, read.month - 1, read.day, read.hour, read.minute) -
-      Math.floor(instant / 60_000) * 60_000
+      this.wallClockOf(instant) - Math.floor(instant / minuteMs) * minuteMs
     );
   }
 
   /**
-   * One instant taken apart, in the numbering the formatter reports.
+   * What a clock in this zone reads at an instant, as a UTC instant of the same
+   * wall-clock fields, which is what makes two readings comparable.
    */
-  private read(instant: number): {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-    weekday: number;
-  } {
-    const parts = new Map(
-      this.format
-        .formatToParts(new Date(instant))
-        .map((part) => [part.type, part.value]),
-    );
+  private wallClockOf(instant: number): number {
+    const read = this.clock(instant);
 
-    return {
-      year: Number(parts.get("year")),
-      month: Number(parts.get("month")),
-      day: Number(parts.get("day")),
-      // Midnight reads as 24 under some locales rather than as zero.
-      hour: Number(parts.get("hour")) % 24,
-      minute: Number(parts.get("minute")),
-      weekday: weekdays.indexOf(parts.get("weekday") ?? ""),
-    };
+    return Date.UTC(read.year, read.month, read.day, read.hour, read.minute);
   }
 }
