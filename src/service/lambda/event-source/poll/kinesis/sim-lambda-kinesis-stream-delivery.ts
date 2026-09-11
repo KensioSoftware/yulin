@@ -2,11 +2,16 @@ import type { SimLambdaFunction } from "../../../function/sim-lambda-function.js
 import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-mapping.js";
 import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
+import type { SimLambdaFilterCriteria } from "../../filter/sim-lambda-filter-criteria.js";
+import { simLambdaFilteredDelivery } from "../../filter/sim-lambda-filtered-delivery.js";
 import { SimLambdaStreamCascadeGuard } from "../../stream/sim-lambda-stream-cascade-guard.js";
 import { SimLambdaStreamHalt } from "../../stream/sim-lambda-stream-halt.js";
 import { countSimLambdaKinesisIteratorAge } from "../sim-lambda-stream-iterator-age.js";
-import { simLambdaKinesisStreamRecordTimes } from "../sim-lambda-stream-record-times.js";
-import type { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
+import {
+  simLambdaKinesisStreamRecordTimes,
+  type SimLambdaStreamRecordTime,
+} from "../sim-lambda-stream-record-times.js";
+import { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamBatchResponse } from "../sim-lambda-stream-batch-response.js";
 import { SimLambdaKinesisStreamEventBuilder } from "./sim-lambda-kinesis-stream-event.js";
 
@@ -33,9 +38,12 @@ export class SimLambdaKinesisStreamDelivery {
   private readonly batchResponse: SimLambdaStreamBatchResponse;
   private readonly cascade: SimLambdaStreamCascadeGuard;
   private readonly halt = new SimLambdaStreamHalt();
+  private readonly filterCriteria: SimLambdaFilterCriteria | undefined;
 
   constructor(properties: SimLambdaKinesisStreamDeliveryProperties) {
     const { eventSourceArn } = properties;
+
+    this.filterCriteria = properties.mapping.filterCriteria;
 
     this.eventBuilder = new SimLambdaKinesisStreamEventBuilder({
       eventSourceArn,
@@ -98,10 +106,28 @@ export class SimLambdaKinesisStreamDelivery {
   ): Promise<SimLambdaStreamBatchOutcome> {
     const times = simLambdaKinesisStreamRecordTimes(records);
 
+    return await simLambdaFilteredDelivery({
+      criteria: this.filterCriteria,
+      records,
+      documentOf: (record) => this.eventBuilder.filterDocumentOf(record),
+      // A batch the filters emptied is finished with even though the function
+      // never saw it, as a filtered record advances a real checkpoint too.
+      handled: () => SimLambdaStreamBatchOutcome.handled(times),
+      invoke: async (delivered) =>
+        await this.invoked(simFunction, delivered, times, records),
+    });
+  }
+
+  private async invoked(
+    simFunction: SimLambdaFunction,
+    delivered: readonly SimLambdaKinesisStreamRecord[],
+    times: readonly SimLambdaStreamRecordTime[],
+    records: readonly SimLambdaKinesisStreamRecord[],
+  ): Promise<SimLambdaStreamBatchOutcome> {
     try {
       return this.batchResponse.handled(
         times,
-        await simFunction.invoke(this.eventBuilder.of(records)),
+        await simFunction.invoke(this.eventBuilder.of(delivered)),
       );
     } catch {
       // As on real Lambda, the handler error goes to the function's logs. What

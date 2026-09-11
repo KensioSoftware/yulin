@@ -1,5 +1,6 @@
 import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
+import { simLambdaFilterData } from "../../filter/sim-lambda-filtered-records.js";
 import type {
   SimLambdaKinesisStreamEvent,
   SimLambdaKinesisStreamEventRecord,
@@ -51,7 +52,28 @@ export class SimLambdaKinesisStreamEventBuilder {
   of(
     records: readonly SimLambdaKinesisStreamRecord[],
   ): SimLambdaKinesisStreamEvent {
-    return { Records: records.map((record) => this.record(record)) };
+    return { Records: records.map((record) => this.recordOf(record)) };
+  }
+
+  /**
+   * What a mapping's filters read one record as.
+   *
+   * The event record carries the payload base64 encoded under `kinesis`, and a
+   * Lambda filter pattern addresses it as JSON under a top-level `data`. Both
+   * are here, so a pattern can name the payload the way AWS documents it and
+   * the record's metadata the way the event carries it.
+   */
+  filterDocumentOf(
+    record: SimLambdaKinesisStreamRecord,
+  ): Record<string, unknown> {
+    const eventRecord = this.recordOf(record);
+
+    return {
+      ...eventRecord,
+      data: simLambdaFilterData(
+        Buffer.from(eventRecord.kinesis.data, "base64").toString("utf8"),
+      ),
+    };
   }
 
   /**
@@ -65,7 +87,10 @@ export class SimLambdaKinesisStreamEventBuilder {
     return `${this.shardId}:${record.SequenceNumber ?? ""}`;
   }
 
-  private record(
+  /**
+   * The event record one polled record becomes.
+   */
+  recordOf(
     record: SimLambdaKinesisStreamRecord,
   ): SimLambdaKinesisStreamEventRecord {
     return {

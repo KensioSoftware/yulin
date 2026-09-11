@@ -881,7 +881,7 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
   `AWS::Lambda::Url`, `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias`,
   `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig`
-- event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
+- event sources other than SQS queues, DynamoDB streams and Kinesis streams,
   `UpdateEventSourceMapping`, and polling concurrency
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime

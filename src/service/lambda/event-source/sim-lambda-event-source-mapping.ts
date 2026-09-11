@@ -4,6 +4,10 @@ import { SimLambdaNoDestinationTargets } from "../destination/sim-lambda-destina
 import { randomUUID } from "node:crypto";
 
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type {
+  SimLambdaFilterCriteria,
+  SimLambdaFilterCriteriaInput,
+} from "./filter/sim-lambda-filter-criteria.js";
 import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
 import type {
   SimLambdaStreamRetryLimits,
@@ -56,6 +60,7 @@ interface SimLambdaEventSourceMappingProperties {
     | SimLambdaStreamDestinationConfiguration
     | undefined;
   readonly destinations?: SimLambdaDestinationTargets | undefined;
+  readonly filterCriteria?: SimLambdaFilterCriteria | undefined;
   readonly createdAt: Date;
 }
 
@@ -77,6 +82,7 @@ export interface SimLambdaEventSourceMappingConfiguration extends Partial<SimLam
   readonly StartingPositionTimestamp?: Date | undefined;
   readonly MaximumBatchingWindowInSeconds: number;
   readonly FunctionResponseTypes: readonly SimLambdaFunctionResponseType[];
+  readonly FilterCriteria?: SimLambdaFilterCriteriaInput | undefined;
   readonly State: SimLambdaEventSourceMappingState;
   readonly StateTransitionReason: string;
   readonly LastModified: Date;
@@ -117,6 +123,14 @@ export class SimLambdaEventSourceMapping {
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
   /**
+   * The filters a record has to match before it is delivered, if this mapping
+   * was created with any.
+   *
+   * A mapping with none delivers every record its source hands it.
+   */
+  public readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+
+  /**
    * When this mapping stops delivering a batch its function keeps failing, for
    * a source that leaves the counting to the mapping.
    *
@@ -148,6 +162,7 @@ export class SimLambdaEventSourceMapping {
     // cannot change what this mapping does with a batch afterwards.
     this.functionResponseTypes = [...(properties.functionResponseTypes ?? [])];
     this.streamRetryLimits = properties.streamRetryLimits;
+    this.filterCriteria = properties.filterCriteria;
     this.enabled = properties.enabled ?? true;
     this.lastModified = properties.createdAt;
   }
@@ -218,6 +233,9 @@ export class SimLambdaEventSourceMapping {
       // them out rather than reporting a limit it does not have.
       ...this.streamRetryLimits?.configuration(),
       FunctionResponseTypes: this.functionResponseTypes,
+      // A mapping created without filters reports none, as real Lambda does,
+      // rather than reporting an empty list of them.
+      FilterCriteria: this.filterCriteria?.configuration(),
       State: this.#state,
       StateTransitionReason: "USER_INITIATED",
       LastModified: this.lastModified,

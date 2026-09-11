@@ -48,12 +48,8 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
   ["AmazonManagedKafkaEventSourceConfig", absentEventSource],
   ["DocumentDBEventSourceConfig", absentEventSource],
   [
-    "FilterCriteria",
-    "every record on the event source is delivered to the function, unfiltered",
-  ],
-  [
     "KmsKeyArn",
-    "the key encrypts filter criteria, and filter criteria are not simulated",
+    "filter criteria are simulated in plaintext, and encrypting them is not",
   ],
   ["MetricsConfig", "the mapping publishes no CloudWatch metrics"],
   [

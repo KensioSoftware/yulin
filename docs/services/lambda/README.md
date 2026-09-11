@@ -2365,9 +2365,11 @@ the mapping's execution-role check is looking for.
 
 `bisectBatchOnError` is simulated, and is covered under
 [Splitting a failed batch around the record that broke it](#splitting-a-failed-batch-around-the-record-that-broke-it).
-The other properties a non-default `DynamoEventSource` adds are recorded rather than acted on. Those
-are `FilterCriteria`, `ParallelizationFactor` and `TumblingWindowInSeconds`.
-The mapping deploys, delivers every record whole and unfiltered, and each property it was created
+So is `filters`, which is covered under
+[Filtering the records a mapping delivers](#filtering-the-records-a-mapping-delivers). The other
+properties a non-default `DynamoEventSource` adds are recorded and left alone. Those are
+`ParallelizationFactor` and `TumblingWindowInSeconds`.
+The mapping deploys, delivers every record whole, and each property it was created
 without is listed in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without "Properties a Resource was created without")
 with what the mapping does in its place. `CreateEventSourceMapping` still refuses the same
@@ -2534,6 +2536,137 @@ work the same way here, and each shard counts its own attempts.
 
 A mapping naming an enhanced fan-out consumer ARN is refused, since consumers are unsimulated.
 `AWS::Lambda::EventSourceMapping` deploys a Kinesis mapping the same way it deploys a DynamoDB one.
+
+## Filtering the records a mapping delivers
+
+`FilterCriteria` on an event source mapping decides which records reach the function. A record that
+matches is delivered. One that does not is treated as handled. A stream moves its checkpoint past it
+and a queue deletes it, the way real Lambda handles a record it filtered out. A batch that comes back
+empty invokes nothing at all.
+
+AWS documents Lambda's filter rules as EventBridge event patterns, and simulated EventBridge's
+matcher is what evaluates them here. Exact values, `prefix`, `suffix`, `anything-but`, `numeric` and
+`exists` all work. A mapping naming an operator the matcher has no behaviour for is refused when it
+is created. A mapping carrying several filters delivers a record any one of them matches.
+
+What a pattern reads depends on the source:
+
+- **SQS** filters on `body` alone, as real Lambda does. A body holding JSON is read as the object it
+  parses to, and one holding anything else is read as the string it is. A pattern naming any other
+  key is refused when the mapping is created.
+- **DynamoDB streams** filter on the record the function would have received, so `eventName` and
+  `dynamodb.NewImage.status.S` both work, with the attribute values in their DynamoDB shapes.
+- **Kinesis streams** filter on the record with the payload decoded, under a top-level `data` key.
+  The payload has to hold JSON for a pattern to read inside it.
+
+```typescript sim-lambda-event-source-filter-criteria
+/**
+ * Delivering only the queue messages a filter matches.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "ShippedOrdersRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ShippedOrdersRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const shipped: string[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "shipped-orders",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaSqsEvent) => {
+        for (const record of event.Records) {
+          shipped.push(
+            (JSON.parse(record.body) as { orderId: string }).orderId,
+          );
+        }
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "shipped-orders",
+    FilterCriteria: {
+      Filters: [{ Pattern: JSON.stringify({ body: { status: ["shipped"] } }) }],
+    },
+  }),
+);
+
+for (const order of [
+  { orderId: "order-1", status: "placed" },
+  { orderId: "order-2", status: "shipped" },
+]) {
+  await simAws
+    .sqs()
+    .sendMessage(
+      new SendMessageCommand({ QueueUrl, MessageBody: JSON.stringify(order) }),
+    );
+}
+
+await simAws.backgroundTasksComplete();
+
+console.log(shipped); // ["order-2"]
+```
+
+`GetEventSourceMappingCommand` reports the patterns back as they were written. A mapping created
+without filters reports none.
+
+An `AWS::Lambda::EventSourceMapping` carrying `FilterCriteria` deploys with it, and so does a SAM
+function's queue or stream event. A CDK `SqsEventSource` or `DynamoEventSource` given `filters`
+therefore filters here the way it does deployed.
 
 ## Function URLs
 
@@ -4203,6 +4336,8 @@ Sim Lambda currently supports:
   `CreateEventSourceMappingCommand` and read with `GetEventSourceMappingCommand`,
   `ListEventSourceMappingsCommand` and `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
   DynamoDB stream and Kinesis events and honouring `BatchSize`
+- `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns, delivering
+  the records that match and handling the rest without an invocation
 - `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, and `"AT_TIMESTAMP"` on a
   Kinesis one, with a failing batch blocking its shard until it is through or discarded
 - `MaximumRetryAttempts` and `MaximumRecordAgeInSeconds` on a stream mapping, ending the retries at
@@ -4365,7 +4500,7 @@ Current documented limitations:
   it stands.
 - SQS queues, DynamoDB streams and Kinesis streams are the only event sources. Kafka, DocumentDB and
   Kinesis enhanced fan-out consumers are refused outright. `CreateEventSourceMapping` also refuses
-  `FilterCriteria`, `ScalingConfig`, `ParallelizationFactor`, `TumblingWindowInSeconds` and the
+  `ScalingConfig`, `ParallelizationFactor`, `TumblingWindowInSeconds` and the
   other inputs this simulation has no behaviour for. An
   `AWS::Lambda::EventSourceMapping` naming any of them deploys instead, and records each one against
   the Resource (see
@@ -4385,6 +4520,10 @@ Current documented limitations:
   invoked it, are refused with `SimLambdaStreamCascadeError`. Real Lambda runs that loop for as long
   as it is paid for. A handler that writes back and then settles is delivered its own writes and
   finishes.
+- `FilterCriteria` is evaluated by simulated EventBridge's pattern matcher, which leaves out the
+  `equals-ignore-case` and `$or` operators real Lambda takes. A pattern naming one is refused when
+  the mapping is created. The limits AWS puts on the number and length of patterns go unenforced,
+  and `KMSKeyArn` is refused, so criteria are held in plaintext.
 - A shard iterator never expires, where a real one is good for 15 minutes.
 - `MaximumBatchingWindowInSeconds` is only simulated as 0. A partial batch is delivered as soon as
   anything is on the event source, leaving a batching window nothing to wait for. A non-zero value
