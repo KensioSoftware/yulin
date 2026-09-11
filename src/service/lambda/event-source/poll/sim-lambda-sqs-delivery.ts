@@ -24,5 +24,6 @@ export function makeSimLambdaSqsDelivery(
     batchResponse: new SimLambdaSqsBatchResponse(
       properties.mapping.reportsBatchItemFailures,
     ),
+    filterCriteria: properties.mapping.filterCriteria,
   });
 }

@@ -8,6 +8,7 @@ import {
   simLambdaEventSourceArnOf,
 } from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
+import { SimLambdaFilterCriteria } from "../../event-source/filter/sim-lambda-filter-criteria.js";
 import type { SimLambdaStreamRetryLimits } from "../../event-source/sim-lambda-stream-retry-limits.js";
 import type { SimLambdaEventSourceStart } from "../../event-source/sim-lambda-event-source-starting-position.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
@@ -34,6 +35,7 @@ interface SimLambdaEventSourceMappingInputProperties {
     | SimLambdaStreamDestinationConfiguration
     | undefined;
   readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
+  readonly filterCriteria: SimLambdaFilterCriteria | undefined;
 }
 
 /**
@@ -73,6 +75,11 @@ export class SimLambdaEventSourceMappingInput {
    */
   public readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
 
+  /**
+   * The filters this mapping delivers through, if it was created with any.
+   */
+  public readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+
   private constructor(properties: SimLambdaEventSourceMappingInputProperties) {
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
@@ -83,6 +90,7 @@ export class SimLambdaEventSourceMappingInput {
     this.functionResponseTypes = properties.functionResponseTypes;
     this.destinationConfig = properties.destinationConfig;
     this.streamRetryLimits = properties.streamRetryLimits;
+    this.filterCriteria = properties.filterCriteria;
   }
 
   /**
@@ -114,6 +122,10 @@ export class SimLambdaEventSourceMappingInput {
       }),
       enabled: input.Enabled ?? true,
       functionResponseTypes: functionResponseTypesIn(input),
+      filterCriteria: SimLambdaFilterCriteria.of(
+        input.FilterCriteria,
+        eventSourceArn.kind,
+      ),
       streamRetryLimits: eventSourceArn.retryLimitRules.limitsIn({
         maximumRetryAttempts: input.MaximumRetryAttempts,
         maximumRecordAgeInSeconds: input.MaximumRecordAgeInSeconds,

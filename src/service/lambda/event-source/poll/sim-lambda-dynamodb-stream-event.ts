@@ -33,10 +33,14 @@ export class SimLambdaDynamoDbStreamEventBuilder {
   of(
     records: readonly SimLambdaEventSourceStreamRecord[],
   ): SimLambdaDynamoDbStreamEvent {
-    return { Records: records.map((record) => this.record(record)) };
+    return { Records: records.map((record) => this.recordOf(record)) };
   }
 
-  private record(
+  /**
+   * The event record one polled record becomes, which is also what a mapping's
+   * filters are matched against.
+   */
+  recordOf(
     record: SimLambdaEventSourceStreamRecord,
   ): SimLambdaDynamoDbStreamEventRecord {
     const identity = record.userIdentity;

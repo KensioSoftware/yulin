@@ -248,7 +248,7 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
     assertStringIncludes(error.message, "Nonsense");
   });
 
-  it("records mapping settings it cannot act on rather than failing the stack", async () => {
+  it("records a mapping setting it cannot act on rather than failing the stack", async () => {
     // Given a mapping asking for a tumbling window and event filtering, as a
     // CDK event source carrying those options synthesises one.
     const simAws = new SimAws();
@@ -283,24 +283,31 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
 
     assertArrayIncludesAll(
       resource.ignoredProperties.map((ignored) => ignored.path),
-      ["TumblingWindowInSeconds", "FilterCriteria"],
+      ["TumblingWindowInSeconds"],
     );
     assertArrayIncludesAll(
       stack.ignoredProperties.map((ignored) => ignored.path),
-      ["TumblingWindowInSeconds", "FilterCriteria"],
+      ["TumblingWindowInSeconds"],
     );
 
-    // And it delivers, unfiltered, as the recorded reason says it does.
-    await simAws.sqs().sendMessage(
-      new SendMessageCommand({
-        QueueUrl: simAws.sqs().findQueue("orders")?.url,
-        MessageBody: "order-1",
-      }),
-    );
+    // And the filter the template asked for is applied, so only the message it
+    // names reaches the function.
+    const queueUrl = simAws.sqs().findQueue("orders")?.url;
+
+    await simAws
+      .sqs()
+      .sendMessage(
+        new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
+      );
+    await simAws
+      .sqs()
+      .sendMessage(
+        new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-2" }),
+      );
     await simAws.backgroundTasksComplete();
 
     assertArrayLength(events, 1);
-    assertIdentical(events[0].Records[0]?.body, "order-1");
+    assertIdentical(events[0].Records[0]?.body, "order-2");
   });
 
   it("records a property AWS::Lambda::EventSourceMapping does not have", async () => {

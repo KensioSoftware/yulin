@@ -142,6 +142,7 @@ interface StreamEventSourceOptions {
   readonly maximumRetryAttempts?: number;
   readonly maximumRecordAgeInSeconds?: number;
   readonly bisectBatchOnFunctionError?: boolean;
+  readonly filterPatterns?: readonly string[];
 }
 
 /**
@@ -188,6 +189,11 @@ export async function simAwsWithStreamEventSource(
       }),
       ...(options.bisectBatchOnFunctionError !== undefined && {
         BisectBatchOnFunctionError: options.bisectBatchOnFunctionError,
+      }),
+      ...(options.filterPatterns !== undefined && {
+        FilterCriteria: {
+          Filters: options.filterPatterns.map((Pattern) => ({ Pattern })),
+        },
       }),
     }),
   );

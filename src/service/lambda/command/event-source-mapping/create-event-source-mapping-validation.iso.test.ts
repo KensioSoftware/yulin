@@ -248,18 +248,34 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "ReportEverything");
   });
 
-  it("refuses filter criteria, which would change what the function sees", async () => {
+  it("refuses a queue filter on anything but the message body", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping asks for event filtering.
+    // When a mapping asks to filter on a message's metadata.
     const error = await refusedMapping(ready, {
-      FilterCriteria: { Filters: [{ Pattern: "{}" }] },
+      FilterCriteria: { Filters: [{ Pattern: '{"messageId":["order-1"]}' }] },
     });
 
-    // Then it is refused rather than delivering everything.
+    // Then it is refused, since real Lambda filters a queue on the body alone.
     assertStringIncludes(error.message, "FilterCriteria");
-    assertStringIncludes(error.message, "not simulated");
+    assertStringIncludes(error.message, "messageId");
+  });
+
+  it("refuses a filter pattern the simulated matcher cannot evaluate", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping asks for an operator this simulation has no behaviour for.
+    const error = await refusedMapping(ready, {
+      FilterCriteria: {
+        Filters: [{ Pattern: '{"body":[{"wildcard":"order-*"}]}' }],
+      },
+    });
+
+    // Then it is refused by name rather than matching nothing.
+    assertStringIncludes(error.message, "FilterCriteria");
+    assertStringIncludes(error.message, "wildcard");
   });
 
   it("refuses a mapping on a standalone simulated Lambda with no queues", async () => {

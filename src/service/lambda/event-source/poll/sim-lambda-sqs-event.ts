@@ -2,6 +2,7 @@ import type {
   SimSqsPollMessage,
   SimSqsPollMessageAttribute,
 } from "../../../sqs/poll/sim-sqs-poll-message.js";
+import { simLambdaFilterData } from "../filter/sim-lambda-filtered-records.js";
 import type { SimLambdaSqsEventSourceArn } from "../queue/sim-lambda-sqs-event-source-arn.js";
 
 /**
@@ -62,6 +63,17 @@ export class SimLambdaSqsEventBuilder {
    */
   of(messages: readonly SimSqsPollMessage[]): SimLambdaSqsEvent {
     return { Records: messages.map((message) => this.record(message)) };
+  }
+
+  /**
+   * What a mapping's filters read one message as.
+   *
+   * Real Lambda filters an SQS message on its body alone, and reads the body as
+   * JSON where it holds JSON. Nothing else about the message is here, because a
+   * pattern naming anything else was refused when the mapping was created.
+   */
+  filterDocumentOf(message: SimSqsPollMessage): Record<string, unknown> {
+    return { body: simLambdaFilterData(message.Body) };
   }
 
   private record(message: SimSqsPollMessage): SimLambdaSqsEventRecord {

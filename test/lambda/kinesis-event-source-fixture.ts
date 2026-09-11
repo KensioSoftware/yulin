@@ -106,6 +106,7 @@ interface KinesisEventSourceOptions {
   readonly maximumRetryAttempts?: number;
   readonly maximumRecordAgeInSeconds?: number;
   readonly bisectBatchOnFunctionError?: boolean;
+  readonly filterPatterns?: readonly string[];
 }
 
 /**
@@ -161,6 +162,11 @@ export async function simAwsWithKinesisEventSource(
       }),
       ...(options.bisectBatchOnFunctionError !== undefined && {
         BisectBatchOnFunctionError: options.bisectBatchOnFunctionError,
+      }),
+      ...(options.filterPatterns !== undefined && {
+        FilterCriteria: {
+          Filters: options.filterPatterns.map((Pattern) => ({ Pattern })),
+        },
       }),
     }),
   );

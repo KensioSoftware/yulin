@@ -11,7 +11,6 @@ import type { SimCreateEventSourceMappingCommandInput } from "./event-source-map
  * would not have.
  */
 const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
-  ["FilterCriteria", "event filtering is not simulated"],
   ["ScalingConfig", "polling concurrency is not simulated"],
   ["ProvisionedPollerConfig", "polling concurrency is not simulated"],
   [

@@ -1,3 +1,4 @@
+import type { SimLambdaFilterCriteriaInput } from "../../event-source/filter/sim-lambda-filter-criteria.js";
 /**
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/lambda/command/CreateEventSourceMappingCommand/
  *
@@ -35,7 +36,7 @@ export interface SimCreateEventSourceMappingCommandInput {
   readonly BatchSize?: number | undefined;
   readonly MaximumBatchingWindowInSeconds?: number | undefined;
   readonly FunctionResponseTypes?: readonly string[] | undefined;
-  readonly FilterCriteria?: object | undefined;
+  readonly FilterCriteria?: SimLambdaFilterCriteriaInput | undefined;
   readonly ScalingConfig?: object | undefined;
   readonly DestinationConfig?: object | undefined;
   readonly SelfManagedEventSource?: object | undefined;

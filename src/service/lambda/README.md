@@ -461,7 +461,8 @@ that differs from an `Invoke`.
 
 ## Event source mappings
 
-`event-source/` owns delivery from a simulated SQS queue or DynamoDB stream to a function.
+`event-source/` owns delivery from a simulated SQS queue, DynamoDB stream or Kinesis stream to a
+function.
 
 The machinery is split by event source kind rather than assuming one.
 `sim-lambda-event-source-arn.ts` reads the ARN a mapping names into a union discriminated by `kind`,
@@ -881,7 +882,7 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
   `AWS::Lambda::Url`, `AWS::Lambda::Permission`, `AWS::Lambda::Version`, `AWS::Lambda::Alias`,
   `AWS::Lambda::EventSourceMapping` and `AWS::Lambda::EventInvokeConfig`
-- event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
+- event sources other than SQS queues, DynamoDB streams and Kinesis streams,
   `UpdateEventSourceMapping`, and polling concurrency
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
