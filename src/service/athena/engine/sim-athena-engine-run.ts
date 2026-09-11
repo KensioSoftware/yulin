@@ -23,6 +23,9 @@ export interface SimAthenaEngineRun {
   readonly caller: SimAwsCaller | undefined;
   readonly startedAt: Date;
   readonly sql: string;
+
+  /** The decimal places each result column was rounded to, by position. */
+  readonly scales: ReadonlyMap<number, number>;
 }
 
 /**
@@ -57,7 +60,12 @@ export async function simAthenaEngineRun(
 
     try {
       return simAthenaEngineAnswered(
-        simAthenaEngineResult(database, run.sql, loaded),
+        simAthenaEngineResult({
+          database,
+          sql: run.sql,
+          loaded,
+          scales: run.scales,
+        }),
       );
     } finally {
       database.close();

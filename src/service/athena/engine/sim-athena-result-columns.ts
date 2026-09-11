@@ -31,16 +31,31 @@ export function simAthenaResultColumns(
   metadata: readonly StatementColumnMetadata[],
   rows: readonly (readonly SQLOutputValue[])[],
   loaded: readonly SimAthenaLoadedTable[],
+  scales: ReadonlyMap<number, number> = new Map(),
 ): readonly SimAthenaDeclaredColumn[] {
   const types = glueColumnTypes(loaded);
 
   return metadata.map((column, index) => ({
     name: nameOf(column, index),
-    type:
-      column.column === null
-        ? inferredType(rows, index)
-        : simAthenaResultType(types.get(originOf(column))),
+    // A column the statement rounded to a scale is a double whatever value it
+    // happens to hold, since a whole number rounded to one place is still one.
+    type: scales.has(index)
+      ? "double"
+      : columnType({ column, rows, index, types }),
   }));
+}
+
+interface SimAthenaColumnTypeRead {
+  readonly column: StatementColumnMetadata;
+  readonly rows: readonly (readonly SQLOutputValue[])[];
+  readonly index: number;
+  readonly types: ReadonlyMap<string, string | undefined>;
+}
+
+function columnType(read: SimAthenaColumnTypeRead): string {
+  return read.column.column === null
+    ? inferredType(read.rows, read.index)
+    : simAthenaResultType(read.types.get(originOf(read.column)));
 }
 
 function nameOf(column: StatementColumnMetadata, index: number): string {

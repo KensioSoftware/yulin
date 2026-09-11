@@ -6,7 +6,18 @@ import type { DatabaseSync, SQLOutputValue } from "node:sqlite";
 import type { SimAthenaDeclaredColumn } from "../result/sim-athena-declared-result.js";
 import { SimAthenaResolvedResult } from "../result/sim-athena-resolved-result.js";
 import { simAthenaResultColumns } from "./sim-athena-result-columns.js";
+import { simAthenaRoundedText } from "./sim-athena-round-scales.js";
 import type { SimAthenaLoadedTable } from "./sim-athena-table-rows.js";
+
+/** What one statement is run and read back with. */
+export interface SimAthenaEngineResultRun {
+  readonly database: DatabaseSync;
+  readonly sql: string;
+  readonly loaded: readonly SimAthenaLoadedTable[];
+
+  /** The decimal places each result column was rounded to, by position. */
+  readonly scales: ReadonlyMap<number, number>;
+}
 
 /**
  * Run one translated statement and read its answer back as a result set.
@@ -16,11 +27,9 @@ import type { SimAthenaLoadedTable } from "./sim-athena-table-rows.js";
  * them.
  */
 export function simAthenaEngineResult(
-  database: DatabaseSync,
-  sql: string,
-  loaded: readonly SimAthenaLoadedTable[],
+  run: SimAthenaEngineResultRun,
 ): SimAthenaResolvedResult {
-  const statement = database.prepare(sql);
+  const statement = run.database.prepare(run.sql);
 
   statement.setReturnArrays(true);
 
@@ -31,14 +40,37 @@ export function simAthenaEngineResult(
   statement.setReadBigInts(true);
 
   const rows = statement.all() as unknown as readonly SQLOutputValue[][];
-  const columns = simAthenaResultColumns(statement.columns(), rows, loaded);
+  const columns = simAthenaResultColumns(
+    statement.columns(),
+    rows,
+    run.loaded,
+    run.scales,
+  );
 
   return new SimAthenaResolvedResult({
     columns,
     rows: rows.map((row) =>
-      columns.map((column, index) => rendered(row[index], column)),
+      columns.map((column, index) =>
+        renderedCell(row[index], column, run.scales.get(index)),
+      ),
     ),
   });
+}
+
+/**
+ * One value as `GetQueryResults` carries it, with the scale its column was
+ * rounded to where the statement asked for one.
+ */
+function renderedCell(
+  value: SQLOutputValue | undefined,
+  column: SimAthenaDeclaredColumn,
+  scale: number | undefined,
+): string {
+  const text = rendered(value, column);
+
+  return scale === undefined || text === ""
+    ? text
+    : simAthenaRoundedText(value, scale);
 }
 
 /**

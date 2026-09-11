@@ -10,22 +10,33 @@ import {
   simAthenaUnwrittenStatement,
 } from "./sim-athena-turn-down.js";
 import { simAthenaRejectedStatement } from "./sim-athena-rejected-statement.js";
+import { simAthenaRoundScales } from "./sim-athena-round-scales.js";
 import { simAthenaRewriteUnnest } from "./sim-athena-unnest-rewrite.js";
 
 /** One statement translated for SQLite, or why it was not. */
 export type SimAthenaTranslatedSql =
   | {
       readonly sql: string;
+
+      /**
+       * The decimal places each result column was rounded to, by position.
+       *
+       * Read here because the syntax tree is the only place that knows, and
+       * the tree is gone by the time the answer is rendered.
+       */
+      readonly scales: ReadonlyMap<number, number>;
       readonly turnedDown: undefined;
       readonly rejected: undefined;
     }
   | {
       readonly sql: undefined;
+      readonly scales: undefined;
       readonly turnedDown: string;
       readonly rejected: undefined;
     }
   | {
       readonly sql: undefined;
+      readonly scales: undefined;
       readonly turnedDown: undefined;
       readonly rejected: string;
     };
@@ -69,7 +80,12 @@ export function simAthenaSqliteSql(
   const rejected = simAthenaRejectedStatement(ast);
 
   if (rejected !== undefined) {
-    return { sql: undefined, turnedDown: undefined, rejected };
+    return {
+      sql: undefined,
+      scales: undefined,
+      turnedDown: undefined,
+      rejected,
+    };
   }
 
   try {
@@ -83,8 +99,13 @@ export function simAthenaSqliteSql(
       return turnedDown(simAthenaUnrewrittenUnnest);
     }
 
+    // Read before the tree is written back out, since the rewrites above can
+    // move a select item and the scale travels by position.
+    const scales = simAthenaRoundScales(ast);
+
     return {
       sql: simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" })),
+      scales,
       turnedDown: undefined,
       rejected: undefined,
     };
@@ -94,5 +115,10 @@ export function simAthenaSqliteSql(
 }
 
 function turnedDown(reason: string): SimAthenaTranslatedSql {
-  return { sql: undefined, turnedDown: reason, rejected: undefined };
+  return {
+    sql: undefined,
+    scales: undefined,
+    turnedDown: reason,
+    rejected: undefined,
+  };
 }
