@@ -1,4 +1,4 @@
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertThrowsErrorAsync } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
@@ -133,6 +133,58 @@ describe("Trino's string functions on SQLite", () => {
     assertIdentical(await anAnsweredExpression("strpos('abc', 'c')"), 3);
     assertIdentical(await anAnsweredExpression("strpos('abc', 'z')"), 0);
     assertIdentical(await anAnsweredExpression("strpos('abc', NULL)"), null);
+  });
+
+  it("cuts a value into an array of its parts", async () => {
+    // Given a delimited value, an empty one, and a null.
+    // When each is split.
+    // Then the parts come back as the JSON text an array is held as, and an
+    // empty value answers with one empty part the way Trino does.
+    assertIdentical(
+      await anAnsweredExpression("split('a,b,c', ',')"),
+      '["a","b","c"]',
+    );
+    assertIdentical(await anAnsweredExpression("split('', ',')"), '[""]');
+    assertIdentical(
+      await anAnsweredExpression("split('a,,b', ',')"),
+      '["a","","b"]',
+    );
+    assertIdentical(await anAnsweredExpression("split(NULL, ',')"), null);
+    assertIdentical(await anAnsweredExpression("split('a,b', NULL)"), null);
+  });
+
+  it("leaves the rest of the value in the last part under a limit", async () => {
+    // Given a value with three parts in it.
+    // When a limit is put on how many come back.
+    // Then the last part carries everything left, and a limit past the parts
+    // changes nothing. An explicit null limit answers null, since a Trino
+    // function answers null for any null argument.
+    assertIdentical(
+      await anAnsweredExpression("split('a.b.c', '.', 2)"),
+      '["a","b.c"]',
+    );
+    assertIdentical(
+      await anAnsweredExpression("split('a.b', '.', 9)"),
+      '["a","b"]',
+    );
+    assertIdentical(
+      await anAnsweredExpression("split('a.b', '.', NULL)"),
+      null,
+    );
+  });
+
+  it("refuses an empty delimiter and a limit below one", async () => {
+    // Given a value to split.
+    // When the delimiter is empty and when the limit is zero.
+    // Then the statement raises, which leaves the declared result to answer.
+    // Trino refuses both, where JavaScript would split an empty delimiter a
+    // character at a time and answer something else.
+    await assertThrowsErrorAsync(async () =>
+      anAnsweredExpression("split('abc', '')"),
+    );
+    await assertThrowsErrorAsync(async () =>
+      anAnsweredExpression("split('a.b', '.', 0)"),
+    );
   });
 });
 

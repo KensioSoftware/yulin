@@ -2,47 +2,7 @@ import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { anAnsweredQuery } from "./sim-athena-answered-query.fixture.js";
-import {
-  aCatalogTable,
-  anEngineSimulation,
-  aSeededJson,
-  type SimAthenaEngineSimulation,
-} from "./sim-athena-engine.fixture.js";
-
-const events = [
-  { id: 1, tags: ["red", "blue"], attrs: { size: "large" }, name: "one" },
-  { id: 2, tags: [], attrs: {}, name: "two" },
-  {
-    id: 3,
-    tags: ["green"],
-    attrs: { size: "small", colour: "green" },
-    name: "three",
-  },
-];
-
-/** A simulation holding the events, with the engine on. */
-async function anEventSimulation(): Promise<SimAthenaEngineSimulation> {
-  const simulation = await anEngineSimulation();
-
-  aCatalogTable(simulation.simAws, {
-    name: "events",
-    columns: [
-      { Name: "id", Type: "int" },
-      { Name: "tags", Type: "array<string>" },
-      { Name: "attrs", Type: "map<string,string>" },
-      { Name: "name", Type: "string" },
-    ],
-  });
-
-  await aSeededJson(simulation.simAws, "events/part-0.json", events);
-  await simulation.simAws.athena().engine().enable();
-  simulation.simAws
-    .athena()
-    .results()
-    .byDefault({ columns: ["fallback"], rows: [["declared"]] });
-
-  return simulation;
-}
+import { anEventSimulation } from "./sim-athena-flattened-events.fixture.js";
 
 describe("flattening an Athena array with UNNEST", () => {
   it("returns one row per element", async () => {
@@ -218,19 +178,36 @@ describe("an UNNEST the engine turns down", () => {
     assertIdentical(answered.answeredBy, "declaration");
   });
 
-  it("falls back over an expression the catalog says nothing about", async () => {
+  it("falls back over an expression answering no collection", async () => {
     // Given the events, with the engine on.
     const simulation = await anEventSimulation();
 
-    // When a query flattens something that is not a column.
+    // When a query flattens a call that answers a scalar.
     const answered = await anAnsweredQuery(
       simulation,
       "SELECT t.part FROM rainlytics.events e " +
         "CROSS JOIN UNNEST(split_part(e.name, 'n', 1)) AS t(part)",
     );
 
-    // Then the declaration answers it. Only the schema says what a value
-    // holds, and it says nothing about an expression.
+    // Then the declaration answers it. An expression has no schema entry, so
+    // the call is what says the value is a collection, and `split_part`
+    // answers one field rather than all of them.
+    assertIdentical(answered.answeredBy, "declaration");
+  });
+
+  it("falls back over an array the statement wrote out", async () => {
+    // Given the events, with the engine on.
+    const simulation = await anEventSimulation();
+
+    // When a query flattens an array literal.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT t.tag FROM rainlytics.events e " +
+        "CROSS JOIN UNNEST(ARRAY['red', 'blue']) AS t(tag)",
+    );
+
+    // Then the declaration answers it. A column and a call are the two things
+    // the flattening reads, and a literal is neither.
     assertIdentical(answered.answeredBy, "declaration");
   });
 

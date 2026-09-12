@@ -21,6 +21,34 @@ export interface SimAthenaFromItem extends SimAthenaAstNode {
   as?: string | null;
 }
 
+/** One value as a node, or nothing where it is not an object. */
+export function asAstNode(value: unknown): SimAthenaAstNode | undefined {
+  return typeof value === "object" && value !== null
+    ? (value as SimAthenaAstNode)
+    : undefined;
+}
+
+/**
+ * The name a call carries, where the statement wrote it as one part.
+ *
+ * The parser holds a name as a list, one entry per piece of a qualified name,
+ * and it holds an `UNNEST` alias as a call of its own. A name written in more
+ * than one part answers with nothing, since neither the engine's functions nor
+ * an alias is reached that way.
+ */
+export function simAthenaCalledName(
+  node: SimAthenaAstNode | undefined,
+): string | undefined {
+  const parts = asAstNode(node?.["name"])?.["name"];
+  const first =
+    Array.isArray(parts) && parts.length === 1
+      ? asAstNode(parts[0])
+      : undefined;
+  const name = first?.["value"];
+
+  return typeof name === "string" ? name : undefined;
+}
+
 /** Every node in the tree, the outermost first. */
 export function* simAthenaAstNodes(root: unknown): Generator<SimAthenaAstNode> {
   if (Array.isArray(root)) {

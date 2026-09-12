@@ -22,10 +22,10 @@ interface SimAthenaUnnestRewriteRequest {
 /**
  * Turn an `UNNEST` into the `json_each` SQLite flattens JSON with.
  *
- * An array or a map column is held as its JSON text, and `json_each` reads that
- * as one row per element with a `key` and a `value`. The `FROM` entry becomes a
- * call to it and every reference to the alias is pointed at the column it
- * answers with.
+ * An array or a map column is held as its JSON text, as is what a function like
+ * `split` answers, and `json_each` reads that as one row per element with a
+ * `key` and a `value`. The `FROM` entry becomes a call to it and every
+ * reference to the alias is pointed at the column it answers with.
  *
  * Answers with whether the statement can run. A statement carrying no `UNNEST`
  * runs untouched, and one carrying an `UNNEST` this cannot turn into

@@ -3,6 +3,7 @@ import {
   isColumnRef,
   isFromItem,
   simAthenaAstNodes,
+  simAthenaCalledName,
   type SimAthenaAstNode,
 } from "./sim-athena-ast-nodes.js";
 
@@ -10,17 +11,27 @@ import {
 export type SimAthenaUnnestKind = "array" | "map";
 
 /**
- * What the statement is flattening, read off the Glue schema.
+ * The engine's own functions that answer an array.
  *
- * The catalog is the only thing that says whether a column holds an array, a
- * map or a scalar, and `json_each` answers with different columns for the first
- * two. A column the schema calls anything else answers with nothing here, and
- * the query falls back rather than reading a value as a collection it never
- * was.
+ * An expression has no catalog entry to read, so the call itself is what says
+ * the value is a collection. Each of these answers with the JSON text an array
+ * column is held as, which is what `json_each` reads.
+ */
+const arrayFunctions = new Set(["split", "slice"]);
+
+/**
+ * What the statement is flattening.
  *
- * An expression that is not a plain column reference answers with nothing too.
- * `UNNEST(split(x, ','))` is a real Athena query and the schema says nothing
- * about what it comes to.
+ * A column is read off the Glue schema. The catalog is the only thing that says
+ * whether a column holds an array, a map or a scalar, and `json_each` answers
+ * with different columns for the first two. A column the schema calls anything
+ * else answers with nothing here, and the query falls back rather than reading
+ * a value as a collection it never was.
+ *
+ * An expression is read off the function it calls. `UNNEST(split(x, ','))` is
+ * how a statement flattens a delimited string, and nothing but the call says
+ * what it comes to. A call to anything else answers with nothing, since the
+ * flattening would otherwise run over whatever SQLite made of a scalar.
  */
 export function simAthenaUnnestKind(
   source: SimAthenaAstNode,
@@ -28,7 +39,7 @@ export function simAthenaUnnestKind(
   tables: readonly SimAthenaCatalogTable[],
 ): SimAthenaUnnestKind | undefined {
   if (!isColumnRef(source)) {
-    return undefined;
+    return answersArray(source) ? "array" : undefined;
   }
 
   const declared = declaredType(source, ast, tables);
@@ -44,6 +55,14 @@ export function simAthenaUnnestKind(
   }
 
   return type.startsWith("map") ? "map" : undefined;
+}
+
+/** Whether this expression is a call to a function answering an array. */
+function answersArray(source: SimAthenaAstNode): boolean {
+  const name =
+    source["type"] === "function" ? simAthenaCalledName(source) : undefined;
+
+  return name !== undefined && arrayFunctions.has(name.toLowerCase());
 }
 
 /** Every catalog table the statement reads, by the name it reaches each one by. */
