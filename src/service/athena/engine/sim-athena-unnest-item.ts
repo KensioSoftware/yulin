@@ -1,5 +1,7 @@
 import {
+  asAstNode,
   simAthenaAstNodes,
+  simAthenaCalledName,
   type SimAthenaAstNode,
 } from "./sim-athena-ast-nodes.js";
 
@@ -50,9 +52,9 @@ export function simAthenaUnnestItem(ast: unknown): SimAthenaUnnestRead {
 
   const alias = aliasOf(item);
   const columns = aliasColumns(item);
-  const source = item["expr"];
+  const source = asAstNode(item["expr"]);
 
-  if (alias === undefined || columns === undefined || !isNode(source)) {
+  if (alias === undefined || columns === undefined || source === undefined) {
     return { kind: "unreadable" };
   }
 
@@ -74,32 +76,20 @@ function isCrossJoined(item: SimAthenaAstNode): boolean {
 
 /** The alias name, which the parser holds as a function's name. */
 function aliasOf(item: SimAthenaAstNode): string | undefined {
-  const parts = asNode(asNode(item["as"])?.["name"])?.["name"];
-  const first = Array.isArray(parts) ? asNode(parts[0]) : undefined;
-  const value = first?.["value"];
-
-  return typeof value === "string" ? value : undefined;
+  return simAthenaCalledName(asAstNode(item["as"]));
 }
 
 /** The names inside the alias, which the parser holds as a function's arguments. */
 function aliasColumns(item: SimAthenaAstNode): readonly string[] | undefined {
-  const values = asNode(asNode(item["as"])?.["args"])?.["value"];
+  const values = asAstNode(asAstNode(item["as"])?.["args"])?.["value"];
 
   if (!Array.isArray(values) || values.length === 0) {
     return undefined;
   }
 
-  const columns = values.map((value) => asNode(value)?.["column"]);
+  const columns = values.map((value) => asAstNode(value)?.["column"]);
 
   return columns.every((column) => typeof column === "string")
     ? columns
     : undefined;
-}
-
-function isNode(value: unknown): value is SimAthenaAstNode {
-  return typeof value === "object" && value !== null;
-}
-
-function asNode(value: unknown): SimAthenaAstNode | undefined {
-  return isNode(value) ? value : undefined;
 }

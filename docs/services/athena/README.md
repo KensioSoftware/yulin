@@ -486,7 +486,7 @@ Every ascending sort is emitted carrying `NULLS LAST`, because Trino orders null
 direction it sorts and SQLite orders them first ascending. Both were cases where a query answered
 differently while still succeeding, which is the failure that costs the most to find.
 
-### Flattening an array or a map
+### Flattening an array, a map or a split value
 
 `UNNEST` runs. An array or a map column is held as its JSON text, and SQLite reads that with
 `json_each`, so a statement flattening one returns a row per element the way Athena does.
@@ -505,6 +505,22 @@ falls back rather than reading a scalar as a collection.
 One flattening per statement is what this covers, joined with `CROSS JOIN`. A second `UNNEST`, a
 `LEFT JOIN UNNEST`, a `SELECT *` beside one, and a position taken from a map all fall back.
 
+A table with no array column in it can still be flattened. `split` answers an array, and an `UNNEST`
+over the call cuts one stored string into a row per part. This is how a packed access log row is
+read, since Glue builds a log table's columns from what the delivery was configured with.
+
+```sql
+SELECT t.part
+FROM rainlytics.logs
+CROSS JOIN UNNEST(split(url_extract_parameter(cs_uri_stem || '?' || cs_uri_query, 'b'), ';'))
+  AS t(part)
+```
+
+Splitting an empty value answers one empty part, as it does on Trino. A row whose value is null
+answers no parts at all and drops out, the way an empty array column does. The call is what says the
+value is a collection (an expression has no schema entry to read). `split` and `slice` are the two
+calls the flattening reaches, and any other expression under an `UNNEST` falls back.
+
 ### The functions a statement can call
 
 SQLite carries a much smaller function library than Trino, and the engine fills the gap for the ones
@@ -516,7 +532,7 @@ its declared result.
 | Date and time | `current_date`, `current_timestamp`, `date_add`, `date_diff`, `date_trunc`, `date_format`, `at_timezone`, `from_unixtime`, `to_unixtime`, `from_iso8601_timestamp`, `from_iso8601_date`, `to_iso8601` |
 | JSON          | `json_extract`, `json_extract_scalar`, `json_parse`, `json_size`                                                                                                                                      |
 | Array and map | `array_agg`, `cardinality`, `contains`, `element_at`, `array_join`, `slice`                                                                                                                           |
-| String        | `regexp_like`, `regexp_extract`, `regexp_replace`, `split_part`, `strpos`                                                                                                                             |
+| String        | `regexp_like`, `regexp_extract`, `regexp_replace`, `split`, `split_part`, `strpos`                                                                                                                    |
 | Binary        | `md5`, `sha1`, `sha256`, `sha512`, `xxhash64`, `murmur3`, `crc32`, `to_hex`, `from_hex`, `to_base64`, `from_base64`, `to_utf8`, `from_utf8`                                                           |
 | URL           | `url_extract_host`, `url_extract_path`, `url_extract_protocol`, `url_extract_port`, `url_extract_query`, `url_extract_fragment`, `url_extract_parameter`, `url_decode`, `url_encode`                  |
 | Approximate   | `approx_distinct`, `approx_percentile`                                                                                                                                                                |
@@ -992,6 +1008,7 @@ own and authorizes work on one against the workgroup it belongs to. This asks th
 - `StartQueryExecution`, `GetQueryExecution`, `GetQueryResults` and `StopQueryExecution`
 - A `SELECT` run for real over JSON lines and CSV objects in simulated S3, answered by SQLite
 - `UNNEST` over an array or a map column, with `WITH ORDINALITY` where a query wants the position
+- `UNNEST` over a `split` or a `slice` call, flattening one stored string into a row per part
 - Trino's date, JSON, array, string and URL functions, with `current_timestamp` reading the
   simulated clock
 - Declared results, matched on the query text, ahead of the engine for one statement and behind it
@@ -1027,6 +1044,8 @@ Current documented limitations:
   gives a map's keys rather than its positions.
 - `UNNEST` over a `ROW` or a struct array falls back. The element needs field access and the
   flattened column is JSON text here.
+- `UNNEST` over an expression reaches `split` and `slice`. The engine reads the call to decide that
+  a value is a collection, and a call to anything else falls back.
 - The Trino function library reaches as far as the table under
   [the functions a statement can call](#the-functions-a-statement-can-call). A query reaching for
   anything else Trino has and SQLite lacks falls back.
