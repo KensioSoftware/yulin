@@ -1,5 +1,6 @@
 import {
   assertArrayEmpty,
+  assertArrayEquals,
   assertArrayLength,
   assertIdentical,
   assertResponseStatus,
@@ -141,7 +142,7 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
 
   it("records a web ACL member it has no behaviour for", async () => {
     // Given a template whose web ACL configures the CAPTCHA action, which
-    // needs a browser to answer it.
+    // needs a browser to answer it, and carries tags.
     const simAws = simAwsInEuWest2();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "captcha",
@@ -153,6 +154,7 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
               ...simWafMixedAclResource.Properties,
               Rules: [simWafBlockAdmin],
               CaptchaConfig: { ImmunityTimeProperty: { ImmunityTime: 300 } },
+              Tags: [{ Key: "Team", Value: "payments" }],
             },
           },
         },
@@ -160,10 +162,13 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the web ACL deployed holding it, and the record says it does
-    // nothing here.
+    // Then the web ACL deployed holding it and the tags the template gave it,
+    // and the record says neither does anything here.
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
-    assertIdentical(simWafIgnoredProperty(stack).path, "CaptchaConfig");
+    assertArrayEquals(
+      stack.ignoredProperties.map(({ path }) => path),
+      ["CaptchaConfig", "Tags"],
+    );
     assertStringIncludes(
       simWafIgnoredProperty(stack).reason,
       "answered by a browser",

@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimWafV2 } from "../../sim-wafv2.js";
 import type { SimWafWebAcl } from "../../web-acl/sim-waf-web-acl.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
+import { simCfnWafRecordUnsimulated } from "../sim-cfn-waf-unsimulated.js";
 import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafWebAclConfig } from "./sim-cfn-waf-web-acl-config.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -66,9 +67,7 @@ export class SimCfnWafWebAclCreator {
           `sim WAFv2 web ACL ${arn} after CloudFormation creation`,
         );
 
-        for (const { part, reason } of webAcl.unsimulated) {
-          resource.ignoreProperty(part, reason);
-        }
+        simCfnWafRecordUnsimulated(resource, webAcl);
 
         return webAcl;
       },

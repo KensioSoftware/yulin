@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimWafIpSet } from "../../ip-set/sim-waf-ip-set.js";
 import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
+import { simCfnWafRecordUnsimulated } from "../sim-cfn-waf-unsimulated.js";
 import { wafIpSetResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafIpSetConfig } from "./sim-cfn-waf-ip-set-config.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -60,6 +61,8 @@ export class SimCfnWafIpSetCreator {
           ipSet,
           `sim WAFv2 IP set ${arn} after CloudFormation creation`,
         );
+
+        simCfnWafRecordUnsimulated(resource, ipSet);
 
         return ipSet;
       },

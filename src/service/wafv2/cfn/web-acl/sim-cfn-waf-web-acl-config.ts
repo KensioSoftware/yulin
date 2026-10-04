@@ -29,6 +29,7 @@ export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
       Name: this.name(),
       Scope: this.scope(),
       Description: this.description(),
+      Tags: this.tags(),
       DefaultAction: this.value("DefaultAction") as
         | SimWafActionInput
         | undefined,

@@ -4,6 +4,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import type { SimWafRegexPatternSet } from "../../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
+import { simCfnWafRecordUnsimulated } from "../sim-cfn-waf-unsimulated.js";
 import { wafRegexPatternSetResourceType } from "../sim-cfn-waf-resource-types.js";
 import { SimCfnWafRegexPatternSetConfig } from "./sim-cfn-waf-regex-set-config.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -63,6 +64,8 @@ export class SimCfnWafRegexPatternSetCreator {
           patternSet,
           `sim WAFv2 regex pattern set ${arn} after CloudFormation creation`,
         );
+
+        simCfnWafRecordUnsimulated(resource, patternSet);
 
         return patternSet;
       },

@@ -82,6 +82,19 @@ export abstract class SimCfnWafResourceConfig {
   /**
    * One property of the Resource, whatever shape it is in.
    */
+  /**
+   * The tags the template gave the Resource, as written.
+   */
+  tags(): readonly unknown[] | undefined {
+    const tags = this.value("Tags");
+
+    if (tags !== undefined && !Array.isArray(tags)) {
+      this.refuse("Tags must be a list");
+    }
+
+    return tags;
+  }
+
   protected value(key: string): SimCfnTemplateValue | undefined {
     // oxlint-disable-next-line security/detect-object-injection
     return this.properties[key] ?? undefined;
