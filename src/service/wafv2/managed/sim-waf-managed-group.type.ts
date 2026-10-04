@@ -4,8 +4,8 @@ import type { SimWafActionInput } from "../web-acl/sim-waf-action.type.js";
 /**
  * Minimal structural WAFv2 ManagedRuleGroupStatement.
  *
- * The members Yulin refuses are declared here rather than left out, so a
- * statement that names one is refused by name.
+ * The members Yulin does not simulate are declared here rather than left out,
+ * so a rule whose statement names one is held and reported by name.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/Interface/ManagedRuleGroupStatement/
  */

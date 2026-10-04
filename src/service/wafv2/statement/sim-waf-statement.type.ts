@@ -23,9 +23,9 @@ export interface SimWafFieldStatementInput {
 /**
  * Minimal structural WAFv2 Statement.
  *
- * The kinds Yulin refuses are declared alongside the ones it evaluates, so a
- * rule that uses one is refused by name rather than read as a rule with no
- * statement in it.
+ * The kinds Yulin does not evaluate are declared alongside the ones it does,
+ * so a rule that uses one is held and reported by name rather than read as a
+ * rule with no statement in it.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/wafv2/Interface/Statement/
  */

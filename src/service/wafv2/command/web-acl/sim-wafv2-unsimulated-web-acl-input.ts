@@ -1,73 +1,64 @@
-import { SimWafUnsimulatedInputException } from "../../error/sim-wafv2.error.js";
-import { refuseSimWafTags } from "../sim-wafv2-input.js";
+import type { SimWafUnsimulatedPart } from "../../resource/sim-waf-unsimulated-part.js";
 import type { SimWafWebAclWriteInput } from "./web-acl.command.js";
-
-/**
- * One web ACL member real WAFv2 takes and this simulation does not.
- */
-type SimWafRefusedMember = readonly [
-  read: (input: SimWafWebAclWriteInput) => unknown,
-  member: string,
-  reason: string,
-];
 
 const tokenActions =
   "the CAPTCHA and Challenge actions are answered by a browser, and nothing " +
   "in a test does that";
 
-const refusedMembers: readonly SimWafRefusedMember[] = [
-  [(input): unknown => input.CaptchaConfig, "CaptchaConfig", tokenActions],
-  [(input): unknown => input.ChallengeConfig, "ChallengeConfig", tokenActions],
-  [(input): unknown => input.TokenDomains, "TokenDomains", tokenActions],
+/**
+ * Why each web ACL member this simulation does not model is held and not
+ * acted on, by the name a request and a template both write.
+ */
+const unsimulatedMembers: ReadonlyMap<string, string> = new Map([
+  ["CaptchaConfig", tokenActions],
+  ["ChallengeConfig", tokenActions],
+  ["TokenDomains", tokenActions],
   [
-    (input): unknown => input.DataProtectionConfig,
     "DataProtectionConfig",
     "it decides what a request field looks like in logs, and web ACL logging " +
       "is not simulated",
   ],
   [
-    (input): unknown => input.OnSourceDDoSProtectionConfig,
     "OnSourceDDoSProtectionConfig",
     "it responds to traffic volume, which a simulated request never has",
   ],
   [
-    (input): unknown => input.ApplicationConfig,
     "ApplicationConfig",
     "it configures the WAF-hosted sign-in pages, which are not simulated",
   ],
-];
+]);
 
 /**
- * Why each web ACL member this simulation does not model is refused, by the
- * name a request and a template both write.
+ * The web ACL members a write carries that this simulation holds without
+ * acting on, keyed by member name.
  *
- * The refusal below and the CloudFormation layer read the same list. One
- * throws and the other records the member and deploys the web ACL without it,
- * and neither should be able to grow a reason the other has not got.
+ * Each of them changes what a web ACL does on real WAF. The web ACL keeps
+ * them, `GetWebACL` returns them as written, and `unsimulatedSimWafWebAclMembers`
+ * says which ones a request evaluated here goes without.
  */
-export const simWafUnsimulatedWebAclMembers: ReadonlyMap<string, string> =
-  new Map(refusedMembers.map(([, member, reason]) => [member, reason]));
-
-/**
- * Refuse the web ACL members this simulation does not model.
- *
- * Each of them changes what a web ACL does on real WAF, so accepting one and
- * dropping it would leave the web ACL looking configured to the request that
- * wrote it and unconfigured to every request it then evaluated.
- */
-export function refuseUnsimulatedSimWafWebAclInput(
+export function heldSimWafWebAclMembers(
   input: SimWafWebAclWriteInput,
-  operation: string,
-): void {
-  refuseSimWafTags(input.Tags, operation);
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(input).filter(
+      ([member, value]) =>
+        unsimulatedMembers.has(member) && value !== undefined,
+    ),
+  );
+}
 
-  for (const [read, member, reason] of refusedMembers) {
-    if (read(input) !== undefined) {
-      throw new SimWafUnsimulatedInputException(
-        `${operation} refuses ${member}, which Yulin does not simulate: ${
-          reason
-        }`,
-      );
-    }
-  }
+/**
+ * What a web ACL's held members leave out, one part per member.
+ */
+export function unsimulatedSimWafWebAclMembers(
+  members: Readonly<Record<string, unknown>>,
+): readonly SimWafUnsimulatedPart[] {
+  return unsimulatedMembers
+    .entries()
+    .filter(([member]) => Object.hasOwn(members, member))
+    .map(([member, reason]) => ({
+      part: member,
+      reason: `${member} is not simulated: ${reason}`,
+    }))
+    .toArray();
 }

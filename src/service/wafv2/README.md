@@ -116,19 +116,24 @@ forwarded. API Gateway forwards it. Cognito forwards it for the user pool API an
 managed login. `forwardBody` is `false` on the Cognito path, which leaves a `ByteMatchStatement` on
 `Body` inspecting an empty field at a hosted domain, as it inspects one on AWS.
 
-`sim-waf-protected-resource.ts` reads an ARN for what it names. The three refusals in it mean
-different things. An HTTP API stage is refused because AWS WAF protects no HTTP API, and an
-association accepted here would let a test cover protection AWS never applies. A load balancer and
-the other three resource types AWS does protect are refused as unsimulated. Anything else is refused
-as an ARN. A third target type joins the union and gains a branch in the reader, and everything
-holding an association goes on addressing a resource by its ARN.
+`sim-waf-protected-resource.ts` reads an ARN for what it names. A load balancer, an AppSync API,
+an App Runner service and a Verified Access instance are read as a `SimWafUnsimulatedResource`
+(`sim-waf-unsimulated-resource.ts`). The association is held and listed. Simulated requests reach a
+web ACL through a REST API stage or a user pool alone, so the resource is taken as named, without
+looking for it. The three refusals left mean different things. An HTTP API stage is
+refused because AWS WAF protects no HTTP API. An Amplify app takes a `CLOUDFRONT` web ACL from
+`us-east-1` for an app in any Region, and a WAFv2 here reaches the web ACLs of its own Region only.
+Anything else is refused as an ARN. A type that starts serving requests gets a class of its own in
+the union and a branch in the reader, and everything holding an association goes on addressing a
+resource by its ARN.
 
 ## Compiling a statement
 
 `statement/sim-waf-statement.ts` turns a statement into a matcher when the web ACL is written. That
-is the decision the whole directory is arranged around. A rule Yulin cannot evaluate is refused by
-`CreateWebACL` and `UpdateWebACL`, at the point where the rule was written. Every rule a request
-meets has already been compiled into something that can answer about it.
+is the decision the whole directory is arranged around. Every rule a request meets has already
+been compiled into something that can answer about it. A rule using something outside the
+simulation stops compiling there, and `web-acl/sim-waf-rule.ts` holds it as a rule that claims no
+request (see [Held input](#held-input)).
 
 The pieces underneath it each answer one question about a statement:
 
@@ -170,7 +175,7 @@ the key is read. The clock is the simulation's own, reaching a rule through
 therefore all a test needs to watch a limited client be served again.
 
 `sim-waf-rate-based-input.ts` reads `Limit`, `EvaluationWindowSec` and `AggregateKeyType`, and
-`sim-waf-unsimulated-rate-based.ts` beside it refuses the two aggregation key types that need
+`sim-waf-unsimulated-rate-based.ts` beside it stops at the two aggregation key types that need
 something this simulation has none of. `IP` reads `simAwsProxiedSourceIp`, the address every request in this simulation reports, leaving a
 web ACL with one client. That is the case a rate limiting test covers, and the keyed counter is the
 seam if source addresses ever vary.
@@ -231,38 +236,64 @@ claim picks up no label.
 the labels they add. It is the only WAFv2 operation these groups have of their own, and it
 authorizes against `*` as the listings do.
 
-## Refusals
+## Held input
 
-Four files hold them, one per level.
+Issue #1366 is the principle. A write WAFv2 itself would accept succeeds, whatever it carries, and
+the read that follows returns it as written. What the simulation leaves out
+is reported instead, by `SimWafV2.unsimulatedParts(webAclArn)`, one `SimWafUnsimulatedPart` per
+part with its path and its reason. A test can then deploy the web ACL it ships and still find out
+how far the simulated one is from it.
+
+Four files say what a rule can use that sits outside the simulation, one per level.
 
 - `statement/sim-waf-unsimulated-statement.ts` for the statement kinds.
 - `statement/sim-waf-unsimulated-rate-based.ts` for the parts of a rate-based statement.
 - `statement/sim-waf-unsimulated-field.ts` for the field-to-match kinds.
-- `web-acl/sim-waf-rule-input.ts` and `command/web-acl/sim-wafv2-unsimulated-web-acl-input.ts` for
-  the members of a rule and of a web ACL.
+- `web-acl/sim-waf-rule-input.ts` for the members of a rule.
 
-Every refusal names the rule and what in it was refused, because a web ACL is a list of rules that
+Each raises a `SimWafUnsimulatedInputException` through `refuseSimWafRuleInput`. `SimWafRule.compile`
+catches it and holds the rule with an evaluator that claims no request, keeping the message as
+`unsimulatedReason`. Input WAFv2 itself would refuse is still refused. The name, the priority and
+the labels are read before anything that can stop compilation, so a held rule still takes part in
+the check for two rules at one priority.
+
+The unit is the whole rule, as #823 settled for CloudFormation. A held rule keeps its `Action` or
+`OverrideAction` as written and never matches. That is what AWS does with a request the rule would
+not have claimed, and a request it would have claimed goes on to the next rule. An allow list (a
+`NotStatement` around an `IPSetReferenceStatement`) is the sharpest case, where AWS blocks every
+address outside the list and the simulation blocks none.
+
+The message names the rule and what in it was left out, because a web ACL is a list of rules that
 all look alike from the outside and the name is the only thing that says which one to go and look
-at.
-
-The reasons are worth knowing. `IPSetReferenceStatement`, `GeoMatchStatement` and
-`AsnMatchStatement` are refused because every request in this simulation reports a source address of
-`127.0.0.1` (`simAwsProxiedSourceIp`), and a rule on where a request came from would see one client
-for the whole simulation. `SqliMatchStatement` and `XssMatchStatement` are refused because AWS
-publishes no description of the detection they run. `RuleGroupReferenceStatement` is refused because
-a rule group of the reader's own is a resource in its own right, and none is simulated.
+at. The reasons are worth knowing. `IPSetReferenceStatement`, `GeoMatchStatement` and
+`AsnMatchStatement` are not evaluated because every request in this simulation reports a source
+address of `127.0.0.1` (`simAwsProxiedSourceIp`), and a rule on where a request came from would see
+one client for the whole simulation. AWS publishes no description of the detection
+`SqliMatchStatement` and `XssMatchStatement` run. A rule group of the reader's own
+(`RuleGroupReferenceStatement`) is a resource in its own right, and none is simulated.
 
 `statement/sim-waf-unsimulated-rate-based.ts` holds two more, for the same one-client-address reason
 and for scope. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding header.
 `CUSTOM_KEYS` and `CustomKeys` aggregate on headers, cookies and query arguments (feasible, and not
 part of this).
 
-`managed/sim-waf-managed-group-input.ts` refuses a managed rule group outside the three, naming the
-ones that are simulated. It also refuses `Version`, `ExcludedRules` and `ManagedRuleGroupConfigs`.
+`managed/sim-waf-managed-group-input.ts` stops at a managed rule group outside the three, naming the
+ones that are simulated, and at `Version`, `ExcludedRules` and `ManagedRuleGroupConfigs`.
+
+The web ACL holds the rest of what sits outside the simulation. `command/web-acl/sim-wafv2-unsimulated-web-acl-input.ts`
+lists the members (`CaptchaConfig`, `ChallengeConfig`, `TokenDomains`, `DataProtectionConfig`,
+`OnSourceDDoSProtectionConfig` and `ApplicationConfig`), which are stored in the configuration and
+returned by `GetWebACL`. `web-acl/sim-waf-association-config.ts` keeps a body inspection limit set
+for a resource type no simulated request passes through. `resource/sim-waf-resource.ts` keeps the
+tags any of the three resources is created with, for a `ListTagsForResource` Yulin leaves out.
+`SimWafAssociations.unsimulatedFor` adds the associations with a `SimWafUnsimulatedResource`.
 
 An IP set is held and reported, and no rule reads one, for the same reason
-`IPSetReferenceStatement` is refused. A stack that creates one still deploys, and a test can read
-back what it created.
+`IPSetReferenceStatement` is held. A stack that creates one still deploys, and a test can
+read back what it created.
+
+`DescribeManagedRuleGroup` is the one place that still refuses a group outside the three. It has
+no stored input to hand back, and an answer would be invented.
 
 ## CloudFormation
 
@@ -286,27 +317,22 @@ compilation of every rule that an SDK caller gets, and the same refusals.
 because a deployment failing on `Rule block-admin uses the statement kind SqliMatchStatement` says
 which rule and not which of a template's web ACLs declared it.
 
-A rule this simulation cannot evaluate is where the two part company, and where the CloudFormation
-layer does more than pass the template through. `SimWafV2.unevaluatableWebAclRules` compiles each
-rule on its own and reports the ones that raise a `SimWafUnsimulatedInputException`
-(`web-acl/sim-waf-unevaluatable-rules.ts`), and `web-acl/sim-cfn-waf-web-acl-creator.ts` leaves them
-out of the input it writes, recording each on the Resource. The web ACL members with no behaviour
-behind them go the same way, from `web-acl/sim-cfn-waf-web-acl-config.ts`.
-
-Issue #823 is the reasoning, and #391 is the principle it comes from. A web ACL that accepted a rule
-it cannot evaluate would allow a request AWS blocks, so `CreateWebACL` refuses one. Failing a whole
-stack over it is a different thing, and it cost one consumer twelve Resources and 25 test files over
-a single rule. The unit is the rule, and everything larger than the rule deploys.
+A rule or member outside the simulation is held by the web ACL like any other, and
+`web-acl/sim-cfn-waf-web-acl-creator.ts` records each part `SimWafWebAcl.unsimulated` reports on
+the Resource, under the same path. `stack.ignoredProperties` is where a test reads them. Issue #823
+first set the rule as the unit here, and #1366 took the SDK path the same way.
 
 `sim-cfn-waf-resource-error.ts` still sorts what is left. A `SimWafUnsimulatedInputException`
-reaching it skips the Resource, worded so sim CloudFormation records it and steps over it (see
+reaching it (an Amplify association is the one left) skips the Resource, worded so sim
+CloudFormation records it and steps over it (see
 `resource/unsupported/sim-cfn-unsupported-resource.ts`). Every other `SimWafError` fails the stack,
 because the template asked for something WAFv2 itself will not take.
 
 The association hands `ResourceArn` straight to `AssociateWebACL`. What a web ACL may be put in
 front of is decided once, in `association/sim-waf-protected-resource.ts`, and the CloudFormation
-layer inherits every answer in it. The same split runs through it. An HTTP API stage fails the
-stack, and a load balancer skips the association. Deleting the association tolerates a resource that
+layer inherits every answer in it. An HTTP API stage fails the stack, an Amplify app skips the
+association, and a load balancer is associated with `ResourceArn` recorded on the Resource as one
+held for reading back. Deleting the association tolerates a resource that
 has gone already, which is what a REST API stage in one stack and the association in another leaves
 behind.
 

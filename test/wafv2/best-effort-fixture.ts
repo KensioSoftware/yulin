@@ -2,7 +2,7 @@
  * The template pieces the WAFv2 best effort deployment tests share.
  *
  * Both suites deploy a web ACL carrying a rule Yulin cannot evaluate, one to
- * watch the web ACL deploy without it and one to watch what happens to the
+ * watch the web ACL deploy holding it and one to watch what happens to the
  * things in front of it. This lives under `test/` for the same reasons as the
  * other fixtures here: eslint rejects a test file that exports helpers
  * alongside its own `describe` calls, and `test/**` is type-checked with

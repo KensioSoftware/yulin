@@ -8,6 +8,7 @@ import {
 import {
   assertArrayEquals,
   assertFalse,
+  assertIdentical,
   assertInstanceOf,
   assertNonNullable,
   assertThrowsErrorAsync,
@@ -20,7 +21,6 @@ import {
   SimWafInvalidParameterException,
   SimWafNonexistentItemException,
   SimWafOptimisticLockException,
-  SimWafUnsimulatedInputException,
 } from "./error/sim-wafv2.error.js";
 import { simWafStatementMatches } from "./sim-wafv2.fixture.js";
 
@@ -112,23 +112,30 @@ describe("SimWafV2 regex pattern sets", () => {
     assertInstanceOf(error, SimWafInvalidParameterException);
   });
 
-  it("refuses tags on a pattern set", async () => {
+  it("holds the tags a pattern set is created with", async () => {
     // Given a simulated WAFv2.
     const waf = new SimAws().wafV2();
+    const tags = [{ Key: "Team", Value: "payments" }];
 
     // When a pattern set is created with tags.
-    const error = await assertThrowsErrorAsync(async () => {
-      await waf.createRegexPatternSet(
-        new CreateRegexPatternSetCommand({
-          Name: "tagged",
-          Scope: "REGIONAL",
-          RegularExpressionList: [],
-          Tags: [{ Key: "Team", Value: "payments" }],
-        }),
-      );
-    });
+    const created = await waf.createRegexPatternSet(
+      new CreateRegexPatternSetCommand({
+        Name: "tagged",
+        Scope: "REGIONAL",
+        RegularExpressionList: [],
+        Tags: tags,
+      }),
+    );
 
-    assertInstanceOf(error, SimWafUnsimulatedInputException);
+    // Then they are held, and reported as nothing reading them.
+    const patternSet = waf.findRegexPatternSetByArn(created.Summary?.ARN ?? "");
+
+    assertNonNullable(patternSet);
+    assertIdentical(patternSet.tags, tags);
+    assertArrayEquals(
+      patternSet.unsimulated.map(({ part }) => part),
+      ["Tags"],
+    );
   });
 
   it("lists and deletes regex pattern sets", async () => {

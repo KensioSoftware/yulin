@@ -81,8 +81,8 @@ function nestedCapacity(statement: SimWafStatementInput): number {
  *
  * A group is fixed at the capacity its owner gave it, and a scope-down
  * statement is charged on top. A group this simulation does not carry
- * contributes nothing, which cannot happen through a compiled web ACL: naming
- * one is refused where the rule is written.
+ * contributes nothing, so a web ACL holding one reports less than AWS would
+ * charge.
  */
 function managedGroupCapacity(statement: SimWafStatementInput): number {
   const named = statement.ManagedRuleGroupStatement;

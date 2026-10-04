@@ -3,7 +3,6 @@ import type { SimWafAssociationConfigInput } from "../../web-acl/sim-waf-associa
 import type { SimWafCustomResponseBodies } from "../../web-acl/sim-waf-custom-response.type.js";
 import type { SimWafRuleInput } from "../../web-acl/sim-waf-rule.type.js";
 import type { SimCreateWebAclCommandInput } from "../../command/web-acl/web-acl.command.js";
-import { simWafUnsimulatedWebAclMembers } from "../../command/web-acl/sim-wafv2-unsimulated-web-acl-input.js";
 import { SimCfnWafResourceConfig } from "../sim-cfn-waf-resource-config.js";
 import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
 
@@ -15,6 +14,7 @@ import { wafWebAclResourceType } from "../sim-cfn-waf-resource-types.js";
  * template wrote them. They are not read here at all: every rule is compiled
  * by CreateWebACL, which is where a statement kind Yulin cannot evaluate is
  * found, and reading them twice would mean two answers to the same question.
+ * The members Yulin holds without acting on are handed over the same way.
  */
 export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
   protected override get resourceType(): string {
@@ -23,19 +23,13 @@ export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
 
   /**
    * The input the web ACL this Resource describes is created from.
-   *
-   * The properties this simulation has no behaviour for are left out of it and
-   * recorded, so the web ACL deploys with the rest of what the template wrote.
-   * An SDK caller is refused for the same properties, because a request that
-   * was answered and then quietly dropped is a worse answer than a refusal.
    */
   createInput(): SimCreateWebAclCommandInput {
-    this.recordUnsimulatedMembers();
-
     return {
       Name: this.name(),
       Scope: this.scope(),
       Description: this.description(),
+      Tags: this.tags(),
       DefaultAction: this.value("DefaultAction") as
         | SimWafActionInput
         | undefined,
@@ -47,25 +41,13 @@ export class SimCfnWafWebAclConfig extends SimCfnWafResourceConfig {
       AssociationConfig: this.value("AssociationConfig") as
         | SimWafAssociationConfigInput
         | undefined,
+      CaptchaConfig: this.value("CaptchaConfig"),
+      ChallengeConfig: this.value("ChallengeConfig"),
+      TokenDomains: this.value("TokenDomains") as readonly string[] | undefined,
+      DataProtectionConfig: this.value("DataProtectionConfig"),
+      OnSourceDDoSProtectionConfig: this.value("OnSourceDDoSProtectionConfig"),
+      ApplicationConfig: this.value("ApplicationConfig"),
     };
-  }
-
-  /**
-   * Record the web ACL members this simulation has no behaviour for.
-   *
-   * Each of them changes what a web ACL does on real WAF, so a web ACL
-   * deployed without one behaves differently to the one the template
-   * describes. `stack.ignoredProperties` is where a test reads that.
-   */
-  private recordUnsimulatedMembers(): void {
-    for (const [member, reason] of simWafUnsimulatedWebAclMembers) {
-      if (this.value(member) !== undefined) {
-        this.resource.ignoreProperty(
-          member,
-          `${member} is not simulated: ${reason}`,
-        );
-      }
-    }
   }
 
   /**

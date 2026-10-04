@@ -35,9 +35,10 @@ const refusedMembers = new Map<string, string>([
 ]);
 
 /**
- * Find the simulated group a statement names, refusing any other.
+ * Find the simulated group a statement names, stopping the rule's compilation
+ * at any other so the web ACL holds it unevaluated.
  *
- * The refusal names the groups that are simulated, because the ones that are
+ * The reason names the groups that are simulated, because the ones that are
  * not are left out for reasons a reader cannot guess from the name: a group
  * that decides by caller address sees one client for the whole simulation, and
  * a group whose detection AWS does not describe cannot be reproduced at all.

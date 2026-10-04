@@ -5,18 +5,13 @@ import {
   simWafProtectedResource,
   simWafProtectedResourceTypes,
 } from "../../association/sim-waf-protected-resource.js";
-import {
-  SimWafInvalidParameterException,
-  SimWafUnsimulatedInputException,
-} from "../../error/sim-wafv2.error.js";
+import { SimWafInvalidParameterException } from "../../error/sim-wafv2.error.js";
+import type { SimWafWebAcl } from "../../web-acl/sim-waf-web-acl.js";
 import { requiredSimWafArn } from "../sim-wafv2-input.js";
 
 /**
- * What ListResourcesForWebACL lists when the request names no resource type.
- *
- * Real WAFv2 documents that default, and it is not one of the types simulated
- * here. A listing that names nothing is refused, because the empty list a load
- * balancer listing produces reads as a web ACL protecting nothing.
+ * What ListResourcesForWebACL lists when the request names no resource type,
+ * as real WAFv2 documents it.
  */
 const defaultResourceType = "APPLICATION_LOAD_BALANCER";
 
@@ -58,8 +53,7 @@ export function simWafAssociationResource(
 }
 
 /**
- * Read the resource type a listing named, refusing one this simulation does
- * not hold.
+ * Read the resource type a listing named, refusing one WAFv2 does not list.
  */
 export function simWafListedResourceType(
   resourceType: string | undefined,
@@ -70,16 +64,45 @@ export function simWafListedResourceType(
   );
 
   if (simulated === undefined) {
-    throw new SimWafUnsimulatedInputException(
-      `AWS WAF lists ${listed} resources, and ` +
-        `${simWafProtectedResourceTypes.join(" and ")} are the types Yulin ` +
-        `simulates. ListResourcesForWebACL lists ${defaultResourceType} when ` +
-        `a request names no ResourceType, so name one of the simulated types ` +
-        `to list the resources a web ACL protects.`,
+    throw new SimWafInvalidParameterException(
+      `Error reason: ListResourcesForWebACL lists one of ` +
+        `${simWafProtectedResourceTypes.join(", ")}, field: RESOURCE_TYPE, ` +
+        `parameter: ${listed}`,
     );
   }
 
   return simulated;
+}
+
+const accountTakeoverGroup = "AWSManagedRulesATPRuleSet";
+
+/**
+ * Refuse a web ACL carrying the account takeover group in front of a user
+ * pool, as AWS does.
+ *
+ * AWS refuses the whole association over the one rule group. Yulin holds the
+ * group without evaluating it, and this is where the refusal lands.
+ */
+export function refuseSimWafAccountTakeoverForUserPool(
+  resource: SimWafProtectedResource,
+  webAcl: SimWafWebAcl,
+): void {
+  if (resource.resourceType !== "COGNITO_USER_POOL") {
+    return;
+  }
+
+  const carriesGroup = (webAcl.configuration.rules ?? []).some(
+    (rule) =>
+      rule.Statement?.ManagedRuleGroupStatement?.Name === accountTakeoverGroup,
+  );
+
+  if (carriesGroup) {
+    throw refusedResourceArn(
+      `A web ACL carrying ${accountTakeoverGroup} cannot protect a Cognito ` +
+        `user pool`,
+      resource.arn,
+    );
+  }
 }
 
 /**

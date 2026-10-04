@@ -4,6 +4,10 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { SimWafOptimisticLockException } from "../error/sim-wafv2.error.js";
 import { type SimWafResourceKind, simWafArn } from "../sim-wafv2-arn.js";
 import type { SimWafScope } from "../scope/sim-waf-scope.js";
+import {
+  type SimWafUnsimulatedPart,
+  simWafTagsParts,
+} from "./sim-waf-unsimulated-part.js";
 
 /**
  * What every WAFv2 resource reports about itself in a listing.
@@ -21,6 +25,7 @@ export interface SimWafResourceProperties {
   readonly scope: SimWafScope;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly description?: string | undefined;
+  readonly tags?: readonly unknown[] | undefined;
 }
 
 /**
@@ -37,6 +42,10 @@ export abstract class SimWafResource {
   public readonly scope: SimWafScope;
   public readonly id: string = randomUUID();
   public readonly arn: string;
+
+  /** The tags the resource was created with, held as they were written. */
+  public readonly tags: readonly unknown[];
+
   #description: string | undefined;
   #lockToken: string = randomUUID();
 
@@ -47,6 +56,7 @@ export abstract class SimWafResource {
     this.name = properties.name;
     this.scope = properties.scope;
     this.#description = properties.description;
+    this.tags = properties.tags ?? [];
     this.arn = simWafArn({
       accountRegionScope: properties.accountRegionScope,
       scope: properties.scope,
@@ -61,6 +71,15 @@ export abstract class SimWafResource {
    */
   get description(): string | undefined {
     return this.#description;
+  }
+
+  /**
+   * What this resource was written with and the simulation does not act on.
+   *
+   * A web ACL adds the rules and members it holds without evaluating.
+   */
+  get unsimulated(): readonly SimWafUnsimulatedPart[] {
+    return simWafTagsParts(this.tags);
   }
 
   /**

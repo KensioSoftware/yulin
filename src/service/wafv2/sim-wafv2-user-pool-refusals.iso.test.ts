@@ -5,6 +5,7 @@ import {
   ListResourcesForWebACLCommand,
 } from "@aws-sdk/client-wafv2";
 import {
+  assertArrayEmpty,
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
@@ -21,9 +22,9 @@ import { simWafCreateWebAclFactory } from "./command/web-acl/sim-waf-create-web-
 import {
   SimWafInvalidParameterException,
   SimWafUnavailableEntityException,
-  SimWafUnsimulatedInputException,
 } from "./error/sim-wafv2.error.js";
 import { createSimWafWebAcl } from "./sim-wafv2.fixture.js";
+import { simWafManagedRuleFactory } from "./web-acl/sim-waf-rule.factory.js";
 
 const accountIdTwoTwos = "222222222222" as SimAwsAccountId;
 
@@ -78,6 +79,43 @@ describe("SimWafV2 user pool association refusals", () => {
     // CLOUDFRONT one belongs to a distribution.
     assertInstanceOf(error, SimWafInvalidParameterException);
     assertStringIncludes(error.message, "CLOUDFRONT");
+  });
+
+  it("refuses a web ACL carrying the account takeover group", async () => {
+    // Given a user pool and a web ACL running AWSManagedRulesATPRuleSet, which
+    // Yulin holds without evaluating.
+    const simAws = new SimAws();
+    const { poolArn } = await poolAndWebAcl(simAws);
+    const webAcl = await createSimWafWebAcl(
+      simAws.wafV2(),
+      simWafCreateWebAclFactory.make({
+        Rules: [
+          {
+            ...simWafManagedRuleFactory.make(),
+            Statement: {
+              ManagedRuleGroupStatement: {
+                VendorName: "AWS",
+                Name: "AWSManagedRulesATPRuleSet",
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    // When it is associated with the pool.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.wafV2().associateWebAcl(
+        new AssociateWebACLCommand({
+          WebACLArn: webAcl.ARN,
+          ResourceArn: poolArn,
+        }),
+      );
+    });
+
+    // Then it is refused, as AWS refuses the whole association over the group.
+    assertInstanceOf(error, SimWafInvalidParameterException);
+    assertStringIncludes(error.message, "AWSManagedRulesATPRuleSet");
   });
 
   it("refuses a user pool in another Region", async () => {
@@ -177,23 +215,26 @@ describe("SimWafV2 user pool association refusals", () => {
     assertInstanceOf(error, SimWafUnavailableEntityException);
   });
 
-  it("names both simulated types when a listing names no resource type", async () => {
-    // Given a web ACL.
+  it("leaves a user pool out of a listing that names no resource type", async () => {
+    // Given a web ACL in front of a user pool.
     const simAws = new SimAws();
-    const { webAclArn } = await poolAndWebAcl(simAws);
+    const { poolArn, webAclArn } = await poolAndWebAcl(simAws);
+    const waf = simAws.wafV2();
+
+    await waf.associateWebAcl(
+      new AssociateWebACLCommand({
+        WebACLArn: webAclArn,
+        ResourceArn: poolArn,
+      }),
+    );
 
     // When its resources are listed without naming a type.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws
-        .wafV2()
-        .listResourcesForWebAcl(
-          new ListResourcesForWebACLCommand({ WebACLArn: webAclArn }),
-        );
-    });
+    const { ResourceArns } = await waf.listResourcesForWebAcl(
+      new ListResourcesForWebACLCommand({ WebACLArn: webAclArn }),
+    );
 
-    // Then the refusal names the types that can be listed here.
-    assertInstanceOf(error, SimWafUnsimulatedInputException);
-    assertStringIncludes(error.message, "API_GATEWAY");
-    assertStringIncludes(error.message, "COGNITO_USER_POOL");
+    // Then the listing is of load balancers, as AWS defaults to, and holds
+    // none.
+    assertArrayEmpty(ResourceArns);
   });
 });

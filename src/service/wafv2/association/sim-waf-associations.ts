@@ -1,5 +1,6 @@
 import type { SimWafDecision } from "../evaluate/sim-waf-decision.js";
 import { simWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
+import type { SimWafUnsimulatedPart } from "../resource/sim-waf-unsimulated-part.js";
 import type { SimWafWebAcl } from "../web-acl/sim-waf-web-acl.js";
 import type {
   SimWafProtectedResource,
@@ -9,6 +10,7 @@ import type {
   SimWafProtectedRequest,
   SimWafProtection,
 } from "./sim-waf-protection.js";
+import { SimWafUnsimulatedResource } from "./sim-waf-unsimulated-resource.js";
 
 /**
  * One web ACL in front of one resource.
@@ -20,6 +22,9 @@ import type {
 interface SimWafAssociation {
   readonly webAcl: SimWafWebAcl;
   readonly resourceType: SimWafProtectedResourceType;
+
+  /** Why nothing is evaluated in front of the resource, when it is held only. */
+  readonly unsimulatedReason: string | undefined;
 }
 
 /**
@@ -43,6 +48,10 @@ export class SimWafAssociations implements SimWafProtection {
     this.#associations.set(resource.arn, {
       webAcl,
       resourceType: resource.resourceType,
+      unsimulatedReason:
+        resource instanceof SimWafUnsimulatedResource
+          ? resource.reason
+          : undefined,
     });
   }
 
@@ -74,6 +83,22 @@ export class SimWafAssociations implements SimWafProtection {
           association.resourceType === resourceType,
       )
       .map(([resourceArn]) => resourceArn)
+      .toArray();
+  }
+
+  /**
+   * The associations of one web ACL that nothing is evaluated through, one
+   * part per resource ARN.
+   */
+  unsimulatedFor(webAcl: SimWafWebAcl): readonly SimWafUnsimulatedPart[] {
+    return this.#associations
+      .entries()
+      .filter(([, association]) => association.webAcl === webAcl)
+      .flatMap(([resourceArn, { unsimulatedReason }]) =>
+        unsimulatedReason === undefined
+          ? []
+          : [{ part: `Association.${resourceArn}`, reason: unsimulatedReason }],
+      )
       .toArray();
   }
 

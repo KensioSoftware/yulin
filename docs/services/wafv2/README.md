@@ -447,10 +447,12 @@ A match names the rule, in the spelling `RuleActionOverrides` and `DescribeManag
 (`CrossSiteScripting_QueryArguments`). A name no simulated group holds is refused where it was
 written.
 
-Anything outside the three groups is refused by name, and the refusal says which are simulated. The
-IP reputation and anonymous IP groups decide by caller address, and every request in this simulation
-comes from one client. Bot Control and the account takeover groups decide by behaviour across
-requests. The SQL injection group is undocumented in the way the cross-site scripting rules are.
+A rule naming any other group is held and claims no request (see
+[Held input](#held-input)), and the reason it gives says which groups are
+simulated. The IP reputation and anonymous IP groups decide by caller address, and every request in
+this simulation comes from one client. Bot Control and the account takeover groups decide by
+behaviour across requests. The SQL injection group is undocumented in the way the cross-site
+scripting rules are.
 
 ## Labels
 
@@ -704,9 +706,8 @@ await srv.close();
 
 `DisassociateWebACL` takes the web ACL back off. `GetWebACLForResource` reports the web ACL one
 stage carries, and `ListResourcesForWebACL` reports the stages one web ACL protects. That listing
-takes a `ResourceType` of `API_GATEWAY`. Real WAFv2 lists `APPLICATION_LOAD_BALANCER` for a request
-that names no type. Load balancers are outside this simulation, and a listing that names no type is
-refused.
+takes a `ResourceType` of `API_GATEWAY`. A listing that names no type lists
+`APPLICATION_LOAD_BALANCER`, as real WAFv2 does.
 
 Deleting the stage or the whole API takes the association with it. A stage deployed again under the
 same name carries no web ACL. A web ACL that is still in front of a stage cannot be deleted, and
@@ -717,9 +718,14 @@ because a distribution takes its web ACL from the distribution and not from `Ass
 ACL from another Region or another Account is refused, as it is on AWS.
 
 An API Gateway HTTP API stage is refused. AWS WAF has no resource type for one, and an association
-accepted here would let a test cover protection AWS never applies. Application Load Balancer,
-AppSync, App Runner, Amplify and Verified Access resources are refused as unsimulated, each naming
-what it would have protected.
+accepted here would let a test cover protection AWS never applies.
+
+An Application Load Balancer, an AppSync API, an App Runner service and a Verified Access instance
+are associated, and `GetWebACLForResource` and `ListResourcesForWebACL` report them. Simulated
+requests reach a web ACL through a REST API stage or a user pool alone, so the association is held
+for reading back and listed by `unsimulatedParts` (see [Held input](#held-input)). Yulin takes the
+resource as named, without looking for it. An Amplify app is refused. AWS takes a `CLOUDFRONT` web ACL from `us-east-1`
+for one, and a simulated WAFv2 associates the web ACLs of its own Region only.
 
 ## Protecting a Cognito user pool
 
@@ -854,9 +860,10 @@ The web ACL and the pool belong to one Account and Region. A `CLOUDFRONT` scope 
 because a distribution takes its web ACL from the distribution. A pool in another Account or another
 Region is refused as well.
 
-AWS also refuses a web ACL carrying `AWSManagedRulesATPRuleSet`, and it refuses the whole web ACL
-over the one rule group. Yulin turns that group away earlier, at `CreateWebACL`, along with every
-managed rule group outside the [three that are simulated](#the-aws-managed-rule-groups).
+AWS also refuses a web ACL carrying `AWSManagedRulesATPRuleSet`, and it refuses the whole
+association over the one rule group. `AssociateWebACL` refuses it here too. The web ACL itself is
+created, holding the group without evaluating it, like every managed rule group outside the
+[three that are simulated](#the-aws-managed-rule-groups).
 
 ### The request body is withheld at a hosted domain
 
@@ -967,7 +974,7 @@ An update to a pattern set reaches the rules pointing at it. A reference resolve
 the rule is written and reads its expressions when a request arrives, as it does on AWS.
 
 IP sets are created, read, updated, listed and deleted the same way. No rule reads one, for the
-reason in [Refusals](#refusals) below.
+reason in [Held input](#held-input) below.
 
 ## Deploying web ACLs with CloudFormation
 
@@ -1040,29 +1047,26 @@ strings where the SDK takes a list of `RegexString` objects. Both are read here 
 CloudFormation writes them.
 
 Every rule is compiled while the stack deploys. A rule this simulator will not evaluate (see
-[Refusals](#refusals)) is left out of the web ACL, and the web ACL deploys with the rules that are
-left. The rule that went missing is recorded on `stack.ignoredProperties`, under the logical ID that
-declared it, and the reason is the one `CreateWebACL` gives an SDK caller.
+[Held input](#held-input)) is held by the web ACL and claims no request. It
+is recorded on `stack.ignoredProperties`, under the logical ID that declared it, with the reason
+`unsimulatedParts` gives.
 
 ```typescript
-const [dropped] = stack.ignoredProperties;
+const [held] = stack.ignoredProperties;
 
 // "OrdersAcl Rules.block-countries"
-console.log(`${dropped.logicalId} ${dropped.path}`);
+console.log(`${held.logicalId} ${held.path}`);
 
 // "Rule block-countries uses the statement kind GeoMatchStatement, which
 //  Yulin does not simulate: ..."
-console.log(dropped.reason);
+console.log(held.reason);
 ```
 
-The web ACL is then real, and thinner than the one the template describes. Requests the dropped rule
-would have blocked are served by whatever the web ACL is in front of. That is the size of what a
-test loses, and `stack.ignoredProperties` is where to read it. An SDK caller writing the same rule
-is refused outright, because a request that was answered and then quietly emptied is a worse answer
-than a refusal.
+Requests the held rule would have blocked are served by whatever the web ACL is in front of. That
+is the size of what a test loses, and `stack.ignoredProperties` is where to read it.
 
 The same goes for a web ACL member with no behaviour behind it, such as `CaptchaConfig`. The web ACL
-deploys without it and the member is recorded.
+holds it and the member is recorded.
 
 A web ACL nothing coherent could be deployed from still fails the stack. A `Scope` outside
 `REGIONAL` and `CLOUDFRONT`, a `Rules` written as an object, a `Name` written as a number. The
@@ -1080,8 +1084,8 @@ cover where the tail comes from.
 covers an API Gateway REST API stage and a Cognito user pool. It goes through `AssociateWebACL` and
 inherits that command's answers. An ARN naming an HTTP API stage fails the deployment, because AWS
 WAF protects no HTTP API and neither does real CloudFormation. An ARN naming a load balancer or an
-AppSync API skips the association. AWS WAF protects both, and Yulin simulates a web ACL in front of
-neither.
+AppSync API is associated, and `ResourceArn` is recorded on `stack.ignoredProperties` as an
+association held for reading back. An ARN naming an Amplify app skips the association.
 
 An association naming a web ACL from outside this simulation is skipped too, which covers a template
 naming one from a real account and one whose web ACL is in another Region. The stage or the pool
@@ -1143,7 +1147,8 @@ composite primary identifier of name, ID and scope. An association's physical ID
 and the web ACL ARN joined by a pipe, and it publishes no attributes.
 
 `AWS::WAFv2::RuleGroup` and `AWS::WAFv2::LoggingConfiguration` are recorded as unsupported and
-stepped over. A rule naming a rule group is refused anyway, and there is no log here to write to.
+stepped over. A rule naming a rule group is held and not evaluated anyway, and there is no log here
+to write to.
 
 ## Scopes
 
@@ -1344,17 +1349,72 @@ const scoped = simSdk.simAws.accountRegionScope(
 console.log(scoped.wafV2().allWebAcls("REGIONAL")[0]?.name);
 ```
 
-## Refusals
+## Held input
 
-A rule Yulin cannot evaluate is refused by `CreateWebACL` and `UpdateWebACL`, naming the rule and
-what in it was refused. A web ACL that accepted such a rule would allow a request AWS blocks, and a
-silent hole in a security layer is worse than a missing one.
+A write WAFv2 itself would accept succeeds, whatever it carries, and `GetWebACL` returns it as
+written. A rule using something outside the simulation is held, and it claims no request. `unsimulatedParts` lists each part the simulation leaves out, with the reason.
 
-A template carrying one of these keeps the caution and drops the blast radius. The rule is left out,
-the web ACL deploys with the rest of them, and the omission is recorded. See
-[Deploying web ACLs with CloudFormation](#deploying-web-acls-with-cloudformation).
+```typescript sim-wafv2-unsimulated
+/**
+ * Writing a web ACL with a rule Yulin does not evaluate.
+ */
 
-These statement kinds are refused:
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "site",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "site-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "bot-control",
+        Priority: 0,
+        OverrideAction: { Count: {} },
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesBotControlRuleSet",
+            ManagedRuleGroupConfigs: [
+              {
+                AWSManagedRulesBotControlRuleSet: { InspectionLevel: "COMMON" },
+              },
+            ],
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+    ],
+  }),
+);
+
+const [part] = waf.unsimulatedParts(created.Summary!.ARN);
+
+// "Rules.bot-control"
+console.log(part?.part);
+
+// "Rule bot-control uses the rule group member ManagedRuleGroupConfigs,
+//  which Yulin does not simulate: ..."
+console.log(part?.reason);
+```
+
+The rule keeps its `Action` or `OverrideAction` as written and never matches. That is what AWS does
+with a request the rule would not have claimed. A request it would have claimed goes on to the next
+rule. An allow list (a `NotStatement` around an `IPSetReferenceStatement`) is the sharpest case,
+where AWS blocks every address outside the list and the simulation blocks none.
+
+A rule is held for any of these statement kinds:
 
 - `IPSetReferenceStatement`, `GeoMatchStatement` and `AsnMatchStatement`. Every request in this
   simulation reports a source address of `127.0.0.1`, and a rule on where a request came from would
@@ -1364,21 +1424,31 @@ These statement kinds are refused:
 - `RuleGroupReferenceStatement`. A rule group of your own is a resource in its own right, and none
   is simulated. The three simulated AWS managed rule groups are named in a statement rather than
   created.
+- `ManagedRuleGroupStatement` naming a group outside the three, or carrying `Version`,
+  `ExcludedRules` or `ManagedRuleGroupConfigs`.
 
-A `RateBasedStatement` is evaluated (see [Rate limiting](#rate-limiting)). Two of its aggregation
-key types are refused. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a forwarding
-header, which needs the source address variety an IP set is waiting on. `CUSTOM_KEYS` and
+A `RateBasedStatement` is evaluated (see [Rate limiting](#rate-limiting)). A rule using two of its
+aggregation key types is held. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a
+forwarding header, which needs the source address variety an IP set is waiting on. `CUSTOM_KEYS` and
 `CustomKeys` aggregate on headers, cookies and query arguments, and are feasible and not part of
 this yet. `GetRateBasedStatementManagedKeys` is not simulated.
 
-`JsonBody`, `HeaderOrder`, `UriFragment`, `JA3Fingerprint` and `JA4Fingerprint` are refused as
-fields to match. The `Captcha` and `Challenge` actions are refused, along with the `CaptchaConfig`,
-`ChallengeConfig` and `TokenDomains` that configure them, because a browser has to answer them.
+A rule is held for the `JsonBody`, `HeaderOrder`, `UriFragment`, `JA3Fingerprint` and
+`JA4Fingerprint` fields to match, and for the `Captcha` and `Challenge` actions and the rule-level
+`CaptchaConfig` and `ChallengeConfig`, because a browser has to answer them.
 
-Tags, logging, sampled requests and CloudWatch metrics for a web ACL are not simulated.
-`DataProtectionConfig`, `OnSourceDDoSProtectionConfig` and `ApplicationConfig` are refused for the
-same reason, each naming what it would have configured. An `AssociationConfig` naming a resource
-type this simulation has no association for is refused too.
+The web ACL holds these members as written, and they have no effect on a request. `CaptchaConfig`,
+`ChallengeConfig` and `TokenDomains` configure the browser-answered actions. `DataProtectionConfig` shapes web ACL
+logs, which Yulin leaves out. `OnSourceDDoSProtectionConfig` responds to
+traffic volume, and `ApplicationConfig` configures the WAF-hosted sign-in pages. An
+`AssociationConfig` limit for a resource type no simulated request passes through is held too.
+
+Tags on a web ACL, an IP set or a regex pattern set are held, and `unsimulatedParts` lists them.
+`ListTagsForResource` is the operation that would read them back, and Yulin leaves it out. Logging, sampled requests and CloudWatch metrics for a
+web ACL are not simulated.
+
+`DescribeManagedRuleGroup` refuses a group outside the three, and a `VersionName`. Its only possible
+answer would be invented rules.
 
 ## Supported operations
 

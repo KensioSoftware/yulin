@@ -1,6 +1,5 @@
 import {
   SimWafInvalidParameterException,
-  SimWafUnsimulatedInputException,
   SimWafValidationException,
 } from "../error/sim-wafv2.error.js";
 
@@ -33,24 +32,6 @@ export function requiredSimWafId(id: string | undefined): string {
   }
 
   return id;
-}
-
-/**
- * Refuse tags on a WAFv2 resource.
- *
- * Nothing here reads a tag, and a resource that reported tags it was never
- * asked about would be worse than one that says it does not carry them.
- */
-export function refuseSimWafTags(
-  tags: readonly unknown[] | undefined,
-  operation: string,
-): void {
-  if (tags !== undefined && tags.length > 0) {
-    throw new SimWafUnsimulatedInputException(
-      `WAFv2 resource tags are not simulated, so ${operation} refuses them ` +
-        `rather than dropping them`,
-    );
-  }
 }
 
 /**

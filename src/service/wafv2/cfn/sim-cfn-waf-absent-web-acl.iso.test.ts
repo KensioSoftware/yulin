@@ -109,33 +109,48 @@ describe("An association naming a web ACL that is not here", () => {
     assertStringIncludes(skippedReason(stack), simWafRealAccountAclArn);
   });
 
-  it("skips an association naming a resource type Yulin does not protect", async () => {
+  it("associates a load balancer and records that nothing is evaluated through it", async () => {
     // Given a template whose association points at a load balancer, which AWS
-    // WAF protects and Yulin does not simulate.
+    // WAF protects and no simulated request passes through.
     const simAws = simAwsInEuWest2();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "balanced",
       template: {
         Resources: {
           OrdersAcl: simWafMixedAclResource,
-          BalancerAclAssociation: simWafAssociationResource(
-            "arn:aws:elasticloadbalancing:eu-west-2:111111111111:" +
-              "loadbalancer/app/orders/50dc6c495c0c9188",
-          ),
+          BalancerAclAssociation: simWafAssociationResource({
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:elasticloadbalancing:",
+                { Ref: "AWS::Region" },
+                ":",
+                { Ref: "AWS::AccountId" },
+                ":loadbalancer/app/orders/50dc6c495c0c9188",
+              ],
+            ],
+          }),
         },
       },
     });
     await stack.waitForDeployComplete();
 
-    // Then the web ACL deployed and only the association was skipped, naming
-    // the resource type it would have gone in front of.
-    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
-    assertStringIncludes(skippedReason(stack), "an Application Load Balancer");
+    // Then both deployed, and the association is recorded as one nothing is
+    // evaluated through.
+    const balancer = stack.ignoredProperties.find(
+      (ignored) => ignored.path === "ResourceArn",
+    );
+
+    assertArrayEmpty(stack.skippedResources);
+    assertStringIncludes(
+      balancer?.reason ?? "",
+      "an Application Load Balancer",
+    );
   });
 
-  it("associates the web ACL when it is there, dropped rule and all", async () => {
+  it("associates the web ACL when it is there, held rule and all", async () => {
     // Given a template whose association names the web ACL beside it, which
-    // lost a rule this simulation cannot evaluate.
+    // holds a rule this simulation cannot evaluate.
     const simAws = simAwsInEuWest2();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "pool",
@@ -159,7 +174,7 @@ describe("An association naming a web ACL that is not here", () => {
 
     assertTypeString(poolArn);
 
-    // Then the pool is protected by what the web ACL still holds. A dropped
+    // Then the pool is protected by the rules the web ACL evaluates. A held
     // rule is not a reason to leave the pool with nothing in front of it.
     assertArrayEmpty(stack.skippedResources);
     assertTrue(simAws.wafV2().protection().protects(poolArn));

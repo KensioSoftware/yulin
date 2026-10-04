@@ -1,3 +1,4 @@
+import { SimWafUnsimulatedInputException } from "../error/sim-wafv2.error.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
 import type { SimWafAction } from "./sim-waf-action.js";
 import {
@@ -18,18 +19,36 @@ interface SimWafRuleProperties {
   readonly priority: number;
   readonly labels: readonly string[];
   readonly evaluate: SimWafRuleEvaluator;
+  readonly unsimulatedReason?: string | undefined;
+}
+
+/**
+ * What a rule held without being evaluated does with every request.
+ */
+function claimsNothing(): undefined {
+  // A held rule claims no request, so every request goes on to the next rule.
 }
 
 /**
  * One rule of a web ACL, compiled so a request can be evaluated against it.
  *
- * The statement is turned into an evaluator when the web ACL is written, which
- * is what lets a rule Yulin cannot evaluate be refused at that point rather
- * than silently letting requests past later on.
+ * The statement is turned into an evaluator when the web ACL is written. A
+ * rule using something Yulin does not simulate is held all the same, as a
+ * rule that claims no request, and says why in `unsimulatedReason`. The web
+ * ACL reports it from there.
  */
 export class SimWafRule {
   public readonly name: string;
   public readonly priority: number;
+
+  /**
+   * Why this rule claims no request, when it uses something Yulin does not
+   * simulate.
+   *
+   * AWS would evaluate it. A request it would have claimed goes on to the
+   * next rule here.
+   */
+  public readonly unsimulatedReason: string | undefined;
 
   readonly #labels: readonly string[];
   readonly #evaluate: SimWafRuleEvaluator;
@@ -39,22 +58,42 @@ export class SimWafRule {
     this.priority = properties.priority;
     this.#labels = properties.labels;
     this.#evaluate = properties.evaluate;
+    this.unsimulatedReason = properties.unsimulatedReason;
   }
 
   /**
    * Compile one rule as it was written.
+   *
+   * Input WAFv2 itself would refuse is refused here too. A rule using
+   * something only Yulin leaves out compiles to one that claims nothing.
    */
   static compile(input: SimWafRuleInput, scope: SimWafRuleScope): SimWafRule {
     const name = requiredSimWafRuleName(input.Name);
+    const priority = requiredSimWafRulePriority(input.Priority, name);
+    const labels = simWafRuleLabels(input.RuleLabels, name);
 
-    refuseUnsimulatedSimWafRuleInput(input, name);
+    try {
+      refuseUnsimulatedSimWafRuleInput(input, name);
 
-    return new SimWafRule({
-      name,
-      priority: requiredSimWafRulePriority(input.Priority, name),
-      labels: simWafRuleLabels(input.RuleLabels, name),
-      evaluate: compileSimWafRuleEvaluator(input, name, scope),
-    });
+      return new SimWafRule({
+        name,
+        priority,
+        labels,
+        evaluate: compileSimWafRuleEvaluator(input, name, scope),
+      });
+    } catch (error) {
+      if (!(error instanceof SimWafUnsimulatedInputException)) {
+        throw error;
+      }
+
+      return new SimWafRule({
+        name,
+        priority,
+        labels,
+        evaluate: claimsNothing,
+        unsimulatedReason: error.message,
+      });
+    }
   }
 
   /**

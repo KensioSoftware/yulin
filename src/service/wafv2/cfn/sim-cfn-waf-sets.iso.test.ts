@@ -3,6 +3,7 @@ import {
   UpdateStackCommand,
 } from "@aws-sdk/client-cloudformation";
 import {
+  assertArrayEquals,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -127,6 +128,26 @@ describe("AWS::WAFv2::IPSet and AWS::WAFv2::RegexPatternSet", () => {
     assertIdentical(ipSet.addresses[0], "192.0.2.0/24");
     assertArrayLength(patternSet.regularExpressions, 2);
     assertIdentical(patternSet.regularExpressions[0], "^curl/");
+  });
+
+  it("holds the tags a template gives both sets and records them", async () => {
+    // Given a template tagging both sets.
+    const simAws = new SimAws();
+    const tags = [{ Key: "Team", Value: "payments" }];
+    const stack = await deploySets(simAws, { Tags: tags }, { Tags: tags });
+
+    // Then each set holds them, and each Resource records them as held with
+    // nothing reading them.
+    const ipSet = simAws.wafV2().findIpSetByArn(outputValue(stack, "IpSetArn"));
+
+    assertNonNullable(ipSet);
+    assertArrayLength(ipSet.tags, 1);
+    assertArrayEquals(
+      stack.ignoredProperties.map(
+        ({ logicalId, path }) => `${logicalId} ${path}`,
+      ),
+      ["OfficeAddresses Tags", "BotPatterns Tags"],
+    );
   });
 
   it("answers Ref with the physical id and Id with the id alone", async () => {

@@ -39,9 +39,9 @@ export interface SimWafStatementScope {
  * Turn one statement into the matcher a rule evaluates a request with.
  *
  * Compiling happens when the web ACL is written rather than when a request
- * arrives, which is what lets `CreateWebACL` refuse a statement kind it cannot
- * evaluate. It also means a rule does no parsing per request: what a request
- * meets is a closure over what the rule already worked out.
+ * arrives, which is where a statement kind Yulin cannot evaluate is found and
+ * its rule held unevaluated. It also means a rule does no parsing per request:
+ * what a request meets is a closure over what the rule already worked out.
  */
 export function compileSimWafStatement(
   statement: SimWafStatementInput | undefined,

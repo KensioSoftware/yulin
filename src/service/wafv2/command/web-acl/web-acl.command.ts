@@ -82,6 +82,12 @@ export interface SimWafWebAclOutput {
   readonly VisibilityConfig: unknown;
   readonly CustomResponseBodies: SimWafCustomResponseBodies | undefined;
   readonly AssociationConfig: SimWafAssociationConfigInput | undefined;
+  readonly CaptchaConfig?: unknown;
+  readonly ChallengeConfig?: unknown;
+  readonly TokenDomains?: readonly string[] | undefined;
+  readonly DataProtectionConfig?: unknown;
+  readonly OnSourceDDoSProtectionConfig?: unknown;
+  readonly ApplicationConfig?: unknown;
 }
 
 export interface SimGetWebAclCommandOutput {

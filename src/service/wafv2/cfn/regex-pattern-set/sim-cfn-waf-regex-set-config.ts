@@ -24,6 +24,7 @@ export class SimCfnWafRegexPatternSetConfig extends SimCfnWafResourceConfig {
       Name: this.name(),
       Scope: this.scope(),
       Description: this.description(),
+      Tags: this.tags(),
       RegularExpressionList: this.requiredStrings("RegularExpressionList").map(
         (pattern) => ({ RegexString: pattern }),
       ),

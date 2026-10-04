@@ -23,6 +23,7 @@ export class SimCfnWafIpSetConfig extends SimCfnWafResourceConfig {
       Name: this.name(),
       Scope: this.scope(),
       Description: this.description(),
+      Tags: this.tags(),
       IPAddressVersion: this.text("IPAddressVersion"),
       Addresses: this.requiredStrings("Addresses"),
     };

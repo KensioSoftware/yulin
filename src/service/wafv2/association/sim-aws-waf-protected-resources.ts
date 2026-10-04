@@ -4,6 +4,7 @@ import type {
 } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimWafProtectedResource } from "./sim-waf-protected-resource.js";
+import { SimWafUnsimulatedResource } from "./sim-waf-unsimulated-resource.js";
 import type { SimWafProtectedResources } from "./sim-waf-protected-resources.js";
 import type { SimWafRestApiStage } from "./sim-waf-rest-api-stage.js";
 import type { SimWafUserPool } from "./sim-waf-user-pool.js";
@@ -36,6 +37,10 @@ export class SimAwsWafProtectedResources implements SimWafProtectedResources {
    * Whether the resource an ARN names is one this scope holds.
    */
   has(resource: SimWafProtectedResource): boolean {
+    if (resource instanceof SimWafUnsimulatedResource) {
+      return true;
+    }
+
     if (resource.resourceType === "COGNITO_USER_POOL") {
       return this.hasUserPool(resource);
     }

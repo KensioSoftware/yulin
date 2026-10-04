@@ -4,23 +4,23 @@ import {
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
-  assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import {
-  SimWafDeclarationError,
-  SimWafUnsimulatedInputException,
-} from "../error/sim-wafv2.error.js";
+import { SimWafDeclarationError } from "../error/sim-wafv2.error.js";
 import {
   simWafBrowserRequest,
   simWafWebAclDecisions,
 } from "../sim-wafv2.fixture.js";
-import { simWafManagedRuleFactory } from "../web-acl/sim-waf-rule.factory.js";
+import {
+  simWafManagedRuleFactory,
+  simWafRuleFactory,
+} from "../web-acl/sim-waf-rule.factory.js";
 import type { SimWafRuleInput } from "../web-acl/sim-waf-rule.type.js";
 
 const coreRuleSet = "AWSManagedRulesCommonRuleSet";
@@ -144,49 +144,31 @@ describe("SimWafV2 AWS managed rule groups", () => {
     ]);
   });
 
-  it("refuses a managed rule group that is not simulated", async () => {
-    // Given a web ACL naming the bot control group, which decides by behaviour
-    // across requests.
+  it("holds a managed rule group that is not simulated, naming the ones that are", async () => {
+    // Given a web ACL naming the bot control group, which is not simulated,
+    // ahead of a rule that blocks everything.
     const waf = new SimAws().wafV2();
+    const decide = await simWafWebAclDecisions(waf, [
+      { ...blockingGroup("AWSManagedRulesBotControlRuleSet"), Name: "bots" },
+      simWafRuleFactory.make({ Name: "everything", Priority: 1 }),
+    ]);
 
-    // When it is created.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simWafWebAclDecisions(waf, [
-        blockingGroup("AWSManagedRulesBotControlRuleSet"),
-      ]);
-    });
+    // When a request is evaluated.
+    const decision = decide(simWafBrowserRequest("https://example.com/"));
 
-    // Then it is refused by name, and the refusal says which groups are
-    // simulated rather than leaving a reader to try them.
-    assertInstanceOf(error, SimWafUnsimulatedInputException);
-    assertStringIncludes(error.message, "AWSManagedRulesBotControlRuleSet");
-    assertStringIncludes(error.message, coreRuleSet);
-    assertStringIncludes(error.message, knownBadInputs);
-    assertStringIncludes(error.message, adminProtection);
-  });
+    // Then the group claims nothing and the next rule decides.
+    assertIdentical(decision.terminatingRuleName, "everything");
 
-  it("refuses a rule group from another vendor", async () => {
-    // Given a web ACL naming a marketplace group under the core rule set name.
-    const waf = new SimAws().wafV2();
+    // And the group is reported, with the groups that are simulated named
+    // rather than leaving a reader to try them.
+    const [part] = waf.unsimulatedParts(decision.webAclArn);
 
-    // When it is created.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simWafWebAclDecisions(waf, [
-        {
-          ...simWafManagedRuleFactory.make({ Name: "managed" }),
-          Statement: {
-            ManagedRuleGroupStatement: {
-              VendorName: "Fortinet",
-              Name: coreRuleSet,
-            },
-          },
-        },
-      ]);
-    });
-
-    // Then it is refused: a subscription buys rules nobody outside the vendor
-    // has seen.
-    assertStringIncludes(error.message, "Fortinet");
+    assertNonNullable(part);
+    assertIdentical(part.part, "Rules.bots");
+    assertStringIncludes(part.reason, "AWSManagedRulesBotControlRuleSet");
+    assertStringIncludes(part.reason, coreRuleSet);
+    assertStringIncludes(part.reason, knownBadInputs);
+    assertStringIncludes(part.reason, adminProtection);
   });
 
   it("reports what it covers of every rule it carries", () => {
