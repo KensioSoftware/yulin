@@ -29,16 +29,15 @@ export function refuseUnsimulatedSimWafGroupConfigs(
   const written = configs ?? [];
 
   for (const config of written) {
-    const level = (config as SimWafBotControlConfigInput)
-      .AWSManagedRulesBotControlRuleSet?.InspectionLevel;
+    const level = botControlLevel(config);
 
     if (group !== simWafBotControlRuleSet || level === undefined) {
       refuseSimWafRuleInput(
         ruleName,
         "the rule group member ManagedRuleGroupConfigs",
         "it configures the account takeover and account creation groups, " +
-          "and Bot Control's level, and Bot Control at COMMON is the one " +
-          "configuration simulated",
+          "and Bot Control's level, and an entry holding nothing but Bot " +
+          "Control at COMMON is the one configuration simulated",
       );
     }
 
@@ -51,4 +50,23 @@ export function refuseUnsimulatedSimWafGroupConfigs(
       );
     }
   }
+}
+
+/**
+ * The level one entry runs Bot Control at, when the entry is Bot Control's
+ * configuration and nothing else.
+ *
+ * Anything else answers with no level, so a malformed entry or one carrying
+ * another member beside Bot Control's is held rather than read as `COMMON`.
+ */
+function botControlLevel(config: unknown): string | undefined {
+  const isBotControlAlone =
+    typeof config === "object" &&
+    config !== null &&
+    Object.keys(config).join(",") === "AWSManagedRulesBotControlRuleSet";
+
+  return isBotControlAlone
+    ? (config as SimWafBotControlConfigInput).AWSManagedRulesBotControlRuleSet
+        ?.InspectionLevel
+    : undefined;
 }

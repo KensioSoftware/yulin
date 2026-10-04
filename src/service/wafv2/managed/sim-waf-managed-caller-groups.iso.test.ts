@@ -6,6 +6,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertObjectEquals,
+  assertStringIncludes,
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -14,6 +15,8 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { SimWafDeclarationError } from "../error/sim-wafv2.error.js";
 import {
   simWafBrowserRequest,
+  simWafHeldWebAcl,
+  simWafUnsimulatedReason,
   simWafWebAclDecisions,
 } from "../sim-wafv2.fixture.js";
 import {
@@ -271,6 +274,32 @@ describe("SimWafV2 managed rule groups that read the caller", () => {
       `${botControl}:SignalNonBrowserUserAgent`,
       `${botControl}:signal:non_browser_user_agent`,
     ]);
+  });
+
+  it.each<[string, readonly unknown[]]>([
+    ["a null entry", [null]],
+    [
+      "an entry carrying another member beside Bot Control's",
+      [
+        {
+          AWSManagedRulesBotControlRuleSet: { InspectionLevel: "COMMON" },
+          LoginPath: "/login",
+        },
+      ],
+    ],
+  ])("holds Bot Control configured with %s", async (_, configs) => {
+    // When Bot Control is written with a configuration that is not Bot
+    // Control at COMMON and nothing else.
+    const waf = new SimAws().wafV2();
+    const { parts } = await simWafHeldWebAcl(waf, {
+      Rules: [botControlGroup({ ManagedRuleGroupConfigs: configs })],
+    });
+
+    // Then the rule is held, rather than read as COMMON or failing the write.
+    assertStringIncludes(
+      simWafUnsimulatedReason(parts, "Rules.managed"),
+      "ManagedRuleGroupConfigs",
+    );
   });
 
   it("refuses a bot category Bot Control does not name", () => {
