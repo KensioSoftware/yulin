@@ -1,5 +1,10 @@
 import { simWafAdminProtectionRuleSet } from "./group/sim-waf-admin-protection.js";
+import { simWafBotControlRuleSet } from "./group/sim-waf-bot-control.js";
 import { simWafCommonRuleSet } from "./group/sim-waf-common-rule-set.js";
+import {
+  simWafAnonymousIpList,
+  simWafIpReputationList,
+} from "./group/sim-waf-ip-reputation.js";
 import { simWafKnownBadInputsRuleSet } from "./group/sim-waf-known-bad-inputs.js";
 import type {
   SimWafManagedRuleDefinition,
@@ -19,6 +24,9 @@ const groups: readonly SimWafManagedRuleGroupDefinition[] = [
   simWafCommonRuleSet,
   simWafKnownBadInputsRuleSet,
   simWafAdminProtectionRuleSet,
+  simWafIpReputationList,
+  simWafAnonymousIpList,
+  simWafBotControlRuleSet,
 ];
 
 const byName = new Map(groups.map((group) => [group.name, group]));

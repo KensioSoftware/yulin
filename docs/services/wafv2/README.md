@@ -302,12 +302,19 @@ both refused where the rule is written.
 
 ## The AWS managed rule groups
 
-Three of the AWS managed rule groups are simulated, so a stack that turns them on deploys and its
-traffic can be tested against them.
+Six of the AWS managed rule groups are simulated, so a stack that turns them on deploys and its
+traffic can be tested against them. The first three read the request.
 
 - `AWSManagedRulesCommonRuleSet`, the core rule set, 22 rules.
 - `AWSManagedRulesKnownBadInputsRuleSet`, 11 rules.
 - `AWSManagedRulesAdminProtectionRuleSet`, one rule.
+
+The other three read the caller, and a test declares what they find (see
+[Groups that read the caller](#groups-that-read-the-caller)).
+
+- `AWSManagedRulesAmazonIpReputationList`, three rules.
+- `AWSManagedRulesAnonymousIpList`, two rules.
+- `AWSManagedRulesBotControlRuleSet` at the common inspection level, 19 rules.
 
 A group evaluates its rules in the order AWS documents them, adds the documented
 `awswaf:managed:aws:*` label to a request a rule claims, and blocks by that rule's action. The
@@ -405,7 +412,8 @@ AWS rule it stands for, and `managedRules().rules()` reports the tier of every o
   `ExploitablePaths_URIPATH`, `AdminProtection_URIPATH`, `JavaDeserializationRCE_*` and
   `UserAgent_BadBots_HEADER`.
 - **declared** detects nothing at all. The four `CrossSiteScripting_*` rules run AWS's own
-  detection, and AWS documents none of it.
+  detection, and AWS documents none of it. Every rule of the IP reputation, anonymous IP and Bot
+  Control groups is declared too.
 
 The tiers under-detect against AWS and never over-detect. The usual reason to put WAF in a test is
 to find out whether an application's own traffic still gets through with the core rule set on. A
@@ -447,12 +455,125 @@ A match names the rule, in the spelling `RuleActionOverrides` and `DescribeManag
 (`CrossSiteScripting_QueryArguments`). A name no simulated group holds is refused where it was
 written.
 
-A rule naming any other group is held and claims no request (see
-[Held input](#held-input)), and the reason it gives says which groups are
-simulated. The IP reputation and anonymous IP groups decide by caller address, and every request in
-this simulation comes from one client. Bot Control and the account takeover groups decide by
-behaviour across requests. The SQL injection group is undocumented in the way the cross-site
-scripting rules are.
+A rule naming any other group is held and claims no request (see [Held input](#held-input)), and
+the reason it gives says which groups are simulated. The account takeover and account creation
+groups, and Bot Control's targeted level, decide by behaviour across requests and by tokens a
+browser carries. The SQL injection group is undocumented in the way the cross-site scripting rules
+are.
+
+### Groups that read the caller
+
+The IP reputation, anonymous IP and Bot Control groups decide by who sent a request, and every
+request in this simulation comes from `127.0.0.1`. Each of their rules is declared-only. The group
+labels the request, takes the rule's documented action and honours overrides, as the groups that
+read the request do.
+
+`AWSManagedRulesAmazonIpReputationList` holds `AWSManagedIPReputationList` and
+`AWSManagedReconnaissanceList`, which block, and `AWSManagedIPDDoSList`, which counts as AWS ships
+it. `AWSManagedRulesAnonymousIpList` holds `AnonymousIPList` (VPNs, proxies and Tor) and
+`HostingProviderIPList` (hosting and cloud providers other than AWS), which both block. A test
+declares a match by rule name, as above, and says which requests come from a flagged address that
+way.
+
+Bot Control labels a request by the bot that sent it, and a verified bot is labelled and matches no
+rule. A test declares the bot.
+
+```typescript sim-wafv2-bot-control
+/**
+ * Counting with Bot Control and blocking unverified bots by label.
+ */
+
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "site",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "site-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "bot-control",
+        Priority: 0,
+        OverrideAction: { Count: {} },
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesBotControlRuleSet",
+            ManagedRuleGroupConfigs: [
+              {
+                AWSManagedRulesBotControlRuleSet: { InspectionLevel: "COMMON" },
+              },
+            ],
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+      {
+        Name: "block-scrapers",
+        Priority: 1,
+        Action: { Block: {} },
+        Statement: {
+          LabelMatchStatement: {
+            Scope: "LABEL",
+            Key: "awswaf:managed:aws:bot-control:bot:category:scraping_framework",
+          },
+        },
+        VisibilityConfig: visibility,
+      },
+    ],
+  }),
+);
+
+waf.managedRules().onRequest("/search", {
+  bot: { category: "scraping_framework", name: "scrapy" },
+});
+waf.managedRules().onRequest("/", {
+  bot: { category: "search_engine", name: "googlebot", verified: true },
+});
+
+const webAclArn = created.Summary!.ARN;
+
+const scraper = waf.evaluateRequest({
+  webAclArn,
+  request: new Request("https://example.test/search"),
+});
+const crawler = waf.evaluateRequest({
+  webAclArn,
+  request: new Request("https://example.test/"),
+});
+
+// "BLOCK" "block-scrapers"
+console.log(scraper.action, scraper.terminatingRuleName);
+
+// "ALLOW" true
+console.log(
+  crawler.action,
+  crawler.labels.includes("awswaf:managed:aws:bot-control:bot:verified"),
+);
+```
+
+A `bot` declaration names the category in the spelling the `bot:category:` label uses
+(`search_engine`, `http_library`, `scraping_framework` and the rest), and optionally the bot's
+`name`, its `organization` and whether it is `verified`. An unverified bot matches its category's
+rule (`CategorySearchEngine` and so on), which blocks by default. A verified bot matches no rule,
+except a verified AI bot, which `CategoryAI` blocks as it does on AWS. Either way the group adds
+`bot:category:`, `bot:name:` and `bot:organization:` labels where the declaration gives them, and
+`bot:verified` or `bot:unverified`. The three `Signal*` rules are declared by rule name in
+`matches`, and add their `signal:` label beside their own.
+
+Bot Control runs at `COMMON` when `ManagedRuleGroupConfigs` names that level or when it is left out.
+A rule naming the `TARGETED` level is held (see [Held input](#held-input)).
 
 ## Labels
 
@@ -863,7 +984,7 @@ Region is refused as well.
 AWS also refuses a web ACL carrying `AWSManagedRulesATPRuleSet`, and it refuses the whole
 association over the one rule group. `AssociateWebACL` refuses it here too. The web ACL itself is
 created, holding the group without evaluating it, like every managed rule group outside the
-[three that are simulated](#the-aws-managed-rule-groups).
+[six that are simulated](#the-aws-managed-rule-groups).
 
 ### The request body is withheld at a hosted domain
 
@@ -1422,10 +1543,11 @@ A rule is held for any of these statement kinds:
 - `SqliMatchStatement` and `XssMatchStatement`. AWS publishes no description of the detection they
   run.
 - `RuleGroupReferenceStatement`. A rule group of your own is a resource in its own right, and none
-  is simulated. The three simulated AWS managed rule groups are named in a statement rather than
+  is simulated. The six simulated AWS managed rule groups are named in a statement rather than
   created.
-- `ManagedRuleGroupStatement` naming a group outside the three, or carrying `Version`,
-  `ExcludedRules` or `ManagedRuleGroupConfigs`.
+- `ManagedRuleGroupStatement` naming a group outside the six, or carrying `Version` or
+  `ExcludedRules`. `ManagedRuleGroupConfigs` holds the rule too, unless it runs Bot Control at
+  `COMMON`.
 
 A `RateBasedStatement` is evaluated (see [Rate limiting](#rate-limiting)). A rule using two of its
 aggregation key types is held. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a
@@ -1447,7 +1569,7 @@ Tags on a web ACL, an IP set or a regex pattern set are held, and `unsimulatedPa
 `ListTagsForResource` is the operation that would read them back, and Yulin leaves it out. Logging, sampled requests and CloudWatch metrics for a
 web ACL are not simulated.
 
-`DescribeManagedRuleGroup` refuses a group outside the three, and a `VersionName`. Its only possible
+`DescribeManagedRuleGroup` refuses a group outside the six, and a `VersionName`. Its only possible
 answer would be invented rules.
 
 ## Supported operations

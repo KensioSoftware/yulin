@@ -28,8 +28,8 @@ export type SimWafManagedDetector = (
 /**
  * One rule of an AWS managed rule group.
  *
- * Every rule in the three simulated groups blocks by default, so the action is
- * not carried here. A rule with no detector is a declared-only rule.
+ * A rule blocks by default unless it says it counts. A rule with no detector
+ * is a declared-only rule.
  */
 export interface SimWafManagedRuleDefinition {
   /** The rule name, as AWS names it and as an override names it. */
@@ -37,6 +37,17 @@ export interface SimWafManagedRuleDefinition {
 
   /** The label this rule adds, within its group's namespace. */
   readonly label: string;
+
+  /**
+   * The labels the rule adds beside its own, within its group's namespace.
+   *
+   * A Bot Control rule labels the bot category or the signal it found as well
+   * as itself.
+   */
+  readonly labels?: readonly string[] | undefined;
+
+  /** Whether the rule counts by default where most rules block. */
+  readonly counts?: boolean | undefined;
 
   readonly tier: SimWafManagedRuleTier;
 
