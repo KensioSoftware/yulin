@@ -1,5 +1,5 @@
 import { compileSimWafStatement } from "../statement/sim-waf-statement.js";
-import { SimWafAction } from "../web-acl/sim-waf-action.js";
+import type { SimWafAction } from "../web-acl/sim-waf-action.js";
 import type {
   SimWafRuleEvaluator,
   SimWafRuleScope,
@@ -8,6 +8,11 @@ import {
   requiredSimWafManagedRuleGroup,
   simWafGroupCountsEverything,
 } from "./sim-waf-managed-group-input.js";
+import { simWafDeclaredGroupLabels } from "./sim-waf-managed-declaration.js";
+import {
+  simWafAddGroupLabels,
+  simWafManagedRuleActions,
+} from "./sim-waf-managed-rule-actions.js";
 import { simWafManagedRuleOverrides } from "./sim-waf-managed-rule-overrides.js";
 import type {
   SimWafManagedRuleGroupStatementInput,
@@ -41,16 +46,16 @@ export function compileSimWafManagedRuleGroup(
 ): SimWafRuleEvaluator {
   const { statement, ruleName, scope } = properties;
   const group = requiredSimWafManagedRuleGroup(statement, ruleName);
-  const overrides = simWafManagedRuleOverrides(
-    statement,
-    group,
+  const actions = simWafManagedRuleActions({
     ruleName,
-    scope.customResponseBodies,
-  );
-  const counting = simWafGroupCountsEverything(
-    properties.overrideAction,
-    ruleName,
-  );
+    overrides: simWafManagedRuleOverrides(
+      statement,
+      group,
+      ruleName,
+      scope.customResponseBodies,
+    ),
+    counting: simWafGroupCountsEverything(properties.overrideAction, ruleName),
+  });
   const scopeDown =
     statement.ScopeDownStatement === undefined
       ? undefined
@@ -60,10 +65,6 @@ export function compileSimWafManagedRuleGroup(
           ruleName,
         });
 
-  // Every rule in the three simulated groups blocks by default, and a group
-  // that is counting counts whatever the rule that matched was set to.
-  const blocking = SimWafAction.read({ Block: {} }, ruleName, {});
-  const counted = SimWafAction.read({ Count: {} }, ruleName, {});
   const { managedRules } = scope;
 
   return (request): SimWafAction | undefined => {
@@ -74,19 +75,26 @@ export function compileSimWafManagedRuleGroup(
     }
 
     const parts = simWafManagedRequestParts(request);
-    const declared = managedRules.declaredMatches(request);
+    const declared = managedRules.declared(request);
     let matched = false;
 
+    simWafAddGroupLabels(
+      request,
+      group,
+      simWafDeclaredGroupLabels(declared, group.name),
+    );
+
     for (const rule of group.rules) {
-      if (!declared.has(rule.name) && rule.detects?.(parts) !== true) {
+      if (!declared.matches.has(rule.name) && rule.detects?.(parts) !== true) {
         continue;
       }
 
-      request.labels.add(`${group.labelNamespace}:${rule.label}`);
+      simWafAddGroupLabels(request, group, [
+        rule.label,
+        ...(rule.labels ?? []),
+      ]);
 
-      const action = counting
-        ? counted
-        : (overrides.get(rule.name) ?? blocking);
+      const action = actions.of(rule);
 
       if (action.isTerminating) {
         return action;
@@ -95,6 +103,6 @@ export function compileSimWafManagedRuleGroup(
       matched = true;
     }
 
-    return matched ? counted : undefined;
+    return matched ? actions.counted : undefined;
   };
 }

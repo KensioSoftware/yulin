@@ -10,16 +10,17 @@ import {
 } from "./sim-waf-managed-rule-report.js";
 
 import type { SimWafManagedRuleTier } from "./sim-waf-managed-rule.type.js";
+import {
+  type SimWafDeclared,
+  type SimWafManagedMatchDeclaration,
+  simWafNothingDeclared,
+  simWafReadDeclaration,
+} from "./sim-waf-managed-declaration.js";
 
-/**
- * The managed rules a test says claim a request.
- */
-export interface SimWafManagedMatchDeclaration {
-  /** The rules that claim the request, by the name AWS gives them. */
-  readonly matches: readonly string[];
-}
-
-const noMatches: ReadonlySet<string> = new Set();
+export type {
+  SimWafDeclared,
+  SimWafManagedMatchDeclaration,
+} from "./sim-waf-managed-declaration.js";
 
 /**
  * The managed rule matches this simulated WAFv2 answers with, and what it
@@ -37,12 +38,21 @@ const noMatches: ReadonlySet<string> = new Set();
  * });
  * ```
  *
+ * Bot Control is declared by the bot rather than the rule, since a verified
+ * bot is labelled and matches no rule:
+ *
+ * ```typescript
+ * simAws.wafV2().managedRules().onRequest("/search", {
+ *   bot: { category: "search_engine", name: "googlebot", verified: true },
+ * });
+ * ```
+ *
  * A declared match is a match, and everything after it is what the group would
  * have done anyway: the rule adds its label, an action override applies to it,
  * and the group blocks by that rule.
  */
 export class SimWafManagedRules {
-  readonly #byUriPath = new Map<string, ReadonlySet<string>>();
+  readonly #byUriPath = new Map<string, SimWafDeclared>();
 
   /**
    * Declare which managed rules claim a request to one URI path.
@@ -61,17 +71,19 @@ export class SimWafManagedRules {
 
     this.#byUriPath.set(
       uriPath,
-      new Set(
-        declaration.matches.map((name) => this.requiredRule(name).rule.name),
+      simWafReadDeclaration(
+        declaration,
+        (name) => this.requiredRule(name).rule.name,
       ),
     );
   }
 
   /**
-   * The rules declared to claim one request.
+   * What a test declared about one request: the rules that claim it, and the
+   * labels a group adds to it whatever its rules decide.
    */
-  declaredMatches(request: SimWafInspectedRequest): ReadonlySet<string> {
-    return this.#byUriPath.get(request.uriPath) ?? noMatches;
+  declared(request: SimWafInspectedRequest): SimWafDeclared {
+    return this.#byUriPath.get(request.uriPath) ?? simWafNothingDeclared;
   }
 
   /**

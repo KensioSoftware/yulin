@@ -11,6 +11,7 @@ import {
   simWafManagedRuleGroupNames,
 } from "./sim-waf-managed-rule-groups.js";
 import type { SimWafManagedRuleGroupDefinition } from "./sim-waf-managed-rule.type.js";
+import { refuseUnsimulatedSimWafGroupConfigs } from "./sim-waf-managed-group-configs.js";
 
 /**
  * The rule group statement members real WAFv2 takes and this simulation does
@@ -27,11 +28,6 @@ const refusedMembers = new Map<string, string>([
     "AWS replaced it with RuleActionOverrides, which says which action a " +
       "named rule takes rather than only that it takes none",
   ],
-  [
-    "ManagedRuleGroupConfigs",
-    "it configures the Bot Control, account takeover and account creation " +
-      "groups, and none of those is simulated",
-  ],
 ]);
 
 /**
@@ -40,8 +36,8 @@ const refusedMembers = new Map<string, string>([
  *
  * The reason names the groups that are simulated, because the ones that are
  * not are left out for reasons a reader cannot guess from the name: a group
- * that decides by caller address sees one client for the whole simulation, and
- * a group whose detection AWS does not describe cannot be reproduced at all.
+ * that decides by behaviour across requests has one request to look at, and a
+ * group whose detection AWS does not describe cannot be reproduced at all.
  */
 export function requiredSimWafManagedRuleGroup(
   statement: SimWafManagedRuleGroupStatementInput,
@@ -74,6 +70,12 @@ export function requiredSimWafManagedRuleGroup(
       `the simulated groups are ${simulated}`,
     );
   }
+
+  refuseUnsimulatedSimWafGroupConfigs(
+    statement.ManagedRuleGroupConfigs,
+    group,
+    ruleName,
+  );
 
   return group;
 }

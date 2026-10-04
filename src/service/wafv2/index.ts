@@ -69,6 +69,7 @@ export {
   SimWafManagedRules,
   type SimWafManagedMatchDeclaration,
 } from "./managed/sim-waf-managed-rules.js";
+export type { SimWafBotDeclaration } from "./managed/sim-waf-bot-declaration.js";
 export type { SimWafManagedRuleReport } from "./managed/sim-waf-managed-rule-report.js";
 export type { SimWafManagedRuleTier } from "./managed/sim-waf-managed-rule.type.js";
 export type {

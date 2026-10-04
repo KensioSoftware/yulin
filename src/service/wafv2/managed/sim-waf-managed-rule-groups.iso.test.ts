@@ -145,11 +145,11 @@ describe("SimWafV2 AWS managed rule groups", () => {
   });
 
   it("holds a managed rule group that is not simulated, naming the ones that are", async () => {
-    // Given a web ACL naming the bot control group, which is not simulated,
+    // Given a web ACL naming the SQL injection group, which is not simulated,
     // ahead of a rule that blocks everything.
     const waf = new SimAws().wafV2();
     const decide = await simWafWebAclDecisions(waf, [
-      { ...blockingGroup("AWSManagedRulesBotControlRuleSet"), Name: "bots" },
+      { ...blockingGroup("AWSManagedRulesSQLiRuleSet"), Name: "sqli" },
       simWafRuleFactory.make({ Name: "everything", Priority: 1 }),
     ]);
 
@@ -164,8 +164,8 @@ describe("SimWafV2 AWS managed rule groups", () => {
     const [part] = waf.unsimulatedParts(decision.webAclArn);
 
     assertNonNullable(part);
-    assertIdentical(part.part, "Rules.bots");
-    assertStringIncludes(part.reason, "AWSManagedRulesBotControlRuleSet");
+    assertIdentical(part.part, "Rules.sqli");
+    assertStringIncludes(part.reason, "AWSManagedRulesSQLiRuleSet");
     assertStringIncludes(part.reason, coreRuleSet);
     assertStringIncludes(part.reason, knownBadInputs);
     assertStringIncludes(part.reason, adminProtection);
@@ -177,12 +177,25 @@ describe("SimWafV2 AWS managed rule groups", () => {
 
     // When the managed rules are asked what they cover.
     const rules = waf.managedRules().rules();
-    const declared = rules.filter((rule) => rule.tier === "declared");
+    const payloadGroups = new Set([
+      coreRuleSet,
+      knownBadInputs,
+      adminProtection,
+    ]);
+    const declared = rules.filter(
+      (rule) => payloadGroups.has(rule.group) && rule.tier === "declared",
+    );
 
-    // Then every rule of the three groups is reported with its group, its
-    // label and its tier, and the rules that detect nothing are the four that
-    // run AWS's own cross-site scripting detection.
-    assertArrayLength(rules, 34);
+    // Then every rule of the six groups is reported with its group, its label
+    // and its tier. Of the three that read the request, the rules that detect
+    // nothing are the four that run AWS's own cross-site scripting detection,
+    // and the three that read the caller are declared-only throughout.
+    assertArrayLength(rules, 58);
+    assertTrue(
+      rules
+        .filter((rule) => !payloadGroups.has(rule.group))
+        .every((rule) => rule.tier === "declared"),
+    );
     assertArrayEquals(
       declared.map((rule) => rule.name),
       [

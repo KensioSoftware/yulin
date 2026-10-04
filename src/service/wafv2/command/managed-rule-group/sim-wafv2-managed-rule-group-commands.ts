@@ -58,11 +58,11 @@ export class SimWafManagedRuleGroupCommands {
       LabelNamespace: `${group.labelNamespace}:`,
       Rules: group.rules.map((rule) => ({
         Name: rule.name,
-        Action: { Block: {} },
+        Action: rule.counts === true ? { Count: {} } : { Block: {} },
       })),
-      AvailableLabels: group.rules.map((rule) => ({
-        Name: `${group.labelNamespace}:${rule.label}`,
-      })),
+      AvailableLabels: group.rules
+        .flatMap((rule) => [rule.label, ...(rule.labels ?? [])])
+        .map((label) => ({ Name: `${group.labelNamespace}:${label}` })),
     };
   }
 }

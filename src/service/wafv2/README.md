@@ -190,12 +190,13 @@ goes through the ordinary statement path and gets every kind above it.
 
 ## The AWS managed rule groups
 
-`managed/` carries `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet` and
-`AWSManagedRulesAdminProtectionRuleSet`. AWS publishes every rule name, every default action, every
+`managed/` carries `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet`,
+`AWSManagedRulesAdminProtectionRuleSet`, `AWSManagedRulesAmazonIpReputationList`,
+`AWSManagedRulesAnonymousIpList` and `AWSManagedRulesBotControlRuleSet`. AWS publishes every rule name, every default action, every
 label and the size limits, and holds back the pattern set behind each rule. What is here follows
 from that split.
 
-`managed/group/` holds the three groups, each an ordered list of rules. The order is AWS's own and
+`managed/group/` holds the six groups, each an ordered list of rules. The order is AWS's own and
 it decides which of two matching rules blocks a request and whose label the request carries. The
 core rule set is split across two files (`sim-waf-core-request-rules.ts` and
 `sim-waf-core-payload-rules.ts`) because 22 rules in one file scores over the FTA threshold, and the
@@ -207,7 +208,20 @@ Every rule declares a tier, in `managed/sim-waf-managed-rule.type.ts`.
   documented limits, `NoUserAgent_HEADER`, `PROPFIND_METHOD` and `Host_localhost_HEADER`.
 - `documented` matches the patterns AWS published for the rule and nothing beyond them.
 - `declared` detects nothing and matches a request a test declared a match for. The four
-  `CrossSiteScripting_*` rules run detection AWS documents none of.
+  `CrossSiteScripting_*` rules run detection AWS documents none of. Every rule of the three groups
+  that read the caller is declared, since every request here comes from `127.0.0.1`.
+
+A rule blocks by default unless it sets `counts` (`AWSManagedIPDDoSList` is the one AWS ships
+counting), and it can carry `labels` beside its own. A Bot Control rule adds the
+`bot:category:` or `signal:` label of what it found. `managed/sim-waf-managed-rule-actions.ts`
+settles each rule's action once, where the rule is compiled.
+
+Bot Control is declared by the bot rather than the rule. `managed/sim-waf-bot-declaration.ts` reads
+a `bot` declaration into the category rule it matches and the labels the group adds whether or not
+a rule matches. A verified bot matches no rule bar `CategoryAI`, which AWS applies to verified bots
+too, and is still labelled. `managed/sim-waf-managed-group-configs.ts` lets
+`ManagedRuleGroupConfigs` through when it runs Bot Control at `COMMON`, and holds every other
+configuration, the `TARGETED` level included.
 
 The tiers under-detect against AWS and never over-detect. The reason is what a test with the core
 rule set on is usually asking. A rule that blocked more than AWS blocks would fail that test for a
@@ -277,8 +291,9 @@ and for scope. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a fo
 `CUSTOM_KEYS` and `CustomKeys` aggregate on headers, cookies and query arguments (feasible, and not
 part of this).
 
-`managed/sim-waf-managed-group-input.ts` stops at a managed rule group outside the three, naming the
-ones that are simulated, and at `Version`, `ExcludedRules` and `ManagedRuleGroupConfigs`.
+`managed/sim-waf-managed-group-input.ts` stops at a managed rule group outside the six, naming the
+ones that are simulated, and at `Version` and `ExcludedRules`. `sim-waf-managed-group-configs.ts`
+beside it stops at any `ManagedRuleGroupConfigs` other than Bot Control at `COMMON`.
 
 The web ACL holds the rest of what sits outside the simulation. `command/web-acl/sim-wafv2-unsimulated-web-acl-input.ts`
 lists the members (`CaptchaConfig`, `ChallengeConfig`, `TokenDomains`, `DataProtectionConfig`,
@@ -292,7 +307,7 @@ An IP set is held and reported, and no rule reads one, for the same reason
 `IPSetReferenceStatement` is held. A stack that creates one still deploys, and a test can
 read back what it created.
 
-`DescribeManagedRuleGroup` is the one place that still refuses a group outside the three. It has
+`DescribeManagedRuleGroup` is the one place that still refuses a group outside the six. It has
 no stored input to hand back, and an answer would be invented.
 
 ## CloudFormation

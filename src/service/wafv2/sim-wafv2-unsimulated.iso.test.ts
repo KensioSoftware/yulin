@@ -168,7 +168,7 @@ describe("SimWafV2 input it does not simulate", () => {
       "CaptchaConfig",
     ],
     [
-      "Bot Control, counting",
+      "Bot Control at the targeted level",
       managedRule(
         {
           ManagedRuleGroupStatement: {
@@ -176,22 +176,24 @@ describe("SimWafV2 input it does not simulate", () => {
             Name: "AWSManagedRulesBotControlRuleSet",
             ManagedRuleGroupConfigs: [
               {
-                AWSManagedRulesBotControlRuleSet: { InspectionLevel: "COMMON" },
+                AWSManagedRulesBotControlRuleSet: {
+                  InspectionLevel: "TARGETED",
+                },
               },
             ],
           },
         },
         { Count: {} },
       ),
-      "ManagedRuleGroupConfigs",
+      "TARGETED",
     ],
     [
-      "the Amazon IP reputation list",
+      "account takeover prevention",
       managedRule(
         {
           ManagedRuleGroupStatement: {
             VendorName: "AWS",
-            Name: "AWSManagedRulesAmazonIpReputationList",
+            Name: "AWSManagedRulesATPRuleSet",
           },
         },
         { None: {} },
