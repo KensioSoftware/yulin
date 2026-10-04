@@ -6,7 +6,6 @@ import type { SimWafAuthorizer } from "../authorize/sim-wafv2-authorizer.js";
 import { SimWafPage } from "../sim-wafv2-page.js";
 import {
   checkedSimWafDescription,
-  refuseSimWafTags,
   requiredSimWafName,
 } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
@@ -57,8 +56,6 @@ export class SimWafRegexPatternSetCommands {
   ): SimCreateRegexPatternSetCommandOutput {
     const { input } = command;
 
-    refuseSimWafTags(input.Tags, "CreateRegexPatternSet");
-
     const patternSet = new SimWafRegexPatternSet({
       name: requiredSimWafName(input.Name),
       scope: requiredSimWafScope(
@@ -67,6 +64,7 @@ export class SimWafRegexPatternSetCommands {
       ),
       accountRegionScope: this.#accountRegionScope,
       description: checkedSimWafDescription(input.Description),
+      tags: input.Tags,
       regularExpressions: input.RegularExpressionList ?? [],
     });
 

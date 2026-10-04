@@ -29,10 +29,10 @@ const textTransformationCost = 10;
 /**
  * What the statements that inspect a request cost.
  *
- * Only the kinds this simulation evaluates are counted. Every other kind is
- * refused where the rule is written, so a web ACL that has rules to add up
- * cannot hold one. Doubling the base cost for a JSON body never applies here
- * for the same reason.
+ * Only the kinds this simulation evaluates are counted. A rule using any
+ * other kind is held unevaluated and contributes nothing, so a web ACL holding
+ * one reports less than AWS would charge. Doubling the base cost for a JSON
+ * body never applies here for the same reason.
  */
 export function simWafMatchCapacity(statement: SimWafStatementInput): number {
   return (

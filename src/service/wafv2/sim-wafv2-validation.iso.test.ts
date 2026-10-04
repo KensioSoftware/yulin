@@ -314,23 +314,6 @@ describe("SimWafV2 input validation", () => {
     assertStringIncludes(scopeless.message, "match scope");
     assertStringIncludes(oversize.message, "oversize handling");
   });
-
-  it("refuses the remaining field kinds it does not read", async () => {
-    // When a rule reads the header order or a URI fragment.
-    const headerOrder = await refusalForStatement(
-      byteMatch({ HeaderOrder: { OversizeHandling: "CONTINUE" } }),
-    );
-    const fragment = await refusalForStatement(
-      byteMatch({ UriFragment: { FallbackBehavior: "NO_MATCH" } }),
-    );
-    const ja3 = await refusalForStatement(
-      byteMatch({ JA3Fingerprint: { FallbackBehavior: "NO_MATCH" } }),
-    );
-
-    assertStringIncludes(headerOrder.message, "HeaderOrder");
-    assertStringIncludes(fragment.message, "UriFragment");
-    assertStringIncludes(ja3.message, "JA3Fingerprint");
-  });
 });
 
 /**

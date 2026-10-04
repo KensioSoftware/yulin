@@ -9,7 +9,6 @@ import type { SimWafAuthorizer } from "../authorize/sim-wafv2-authorizer.js";
 import { SimWafPage } from "../sim-wafv2-page.js";
 import {
   checkedSimWafDescription,
-  refuseSimWafTags,
   requiredSimWafName,
 } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
@@ -36,9 +35,9 @@ interface SimWafIpSetCommandsProperties {
 /**
  * The commands that make, read, list and remove IP sets.
  *
- * The addresses are held and reported and nothing evaluates them, because
- * `IPSetReferenceStatement` is refused: every request in this simulation comes
- * from 127.0.0.1.
+ * The addresses are held and reported and nothing evaluates them. A rule
+ * naming one with `IPSetReferenceStatement` is held unevaluated, because every
+ * request in this simulation comes from 127.0.0.1.
  */
 export class SimWafIpSetCommands {
   readonly #ipSets: SimWafResourceStore<SimWafIpSet>;
@@ -60,8 +59,6 @@ export class SimWafIpSetCommands {
   ): SimCreateIpSetCommandOutput {
     const { input } = command;
 
-    refuseSimWafTags(input.Tags, "CreateIPSet");
-
     const ipSet = new SimWafIpSet({
       name: requiredSimWafName(input.Name),
       scope: requiredSimWafScope(
@@ -70,6 +67,7 @@ export class SimWafIpSetCommands {
       ),
       accountRegionScope: this.#accountRegionScope,
       description: checkedSimWafDescription(input.Description),
+      tags: input.Tags,
       ipAddressVersion: requiredSimWafIpAddressVersion(input.IPAddressVersion),
       addresses: input.Addresses ?? [],
     });

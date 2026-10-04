@@ -3,17 +3,17 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
+import { simWafCreateWebAclFactory } from "../command/web-acl/sim-waf-create-web-acl.factory.js";
+import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
 import {
-  SimWafInvalidParameterException,
-  SimWafUnsimulatedInputException,
-} from "../error/sim-wafv2.error.js";
-import {
+  createSimWafWebAcl,
   simWafBrowserRequest,
   type SimWafRequestDecision,
   simWafWebAclDecisions,
@@ -56,22 +56,34 @@ async function refusalForRule(rule: SimWafRuleInput): Promise<Error> {
 }
 
 /**
- * Try to create a web ACL running the core rule set as the statement says, and
- * answer with the refusal.
+ * Create a web ACL running the core rule set as the statement says, and answer
+ * with why the simulation holds the rule without evaluating it.
  */
-async function refusalForGroup(
+async function heldReasonForGroup(
   statement: SimWafManagedRuleGroupStatementInput,
-): Promise<Error> {
-  return await refusalForRule({
-    ...simWafManagedRuleFactory.make({ Name: "core" }),
-    Statement: {
-      ManagedRuleGroupStatement: {
-        VendorName: "AWS",
-        Name: "AWSManagedRulesCommonRuleSet",
-        ...statement,
+): Promise<string> {
+  const waf = new SimAws().wafV2();
+  const { ARN } = await createSimWafWebAcl(waf, {
+    ...simWafCreateWebAclFactory.make(),
+    Rules: [
+      {
+        ...simWafManagedRuleFactory.make({ Name: "core" }),
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesCommonRuleSet",
+            ...statement,
+          },
+        },
       },
-    },
+    ],
   });
+  const [part] = waf.unsimulatedParts(ARN);
+
+  assertNonNullable(part);
+  assertIdentical(part.part, "Rules.core");
+
+  return part.reason;
 }
 
 describe("SimWafV2 managed rule group overrides", () => {
@@ -169,10 +181,17 @@ describe("SimWafV2 managed rule group overrides", () => {
 
   it("refuses an override naming a rule the group does not hold", async () => {
     // When a rule group override names a rule from another group.
-    const error = await refusalForGroup({
-      RuleActionOverrides: [
-        { Name: "Log4JRCE_HEADER", ActionToUse: { Count: {} } },
-      ],
+    const error = await refusalForRule({
+      ...simWafManagedRuleFactory.make({ Name: "core" }),
+      Statement: {
+        ManagedRuleGroupStatement: {
+          VendorName: "AWS",
+          Name: "AWSManagedRulesCommonRuleSet",
+          RuleActionOverrides: [
+            { Name: "Log4JRCE_HEADER", ActionToUse: { Count: {} } },
+          ],
+        },
+      },
     });
 
     // Then it is refused. A name that matched nothing would leave the rule it
@@ -220,22 +239,22 @@ describe("SimWafV2 managed rule group overrides", () => {
     assertStringIncludes(error.message, "block-admin");
   });
 
-  it("refuses the rule group members this simulation does not model", async () => {
+  it("holds the rule group members this simulation does not model", async () => {
     // When a rule group names a published version, excludes rules the
     // deprecated way, or configures one of the groups that is not simulated.
-    const version = await refusalForGroup({ Version: "Version_1.9" });
-    const excluded = await refusalForGroup({
+    const version = await heldReasonForGroup({ Version: "Version_1.9" });
+    const excluded = await heldReasonForGroup({
       ExcludedRules: [{ Name: "NoUserAgent_HEADER" }],
     });
-    const configs = await refusalForGroup({
+    const configs = await heldReasonForGroup({
       ManagedRuleGroupConfigs: [{ LoginPath: "/login" }],
     });
 
-    // Then each is refused by name, and the exclusion says what replaced it.
-    assertInstanceOf(version, SimWafUnsimulatedInputException);
-    assertStringIncludes(version.message, "Version");
-    assertStringIncludes(excluded.message, "RuleActionOverrides");
-    assertStringIncludes(configs.message, "ManagedRuleGroupConfigs");
+    // Then each rule is held and reported by member, and the exclusion says
+    // what replaced it.
+    assertStringIncludes(version, "Version");
+    assertStringIncludes(excluded, "RuleActionOverrides");
+    assertStringIncludes(configs, "ManagedRuleGroupConfigs");
   });
 
   it("refuses a rule group nested inside another statement", async () => {

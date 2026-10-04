@@ -22,5 +22,6 @@ export function simWafWebAclOutput(webAcl: SimWafWebAcl): SimWafWebAclOutput {
     VisibilityConfig: configuration.visibilityConfig,
     CustomResponseBodies: configuration.customResponseBodies,
     AssociationConfig: configuration.associationConfig,
+    ...(configuration.heldMembers as Partial<SimWafWebAclOutput> | undefined),
   };
 }

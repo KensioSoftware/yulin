@@ -3,7 +3,10 @@ import { requiredSimWafArn } from "../sim-wafv2-input.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
 import { simWafWebAclOutput } from "../web-acl/sim-waf-web-acl-output.js";
 import type { SimWafAssociationAccess } from "./sim-wafv2-association-access.js";
-import { simWafListedResourceType } from "./sim-wafv2-association-input.js";
+import {
+  refuseSimWafAccountTakeoverForUserPool,
+  simWafListedResourceType,
+} from "./sim-wafv2-association-input.js";
 import type {
   SimAssociateWebAclCommand,
   SimAssociateWebAclCommandOutput,
@@ -58,6 +61,7 @@ export class SimWafAssociationCommands {
     const webAcl = this.#access.webAcl(webAclArn);
 
     this.#access.requireResource(resource);
+    refuseSimWafAccountTakeoverForUserPool(resource, webAcl);
     this.#associations.associate(resource, webAcl);
 
     return { $metadata: {} };

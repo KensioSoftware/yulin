@@ -4,7 +4,10 @@ import {
   ListResourcesForWebACLCommand,
 } from "@aws-sdk/client-wafv2";
 import {
+  assertArrayEquals,
+  assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -21,6 +24,7 @@ import {
   SimWafUnsimulatedInputException,
 } from "./error/sim-wafv2.error.js";
 import { SimWafV2 } from "./sim-wafv2.js";
+import { simWafArnParts } from "./sim-wafv2-arn.js";
 import { createSimWafWebAcl } from "./sim-wafv2.fixture.js";
 
 const accountIdTwoTwos = "222222222222" as SimAwsAccountId;
@@ -185,25 +189,66 @@ describe("SimWafV2 association refusals", () => {
     assertStringIncludes(error.message, "HTTP API");
   });
 
-  it("refuses a resource type it does not simulate", async () => {
+  it("holds an association with a load balancer and lists it", async () => {
     // Given a web ACL and the ARN of a load balancer.
     const simAws = new SimAws();
     const { webAclArn } = await stageAndWebAcl(simAws);
+    const waf = simAws.wafV2();
+    const webAclParts = simWafArnParts(webAclArn);
+
+    assertNonNullable(webAclParts);
+
+    const loadBalancerArn =
+      `arn:aws:elasticloadbalancing:${webAclParts.regionName}:` +
+      `${webAclParts.accountId}:loadbalancer/app/orders/1`;
 
     // When the load balancer is associated with it.
+    await waf.associateWebAcl(
+      new AssociateWebACLCommand({
+        WebACLArn: webAclArn,
+        ResourceArn: loadBalancerArn,
+      }),
+    );
+
+    // Then the association is read back, and a listing naming no type lists
+    // load balancers, as AWS defaults to.
+    const { WebACL } = await waf.getWebAclForResource(
+      new GetWebACLForResourceCommand({ ResourceArn: loadBalancerArn }),
+    );
+    const { ResourceArns } = await waf.listResourcesForWebAcl(
+      new ListResourcesForWebACLCommand({ WebACLArn: webAclArn }),
+    );
+
+    assertIdentical(WebACL?.ARN, webAclArn);
+    assertArrayEquals(ResourceArns, [loadBalancerArn]);
+
+    // And the association is reported as one nothing is evaluated through.
+    const [part] = waf.unsimulatedParts(webAclArn);
+
+    assertNonNullable(part);
+    assertIdentical(part.part, `Association.${loadBalancerArn}`);
+    assertStringIncludes(part.reason, "Application Load Balancer");
+  });
+
+  it("refuses an Amplify app, whose web ACL is out of reach", async () => {
+    // Given a web ACL.
+    const simAws = new SimAws();
+    const { webAclArn } = await stageAndWebAcl(simAws);
+
+    // When an Amplify app is associated with it.
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.wafV2().associateWebAcl(
         new AssociateWebACLCommand({
           WebACLArn: webAclArn,
-          ResourceArn:
-            "arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/orders/1",
+          ResourceArn: "arn:aws:amplify:us-east-1:111111111111:apps/d1",
         }),
       );
     });
 
-    // Then it is refused as unsimulated rather than as an invalid ARN.
+    // Then it is refused. AWS takes a CLOUDFRONT web ACL for an Amplify app,
+    // and a REGIONAL one from this Region cannot stand in for it.
     assertInstanceOf(error, SimWafUnsimulatedInputException);
-    assertStringIncludes(error.message, "Application Load Balancer");
+    assertStringIncludes(error.message, "Amplify");
   });
 
   it("refuses a resource ARN naming nothing WAF protects", async () => {
@@ -304,23 +349,23 @@ describe("SimWafV2 association refusals", () => {
     assertInstanceOf(error, SimWafUnavailableEntityException);
   });
 
-  it("refuses a listing that names no resource type", async () => {
+  it("refuses a listing naming a resource type WAF does not list", async () => {
     // Given a web ACL.
     const simAws = new SimAws();
     const { webAclArn } = await stageAndWebAcl(simAws);
 
-    // When its resources are listed without naming a type.
+    // When its resources are listed under a type that does not exist.
     const error = await assertThrowsErrorAsync(async () => {
-      await simAws
-        .wafV2()
-        .listResourcesForWebAcl(
-          new ListResourcesForWebACLCommand({ WebACLArn: webAclArn }),
-        );
+      await simAws.wafV2().listResourcesForWebAcl(
+        new ListResourcesForWebACLCommand({
+          WebACLArn: webAclArn,
+          ResourceType: "LAMBDA" as "API_GATEWAY",
+        }),
+      );
     });
 
-    // Then it is refused. Real WAFv2 defaults to load balancers, which are not
-    // simulated, so a listing that says nothing would answer with nothing.
-    assertInstanceOf(error, SimWafUnsimulatedInputException);
+    // Then it is refused, naming the types that are listed.
+    assertInstanceOf(error, SimWafInvalidParameterException);
     assertStringIncludes(error.message, "APPLICATION_LOAD_BALANCER");
   });
 

@@ -9,8 +9,9 @@ import type {
 /**
  * The vendor the simulated managed rule groups belong to.
  *
- * A group from any other vendor is refused, marketplace groups included: a
- * subscription buys rules nobody outside the vendor has ever seen.
+ * A rule naming a group from any other vendor is held unevaluated,
+ * marketplace groups included: a subscription buys rules nobody outside the
+ * vendor has ever seen.
  */
 export const simWafManagedVendorName = "AWS";
 
@@ -49,7 +50,8 @@ export function findSimWafManagedRuleGroup(
 }
 
 /**
- * The groups that are simulated, named as a refusal names them.
+ * The groups that are simulated, named as an unsimulated group's reason names
+ * them.
  */
 export function simWafManagedRuleGroupNames(): readonly string[] {
   return groups.map((group) => group.name);

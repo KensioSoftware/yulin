@@ -3,16 +3,25 @@ import {
   SimWafUnsimulatedInputException,
 } from "../error/sim-wafv2.error.js";
 import { SimWafRestApiStage } from "./sim-waf-rest-api-stage.js";
+import {
+  SimWafUnsimulatedResource,
+  simWafUnsimulatedResourceTypes,
+} from "./sim-waf-unsimulated-resource.js";
 import { SimWafUserPool } from "./sim-waf-user-pool.js";
 
 /**
  * A resource a `REGIONAL` web ACL can be put in front of.
  *
- * Two types are simulated. A third one joins this union and the reader below
- * gains a branch for it, and everything that holds an association goes on
+ * Requests reach a web ACL through two types here. The rest are held as
+ * `SimWafUnsimulatedResource`, associated and listed, with nothing evaluated
+ * in front of them. A type that starts serving requests gets a class of its
+ * own in this union, and everything that holds an association goes on
  * addressing a resource by its ARN.
  */
-export type SimWafProtectedResource = SimWafRestApiStage | SimWafUserPool;
+export type SimWafProtectedResource =
+  | SimWafRestApiStage
+  | SimWafUserPool
+  | SimWafUnsimulatedResource;
 
 /**
  * The type ListResourcesForWebACL lists one simulated resource under.
@@ -31,10 +40,15 @@ export const simWafApiGatewayResourceType = "API_GATEWAY";
 export const simWafUserPoolResourceType = "COGNITO_USER_POOL";
 
 /**
- * The resource types this simulation holds, as a refusal names them.
+ * The resource types ListResourcesForWebACL lists, which are all the types
+ * an association can hold.
  */
 export const simWafProtectedResourceTypes: readonly SimWafProtectedResourceType[] =
-  [simWafApiGatewayResourceType, simWafUserPoolResourceType];
+  [
+    simWafApiGatewayResourceType,
+    simWafUserPoolResourceType,
+    ...simWafUnsimulatedResourceTypes,
+  ];
 
 const restApiStagePattern =
   /^arn:aws:apigateway:(?<regionName>[^:]+)::\/restapis\/(?<restApiId>[^/]+)\/stages\/(?<stageName>[^/]+)$/u;
@@ -45,27 +59,18 @@ const httpApiStagePattern =
 const userPoolPattern =
   /^arn:aws:cognito-idp:(?<regionName>[^:]+):(?<accountId>[^:]+):userpool\/(?<userPoolId>[^/]+)$/u;
 
-/**
- * The resource types real WAF protects that this simulation does not, by the
- * service in their ARN.
- */
-const unsimulatedResources = new Map<string, string>([
-  ["elasticloadbalancing", "an Application Load Balancer"],
-  ["appsync", "an AppSync GraphQL API"],
-  ["apprunner", "an App Runner service"],
-  ["amplify", "an Amplify app"],
-  ["ec2", "a Verified Access instance"],
-]);
+const amplifyAppPattern = /^arn:aws:amplify:[^:]+:[^:]+:apps\/[^/]+$/u;
 
 /**
  * Read the resource an association names, refusing anything a web ACL cannot
- * be put in front of here.
+ * be put in front of.
  *
  * The three refusals mean different things. An HTTP API stage is refused
  * because AWS WAF protects no HTTP API, so an association accepted here would
- * let a test cover protection AWS never applies. A load balancer and the rest
- * are resource types AWS does protect and this simulation does not, which is
- * the ordinary unsimulated refusal. Anything else is not a resource ARN.
+ * let a test cover protection AWS never applies. An Amplify app takes a
+ * `CLOUDFRONT` web ACL from `us-east-1` for an app in any Region, and a WAFv2
+ * here reaches web ACLs in its own Region only. Anything else is not a
+ * resource ARN.
  */
 export function simWafProtectedResource(arn: string): SimWafProtectedResource {
   const stage = restApiStage(arn);
@@ -78,6 +83,12 @@ export function simWafProtectedResource(arn: string): SimWafProtectedResource {
 
   if (userPool !== undefined) {
     return userPool;
+  }
+
+  const unsimulated = SimWafUnsimulatedResource.read(arn);
+
+  if (unsimulated !== undefined) {
+    return unsimulated;
   }
 
   if (httpApiStagePattern.test(arn)) {
@@ -134,16 +145,14 @@ function simWafUserPool(arn: string): SimWafUserPool | undefined {
 }
 
 /**
- * Refuse an ARN naming a resource type AWS WAF protects and Yulin does not.
+ * Refuse an Amplify app, whose web ACL is out of this WAFv2's reach.
  */
 function refuseUnsimulatedResource(arn: string): void {
-  const described = unsimulatedResources.get(arn.split(":", 3)[2] ?? "");
-
-  if (described !== undefined) {
+  if (amplifyAppPattern.test(arn)) {
     throw new SimWafUnsimulatedInputException(
-      `AWS WAF protects ${described}, and Yulin does not simulate a web ACL ` +
-        `in front of one, so ${arn} is refused rather than protected by ` +
-        `nothing.`,
+      `AWS WAF protects an Amplify app with a CLOUDFRONT web ACL held in ` +
+        `us-east-1, and a simulated WAFv2 associates web ACLs of its own ` +
+        `Region only, so ${arn} is refused.`,
     );
   }
 }

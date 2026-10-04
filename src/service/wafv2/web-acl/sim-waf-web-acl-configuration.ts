@@ -15,6 +15,12 @@ export interface SimWafWebAclConfiguration {
   readonly visibilityConfig?: unknown;
   readonly description?: string | undefined;
   readonly associationConfig?: SimWafAssociationConfigInput | undefined;
+
+  /**
+   * The members held as written and not acted on, such as `CaptchaConfig`,
+   * keyed by the name the API gives them.
+   */
+  readonly heldMembers?: Readonly<Record<string, unknown>> | undefined;
 }
 
 /**

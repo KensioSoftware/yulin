@@ -4,15 +4,14 @@ import {
 } from "../evaluate/sim-waf-decision.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
 import { simWafEvaluateRules } from "../evaluate/sim-waf-evaluate-rules.js";
+import { unsimulatedSimWafWebAclMembers } from "../command/web-acl/sim-wafv2-unsimulated-web-acl-input.js";
 import {
   SimWafResource,
   type SimWafResourceProperties,
 } from "../resource/sim-waf-resource.js";
+import type { SimWafUnsimulatedPart } from "../resource/sim-waf-unsimulated-part.js";
 import type { SimWafAction } from "./sim-waf-action.js";
-import {
-  type SimWafBodyInspectionResourceType,
-  SimWafBodyInspectionLimits,
-} from "./sim-waf-association-config.js";
+import { SimWafBodyInspectionLimits } from "./sim-waf-association-config.js";
 import type { SimWafRule } from "./sim-waf-rule.js";
 import type { SimWafWebAclRuleScope } from "./sim-waf-rule.type.js";
 import { compileSimWafWebAclRules } from "./sim-waf-rules.js";
@@ -83,6 +82,26 @@ export class SimWafWebAcl extends SimWafResource {
   }
 
   /**
+   * What this web ACL was written with and the simulation does not act on.
+   *
+   * A rule listed here claims no request, a member is held and does nothing,
+   * and a body inspection limit applies to no request. `GetWebACL` returns
+   * every one of them as written.
+   */
+  override get unsimulated(): readonly SimWafUnsimulatedPart[] {
+    return [
+      ...this.#rules.flatMap(({ name, unsimulatedReason }) =>
+        unsimulatedReason === undefined
+          ? []
+          : [{ part: `Rules.${name}`, reason: unsimulatedReason }],
+      ),
+      ...unsimulatedSimWafWebAclMembers(this.#configuration.heldMembers ?? {}),
+      ...this.#bodyInspectionLimits.unsimulated,
+      ...super.unsimulated,
+    ];
+  }
+
+  /**
    * What this web ACL was last written with, as the API reports it.
    */
   get configuration(): SimWafWebAclConfiguration {
@@ -94,6 +113,7 @@ export class SimWafWebAcl extends SimWafResource {
    *
    * The rules are compiled before anything is replaced, so a web ACL that
    * refuses an update keeps the rules it had rather than being left with none.
+   * The tags stay as they were created, since UpdateWebACL takes none.
    */
   reconfigure(
     configuration: SimWafWebAclConfiguration,
@@ -121,9 +141,7 @@ export class SimWafWebAcl extends SimWafResource {
    * `AssociationConfig` raises it per resource type, and a web ACL written
    * without one reads the 16 KB default everything it protects has.
    */
-  bodyInspectionLimitBytes(
-    resourceType: SimWafBodyInspectionResourceType | undefined,
-  ): number {
+  bodyInspectionLimitBytes(resourceType: string | undefined): number {
     return this.#bodyInspectionLimits.bytesFor(resourceType);
   }
 

@@ -65,18 +65,20 @@ async function deployPool(simAws: SimAws): Promise<SimCfnDeployedStack> {
 }
 
 describe("A web ACL rule Yulin cannot evaluate", () => {
-  it("deploys the web ACL without it, and the rest of the template", async () => {
+  it("deploys the web ACL holding it, and the rest of the template", async () => {
     // Given a template whose web ACL rate limits sign-ups and blocks admin
     // paths, beside a user pool and a table that know nothing about WAF.
     const simAws = simAwsInEuWest2();
     const stack = await deployPool(simAws);
 
-    // Then everything deployed. One rule went missing rather than the web ACL,
-    // and rather than the Resources that had nothing to do with it.
+    // Then everything deployed, and the web ACL holds both rules as the
+    // template wrote them.
+    const [webAcl] = simAws.wafV2().allWebAcls("REGIONAL");
+
     assertIdentical(stack.getResource("Pool")?.status, "CREATE_COMPLETE");
     assertIdentical(stack.getResource("Orders")?.status, "CREATE_COMPLETE");
     assertArrayEmpty(stack.skippedResources);
-    assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
+    assertArrayLength(webAcl?.configuration.rules ?? [], 2);
   });
 
   it("records the rule and the statement kind it could not evaluate", async () => {
@@ -84,9 +86,9 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     const simAws = simAwsInEuWest2();
     const stack = await deployPool(simAws);
 
-    // Then the dropped rule is on the ignored properties, under the logical id
-    // that declared it and the name that tells it from the rules that stayed.
-    // The reason is the one CreateWebACL gives an SDK caller.
+    // Then the held rule is on the ignored properties, under the logical id
+    // that declared it and the name that tells it from the other rules. The
+    // reason is the one unsimulatedParts gives an SDK caller.
     const property = simWafIgnoredProperty(stack);
 
     assertIdentical(property.logicalId, "OrdersAcl");
@@ -118,7 +120,7 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
 
     assertTypeString(apiUrl);
 
-    // When the path the surviving rule blocks and one it allows are both
+    // When the path the evaluated rule blocks and one it allows are both
     // requested.
     const http = new SimAwsHttp({ simAws });
     const blocked = await http.fetch(
@@ -128,9 +130,9 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
       new SimAwsLocalUrl({ input: `${apiUrl}orders` }).toString(),
     );
 
-    // Then the web ACL is really in front of the stage, deciding by what is
-    // left of it. What the dropped rule would have blocked is served, which is
-    // the cost of deploying at all and why the record of it is there.
+    // Then the web ACL is really in front of the stage, deciding by the rule
+    // it evaluates. What the held rule would have blocked is served, which is
+    // why the record of it is there.
     assertResponseStatus(blocked, 403, await describeResponse(blocked));
     assertResponseStatus(allowed, 200, await describeResponse(allowed));
     assertIdentical(await allowed.text(), "orders");
@@ -158,8 +160,8 @@ describe("A web ACL rule Yulin cannot evaluate", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the web ACL deployed without it, and the record says what was left
-    // unconfigured.
+    // Then the web ACL deployed holding it, and the record says it does
+    // nothing here.
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
     assertIdentical(simWafIgnoredProperty(stack).path, "CaptchaConfig");
     assertStringIncludes(

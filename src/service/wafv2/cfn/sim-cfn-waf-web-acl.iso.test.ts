@@ -168,7 +168,7 @@ describe("AWS::WAFv2::WebACL", () => {
     assertIdentical(decisionFor(simAws, stack, "/orders"), "ALLOW");
   });
 
-  it("leaves out a rate limit aggregating on what it cannot read", async () => {
+  it("holds a rate limit aggregating on what it cannot read", async () => {
     // Given a template whose rate limit counts by forwarded address, beside a
     // rule this simulation does evaluate.
     const simAws = new SimAws();
@@ -190,14 +190,14 @@ describe("AWS::WAFv2::WebACL", () => {
       ],
     });
 
-    // Then the rate limit was left out and recorded, and the web ACL deployed
-    // with the rule beside it still deciding requests. A refused aggregation
-    // key costs the rule and nothing larger than the rule.
-    const [dropped] = stack.ignoredProperties;
+    // Then the rate limit was held and recorded, and the web ACL deployed
+    // with the rule beside it still deciding requests. An unsimulated
+    // aggregation key costs the rule and nothing larger than the rule.
+    const [held] = stack.ignoredProperties;
 
-    assertNonNullable(dropped);
-    assertIdentical(dropped.path, "Rules.forwarded-rate");
-    assertStringIncludes(dropped.reason, "FORWARDED_IP");
+    assertNonNullable(held);
+    assertIdentical(held.path, "Rules.forwarded-rate");
+    assertStringIncludes(held.reason, "FORWARDED_IP");
     assertArrayEmpty(stack.skippedResources);
     assertIdentical(decisionFor(simAws, stack, "/admin/users"), "BLOCK");
   });
@@ -321,7 +321,7 @@ describe("AWS::WAFv2::WebACL", () => {
     assertArrayEmpty(simAws.wafV2().allWebAcls("REGIONAL"));
   });
 
-  it("deploys a web ACL without the rule it cannot evaluate", async () => {
+  it("deploys a web ACL holding the rule it cannot evaluate", async () => {
     // Given a template whose rule inspects the client address, which every
     // request in this simulation shares.
     const simAws = new SimAws();
@@ -338,9 +338,9 @@ describe("AWS::WAFv2::WebACL", () => {
       ],
     });
 
-    // Then the web ACL deployed with no rules, and the one it lost is recorded
-    // under the logical id that declared it, with the rule and the statement
-    // kind WAFv2 would not compile. Best effort is covered in
+    // Then the web ACL deployed holding the rule, which claims no request, and
+    // the rule is recorded under the logical id that declared it, with the
+    // statement kind Yulin does not evaluate. Best effort is covered in
     // sim-cfn-waf-best-effort.iso.test.ts.
     assertArrayLength(simAws.wafV2().allWebAcls("REGIONAL"), 1);
     assertIdentical(decisionFor(simAws, stack, "/admin/users"), "ALLOW");

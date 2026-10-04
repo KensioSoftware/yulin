@@ -10,6 +10,7 @@ import type { SimWafIpSet } from "./ip-set/sim-waf-ip-set.js";
 import type { SimWafManagedRules } from "./managed/sim-waf-managed-rules.js";
 import type { SimWafRegexPatternSet } from "./regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafScope } from "./scope/sim-waf-scope.js";
+import type { SimWafUnsimulatedPart } from "./resource/sim-waf-unsimulated-part.js";
 import { SimWafSdkCommandRouter } from "./sdk/sim-wafv2-sdk-command-router.js";
 import {
   SimWafCommands,
@@ -18,11 +19,6 @@ import {
 import { SimWafCfnResourceFactory } from "./cfn/sim-waf-cfn-resource-factory.js";
 import { SimWafSets } from "./sim-wafv2-sets.js";
 import type { SimWafWebAcl } from "./web-acl/sim-waf-web-acl.js";
-import {
-  type SimWafUnevaluatableRule,
-  unevaluatableSimWafRules,
-} from "./web-acl/sim-waf-unevaluatable-rules.js";
-import type { SimWafWebAclWriteInput } from "./command/web-acl/web-acl.command.js";
 
 export type { SimWafEvaluationRequest } from "./evaluate/sim-waf-evaluation-request.js";
 
@@ -105,6 +101,21 @@ export class SimWafV2 extends SimWafSets {
   }
 
   /**
+   * What a web ACL holds and this simulation does not act on, each part with
+   * its reason: a rule that claims no request (`Rules.<rule name>`), a member
+   * such as `CaptchaConfig`, a body inspection limit, the tags, and an
+   * association nothing is evaluated through (`Association.<resource ARN>`).
+   */
+  unsimulatedParts(webAclArn: string): readonly SimWafUnsimulatedPart[] {
+    const webAcl = this.requireWebAcl(webAclArn);
+
+    return [
+      ...webAcl.unsimulated,
+      ...this.commands.associations.unsimulatedFor(webAcl),
+    ];
+  }
+
+  /**
    * Evaluate one HTTP request against a web ACL's rules.
    *
    * Rules run in ascending priority, the first terminating match decides, and
@@ -114,15 +125,7 @@ export class SimWafV2 extends SimWafSets {
    * front of.
    */
   evaluateRequest(evaluation: SimWafEvaluationRequest): SimWafDecision {
-    const webAcl = this.findWebAclByArn(evaluation.webAclArn);
-
-    if (webAcl === undefined) {
-      throw new SimWafNonexistentItemException(
-        `AWS WAF couldn't perform the operation because your resource ` +
-          `doesn't exist: web ACL ${evaluation.webAclArn}.`,
-      );
-    }
-
+    const webAcl = this.requireWebAcl(evaluation.webAclArn);
     const limitBytes = webAcl.bodyInspectionLimitBytes(evaluation.resourceType);
 
     return webAcl.evaluate(
@@ -139,26 +142,6 @@ export class SimWafV2 extends SimWafSets {
    */
   managedRules(): SimWafManagedRules {
     return this.commands.managedRules;
-  }
-
-  /**
-   * The rules of a web ACL input this simulation cannot evaluate.
-   *
-   * The simulator's own accessor rather than a WAFv2 operation. `CreateWebACL`
-   * refuses a web ACL carrying such a rule, because a web ACL that accepted
-   * one would allow a request AWS blocks. A template is deployed rule by rule
-   * instead, so the CloudFormation layer asks this first and leaves the rules
-   * it names out of the web ACL it writes.
-   */
-  unevaluatableWebAclRules(
-    input: SimWafWebAclWriteInput,
-  ): readonly SimWafUnevaluatableRule[] {
-    return unevaluatableSimWafRules(input.Rules, {
-      regexPatternSets: this.commands.regexPatternSets,
-      managedRules: this.commands.managedRules,
-      clock: this.commands.background,
-      customResponseBodies: input.CustomResponseBodies ?? {},
-    });
   }
 
   /**
@@ -295,5 +278,21 @@ export class SimWafV2 extends SimWafSets {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.#sdkRouter;
+  }
+
+  /**
+   * Find a web ACL by its ARN, refusing one that is not here.
+   */
+  private requireWebAcl(webAclArn: string): SimWafWebAcl {
+    const webAcl = this.findWebAclByArn(webAclArn);
+
+    if (webAcl === undefined) {
+      throw new SimWafNonexistentItemException(
+        `AWS WAF couldn't perform the operation because your resource ` +
+          `doesn't exist: web ACL ${webAclArn}.`,
+      );
+    }
+
+    return webAcl;
   }
 }

@@ -12,7 +12,7 @@ const undocumentedDetection =
 
 /**
  * The statement kinds real WAFv2 evaluates and this simulation does not, and
- * why each of them is refused rather than deferred.
+ * why a rule using one is held unevaluated.
  */
 const refusedStatements = new Map<string, string>([
   ["IPSetReferenceStatement", oneClientAddress],

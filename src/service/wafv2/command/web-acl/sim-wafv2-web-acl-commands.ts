@@ -19,7 +19,7 @@ import {
   type SimWafResourceInput,
 } from "../sim-wafv2-resource-lookup.js";
 import type { SimWafRequestOptions } from "../sim-wafv2-request-options.js";
-import { refuseUnsimulatedSimWafWebAclInput } from "./sim-wafv2-unsimulated-web-acl-input.js";
+import { heldSimWafWebAclMembers } from "./sim-wafv2-unsimulated-web-acl-input.js";
 import { simWafWebAclOutput } from "./sim-waf-web-acl-output.js";
 import type {
   SimCreateWebAclCommand,
@@ -48,9 +48,9 @@ interface SimWafWebAclCommandsProperties {
 /**
  * The commands that make, read, list, change and remove web ACLs.
  *
- * Every rule is compiled where the web ACL is written, so a statement kind
- * this simulation cannot evaluate is refused by CreateWebACL and UpdateWebACL
- * rather than by the request that would have been let through.
+ * Every rule is compiled where the web ACL is written. A rule or member this
+ * simulation cannot act on is held as written, so `GetWebACL` returns it, and
+ * the web ACL reports it in `unsimulated`.
  */
 export class SimWafWebAclCommands {
   readonly #webAcls: SimWafResourceStore<SimWafWebAcl>;
@@ -85,8 +85,6 @@ export class SimWafWebAclCommands {
       this.#accountRegionScope.regionName,
     );
 
-    refuseUnsimulatedSimWafWebAclInput(input, "CreateWebACL");
-
     const configuration = configurationOf(input);
     const webAcl = new SimWafWebAcl({
       name,
@@ -94,6 +92,7 @@ export class SimWafWebAclCommands {
       accountRegionScope: this.#accountRegionScope,
       description: configuration.description,
       configuration,
+      tags: input.Tags,
       regexPatternSets: this.#regexPatternSets,
       managedRules: this.#managedRules,
       clock: this.#clock,
@@ -132,9 +131,6 @@ export class SimWafWebAclCommands {
     options?: SimWafRequestOptions,
   ): SimUpdateWebAclCommandOutput {
     const { input } = command;
-
-    refuseUnsimulatedSimWafWebAclInput(input, "UpdateWebACL");
-
     const configuration = configurationOf(input);
     const webAcl = this.require(input, "wafv2:UpdateWebACL", options);
 
@@ -233,5 +229,6 @@ function configurationOf(
     visibilityConfig: input.VisibilityConfig,
     description: checkedSimWafDescription(input.Description),
     associationConfig: input.AssociationConfig,
+    heldMembers: heldSimWafWebAclMembers(input),
   };
 }

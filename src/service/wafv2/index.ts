@@ -39,6 +39,12 @@ export {
 export { SimWafRestApiStage } from "./association/sim-waf-rest-api-stage.js";
 export { SimWafUserPool } from "./association/sim-waf-user-pool.js";
 export {
+  SimWafUnsimulatedResource,
+  type SimWafUnsimulatedResourceType,
+  simWafUnsimulatedResourceTypes,
+} from "./association/sim-waf-unsimulated-resource.js";
+export type { SimWafUnsimulatedPart } from "./resource/sim-waf-unsimulated-part.js";
+export {
   SimWafResource,
   type SimWafResourceSummary,
 } from "./resource/sim-waf-resource.js";

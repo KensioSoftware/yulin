@@ -5,8 +5,8 @@ import type { SimWafMatchPatternInput } from "./sim-waf-match-pattern.js";
  * shape.
  *
  * The members Yulin does not simulate are declared here rather than left out,
- * so a rule that names one is refused by name instead of being read as a rule
- * with no field at all.
+ * so a rule that names one is held and reported by name instead of being read
+ * as a rule with no field at all.
  */
 export interface SimWafFieldToMatchInput {
   readonly UriPath?: unknown;

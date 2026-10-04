@@ -60,7 +60,7 @@ const blockAdmin = {
  */
 const blockCountries = {
   Name: "block-countries",
-  Priority: 0,
+  Priority: 1,
   Action: { Block: {} },
   Statement: { GeoMatchStatement: { CountryCodes: ["CN", "RU"] } },
   VisibilityConfig: { ...visibility, MetricName: "block-countries" },
@@ -190,8 +190,8 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     assertStringIncludes(ignoredProperty.reason, missingWebAclArn);
   });
 
-  it("serves from a distribution whose web ACL lost a rule", async () => {
-    // Given a template whose web ACL rate limits requests, which Yulin does
+  it("serves from a distribution whose web ACL holds a rule it does not evaluate", async () => {
+    // Given a template whose web ACL blocks whole countries, which Yulin does
     // not evaluate, in front of the distribution serving the site.
     const simAws = new SimAws();
     await simCfSiteBucket(simAws, bucketName, {
@@ -208,8 +208,8 @@ describe("A web ACL a CloudFormation Distribution names in WebACLId", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the distribution deployed behind what the web ACL still holds. The
-    // rule it lost is recorded, and the rule it kept still blocks.
+    // Then the distribution deployed behind the web ACL. The rule it does not
+    // evaluate is recorded, and the rule it does still blocks.
     const blocked = await siteResponse(simAws, stack, "/admin/index.html");
 
     assertArrayEmpty(stack.skippedResources);

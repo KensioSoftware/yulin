@@ -2,7 +2,6 @@ import {
   assertArrayEmpty,
   assertIdentical,
   assertNonNullable,
-  assertStringIncludes,
   assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -110,9 +109,9 @@ describe("AWS::WAFv2::WebACL AssociationConfig", () => {
     assertIdentical(decisionFor(simAws, stack, 40 * 1024), "ALLOW");
   });
 
-  it("leaves the web ACL out when it names a resource type Yulin cannot protect", async () => {
-    // Given a template setting the limit for a resource type nothing here goes
-    // in front of.
+  it("deploys the web ACL when it names a resource type no request passes through", async () => {
+    // Given a template setting the limit for a resource type no simulated
+    // request reaches a web ACL through.
     const simAws = new SimAws();
     const stack = await deployWebAcl(simAws, {
       RequestBody: {
@@ -120,14 +119,14 @@ describe("AWS::WAFv2::WebACL AssociationConfig", () => {
       },
     });
 
-    // Then the web ACL is skipped and the reason names the resource type,
-    // which leaves the rest of the stack deployed.
-    const [skipped] = stack.skippedResources;
+    // Then the web ACL deploys and the limit is recorded under its path.
+    const [ignored] = stack.ignoredProperties;
 
-    assertNonNullable(skipped);
-    assertStringIncludes(
-      skipped.skippedReason ?? "",
-      "VERIFIED_ACCESS_INSTANCE",
+    assertArrayEmpty(stack.skippedResources);
+    assertNonNullable(ignored);
+    assertIdentical(
+      ignored.path,
+      "AssociationConfig.RequestBody.VERIFIED_ACCESS_INSTANCE",
     );
   });
 });

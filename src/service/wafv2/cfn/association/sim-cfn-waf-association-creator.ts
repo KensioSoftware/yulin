@@ -1,5 +1,6 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { SimWafUnsimulatedResource } from "../../association/sim-waf-unsimulated-resource.js";
 import { SimWafUnavailableEntityException } from "../../error/sim-wafv2.error.js";
 import type { SimWafV2 } from "../../sim-wafv2.js";
 import { simCfnWafResourceCommand } from "../sim-cfn-waf-resource-error.js";
@@ -71,6 +72,14 @@ export class SimCfnWafAssociationCreator {
           },
           options,
         );
+
+        const unsimulated = SimWafUnsimulatedResource.read(
+          association.resourceArn,
+        );
+
+        if (unsimulated !== undefined) {
+          resource.ignoreProperty("ResourceArn", unsimulated.reason);
+        }
 
         return association;
       },

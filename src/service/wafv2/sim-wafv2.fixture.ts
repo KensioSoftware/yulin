@@ -3,8 +3,10 @@ import { simWafCreateWebAclFactory } from "./command/web-acl/sim-waf-create-web-
 import type {
   SimCreateWebAclCommandInput,
   SimWafSummaryOutput,
+  SimWafWebAclOutput,
 } from "./command/web-acl/web-acl.command.js";
 import type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
+import type { SimWafUnsimulatedPart } from "./resource/sim-waf-unsimulated-part.js";
 import type { SimWafStatementInput } from "./statement/sim-waf-statement.type.js";
 import type { SimWafRuleInput } from "./web-acl/sim-waf-rule.type.js";
 import type { SimWafV2 } from "./sim-wafv2.js";
@@ -117,3 +119,55 @@ export function simWafBrowserRequest(
 
 const browserUserAgent =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
+
+/**
+ * A web ACL as GetWebACL reads it back, what the simulation says it left out
+ * of it, and what it decided about an ordinary request.
+ */
+export interface SimWafHeld {
+  readonly webAcl: SimWafWebAclOutput;
+  readonly parts: readonly SimWafUnsimulatedPart[];
+  readonly blocked: boolean;
+}
+
+/**
+ * Create a web ACL, read it back, and put one request through it.
+ */
+export async function simWafHeldWebAcl(
+  simWaf: SimWafV2,
+  webAcl: Partial<SimCreateWebAclCommandInput>,
+): Promise<SimWafHeld> {
+  const created = await createSimWafWebAcl(simWaf, {
+    ...simWafCreateWebAclFactory.make(),
+    ...webAcl,
+  });
+  const read = await simWaf.getWebAcl({
+    input: { Name: created.Name, Scope: "REGIONAL", Id: created.Id },
+  });
+
+  assertDefined(read.WebACL, "Simulated WAFv2 read back no web ACL");
+
+  return {
+    webAcl: read.WebACL,
+    parts: simWaf.unsimulatedParts(created.ARN),
+    blocked:
+      simWaf.evaluateRequest({
+        webAclArn: created.ARN,
+        request: new Request("https://example.com/search"),
+      }).action === "BLOCK",
+  };
+}
+
+/**
+ * The reason the simulation gives for leaving out one part.
+ */
+export function simWafUnsimulatedReason(
+  parts: readonly SimWafUnsimulatedPart[],
+  part: string,
+): string {
+  const found = parts.find((candidate) => candidate.part === part);
+
+  assertDefined(found, `Simulated WAFv2 reported no unsimulated part ${part}`);
+
+  return found.reason;
+}

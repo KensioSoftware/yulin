@@ -1,15 +1,14 @@
-import {
-  SimWafInvalidParameterException,
-  SimWafUnsimulatedInputException,
-} from "../error/sim-wafv2.error.js";
+import { SimWafInvalidParameterException } from "../error/sim-wafv2.error.js";
+import type { SimWafUnsimulatedPart } from "../resource/sim-waf-unsimulated-part.js";
+import { unsimulatedSimWafBodyLimits } from "./sim-waf-unsimulated-body-limit.js";
 
 /**
  * A resource type whose body inspection limit a web ACL can set.
  *
  * Real WAF keys `AssociationConfig.RequestBody` by resource type, and these
- * three are the ones a web ACL goes in front of here. `APP_RUNNER_SERVICE` and
- * `VERIFIED_ACCESS_INSTANCE` are keys AWS takes for resources this simulation
- * has no association for.
+ * three are the ones a request reaches a web ACL through here. `APP_RUNNER_SERVICE`
+ * and `VERIFIED_ACCESS_INSTANCE` are keys AWS takes for resources a web ACL
+ * can be associated with and no simulated request passes through.
  */
 export type SimWafBodyInspectionResourceType =
   | "CLOUDFRONT"
@@ -21,8 +20,8 @@ export type SimWafBodyInspectionResourceType =
  * `AssociationConfig`.
  *
  * CloudFront, API Gateway and Cognito all default to 16 KB. A load balancer
- * and an AppSync API are fixed at 8 KB, and a web ACL cannot be put in front
- * of either one here.
+ * and an AppSync API are fixed at 8 KB, and no simulated request reaches a web
+ * ACL through either one.
  */
 export const simWafBodyInspectionLimitBytes = 16_384;
 
@@ -35,12 +34,6 @@ const inspectionLimits = new Map<string, number>([
   ["KB_48", 49_152],
   ["KB_64", 65_536],
 ]);
-
-const simulatedResourceTypes: readonly SimWafBodyInspectionResourceType[] = [
-  "CLOUDFRONT",
-  "API_GATEWAY",
-  "COGNITO_USER_POOL",
-];
 
 /**
  * One resource type's entry under `AssociationConfig.RequestBody`.
@@ -66,31 +59,34 @@ export interface SimWafAssociationConfigInput {
  * default 16 KB.
  */
 export class SimWafBodyInspectionLimits {
-  private constructor(
-    private readonly limits: ReadonlyMap<
-      SimWafBodyInspectionResourceType,
-      number
-    >,
-  ) {}
+  private constructor(private readonly limits: ReadonlyMap<string, number>) {}
 
   /**
    * Read the limits an `AssociationConfig` sets, refusing anything WAF would
-   * refuse and anything this simulation cannot apply.
+   * refuse.
    */
   static read(
     input: SimWafAssociationConfigInput | undefined,
   ): SimWafBodyInspectionLimits {
-    const configured = Object.entries(input?.RequestBody ?? {});
-    const limits = new Map<SimWafBodyInspectionResourceType, number>();
+    return new SimWafBodyInspectionLimits(
+      new Map(
+        Object.entries(input?.RequestBody ?? {}).map(
+          ([resourceType, config]) => [
+            resourceType,
+            inspectionLimit(resourceType, config),
+          ],
+        ),
+      ),
+    );
+  }
 
-    for (const [resourceType, config] of configured) {
-      limits.set(
-        simulatedResourceType(resourceType),
-        inspectionLimit(resourceType, config),
-      );
-    }
-
-    return new SimWafBodyInspectionLimits(limits);
+  /**
+   * The limits set for resource types no simulated request passes through.
+   *
+   * Each is checked as WAF checks it and held, and applies to nothing.
+   */
+  get unsimulated(): readonly SimWafUnsimulatedPart[] {
+    return unsimulatedSimWafBodyLimits(this.limits.keys());
   }
 
   /**
@@ -100,34 +96,13 @@ export class SimWafBodyInspectionLimits {
    * A request evaluated against a web ACL that no resource holds names no
    * resource type, and reads the default.
    */
-  bytesFor(resourceType: SimWafBodyInspectionResourceType | undefined): number {
+  bytesFor(resourceType: string | undefined): number {
     if (resourceType === undefined) {
       return simWafBodyInspectionLimitBytes;
     }
 
     return this.limits.get(resourceType) ?? simWafBodyInspectionLimitBytes;
   }
-}
-
-/**
- * Hold a `RequestBody` key to the resource types this simulation associates.
- */
-function simulatedResourceType(
-  resourceType: string,
-): SimWafBodyInspectionResourceType {
-  const simulated = simulatedResourceTypes.find(
-    (candidate) => candidate === resourceType,
-  );
-
-  if (simulated === undefined) {
-    throw new SimWafUnsimulatedInputException(
-      `AssociationConfig sets the body inspection limit for ${resourceType} ` +
-        `resources, and ${simulatedResourceTypes.join(" and ")} are the ` +
-        `types a web ACL goes in front of in Yulin`,
-    );
-  }
-
-  return simulated;
 }
 
 /**
