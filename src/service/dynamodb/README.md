@@ -79,6 +79,13 @@ the ARN of the table the operation names. `authorizeTable()` builds that ARN fro
 Region scope, so the ARN is put together in one place. ListTables names no table, so
 `authorizeAnyTable()` authorizes it against `*`.
 
+A `Query` or `Scan` naming an `IndexName` authorizes against the index's ARN instead, the table's
+ARN followed by `/index/<name>`. The service authorization reference lists `index` as a resource
+type for both. The command hands the index name to `SimDynamoDbTableAccess` on its
+`SimDynamoDbTableReach`, it reaches `authorizeTable()` on `SimDynamoDbReached`, and that builds the
+index ARN in place of the table's. The condition keys are the same as
+for the table, with `dynamodb:LeadingKeys` read through the index's key schema.
+
 The table need not exist. Real IAM evaluates a request before the service handles it, so
 authorization comes before any lookup in the table store.
 

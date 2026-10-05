@@ -9,10 +9,14 @@ import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
  * The partition key values need the table to read them, so they arrive as a
  * function of it. The attribute names are read from the request's own
  * parameters before the table is reached, so they arrive as they are.
+ *
+ * A read naming one of the table's indexes carries the index name. The index
+ * is then the resource authorized.
  */
 export interface SimDynamoDbTableReach {
   readonly leadingKeys?: SimDynamoDbLeadingKeys | undefined;
   readonly attributes?: readonly string[] | undefined;
+  readonly indexName?: string | undefined;
 }
 
 /**
@@ -29,6 +33,7 @@ export function simDynamoDbReachedIn(
   table: SimDynamoDbTable | undefined,
 ): SimDynamoDbReached {
   return {
+    indexName: reach.indexName,
     leadingKeys: table === undefined ? undefined : leadingKeysIn(reach, table),
     attributes: reach.attributes,
   };

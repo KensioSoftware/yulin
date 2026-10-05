@@ -1434,6 +1434,8 @@ from a different partition key is refused, since it names a collection this quer
 ## Reading a global secondary index
 
 Set `IndexName` on `Query` or `Scan` to read an index. Key conditions then use the index key schema.
+IAM authorizes the read against the index's own ARN, covered under
+[authorizing a read of an index](#authorizing-a-read-of-an-index).
 
 ```typescript sim-dynamodb-query-index
 /**
@@ -3716,12 +3718,34 @@ unauthorized caller cannot find out which names are taken.
 in the same way, each against the `dynamodb:` action of its own name. `ListTables` names no table.
 It authorizes against `*`.
 
+### Authorizing a read of an index
+
+A `Query` or `Scan` of the table authorizes against the table ARN. One naming an `IndexName`
+authorizes against the index's own ARN, the table ARN followed by `/index/` and the index name:
+
+```text
+arn:aws:dynamodb:eu-west-2:111111111111:table/OrdersTable/index/byStatus
+```
+
+Global and local secondary indexes work the same way. A statement allowing `dynamodb:Query` on the
+table ARN alone refuses a query of any index, with an `AccessDenied` naming the index ARN. A
+statement allowing only an index ARN refuses a query of the table. A caller that reads both needs
+the table ARN and `<table ARN>/index/*` (or each index ARN) in its policy.
+
+CDK's `grantReadData` and `grantReadWriteData` add `<table ARN>/index/*` only for a table construct
+that declares its indexes. A table imported with `Table.fromTableName` declares none, so its grant
+covers the table ARN alone, and a query of an index fails here as it fails on AWS. Import the table
+with `Table.fromTableAttributes` and its `globalIndexes` or `localIndexes` to have the grant cover
+them.
+
 ### Fine-grained access control with dynamodb:LeadingKeys
 
 `GetItem`, `BatchGetItem`, `Query`, `PutItem`, `UpdateItem`, `DeleteItem` and `BatchWriteItem`
 supply the partition key values they reach as `dynamodb:LeadingKeys`. A policy conditioned on that
 key restricts a caller to the items under particular partition keys. AWS scopes one user of a
 shared table to their own rows this way.
+
+A `Query` of an index supplies the index's partition key value, the value its key condition names.
 
 The condition takes the `ForAllValues:` qualifier, as AWS requires for this key. Every partition key
 value the request reaches has to match. A batch or a write naming one item outside the allowed set
@@ -3847,6 +3871,8 @@ is written.
   answering with the attributes it projects, and paging with a `LastEvaluatedKey` carrying the index
   key and the table key together. A local secondary index also answers a strongly consistent read,
   and fetches an unprojected attribute from the base table.
+- `Query` and `Scan` of an index authorized against the index ARN, for a global and a local
+  secondary index alike.
 - `dynamodb:LeadingKeys` on `GetItem`, `BatchGetItem`, `Query`, `PutItem`, `UpdateItem`,
   `DeleteItem` and `BatchWriteItem`, carrying the partition key values the request reaches so a
   `ForAllValues:` condition can scope a caller to particular items.

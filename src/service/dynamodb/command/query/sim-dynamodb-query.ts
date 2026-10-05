@@ -57,7 +57,8 @@ export class SimDynamoDbQuery {
 
     // The one partition key the query reads is what authorization needs, and
     // reading it needs the view rather than the table, so it is read again
-    // here against whichever of the two the request names.
+    // here against whichever of the two the request names. A query naming an
+    // index is authorized against the index's own ARN.
     const table = this.access.required(
       "dynamodb:Query",
       input.TableName,
@@ -69,6 +70,7 @@ export class SimDynamoDbQuery {
               .partitionKeyValue,
           ),
         attributes: expressions.attributes,
+        indexName: input.IndexName,
       },
     );
 

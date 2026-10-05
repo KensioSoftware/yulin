@@ -57,13 +57,15 @@ export class SimDynamoDbScan {
     // input DynamoDB would refuse is refused whether or not the table is
     // there. A scan narrows nothing, so unlike a query its filter may name any
     // attribute, including a key attribute, and needs no key schema to check.
+    // A scan naming an index of either kind is authorized against the index's
+    // own ARN.
     const segment = readSimDynamoDbScanSegment(input);
     const expressions = readSimDynamoDbScanExpressions(input);
     const table = this.access.required(
       "dynamodb:Scan",
       input.TableName,
       options?.caller,
-      { attributes: expressions.attributes },
+      { attributes: expressions.attributes, indexName: input.IndexName },
     );
 
     // What is being read is settled here: the table, or one of its indexes.
