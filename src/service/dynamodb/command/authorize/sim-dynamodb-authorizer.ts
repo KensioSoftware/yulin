@@ -3,7 +3,7 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { simDynamoDbTableArn } from "../../table/sim-dynamodb-table-arn.js";
+import { simDynamoDbReadArn } from "../../table/sim-dynamodb-table-arn.js";
 import type { SimDynamoDbReached } from "./sim-dynamodb-reached.js";
 import { simDynamoDbConditionContextOf } from "./sim-dynamodb-reached.js";
 
@@ -17,7 +17,8 @@ interface SimDynamoDbAuthorizerProperties {
  *
  * AWS maps each DynamoDB API operation to the `dynamodb:` action of the same
  * name, and the resource is the ARN of the table the operation names. ListTables
- * is the exception: it names no table, so it authorizes against `*`.
+ * is the exception: it names no table, so it authorizes against `*`. A Query or
+ * Scan naming an `IndexName` authorizes against the index's own ARN.
  */
 export class SimDynamoDbAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
@@ -39,6 +40,23 @@ export class SimDynamoDbAuthorizer {
    * The caller is passed through unchanged so sim IAM can distinguish an
    * omitted caller, which defaults to Account root, from an explicit anonymous
    * caller.
+   *
+   * A request reaching one of the table's indexes is authorized against the
+   * index's ARN. The service authorization reference for DynamoDB gives Query and Scan two
+   * resource types, `table` and `index`. The `index` ARN is the table's with
+   * `/index/<name>` after it. The developer guide's fine-grained access control
+   * page grants index queries on that ARN (its examples 5 and 6). A read naming
+   * an index is authorized against the index ARN alone. A statement naming only
+   * the table refuses it, and one naming only an index does not reach the
+   * table. CDK's `grantReadData` adds `<table ARN>/index/*` only for a table it
+   * knows has indexes, and a grant on a table imported by name covers none.
+   *
+   * The reference also lists `index` for PartiQLSelect, SearchVectors and the
+   * contributor insights actions, none of which are simulated. DescribeTable
+   * and the item actions take `table` only.
+   *
+   * The condition keys are the ones the action supplies on the table, with
+   * the partition key values read through the index's own key schema.
    */
   authorizeTable(
     action: string,
@@ -48,7 +66,7 @@ export class SimDynamoDbAuthorizer {
   ): SimAwsResolvedCaller {
     return this.authorizeResource(
       action,
-      simDynamoDbTableArn(this.accountRegionScope, tableName),
+      simDynamoDbReadArn(this.accountRegionScope, tableName, reached.indexName),
       caller,
       reached,
     );

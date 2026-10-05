@@ -4,11 +4,15 @@ import { simDynamoDbLeadingKeysConditionKey } from "./sim-dynamodb-leading-keys.
 /**
  * What one request reaches in the table it names.
  *
- * Each entry becomes a DynamoDB condition key. A request reaching nothing
- * under one of them leaves it out, as AWS leaves a key out for an operation
- * that reaches nothing it names.
+ * The partition key values and attribute names each become a DynamoDB
+ * condition key. A request reaching nothing under one of them leaves it out,
+ * as AWS leaves a key out for an operation that reaches nothing it names. The
+ * index name decides the resource authorized.
  */
 export interface SimDynamoDbReached {
+  /** The index the request reads, when it names one. */
+  readonly indexName?: string | undefined;
+
   /** The partition key values the request reaches. */
   readonly leadingKeys?: readonly string[] | undefined;
 
