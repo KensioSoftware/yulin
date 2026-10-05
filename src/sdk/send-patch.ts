@@ -2,6 +2,7 @@ import {
   SimSdkAlreadyInterceptedError,
   SimSdkCallbackNotSupportedError,
 } from "./error/sim-sdk.error.js";
+import { SimSdkSendAbort } from "./send-abort.js";
 
 /**
  * All send functions installed by simulated SDK interception, so a second
@@ -71,8 +72,10 @@ export function installSendPatch(
           "use the promise form instead",
       );
     }
-    // oxlint-disable-next-line unicorn-js/no-this-outside-of-class -- this is the client instance send was called on, which the handler needs for per-send config resolution.
-    return await handler(command, this);
+    return await SimSdkSendAbort.fromSendArguments(rest).run(
+      // oxlint-disable-next-line unicorn-js/no-this-outside-of-class -- this is the client instance send was called on, which the handler needs for per-send config resolution.
+      async () => await handler(command, this),
+    );
   };
 
   installedSends.add(patched);

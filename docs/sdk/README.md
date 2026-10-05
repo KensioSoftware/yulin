@@ -172,6 +172,24 @@ specific commands:
 The list accepts command classes or command names. Sending another command throws
 `SimSdkCommandNotInterceptedError`.
 
+## Abort a send
+
+An intercepted client honours the `abortSignal` option of `send`, as the SDK's own HTTP handler does:
+
+`await client.send(command, { abortSignal: AbortSignal.timeout(5000) })`
+
+A signal that has already fired rejects the send before it reaches the simulation. A signal that fires
+while the simulated operation is pending rejects the send then. A Lambda handler sleeping on the
+simulation's clock is one operation that stays pending.
+
+Either way the send rejects with an `AbortError` shaped like the one the SDK throws. Its message is
+`Request aborted` and its `cause` is the signal's reason (a `TimeoutError` for
+`AbortSignal.timeout`). Match it by `error.name`.
+
+A send carrying a signal waits one turn of the host's timers before it reaches the simulation. That
+turn stands in for the request's time on the network. A timeout of 0 or 1 milliseconds set before the
+send aborts it, as it would a request to AWS.
+
 ## Intercept the DynamoDB document client
 
 The DynamoDB document client accepts plain JavaScript values. Intercept the document client object,
@@ -282,6 +300,11 @@ service throws `SimSdkUnknownServiceError`.
 - Simulated errors have SDK-shaped `name` and `$metadata` fields. They are separate classes from the
   SDK exceptions, so match them by `error.name` instead of `instanceof`.
 - The callback form of `send(command, callback)` is not supported. Use the promise form.
+- An aborted send stops waiting for its answer. The simulated operation it started still runs to the
+  end, as a request AWS has already received does.
+- Most simulated operations answer within one turn of the host's timers. A timeout longer than a few
+  milliseconds only fires during an operation that waits, such as a sleeping Lambda handler. A
+  simulated Bedrock answer cannot be delayed.
 - Yulin reads the `marshallOptions` in
   `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })` and ignores the
   `unmarshallOptions`. A stored value comes back the way a document client built with no options of
