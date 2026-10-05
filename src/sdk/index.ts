@@ -24,6 +24,7 @@ export type {
 } from "./stream/sim-sdk-stream-body.js";
 export {
   SimSdkError,
+  SimSdkAbortError,
   SimSdkAlreadyInterceptedError,
   SimSdkCallbackNotSupportedError,
   SimSdkCommandNotInterceptedError,

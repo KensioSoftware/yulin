@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../service/aws/metadata/response-metadata.type.js";
+
 /**
  * Base class for simulated AWS SDK errors.
  */
@@ -48,6 +50,52 @@ export class SimSdkAlreadyInterceptedError extends SimSdkError {
  */
 export class SimSdkCallbackNotSupportedError extends SimSdkError {
   public override readonly name = "SimSdkCallbackNotSupportedError";
+}
+
+/**
+ * An intercepted SDK send was aborted through its `abortSignal` option.
+ *
+ * This reproduces the error the SDK's own HTTP handler throws, so it extends
+ * Error directly and is named `AbortError`, as code catching an aborted send
+ * expects. A signal's Error reason becomes the cause, and any other reason
+ * becomes the message.
+ */
+export class SimSdkAbortError extends Error {
+  public override readonly name = "AbortError";
+  public readonly $metadata: SimResponseMetadata = {
+    attempts: 1,
+    totalRetryDelay: 0,
+  };
+
+  /**
+   * Build the error for a signal that fired with a reason, mirroring
+   * `buildAbortError` in `@smithy/node-http-handler`.
+   */
+  static fromReason(reason: unknown): SimSdkAbortError {
+    if (reason instanceof Error) {
+      return new SimSdkAbortError("Request aborted", { cause: reason });
+    }
+    if (isFalsy(reason)) {
+      return new SimSdkAbortError("Request aborted");
+    }
+    // oxlint-disable-next-line typescript/no-base-to-string -- the SDK stringifies any other reason as it is, so this matches whatever it prints.
+    return new SimSdkAbortError(String(reason));
+  }
+}
+
+/**
+ * Whether an abort reason is falsy, which the SDK treats as no reason.
+ */
+function isFalsy(reason: unknown): boolean {
+  return (
+    reason === undefined ||
+    reason === null ||
+    reason === false ||
+    reason === "" ||
+    reason === 0 ||
+    reason === 0n ||
+    Number.isNaN(reason)
+  );
 }
 
 /**
