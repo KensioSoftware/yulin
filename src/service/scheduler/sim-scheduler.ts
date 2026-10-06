@@ -2,6 +2,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
+import { type SimRandom, SimHostRandom } from "../../util/random/sim-random.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
@@ -30,6 +31,12 @@ interface SimSchedulerProperties {
    * in another simulated service is only reachable through SimAws.
    */
   readonly deliveryTargets?: SimSchedulerDeliveryTargets;
+
+  /**
+   * Where a flexible time window draws the moment each occurrence is invoked,
+   * which is the host's `Math.random` unless a test supplies its own.
+   */
+  readonly random?: SimRandom;
 }
 
 /**
@@ -60,6 +67,7 @@ export class SimScheduler extends SimSchedulerInspection {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
+      random = new SimHostRandom(),
     } = properties;
 
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
@@ -76,6 +84,7 @@ export class SimScheduler extends SimSchedulerInspection {
       background,
       deliveryTargets: properties.deliveryTargets,
       accountRegionScope,
+      random,
     });
   }
 

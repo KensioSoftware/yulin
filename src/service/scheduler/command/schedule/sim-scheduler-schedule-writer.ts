@@ -4,6 +4,7 @@ import { schedulerSchedule } from "../../schedule/sim-scheduler-schedule-express
 import { actionAfterCompletionIn } from "../../schedule/sim-scheduler-action-after-completion.js";
 import { SimSchedulerSchedule } from "../../schedule/sim-scheduler-schedule.js";
 import { SimSchedulerScheduleState } from "../../schedule/sim-scheduler-schedule-state.js";
+import { SimSchedulerTimeWindow } from "../../schedule/sim-scheduler-time-window.js";
 import { SimSchedulerTarget } from "../../target/sim-scheduler-target.js";
 import type { SimSchedulerRequestedSchedule } from "./sim-scheduler-schedule-access.js";
 import { refuseUnsimulatedScheduleInput } from "./sim-scheduler-unsimulated-input.js";
@@ -43,6 +44,8 @@ export class SimSchedulerScheduleWriter {
     requested: SimSchedulerRequestedSchedule,
     createdAt?: Date,
   ): SimSchedulerSchedule {
+    const timeWindow = SimSchedulerTimeWindow.of(input.FlexibleTimeWindow);
+
     refuseUnsimulatedScheduleInput(input);
 
     const now = this.clock.now();
@@ -55,6 +58,7 @@ export class SimSchedulerScheduleWriter {
         input.ScheduleExpressionTimezone,
       ),
       timeZone: input.ScheduleExpressionTimezone,
+      timeWindow,
       target: SimSchedulerTarget.of(input.Target),
       state: SimSchedulerScheduleState.of(input.State),
       actionAfterCompletion: actionAfterCompletionIn(

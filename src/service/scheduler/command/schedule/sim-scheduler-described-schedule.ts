@@ -9,8 +9,7 @@ import type {
  *
  * The expression comes back as the string it was created with rather than a
  * re-serialised version of it, so a caller comparing what they read against
- * what they sent sees what they sent. `FlexibleTimeWindow` always reports `OFF`
- * because that is the only mode this simulation takes.
+ * what they sent sees what they sent. The same goes for `FlexibleTimeWindow`.
  */
 export function describedSchedule(
   schedule: SimSchedulerSchedule,
@@ -24,7 +23,7 @@ export function describedSchedule(
     State: schedule.state.value,
     Description: schedule.description,
     ActionAfterCompletion: schedule.actionAfterCompletion,
-    FlexibleTimeWindow: { Mode: "OFF" },
+    FlexibleTimeWindow: schedule.timeWindow.declared,
     Target: {
       Arn: schedule.target.arn.value,
       RoleArn: schedule.target.roleArn,

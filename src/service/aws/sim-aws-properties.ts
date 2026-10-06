@@ -3,6 +3,7 @@ import type {
   BackgroundScheduler,
 } from "../../util/background/background.js";
 import type { SimClock } from "../../util/clock/sim-clock.js";
+import type { SimRandom } from "../../util/random/sim-random.js";
 import type { SimIamSigV4ExpectedScope } from "../iam/sigv4/sim-iam-sigv4-expected-scope.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
 import type { SimAwsDefaultCaller } from "./caller/sim-aws-caller.js";
@@ -59,4 +60,12 @@ export interface SimAwsProperties {
    * its own clock and time control is refused.
    */
   readonly clock?: SimClock;
+
+  /**
+   * Where this simulation draws the values AWS leaves to chance, such as the
+   * moment a Scheduler flexible time window invokes its target. It defaults to
+   * the host's `Math.random`. Pass a `SimSeededRandom` to make those values
+   * repeatable from run to run.
+   */
+  readonly random?: SimRandom;
 }

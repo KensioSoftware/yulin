@@ -28,40 +28,6 @@ function refuseUnknownTimezone(timezone: string | undefined): void {
 }
 
 /**
- * Read the flexible time window, which AWS requires on every request.
- *
- * `FLEXIBLE` is refused rather than treated as `OFF`. The whole point of it is
- * that AWS invokes the target at some unpredictable moment inside the window,
- * and a simulation firing at the exact due time instead would let a test assert
- * on a precision real Scheduler does not offer.
- */
-function refuseFlexibleWindow(input: SimSchedulerScheduleInput): void {
-  const mode = input.FlexibleTimeWindow?.Mode;
-
-  if (mode === undefined) {
-    throw new SimSchedulerValidationException(
-      "FlexibleTimeWindow is required, and its Mode is OFF or FLEXIBLE",
-    );
-  }
-
-  if (mode === "FLEXIBLE") {
-    throw new SimSchedulerUnsimulatedInputException(
-      "FlexibleTimeWindow Mode FLEXIBLE is not simulated. Real Scheduler " +
-        "invokes the target at an unpredictable moment inside the window, " +
-        "and firing at the exact due time instead would let a test rely on " +
-        "timing AWS does not promise. Use Mode OFF.",
-    );
-  }
-
-  if (mode !== "OFF") {
-    throw new SimSchedulerValidationException(
-      `Invalid parameter: FlexibleTimeWindow Mode Reason: '${mode}' is not a ` +
-        `mode. A window is OFF or FLEXIBLE.`,
-    );
-  }
-}
-
-/**
  * Refuse the schedule request inputs this simulation does not model.
  *
  * A timezone is one it does model. A name no zone answers to is refused here
@@ -71,7 +37,6 @@ function refuseFlexibleWindow(input: SimSchedulerScheduleInput): void {
 export function refuseUnsimulatedScheduleInput(
   input: SimSchedulerScheduleInput,
 ): void {
-  refuseFlexibleWindow(input);
   refuseUnsimulatedTarget(input.Target);
 
   refuseUnknownTimezone(input.ScheduleExpressionTimezone);

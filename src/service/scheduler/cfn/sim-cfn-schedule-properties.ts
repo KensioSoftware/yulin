@@ -6,7 +6,6 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type {
-  SimSchedulerFlexibleTimeWindow,
   SimSchedulerRequestTarget,
   SimSchedulerScheduleInput,
 } from "../command/schedule/schedule.command.js";
@@ -14,6 +13,7 @@ import {
   schedulerScheduleResourceType,
   simCfnSchedulerResourceError,
 } from "./sim-cfn-scheduler-resource-error.js";
+import { cfnFlexibleTimeWindow } from "./sim-cfn-schedule-time-window.js";
 
 const maximumNameLength = 64;
 
@@ -78,7 +78,10 @@ export class SimCfnScheduleProperties {
       ScheduleExpressionTimezone: this.stringProperty(
         "ScheduleExpressionTimezone",
       ),
-      FlexibleTimeWindow: this.flexibleTimeWindow(),
+      FlexibleTimeWindow: cfnFlexibleTimeWindow(
+        this.properties.get("FlexibleTimeWindow"),
+        (reason) => this.propertyError(reason),
+      ),
       Target: this.target(),
       State: this.stringProperty("State"),
       Description: this.stringProperty("Description"),
@@ -86,29 +89,6 @@ export class SimCfnScheduleProperties {
       StartDate: this.dateProperty("StartDate"),
       EndDate: this.dateProperty("EndDate"),
       KmsKeyArn: this.stringProperty("KmsKeyArn"),
-    };
-  }
-
-  /**
-   * The time window, which AWS requires on this Resource type.
-   */
-  private flexibleTimeWindow(): SimSchedulerFlexibleTimeWindow | undefined {
-    const window = this.properties.get("FlexibleTimeWindow");
-
-    if (window === undefined) {
-      return undefined;
-    }
-
-    if (!isRecord(window)) {
-      throw this.propertyError("FlexibleTimeWindow is an object");
-    }
-
-    return {
-      Mode: typeof window["Mode"] === "string" ? window["Mode"] : undefined,
-      MaximumWindowInMinutes:
-        typeof window["MaximumWindowInMinutes"] === "number"
-          ? window["MaximumWindowInMinutes"]
-          : undefined,
     };
   }
 

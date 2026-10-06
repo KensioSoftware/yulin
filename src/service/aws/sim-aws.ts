@@ -29,6 +29,7 @@ import type {
 } from "./sim-aws-properties.js";
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
 import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
+import { type SimRandom, SimHostRandom } from "../../util/random/sim-random.js";
 import {
   closeOnSignal,
   type SimCloseOnSignalOptions,
@@ -57,6 +58,11 @@ export class SimAws extends SimAwsServiceAccessors {
    */
   public readonly iamRegistry: SimIamRegistry;
 
+  /**
+   * Where this simulation draws the values AWS leaves to chance.
+   */
+  public readonly random: SimRandom;
+
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
   private readonly timekeeping: SimAwsTimekeeping;
@@ -71,6 +77,7 @@ export class SimAws extends SimAwsServiceAccessors {
       clock,
       defaultCaller,
       background: suppliedBackground,
+      random = new SimHostRandom(),
     } = properties;
 
     const timekeeping = new SimAwsTimekeeping({
@@ -83,6 +90,7 @@ export class SimAws extends SimAwsServiceAccessors {
     this.defaultRegionName = defaultRegionName;
     this.timekeeping = timekeeping;
     this.background = background;
+    this.random = random;
     this.serviceFactory = new SimAwsServiceFactory({
       simAws: this,
       background,

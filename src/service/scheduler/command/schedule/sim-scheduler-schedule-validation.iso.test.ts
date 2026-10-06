@@ -59,16 +59,63 @@ describe("Scheduler schedule validation", () => {
     assertStringIncludes(error.message, "FlexibleTimeWindow is required");
   });
 
-  it("refuses a flexible window rather than firing at the exact time", async () => {
-    // Given a window AWS would invoke at an unpredictable moment inside.
+  it("requires a window length on a flexible window", async () => {
+    // Given a flexible window with no length, which AWS cannot draw from.
     const error = await refusedSchedule({
-      FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: 15 },
+      FlexibleTimeWindow: { Mode: "FLEXIBLE" },
     });
 
-    // Then it is refused, because firing exactly on time instead would let a
-    // test rely on timing AWS does not promise.
-    assertInstanceOf(error, SimSchedulerUnsimulatedInputException);
-    assertStringIncludes(error.message, "does not promise");
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "MaximumWindowInMinutes");
+  });
+
+  it("refuses a window length outside 1 to 1440 minutes", async () => {
+    // Given windows either side of the range the API model allows.
+    const empty = await refusedSchedule({
+      FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: 0 },
+    });
+    const overADay = await refusedSchedule({
+      FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: 1441 },
+    });
+
+    // Then both are refused in the API's own constraint wording.
+    assertInstanceOf(empty, SimSchedulerValidationException);
+    assertStringIncludes(
+      empty.message,
+      "Value '0' at 'flexibleTimeWindow.maximumWindowInMinutes' failed to " +
+        "satisfy constraint: Member must have value greater than or equal to 1",
+    );
+    assertInstanceOf(overADay, SimSchedulerValidationException);
+    assertStringIncludes(overADay.message, "less than or equal to 1440");
+  });
+
+  it("refuses a window length that is not a whole number of minutes", async () => {
+    // Given a length the API model's integer type cannot carry.
+    const error = await refusedSchedule({
+      FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: 2.5 },
+    });
+
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "whole number of minutes");
+  });
+
+  it("refuses a window length when the window is off", async () => {
+    // Given a window turned off that still names a length.
+    const error = await refusedSchedule({
+      FlexibleTimeWindow: { Mode: "OFF", MaximumWindowInMinutes: 15 },
+    });
+
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "only allowed when Mode is FLEXIBLE");
+  });
+
+  it("refuses a window mode that is neither OFF nor FLEXIBLE", async () => {
+    const error = await refusedSchedule({
+      FlexibleTimeWindow: { Mode: "SOMETIMES" as "OFF" },
+    });
+
+    assertInstanceOf(error, SimSchedulerValidationException);
+    assertStringIncludes(error.message, "[OFF, FLEXIBLE]");
   });
 
   it("refuses a schedule whose group has not been created", async () => {

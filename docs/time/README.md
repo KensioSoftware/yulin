@@ -247,6 +247,24 @@ Yulin uses the clock for:
 - `Date`, global timers, and invocation deadlines inside a simulated Lambda invocation
 - HTTP response `Date` headers
 
+## Values AWS leaves to chance
+
+Some AWS behaviour is unpredictable by design. An EventBridge Scheduler
+[flexible time window](https://yulinsim.dev/services/scheduler/#flexible-time-windows) invokes its
+target at a moment AWS chooses inside the window. Yulin draws those values from the `random` option
+of `SimAws`, which defaults to the host's `Math.random`.
+
+Pass a `SimSeededRandom` to draw the same values on every run:
+
+```typescript
+import { SimAws, SimSeededRandom } from "@kensio/yulin";
+
+const simAws = new SimAws({ random: new SimSeededRandom(2026) });
+```
+
+A test that advances the clock past the end of a window passes whatever was drawn. A seed is for
+reproducing a run (one that failed, for example).
+
 ## Limitations
 
 - Scheduled [EventBridge rules](https://yulinsim.dev/services/eventbridge/#rules-that-fire-on-a-schedule)

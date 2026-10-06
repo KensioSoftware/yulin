@@ -1,4 +1,5 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimRandom } from "../../../util/random/sim-random.js";
 import type { SimSchedulerTargetDelivery } from "../delivery/sim-scheduler-target-delivery.js";
 import type { SimSchedulerSchedule } from "./sim-scheduler-schedule.js";
 import type { SimSchedulerScheduleStore } from "./sim-scheduler-schedule-store.js";
@@ -7,6 +8,9 @@ interface SimSchedulerSchedulesProperties {
   readonly schedules: SimSchedulerScheduleStore;
   readonly delivery: SimSchedulerTargetDelivery;
   readonly background: BackgroundScheduler;
+
+  /** Where each occurrence's moment inside a flexible window is drawn. */
+  readonly random: SimRandom;
 }
 
 /**
@@ -24,16 +28,24 @@ interface SimSchedulerSchedulesProperties {
  * no timer to cancel, only a firing that finds itself out of date. That is also
  * what makes an update reschedule from the new expression rather than keeping
  * the old due times, since an update stores a new schedule and arms it.
+ *
+ * A schedule with a flexible time window is armed for each due instant all
+ * the same, and then invokes its target at a moment drawn inside the window.
+ * The next occurrence is armed from the due instant rather than from the
+ * invocation, so the window delays each invocation without moving the
+ * schedule.
  */
 export class SimSchedulerSchedules {
   private readonly schedules: SimSchedulerScheduleStore;
   private readonly delivery: SimSchedulerTargetDelivery;
   private readonly background: BackgroundScheduler;
+  private readonly random: SimRandom;
 
   constructor(properties: SimSchedulerSchedulesProperties) {
     this.schedules = properties.schedules;
     this.delivery = properties.delivery;
     this.background = properties.background;
+    this.random = properties.random;
   }
 
   /**
@@ -57,19 +69,51 @@ export class SimSchedulerSchedules {
     }
 
     this.background.scheduleAt(due, () => {
-      this.fire(schedule, due);
+      this.occur(schedule, due);
 
       return Promise.resolve();
     });
   }
 
   /**
-   * Fire a schedule that has fallen due, and arm it for the next time.
+   * Handle a schedule that has fallen due: arm the next occurrence, and
+   * invoke the target at the moment its time window gives this one.
    */
-  private fire(schedule: SimSchedulerSchedule, due: Date): void {
-    if (
-      this.schedules.find(schedule.groupName, schedule.name.value) !== schedule
-    ) {
+  private occur(schedule: SimSchedulerSchedule, due: Date): void {
+    if (this.isStale(schedule)) {
+      return;
+    }
+
+    const last = schedule.schedule.nextAfter(due) === undefined;
+
+    if (!last) {
+      this.armAfter(schedule, due);
+    }
+
+    const at = schedule.timeWindow.invocationAt(due, this.random);
+
+    if (at.getTime() === due.getTime()) {
+      this.fire(schedule, due, last);
+
+      return;
+    }
+
+    this.background.scheduleAt(at, () => {
+      this.fire(schedule, due, last);
+
+      return Promise.resolve();
+    });
+  }
+
+  /**
+   * Invoke a schedule's target for one occurrence.
+   *
+   * A schedule deleted or replaced while its occurrence waited inside the
+   * window is not invoked. The delivery carries the due instant rather than
+   * the moment it was made, since that is the occurrence it belongs to.
+   */
+  private fire(schedule: SimSchedulerSchedule, due: Date, last: boolean): void {
+    if (this.isStale(schedule)) {
       return;
     }
 
@@ -81,13 +125,18 @@ export class SimSchedulerSchedules {
       });
     }
 
-    if (schedule.schedule.nextAfter(due) !== undefined) {
-      this.armAfter(schedule, due);
-
-      return;
+    if (last) {
+      this.completed(schedule, invoked);
     }
+  }
 
-    this.completed(schedule, invoked);
+  /**
+   * Whether a schedule has been deleted or replaced since it was armed.
+   */
+  private isStale(schedule: SimSchedulerSchedule): boolean {
+    return (
+      this.schedules.find(schedule.groupName, schedule.name.value) !== schedule
+    );
   }
 
   /**

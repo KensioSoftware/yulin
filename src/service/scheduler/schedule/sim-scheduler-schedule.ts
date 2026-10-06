@@ -5,6 +5,7 @@ import { schedulerScheduleGroupArn } from "../group/sim-scheduler-schedule-group
 import { schedulerScheduleArn } from "./sim-scheduler-schedule-arn.js";
 import type { SimSchedulerScheduleName } from "./sim-scheduler-schedule-name.js";
 import type { SimSchedulerScheduleState } from "./sim-scheduler-schedule-state.js";
+import type { SimSchedulerTimeWindow } from "./sim-scheduler-time-window.js";
 
 /**
  * What Scheduler does with a schedule once it has finished invoking its target.
@@ -28,6 +29,9 @@ interface SimSchedulerScheduleProperties {
 
   /** The timezone the request named, which a describe reports back. */
   readonly timeZone?: string | undefined;
+
+  /** When, relative to each due time, the target is invoked. */
+  readonly timeWindow: SimSchedulerTimeWindow;
   readonly createdAt: Date;
 }
 
@@ -70,6 +74,11 @@ export class SimSchedulerSchedule {
    * than reporting the one it fell back to.
    */
   public readonly timeZone: string | undefined;
+
+  /**
+   * The flexible time window each occurrence is invoked inside.
+   */
+  public readonly timeWindow: SimSchedulerTimeWindow;
   public readonly creationDate: Date;
 
   /**
@@ -98,6 +107,7 @@ export class SimSchedulerSchedule {
     this.actionAfterCompletion = properties.actionAfterCompletion;
     this.description = properties.description;
     this.timeZone = properties.timeZone;
+    this.timeWindow = properties.timeWindow;
     this.creationDate = properties.createdAt;
     this.modified = properties.createdAt;
     this.held = properties.state;
