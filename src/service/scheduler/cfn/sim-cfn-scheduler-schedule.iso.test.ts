@@ -227,7 +227,7 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "reporting-stack",
       template: {
-        Parameters: { WindowMinutes: { Type: "Number", Default: "15" } },
+        Parameters: { WindowMinutes: { Type: "Number", Default: "15.0" } },
         Resources: {
           HourlyReport: scheduleResource({
             FlexibleTimeWindow: {

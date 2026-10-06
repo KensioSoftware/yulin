@@ -4,7 +4,8 @@ import type { SimSchedulerFlexibleTimeWindow } from "../command/schedule/schedul
 
 /**
  * Read a window length, which a template may give as a number or, through a
- * Parameter, as a string of digits. CloudFormation accepts either.
+ * Number Parameter, as a numeric string such as "15" or "15.0". Whether the
+ * number is a valid length is left to simulated Scheduler.
  */
 function windowMinutes(
   value: SimCfnTemplateValue | undefined,
@@ -14,8 +15,12 @@ function windowMinutes(
     return value;
   }
 
-  if (typeof value === "string" && /^\d+$/u.test(value)) {
-    return Number(value);
+  if (typeof value === "string" && value.trim() !== "") {
+    const minutes = Number(value);
+
+    if (Number.isFinite(minutes)) {
+      return minutes;
+    }
   }
 
   throw propertyError("FlexibleTimeWindow MaximumWindowInMinutes is a number");

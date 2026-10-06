@@ -260,6 +260,45 @@ describe("Scheduler flexible time windows", () => {
     assertArrayEmpty(simAws.scheduler().allSchedules);
   });
 
+  it("completes a finite schedule only once every overlapping occurrence is invoked", async () => {
+    // Given two occurrences an hour apart in two-hour windows, where the
+    // first draws late in its window and the second on its due instant.
+    const draws = [0.9, 0];
+    const { simAws, invokedAt } = await simulationWithRole({
+      next: (): number => draws.shift() ?? 0,
+    });
+
+    await simAws.scheduler().createSchedule(
+      new CreateScheduleCommand(
+        creation({
+          ScheduleExpression: "cron(0 10,11 26 7 ? 2026)",
+          FlexibleTimeWindow: {
+            Mode: "FLEXIBLE",
+            MaximumWindowInMinutes: 120,
+          },
+          ActionAfterCompletion: "DELETE",
+        }),
+      ),
+    );
+
+    // When the last occurrence has been invoked but the first is still
+    // waiting inside its window.
+    await simAws.clock().advanceBy({ hours: 2, minutes: 30 });
+
+    // Then the schedule is still there.
+    assertObjectEquals(invokedAt, ["2026-07-26T11:00:00.000Z"]);
+    assertArrayLength(simAws.scheduler().allSchedules, 1);
+
+    // And it goes once the first occurrence is invoked too.
+    await simAws.clock().advanceBy({ minutes: 30 });
+
+    assertObjectEquals(invokedAt, [
+      "2026-07-26T11:00:00.000Z",
+      "2026-07-26T11:48:00.000Z",
+    ]);
+    assertArrayEmpty(simAws.scheduler().allSchedules);
+  });
+
   it("reports the window back on GetSchedule", async () => {
     // Given a schedule created with a flexible window.
     const { simAws } = await simulationWithRole();

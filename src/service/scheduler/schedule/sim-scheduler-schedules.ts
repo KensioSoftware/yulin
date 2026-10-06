@@ -2,6 +2,7 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import type { SimRandom } from "../../../util/random/sim-random.js";
 import type { SimSchedulerTargetDelivery } from "../delivery/sim-scheduler-target-delivery.js";
 import type { SimSchedulerSchedule } from "./sim-scheduler-schedule.js";
+import { SimSchedulerPendingOccurrences } from "./sim-scheduler-pending-occurrences.js";
 import type { SimSchedulerScheduleStore } from "./sim-scheduler-schedule-store.js";
 
 interface SimSchedulerSchedulesProperties {
@@ -40,6 +41,7 @@ export class SimSchedulerSchedules {
   private readonly delivery: SimSchedulerTargetDelivery;
   private readonly background: BackgroundScheduler;
   private readonly random: SimRandom;
+  private readonly pending = new SimSchedulerPendingOccurrences();
 
   constructor(properties: SimSchedulerSchedulesProperties) {
     this.schedules = properties.schedules;
@@ -92,6 +94,8 @@ export class SimSchedulerSchedules {
 
     const at = schedule.timeWindow.invocationAt(due, this.random);
 
+    this.pending.begin(schedule);
+
     if (at.getTime() === due.getTime()) {
       this.fire(schedule, due, last);
 
@@ -110,9 +114,13 @@ export class SimSchedulerSchedules {
    *
    * A schedule deleted or replaced while its occurrence waited inside the
    * window is not invoked. The delivery carries the due instant rather than
-   * the moment it was made, since that is the occurrence it belongs to.
+   * the moment it was made, since that is the occurrence it belongs to. A
+   * schedule completes with whichever occurrence is invoked last, which need
+   * not be its last due instant when windows overlap.
    */
   private fire(schedule: SimSchedulerSchedule, due: Date, last: boolean): void {
+    const completed = this.pending.end(schedule, last);
+
     if (this.isStale(schedule)) {
       return;
     }
@@ -125,7 +133,7 @@ export class SimSchedulerSchedules {
       });
     }
 
-    if (last) {
+    if (completed) {
       this.completed(schedule, invoked);
     }
   }
