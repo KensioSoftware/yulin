@@ -18,6 +18,11 @@ export { SimControllableClock } from "./util/clock/sim-controllable-clock.js";
 export { SimClockControl } from "./util/clock/sim-clock-control.js";
 export { SimTokenBucket } from "./util/throttle/sim-token-bucket.js";
 export {
+  SimHostRandom,
+  type SimRandom,
+  SimSeededRandom,
+} from "./util/random/sim-random.js";
+export {
   SimDuration,
   type SimDurationInput,
   SimInvalidDuration,

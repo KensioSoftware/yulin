@@ -114,6 +114,18 @@ under that name and stops if it is not, which covers deletion and an update repl
 is also what makes an update reschedule from the new expression: an update stores a newly built
 schedule and arms it, and the previous one's next firing finds itself out of date.
 
+A flexible time window leaves the due instants where the expression puts them. Firing at a due instant arms the next one,
+then asks the schedule's `SimSchedulerTimeWindow` when to invoke this occurrence. With `OFF` that is
+now. With `FLEXIBLE` it is an instant drawn inside the window from the `SimRandom` the scheduler was
+built with, and the invocation is scheduled on `BackgroundScheduler` for then. The invocation checks
+again that the schedule is current, which covers a deletion or update made while it waited. A
+schedule with no next occurrence completes when its invocation is made, so `DELETE` removes it after
+the target is invoked.
+
+`SimRandom` comes from `SimAws`, where a test can supply a `SimSeededRandom`. The default draws from
+`Math.random`. A window that always fired on the due instant would let a test depend on timing AWS
+leaves open.
+
 `ActionAfterCompletion` needs a schedule that has _completed_, which is one that invoked its target
 and has no next occurrence. A disabled schedule whose only instant goes past has not completed, so it
 survives whatever the action says. Nothing else needs to know a schedule is one-time: `SimAtExpression`
@@ -195,7 +207,7 @@ service's error type catches this refusal with the rest.
 
 ## Divergences
 
-Six, all deliberate.
+Seven, all deliberate.
 
 A schedule group is **`ACTIVE` or gone**. Real Scheduler holds a group in `DELETING` while the
 schedules in it are removed, and reaching that state needs a deletion that takes time. Deleting a
@@ -210,13 +222,16 @@ reads would refuse a template nobody wrote that way.
 `DeleteSchedule`. It exists to make a retried request idempotent, nothing here retries, and refusing
 it would break ordinary AWS code that passes one as a matter of course.
 
-A schedule fires **exactly, and exactly once**. Real Scheduler invokes within a minute of the due
+A schedule with its window `OFF` fires **exactly, and exactly once**. Real Scheduler invokes within a minute of the due
 time and promises no more than that. Reproducing the imprecision would make a test of a schedule
 assert on something that is not the schedule.
 
 A target with no `Input` receives an **empty JSON object**. AWS documents that for a Lambda target
 and says nothing about it for a queue or a topic, so the same answer is used for all three rather
 than inventing a different one per service.
+
+A flexible window's invocation moment is **uniform over the window**, to the millisecond. AWS
+documents the window and not the distribution inside it.
 
 Retry backoff is a **deterministic power-of-two sequence**, beginning at one second. Real Scheduler
 documents exponential backoff without publishing the delays. A fixed sequence lets a test move the

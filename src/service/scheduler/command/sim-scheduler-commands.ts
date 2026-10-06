@@ -1,4 +1,5 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimRandom } from "../../../util/random/sim-random.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimSchedulerDeliveryTargets } from "../delivery/sim-scheduler-delivery.js";
@@ -23,6 +24,7 @@ interface SimSchedulerCommandsProperties {
   readonly background: BackgroundScheduler;
   readonly deliveryTargets?: SimSchedulerDeliveryTargets | undefined;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly random: SimRandom;
 }
 
 /**
@@ -62,6 +64,7 @@ export class SimSchedulerCommands {
       schedules,
       delivery: this.delivery,
       background,
+      random: properties.random,
     });
 
     this.scheduleCreation = new SimSchedulerCreateSchedule({

@@ -308,6 +308,7 @@ export class SimAwsAccountRegionServiceBuilder {
     return new SimScheduler({
       ...this.scoped(scope),
       deliveryTargets: simAwsSchedulerDeliveryTargets(this.simAws),
+      random: this.simAws.random,
     });
   }
 

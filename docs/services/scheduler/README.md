@@ -303,6 +303,64 @@ regardless of `ActionAfterCompletion`.
 enabling it picks up from the next due instant. What it missed is never replayed. An update that
 changes the expression reschedules from the new one.
 
+### Flexible time windows
+
+`FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: n }` delays each invocation by up
+to `n` minutes. The schedule still falls due at the times its expression gives. Each occurrence then
+invokes its target at a moment drawn inside `[due, due + n minutes)`. The moment is never before the
+due time and always before the window closes.
+
+The draw is made separately for every occurrence. A test that advances the clock past the end of an
+occurrence's window sees exactly one invocation for it, whatever was drawn. A test that stops inside
+the window may or may not see it. Assert after the window has closed.
+
+The draws come from the `random` source the `SimAws` was built with. It defaults to the host's
+`Math.random`, and the moments differ from run to run. Pass a `SimSeededRandom` to draw the same
+moments every time (to reproduce a failure, for example).
+
+```typescript sim-scheduler-flexible-window
+/**
+ * A schedule invoking its target up to fifteen minutes after each hour.
+ */
+
+import {
+  CreateScheduleCommand,
+  GetScheduleCommand,
+} from "@aws-sdk/client-scheduler";
+
+import { SimAws, SimSeededRandom } from "@kensio/yulin";
+
+// The same seed draws the same invocation moments on every run.
+const simAws = new SimAws({ random: new SimSeededRandom(2026) });
+
+await simAws.scheduler().createSchedule(
+  new CreateScheduleCommand({
+    Name: "hourly-digest",
+    ScheduleExpression: "cron(0 * * * ? *)",
+    FlexibleTimeWindow: { Mode: "FLEXIBLE", MaximumWindowInMinutes: 15 },
+    Target: {
+      Arn: "arn:aws:lambda:us-east-1:888888888888:function:digest",
+      RoleArn: "arn:aws:iam::888888888888:role/SchedulerRole",
+    },
+  }),
+);
+
+const described = await simAws
+  .scheduler()
+  .getSchedule(new GetScheduleCommand({ Name: "hourly-digest" }));
+
+console.log(described.FlexibleTimeWindow);
+// { Mode: "FLEXIBLE", MaximumWindowInMinutes: 15 }
+```
+
+A `FLEXIBLE` window needs `MaximumWindowInMinutes`, a whole number from 1 to 1440. An `OFF` window
+must leave it out. Either mistake is a `ValidationException`. `GetSchedule` reports the window the
+schedule was created with.
+
+A schedule deleted or replaced while an occurrence is waiting inside its window does not invoke for
+that occurrence. A one-time schedule with `ActionAfterCompletion: "DELETE"` is removed once its
+delayed invocation has been made.
+
 ## Running an ECS task on a schedule
 
 A target whose ARN names an ECS cluster runs a [simulated ECS](https://yulinsim.dev/services/ecs/)
@@ -812,6 +870,8 @@ Resources of the same stack.
   authorized against that role's own policies. Lambda targets use asynchronous Event invocation.
 - ECS targets, running a simulated task as the execution role, with the task definition and
   `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
+- `FlexibleTimeWindow` in both modes, with each `FLEXIBLE` invocation drawn inside its window from
+  the simulation's `random` source.
 - `ActionAfterCompletion`, and `deliveryFailures` for invocations that did not happen.
 - Target retry policies driven by simulated time, and standard SQS dead-letter queues carrying the
   original input and Scheduler diagnostic attributes.
@@ -829,8 +889,8 @@ Resources of the same stack.
 
 - A schedule only fires while a test advances the simulation's clock. The host's clock drives none
   of it, and a simulation left alone in real time never fires however long it is left.
-- Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time, and its
-  promise is at-least-once.
+- Firing is exact and exactly once with the window `OFF`. Real Scheduler invokes within a minute of
+  the due time, and its promise is at-least-once.
 - Retry delays are deterministic powers of two seconds. Real Scheduler uses exponential backoff
   without publishing an exact sequence. The fixed sequence lets a test advance to a known retry
   instant.
@@ -844,9 +904,12 @@ Resources of the same stack.
   real Scheduler holds the group in `DELETING` until they have gone.
 - The `default` schedule group cannot be deleted. AWS leaves the answer to that request
   undocumented.
-- `FlexibleTimeWindow` with `Mode: "FLEXIBLE"` is refused. Real Scheduler invokes the target at an
-  unpredictable moment inside the window, and firing at the exact due time instead would let a test
-  rely on timing AWS leaves unpromised.
+- A flexible window draws each invocation moment uniformly, to the millisecond. AWS documents only
+  that the target is invoked inside the window after the scheduled time, and publishes no
+  distribution.
+- The wording of the refusals for a `FLEXIBLE` window with no `MaximumWindowInMinutes`, and an `OFF`
+  window with one, is Yulin's own. AWS refuses both and does not document the message. The range
+  refusals use the API's constraint wording.
 - `ScheduleExpressionTimezone` is read from the host's own timezone data through `Intl`, so a zone
   the host has never heard of is refused even where AWS would take it. A schedule that names none
   runs in UTC.

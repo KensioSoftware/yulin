@@ -219,8 +219,41 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
     assertStringIncludes(schedule.name.value, "reporting-stack");
   });
 
-  it("refuses a property it does not model, naming the Resource", async () => {
-    // Given a schedule asking for a flexible window.
+  it("deploys a schedule with a flexible window", async () => {
+    // Given a template asking for runs to drift up to fifteen minutes, with
+    // the length coming in through a Parameter as a string.
+    const { simAws, runs } = await simAwsWithRole();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "reporting-stack",
+      template: {
+        Parameters: { WindowMinutes: { Type: "Number", Default: "15.0" } },
+        Resources: {
+          HourlyReport: scheduleResource({
+            FlexibleTimeWindow: {
+              Mode: "FLEXIBLE",
+              MaximumWindowInMinutes: { Ref: "WindowMinutes" },
+            },
+          }),
+        },
+      },
+    });
+
+    await stack.waitForDeployComplete();
+
+    // When two hours and the last window have passed.
+    await simAws.clock().advanceBy({ hours: 2, minutes: 15 });
+
+    // Then the schedule carries the window and invoked once per occurrence.
+    const [schedule] = simAws.scheduler().allSchedules;
+
+    assertNonNullable(schedule);
+    assertIdentical(schedule.timeWindow.minutes, 15);
+    assertArrayLength(runs, 2);
+  });
+
+  it("refuses a window length that is not a number, naming the Resource", async () => {
+    // Given a schedule whose window length is not a number.
     const { simAws } = await simAwsWithRole();
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -231,7 +264,7 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
             HourlyReport: scheduleResource({
               FlexibleTimeWindow: {
                 Mode: "FLEXIBLE",
-                MaximumWindowInMinutes: 15,
+                MaximumWindowInMinutes: "a quarter of an hour",
               },
             }),
           },
@@ -242,7 +275,30 @@ describe("Scheduler CloudFormation Schedule deployment", () => {
     });
 
     assertStringIncludes(error.message, "HourlyReport");
-    assertStringIncludes(error.message, "FLEXIBLE");
+    assertStringIncludes(error.message, "MaximumWindowInMinutes");
+  });
+
+  it("refuses a flexible window without a length, naming the Resource", async () => {
+    // Given a flexible window the service would refuse.
+    const { simAws } = await simAwsWithRole();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "reporting-stack",
+        template: {
+          Resources: {
+            HourlyReport: scheduleResource({
+              FlexibleTimeWindow: { Mode: "FLEXIBLE" },
+            }),
+          },
+        },
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    assertStringIncludes(error.message, "HourlyReport");
+    assertStringIncludes(error.message, "MaximumWindowInMinutes");
   });
 
   it("removes the schedules a stack created", async () => {
