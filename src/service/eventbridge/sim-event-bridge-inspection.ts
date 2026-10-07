@@ -1,4 +1,6 @@
 import type { SimEventBusStore } from "./bus/sim-event-bus-store.js";
+import type { SimEventBridgeCommands } from "./command/sim-event-bridge-commands.js";
+import type { SimEventBridgeDeliveryFailure } from "./delivery/sim-event-bridge-delivery-failures.js";
 import type { SimEventBusReceipt } from "./bus/sim-event-bus.js";
 import type { SimEventBus } from "./bus/sim-event-bus.js";
 import { defaultEventBusName } from "./bus/sim-event-bus-name.js";
@@ -22,6 +24,17 @@ export abstract class SimEventBridgeInspection {
   protected abstract readonly buses: SimEventBusStore;
   protected abstract readonly rules: SimEventRuleStore;
   protected abstract readonly targets: SimEventTargetStore;
+  protected abstract readonly commands: SimEventBridgeCommands;
+
+  /**
+   * Every event this scope's rules could not get to a target.
+   *
+   * Real EventBridge tells the caller nothing about a failed delivery, and
+   * neither does this. A target that is unexpectedly empty is explained here.
+   */
+  get deliveryFailures(): readonly SimEventBridgeDeliveryFailure[] {
+    return this.commands.router.deliveryFailures;
+  }
 
   /**
    * Find an event bus by name.

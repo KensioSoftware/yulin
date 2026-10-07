@@ -13,11 +13,15 @@ import { SimEventBridgeBusAccess } from "./bus/sim-event-bridge-bus-access.js";
 import { SimEventBridgeBusCommands } from "./bus/sim-event-bridge-bus-commands.js";
 import { SimEventBridgeCreateEventBus } from "./bus/sim-event-bridge-create-event-bus.js";
 import { SimEventBridgeDeleteEventBus } from "./bus/sim-event-bridge-delete-event-bus.js";
+import type { SimPartnerEventSourceStore } from "../source/sim-partner-event-source-store.js";
+import { SimEventBridgePartnerBus } from "./bus/sim-event-bridge-partner-bus.js";
 import { SimEventBridgePutEvents } from "./put-events/sim-event-bridge-put-events.js";
 import { SimEventBridgePutRule } from "./rule/sim-event-bridge-put-rule.js";
 import { SimEventBridgeRuleAccess } from "./rule/sim-event-bridge-rule-access.js";
 import { SimEventBridgeRuleCommands } from "./rule/sim-event-bridge-rule-commands.js";
 import { SimEventBridgeTestEventPattern } from "./rule/sim-event-bridge-test-event-pattern.js";
+import { SimEventBridgeDescribeEventSource } from "./source/sim-event-bridge-describe-event-source.js";
+import { SimEventBridgePutPartnerEvents } from "./source/sim-event-bridge-put-partner-events.js";
 import { SimEventBridgePutTargets } from "./target/sim-event-bridge-put-targets.js";
 import { SimEventBridgeTargetCommands } from "./target/sim-event-bridge-target-commands.js";
 
@@ -25,6 +29,7 @@ interface SimEventBridgeCommandsProperties {
   readonly buses: SimEventBusStore;
   readonly rules: SimEventRuleStore;
   readonly targets: SimEventTargetStore;
+  readonly partnerSources: SimPartnerEventSourceStore;
   readonly deliveryTargets?: SimEventBridgeDeliveryTargets | undefined;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
@@ -44,6 +49,8 @@ export class SimEventBridgeCommands {
   public readonly busDeletion: SimEventBridgeDeleteEventBus;
   public readonly buses: SimEventBridgeBusCommands;
   public readonly putEvents: SimEventBridgePutEvents;
+  public readonly putPartnerEvents: SimEventBridgePutPartnerEvents;
+  public readonly eventSources: SimEventBridgeDescribeEventSource;
   public readonly ruleCreation: SimEventBridgePutRule;
   public readonly rules: SimEventBridgeRuleCommands;
   public readonly patternTest: SimEventBridgeTestEventPattern;
@@ -53,8 +60,14 @@ export class SimEventBridgeCommands {
   public readonly schedules: SimEventBridgeRuleSchedules;
 
   constructor(properties: SimEventBridgeCommandsProperties) {
-    const { buses, rules, targets, accountRegionScope, background } =
-      properties;
+    const {
+      buses,
+      rules,
+      targets,
+      partnerSources,
+      accountRegionScope,
+      background,
+    } = properties;
     const authorizer = new SimEventBridgeAuthorizer({ iam: properties.iam });
     const access = new SimEventBridgeBusAccess({
       buses,
@@ -71,6 +84,7 @@ export class SimEventBridgeCommands {
     this.busCreation = new SimEventBridgeCreateEventBus({
       buses,
       access,
+      partnerBus: new SimEventBridgePartnerBus(partnerSources),
       accountRegionScope,
       clock: background,
     });
@@ -101,6 +115,18 @@ export class SimEventBridgeCommands {
       accountRegionScope,
       clock: background,
       router: this.router,
+    });
+    this.putPartnerEvents = new SimEventBridgePutPartnerEvents({
+      sources: partnerSources,
+      accountRegionScope,
+      clock: background,
+      router: this.router,
+    });
+    this.eventSources = new SimEventBridgeDescribeEventSource({
+      sources: partnerSources,
+      buses,
+      authorizer,
+      accountRegionScope,
     });
     this.ruleCreation = new SimEventBridgePutRule({
       rules,

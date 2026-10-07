@@ -32,8 +32,26 @@ service's own ARN reading rather than deferring to `parseSimArn`, and why an IAM
 bus has the `event-bus/` in it.
 
 `SimEventBusName` validates a name in one place. The API's own pattern allows `/`, but only for
-partner bus names of the form `aws.partner/...`, so a name carrying one is refused here as an
-unsimulated input rather than as a malformed name.
+partner bus names of the form `aws.partner/<partner>/<name>`. A name carrying a `/` in any other
+shape is refused as malformed. `PutEvents` refuses a partner bus name too, because its own
+`EventBusName` pattern has no `/` in it.
+
+## Partner event sources
+
+`source/` holds partner event sources. A SaaS partner creates one from its own account, which is
+outside the simulation, so `SimEventBridgePartners` gives a test the partner's two requests as
+simulator accessors. `addPartnerEventSource(...)` shares a source with the scope, and
+`putPartnerEvents(...)` puts events as the partner's `PutPartnerEvents` would. Both skip SDK
+routing and IAM authorization, because the partner's account sits outside the simulation.
+
+`CreateEventBus` with an `EventSourceName` creates a partner event bus. `SimEventBridgePartnerBus`
+checks that the name equals the source name and that the source exists, which are both AWS's own
+rules. A source's state is derived from whether a bus of its name exists, so deleting the bus puts
+the source back to `PENDING` with no bookkeeping.
+
+A partner's event is read by the same `SimEventBridgeEntryReader` as a `PutEvents` entry, and the
+router delivers it to the bus its `Source` names. A source with no bus drops the event, as AWS
+documents.
 
 ## Event model
 

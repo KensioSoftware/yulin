@@ -16,6 +16,7 @@ describe("EventBridge SDK Command router", () => {
       "DeleteEventBusCommand",
       "DescribeEventBusCommand",
       "ListEventBusesCommand",
+      "DescribeEventSourceCommand",
       "PutEventsCommand",
       "PutRuleCommand",
       "DeleteRuleCommand",

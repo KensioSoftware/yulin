@@ -84,24 +84,6 @@ describe("EventBridge event bus validation", () => {
     assertStringIncludes(error.message, "orders events");
   });
 
-  it("refuses a partner event bus name", async () => {
-    // Given a simulated EventBridge.
-    const simAws = new SimAws();
-
-    // When a name carrying a partner separator is used.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.eventBridge().createEventBus(
-        new CreateEventBusCommand({
-          Name: "aws.partner/example.com/orders",
-        }),
-      );
-    });
-
-    // Then it is refused rather than created as an ordinary custom bus.
-    assertInstanceOf(error, SimEventBridgeUnsimulatedInputException);
-    assertStringIncludes(error.message, "Partner event buses");
-  });
-
   it("refuses bus inputs it does not model rather than dropping them", async () => {
     // Given a simulated EventBridge.
     const simAws = new SimAws();
@@ -117,7 +99,6 @@ describe("EventBridge event bus validation", () => {
         },
       },
       { Name: "orders", LogConfig: { Level: "INFO" } },
-      { Name: "orders", EventSourceName: "aws.partner/example.com/orders" },
     ];
 
     // Then each is refused, so nothing looks configured that is not.

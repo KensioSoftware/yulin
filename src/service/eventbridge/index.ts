@@ -33,6 +33,15 @@ export { SimEventRuleState } from "./rule/sim-event-rule-state.js";
 export { SimEventPattern } from "./pattern/sim-event-pattern.js";
 export type { SimEventBusReceipt } from "./bus/sim-event-bus.js";
 export {
+  partnerEventSourceArn,
+  SimPartnerEventSource,
+  type SimPartnerEventSourceState,
+} from "./source/sim-partner-event-source.js";
+export {
+  isPartnerEventSourceName,
+  SimPartnerEventSourceName,
+} from "./source/sim-partner-event-source-name.js";
+export {
   SimEventBridgeAccessDeniedException,
   SimEventBridgeError,
   SimEventBridgeInvalidEventPatternException,

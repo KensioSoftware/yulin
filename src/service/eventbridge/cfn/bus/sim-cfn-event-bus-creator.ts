@@ -45,13 +45,20 @@ export class SimCfnEventBusCreator {
 
     const name = busProperties.name();
     const description = busProperties.description();
+    const eventSourceName = busProperties.eventSourceName();
 
     return await simCfnEventBridgeResourceCreation(
       eventBusResourceType,
       resource.logicalId,
       async () => {
         await this.eventBridge.createEventBus(
-          { input: { Name: name, Description: description } },
+          {
+            input: {
+              Name: name,
+              Description: description,
+              EventSourceName: eventSourceName,
+            },
+          },
           options,
         );
 

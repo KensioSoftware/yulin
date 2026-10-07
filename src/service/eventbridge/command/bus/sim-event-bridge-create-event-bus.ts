@@ -6,6 +6,7 @@ import type { SimEventBusStore } from "../../bus/sim-event-bus-store.js";
 import { SimEventBridgeResourceAlreadyExistsException } from "../../error/sim-event-bridge.error.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimEventBridgeBusAccess } from "./sim-event-bridge-bus-access.js";
+import type { SimEventBridgePartnerBus } from "./sim-event-bridge-partner-bus.js";
 import { refuseUnsimulatedBusInput } from "./sim-event-bridge-unsimulated-bus-input.js";
 import type {
   SimCreateEventBusCommand,
@@ -15,6 +16,7 @@ import type {
 interface SimEventBridgeCreateEventBusProperties {
   readonly buses: SimEventBusStore;
   readonly access: SimEventBridgeBusAccess;
+  readonly partnerBus: SimEventBridgePartnerBus;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: BackgroundScheduler;
 }
@@ -25,22 +27,27 @@ interface SimEventBridgeCreateEventBusProperties {
  * Unlike SNS CreateTopic this is not idempotent: a name already taken is
  * refused rather than answered with the existing bus. `default` is among those
  * names, since that bus is always there.
+ *
+ * A request carrying an `EventSourceName` creates a partner event bus, which
+ * activates the partner event source of the same name.
  */
 export class SimEventBridgeCreateEventBus {
   private readonly buses: SimEventBusStore;
   private readonly access: SimEventBridgeBusAccess;
+  private readonly partnerBus: SimEventBridgePartnerBus;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: BackgroundScheduler;
 
   constructor(properties: SimEventBridgeCreateEventBusProperties) {
     this.buses = properties.buses;
     this.access = properties.access;
+    this.partnerBus = properties.partnerBus;
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
   }
 
   /**
-   * Create a custom event bus.
+   * Create a custom or partner event bus.
    *
    * The inputs are read before the name is looked for, so a request naming one
    * this simulation will not take is refused whether or not the name is free.
@@ -62,6 +69,8 @@ export class SimEventBridgeCreateEventBus {
         `Event bus ${name.value} already exists.`,
       );
     }
+
+    this.partnerBus.check(name, input.EventSourceName);
 
     const bus = this.created(name, input.Description);
 

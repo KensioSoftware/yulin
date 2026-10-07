@@ -10,6 +10,7 @@ import type {
   SimListEventBusesCommand,
 } from "../command/bus/bus.command.js";
 import type { SimPutEventsCommand } from "../command/put-events/put-events.command.js";
+import type { SimDescribeEventSourceCommand } from "../command/source/source.command.js";
 import type {
   SimDeleteRuleCommand,
   SimDescribeRuleCommand,
@@ -64,6 +65,14 @@ export class SimEventBridgeSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simEventBridge.listEventBuses(
             command as SimListEventBusesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeEventSourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.describeEventSource(
+            command as SimDescribeEventSourceCommand,
             simSdkCallerOptions(context),
           ),
       ],
