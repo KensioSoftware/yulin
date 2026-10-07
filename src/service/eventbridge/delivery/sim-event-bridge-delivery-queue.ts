@@ -1,16 +1,10 @@
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
-import { SimSqsServiceSendAuthorizer } from "../../sqs/command/authorize/sim-sqs-service-send-authorizer.js";
-import {
-  SimEventBridgeDeliveryNotPermitted,
-  SimEventBridgeTargetNotFound,
-} from "../error/sim-event-bridge-delivery.error.js";
 import {
   type SimEventBridgeDeliveryRequest,
   simEventBridgeDeliveryJson,
   simEventBridgeDeliverySource,
-  simEventBridgeServicePrincipal,
 } from "./sim-event-bridge-delivery.js";
-import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
+import { sendEventBridgeQueueMessage } from "./sim-event-bridge-queue-message.js";
 
 interface SimEventBridgeDeliveryQueueProperties {
   readonly scope: SimAwsAccountRegionContainer;
@@ -35,50 +29,11 @@ export class SimEventBridgeDeliveryQueue {
    * Put the event on the queue, if it admits EventBridge for this rule.
    */
   async deliver(request: SimEventBridgeDeliveryRequest): Promise<void> {
-    const source = simEventBridgeDeliverySource(request);
-    const targetArn = request.target.arn;
-    const queue = this.scope.sqs().findQueue(targetArn.resource);
-
-    if (queue === undefined) {
-      throw new SimEventBridgeTargetNotFound(
-        `${targetArn.value} is not a simulated SQS queue.`,
-      );
-    }
-
-    const decision = new SimSqsServiceSendAuthorizer({
-      iam: simScopeIamAuthZ(this.scope),
-    }).authorize({
-      queue,
-      servicePrincipal: simEventBridgeServicePrincipal,
-      ...source,
+    await sendEventBridgeQueueMessage(this.scope, {
+      queueName: request.target.arn.resource,
+      queueArn: request.target.arn.value,
+      body: simEventBridgeDeliveryJson(request),
+      source: simEventBridgeDeliverySource(request),
     });
-
-    if (decision.isDenied) {
-      throw new SimEventBridgeDeliveryNotPermitted(
-        `The queue policy of ${targetArn.value} does not allow ` +
-          `${simEventBridgeServicePrincipal} to send to it for ` +
-          `${source.sourceArn}. Grant sqs:SendMessage with the queue's ` +
-          `Policy attribute.`,
-      );
-    }
-
-    // Sent through the ordinary SendMessage path, so a delivered event is the
-    // same thing an SDK caller would have sent, and is authorized again on the
-    // way in.
-    await this.scope.sqs().sendMessage(
-      {
-        input: {
-          QueueUrl: queue.arn.url,
-          MessageBody: simEventBridgeDeliveryJson(request),
-        },
-      },
-      {
-        caller: {
-          kind: "service",
-          service: simEventBridgeServicePrincipal,
-        },
-        ...source,
-      },
-    );
   }
 }

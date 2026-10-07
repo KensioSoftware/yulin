@@ -154,12 +154,6 @@ describe("EventBridge target validation", () => {
         InputTransformer: { InputTemplate: '{"id": <id>}' },
       },
       { Id: "t", Arn: queueArn, RoleArn: "arn:aws:iam::888888888888:role/R" },
-      {
-        Id: "t",
-        Arn: queueArn,
-        DeadLetterConfig: { Arn: "arn:aws:sqs:us-east-1:888888888888:dlq" },
-      },
-      { Id: "t", Arn: queueArn, RetryPolicy: { MaximumRetryAttempts: 2 } },
       { Id: "t", Arn: queueArn, SqsParameters: { MessageGroupId: "orders" } },
       { Id: "t", Arn: queueArn, HttpParameters: { PathParameterValues: [] } },
     ];

@@ -45,6 +45,7 @@ export class SimEventBridgeRouter {
     this.accountId = properties.accountId;
     this.delivery = new SimEventBridgeTargetDelivery({
       endpoints: properties.endpoints,
+      background: properties.background,
     });
   }
 

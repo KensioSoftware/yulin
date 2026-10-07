@@ -215,6 +215,15 @@ matched. `SimEventBridgeTargetDelivery` makes each of those deliveries and keeps
 there is nothing to match it against. It still records the event on the bus, which is what lets a test
 with no target yet assert on a schedule through `eventsOn(...)`.
 
+`SimEventBridgeDeliveryAttempt` is one delivery across its retries, and it mirrors Scheduler's.
+A target with a `RetryPolicy` has a failed attempt retried on `BackgroundScheduler`, one second
+later, then two, four and so on, up to the policy's limits. A missing target or a refusal is never
+retried. An event given up on goes to the target's `DeadLetterConfig` queue through
+`SimEventBridgeDeliveryQueue`, which sends it as `events.amazonaws.com` for the rule, like a queue
+target. `sim-event-bridge-dead-letter-attributes.ts` writes the message attributes EventBridge
+documents. Scheduler sends its dead letters as the schedule's execution role, so the two services
+share the shape of the loop and none of the sending.
+
 The split is that the router decides and the delivery does. A failure is recorded rather than thrown
 because these run as background tasks: one left rejected would fail an unrelated
 `backgroundTasksComplete()`, and real EventBridge has nowhere to report a delivery failure to
@@ -222,7 +231,7 @@ anyway.
 
 ## Divergences
 
-Six, all deliberate.
+Seven, all deliberate.
 
 An entry naming a bus that does not exist **succeeds**. Real EventBridge answers 200, matches the
 event against no rule, and drops it, without counting the entry as failed. It is a trap, because a
@@ -249,3 +258,8 @@ admitted to a bus, which is stricter than real AWS.
 A scheduled rule fires **exactly, and exactly once**. Real EventBridge documents a delay of several
 seconds between a rule falling due and its target running, and does not promise a single delivery.
 Reproducing either would make a test on a schedule assert on something that is not the schedule.
+
+A target with no `RetryPolicy` is **delivered once**. Real EventBridge retries such a target for up
+to 24 hours and 185 times. Scheduler takes the same position, so in both services a test that wants
+retries says so on the target. Retry waits are a fixed power-of-two sequence where AWS adds jitter,
+which lets a test move the clock to a known retry.

@@ -40,6 +40,35 @@ export interface SimEventBridgeDeliveryTargets {
    * EventBridge.
    */
   deliver(request: SimEventBridgeDeliveryRequest): Promise<void>;
+
+  /**
+   * Send an event EventBridge gave up delivering to its target's dead-letter
+   * queue, refusing if the queue does not admit EventBridge.
+   */
+  deadLetter(request: SimEventBridgeDeadLetterRequest): Promise<void>;
+}
+
+/**
+ * Which of a target's retry limits ran out, as the dead-letter message's
+ * `EXHAUSTED_RETRY_CONDITION` names it.
+ */
+export type SimEventBridgeExhaustedRetryCondition =
+  | "MaximumEventAgeInSeconds"
+  | "MaximumRetryAttempts";
+
+/**
+ * One event on its way to a target's dead-letter queue, and why.
+ *
+ * A failure EventBridge does not retry, such as a target that is missing or
+ * refuses EventBridge, carries no exhausted condition.
+ */
+export interface SimEventBridgeDeadLetterRequest {
+  readonly delivery: SimEventBridgeDeliveryRequest;
+  readonly error: unknown;
+  readonly retryAttempts: number;
+  readonly exhaustedCondition:
+    | SimEventBridgeExhaustedRetryCondition
+    | undefined;
 }
 
 /**

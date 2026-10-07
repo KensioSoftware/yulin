@@ -1,3 +1,5 @@
+import type { BackgroundScheduler } from "../../../util/background/background.js";
+import { SimEventBridgeDeliveryAttempt } from "./sim-event-bridge-delivery-attempt.js";
 import type {
   SimEventBridgeDeliveryRequest,
   SimEventBridgeDeliveryTargets,
@@ -7,10 +9,11 @@ import { SimEventBridgeDeliveryFailures } from "./sim-event-bridge-delivery-fail
 
 interface SimEventBridgeTargetDeliveryProperties {
   readonly endpoints: SimEventBridgeDeliveryTargets;
+  readonly background: BackgroundScheduler;
 }
 
 /**
- * Makes one delivery and keeps whatever went wrong.
+ * Makes one delivery, with its retries, and keeps whatever went wrong.
  *
  * A failure is recorded rather than thrown, because these run as background
  * tasks and one left rejected would fail an unrelated
@@ -20,10 +23,12 @@ interface SimEventBridgeTargetDeliveryProperties {
  */
 export class SimEventBridgeTargetDelivery {
   private readonly endpoints: SimEventBridgeDeliveryTargets;
+  private readonly background: BackgroundScheduler;
   private readonly failures = new SimEventBridgeDeliveryFailures();
 
   constructor(properties: SimEventBridgeTargetDeliveryProperties) {
     this.endpoints = properties.endpoints;
+    this.background = properties.background;
   }
 
   /**
@@ -37,17 +42,20 @@ export class SimEventBridgeTargetDelivery {
    * Send one event to one target.
    */
   async deliver(request: SimEventBridgeDeliveryRequest): Promise<void> {
-    try {
-      await this.endpoints.deliver(request);
-    } catch (error) {
-      this.failures.record({
-        ruleName: request.ruleName,
-        ruleArn: request.ruleArn,
-        targetId: request.target.id,
-        targetArn: request.target.arn.value,
-        eventId: request.event.id,
-        error,
-      });
-    }
+    await new SimEventBridgeDeliveryAttempt({
+      request,
+      endpoints: this.endpoints,
+      background: this.background,
+      record: (error): void => {
+        this.failures.record({
+          ruleName: request.ruleName,
+          ruleArn: request.ruleArn,
+          targetId: request.target.id,
+          targetArn: request.target.arn.value,
+          eventId: request.event.id,
+          error,
+        });
+      },
+    }).start();
   }
 }

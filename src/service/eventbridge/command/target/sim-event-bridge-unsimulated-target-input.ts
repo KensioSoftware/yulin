@@ -14,8 +14,8 @@ type SimEventBridgeTargetRefusal = readonly [
  * The properties that change what a target receives, or whether it receives
  * anything at all.
  *
- * Ignoring one would leave a test believing in a transformation, a retry or a
- * dead letter queue that never happened.
+ * Ignoring one would leave a test believing in a transformation that never
+ * happened.
  */
 const behaviourRefusals: readonly SimEventBridgeTargetRefusal[] = [
   [
@@ -27,16 +27,6 @@ const behaviourRefusals: readonly SimEventBridgeTargetRefusal[] = [
     (target): unknown => target.InputTransformer,
     "Target InputTransformer is not simulated, so PutTargets refuses one " +
       "rather than sending the untransformed event",
-  ],
-  [
-    (target): unknown => target.DeadLetterConfig,
-    "Target dead letter queues are not simulated, so PutTargets refuses a " +
-      "DeadLetterConfig rather than dropping undelivered events silently",
-  ],
-  [
-    (target): unknown => target.RetryPolicy,
-    "Target retry policies are not simulated, so PutTargets refuses a " +
-      "RetryPolicy rather than delivering once and calling it retried",
   ],
   [
     (target): unknown => target.SqsParameters,

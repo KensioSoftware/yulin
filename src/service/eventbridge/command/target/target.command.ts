@@ -1,12 +1,15 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimEcsTargetParametersType } from "../../../ecs/target/sim-ecs-target-parameters.js";
+import type { SimEventTargetDeadLetterConfigInput } from "../../target/sim-event-target-dead-letter-config.js";
+import type { SimEventTargetRetryPolicyInput } from "../../target/sim-event-target-retry-policy.js";
 
 /**
  * One target as a request carries it, and as ListTargetsByRule reports it.
  *
- * The properties beyond `Id`, `Arn`, `Input`, `RoleArn` and `EcsParameters`
- * are the ones real EventBridge takes and this simulation refuses, kept in the
- * shape so a request carrying one is recognised and named rather than ignored.
+ * The properties beyond `Id`, `Arn`, `Input`, `RoleArn`, `EcsParameters`,
+ * `DeadLetterConfig` and `RetryPolicy` are the ones real EventBridge takes and
+ * this simulation refuses. They are kept in the shape so a request carrying
+ * one is recognised and named.
  */
 export interface SimEventBridgeTarget {
   readonly Id?: string | undefined;
@@ -15,8 +18,8 @@ export interface SimEventBridgeTarget {
   readonly InputPath?: string | undefined;
   readonly InputTransformer?: object | undefined;
   readonly RoleArn?: string | undefined;
-  readonly DeadLetterConfig?: object | undefined;
-  readonly RetryPolicy?: object | undefined;
+  readonly DeadLetterConfig?: SimEventTargetDeadLetterConfigInput | undefined;
+  readonly RetryPolicy?: SimEventTargetRetryPolicyInput | undefined;
   readonly SqsParameters?: object | undefined;
   readonly KinesisParameters?: object | undefined;
   readonly EcsParameters?: SimEcsTargetParametersType | undefined;

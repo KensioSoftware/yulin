@@ -110,6 +110,8 @@ export class SimCfnEventRuleCreator {
             Id: target.Id,
             Arn: target.Arn,
             Input: target.Input,
+            DeadLetterConfig: target.DeadLetterConfig,
+            RetryPolicy: target.RetryPolicy,
           })),
         },
       },
