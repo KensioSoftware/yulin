@@ -63,3 +63,13 @@ export type {
   SimRemoveTargetsCommandInput,
   SimRemoveTargetsCommandOutput,
 } from "./target/target.command.js";
+export type {
+  SimDescribeEventSourceCommand,
+  SimDescribeEventSourceCommandInput,
+  SimDescribeEventSourceCommandOutput,
+  SimPutPartnerEventsCommand,
+  SimPutPartnerEventsCommandInput,
+  SimPutPartnerEventsCommandOutput,
+  SimPutPartnerEventsRequestEntry,
+  SimPutPartnerEventsResultEntry,
+} from "./source/source.command.js";

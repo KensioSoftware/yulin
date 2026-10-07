@@ -1,3 +1,4 @@
+import { SimEventBridgeValidationException } from "../../error/sim-event-bridge.error.js";
 import type { SimEventBridgeBusAccess } from "../bus/sim-event-bridge-bus-access.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimPutEventsRequestEntry } from "./put-events.command.js";
@@ -26,6 +27,16 @@ export function authorizedEntries(
 ): readonly SimEventBridgeAuthorizedEntry[] {
   return entries.map((entry) => {
     const busName = access.requestedName(entry.EventBusName);
+
+    // PutEvents takes no `/` in a bus name or ARN, so it cannot name a partner
+    // event bus. Only the partner that owns the bus's event source sends
+    // events to it.
+    if (busName.isPartner) {
+      throw new SimEventBridgeValidationException(
+        `Invalid parameter: EventBusName Reason: '${busName.value}' is a ` +
+          `partner event bus, and only its partner sends events to it.`,
+      );
+    }
 
     access.authorizeName("events:PutEvents", busName, options);
 

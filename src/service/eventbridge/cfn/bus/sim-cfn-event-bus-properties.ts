@@ -22,7 +22,6 @@ const unsimulatedProperties: readonly (readonly [string, string])[] = [
     "DeadLetterConfig",
     "an undeliverable event is recorded rather than sent on",
   ],
-  ["EventSourceName", "partner event buses are not simulated"],
   ["KmsKeyIdentifier", "events are not encrypted with a customer managed key"],
   ["LogConfig", "event bus logging is not simulated"],
 ];
@@ -93,6 +92,24 @@ export class SimCfnEventBusProperties {
     }
 
     return description;
+  }
+
+  /**
+   * The partner event source a partner event bus is matched with, which a
+   * custom bus leaves out.
+   */
+  eventSourceName(): string | undefined {
+    const eventSourceName = this.properties.get("EventSourceName");
+
+    if (eventSourceName === undefined) {
+      return undefined;
+    }
+
+    if (typeof eventSourceName !== "string") {
+      throw this.propertyError("EventSourceName must be a string");
+    }
+
+    return eventSourceName;
   }
 
   /**

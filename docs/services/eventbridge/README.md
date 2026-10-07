@@ -921,6 +921,91 @@ and a rule routes the same events whether it carries them or not. They are recor
 property and the deploy stands. Nothing reads them back. A rule or a bus deployed with tags behaves
 as though the template had never named them.
 
+## Receiving events from a SaaS partner
+
+A SaaS partner such as Stripe sends events to an account through a partner event source, named like
+`aws.partner/stripe.com/ed_...`. The partner creates the source from its own account, so a test
+shares one with `addPartnerEventSource(...)`. The account then creates a partner event bus with the
+same `Name` and `EventSourceName`, and `putPartnerEvents(...)` sends events onto it as the partner
+would.
+
+```typescript sim-event-bridge-partner-events
+/**
+ * Receiving Stripe's events on a partner event bus.
+ */
+
+import {
+  CreateEventBusCommand,
+  PutPartnerEventsCommand,
+  PutRuleCommand,
+} from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const events = simAws.eventBridge();
+const source = "aws.partner/stripe.com/ed_test_billing";
+
+// What Stripe does when an event destination is set up for the account.
+events.addPartnerEventSource(source);
+
+// What the account does to receive from it.
+await events.createEventBus(
+  new CreateEventBusCommand({ Name: source, EventSourceName: source }),
+);
+await events.putRule(
+  new PutRuleCommand({
+    Name: "subscriptions",
+    EventBusName: source,
+    EventPattern: JSON.stringify({
+      source: [{ prefix: "aws.partner/stripe.com" }],
+      "detail-type": ["customer.subscription.created"],
+    }),
+  }),
+);
+
+// What Stripe sends when a subscription starts.
+await events.putPartnerEvents(
+  new PutPartnerEventsCommand({
+    Entries: [
+      {
+        Source: source,
+        DetailType: "customer.subscription.created",
+        Detail: JSON.stringify({
+          id: "evt_test_subscription",
+          type: "customer.subscription.created",
+          data: { object: { id: "sub_test" } },
+        }),
+      },
+    ],
+  }),
+);
+
+console.log(events.receiptsOn(source)[0]?.matchedRuleNames); // ["subscriptions"]
+```
+
+`putPartnerEvents(...)` takes the entries of the partner's `PutPartnerEvents` request. Each entry's
+`Source` names a shared source, and the event goes to the bus of the same name. Rules match it on
+`source`, `detail-type` and `detail` like any other event. A target receives the usual envelope, with
+`account` set to the receiving account. Stripe puts its event type in `DetailType` and the whole
+Stripe event object, as JSON, in `Detail`. An entry whose `Source` names no shared source fails the
+whole request with `ResourceNotFoundException`.
+
+An `AWS::Events::EventBus` with `Name` and `EventSourceName` both set to the source name creates the
+same bus from a template, and a rule names it with a `Ref` to the bus.
+
+The source has to be shared before the bus is created. `CreateEventBus` fails with
+`ResourceNotFoundException` when it is missing, and a template creating the bus fails its stack, as
+both do on AWS. A `Name` that differs from the `EventSourceName` is a `ValidationException`, as is a
+`/` in the name of a bus created without one.
+
+`DescribeEventSource` reports the source as `PENDING` until its bus exists, and `ACTIVE` after.
+Deleting the bus puts it back to `PENDING`. An event sent while the source is pending is dropped,
+as AWS documents.
+
+Only the partner sends events to a partner event bus. `PutEvents` naming one is refused with a
+`ValidationException` (its `EventBusName` takes no `/`).
+
 ## Reading back a failed delivery
 
 Real EventBridge tells the caller nothing about a failed delivery. A `PutEvents` that matched a rule
@@ -1048,6 +1133,8 @@ no permission for.
 ## Supported operations
 
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
+- Partner event buses created with `EventSourceName`, and `DescribeEventSource`. A test acts as the
+  partner through `addPartnerEventSource(...)` and `putPartnerEvents(...)`.
 - `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
   `TestEventPattern`.
 - Scheduled rules, with a `rate(...)` or six-field `cron(...)` `ScheduleExpression`, fired by
@@ -1115,8 +1202,13 @@ no permission for.
   attribute are all missing, and a caller from another account cannot be admitted to a bus. That is
   stricter than real AWS.
 - Putting an event onto another account's or region's bus is refused.
-- Partner event buses and partner event sources are refused, as are event bus tags, encryption with
-  a customer managed key, dead letter queues, logging configuration and global endpoints. An
-  `AWS::Events::EventBus` carrying `Tags` deploys with the tags dropped and the property recorded.
+- Event bus tags, encryption with a customer managed key, dead letter queues, logging configuration
+  and global endpoints are refused. An `AWS::Events::EventBus` carrying `Tags` deploys with the tags
+  dropped and the property recorded.
+- A pending partner event source never expires, and `DescribeEventSource` leaves out
+  `ExpirationTime`. Its `CreatedBy` is the segment after `aws.partner/`, such as `stripe.com`.
+  `ListEventSources`, `ActivateEventSource` and `DeactivateEventSource` are absent, as are the
+  partner's own commands. A partner is a test calling `addPartnerEventSource(...)` and
+  `putPartnerEvents(...)`.
 - Archives, replay, schema registry and discovery, API destinations and connections are not
   simulated.

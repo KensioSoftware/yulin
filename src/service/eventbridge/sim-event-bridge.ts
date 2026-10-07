@@ -15,10 +15,10 @@ import type { SimEventBridgeRequestOptions } from "./command/sim-event-bridge-re
 import { SimEventRuleStore } from "./rule/sim-event-rule-store.js";
 import { SimEventTargetStore } from "./target/sim-event-target-store.js";
 import type { SimEventBridgeDeliveryTargets } from "./delivery/sim-event-bridge-delivery.js";
-import type { SimEventBridgeDeliveryFailure } from "./delivery/sim-event-bridge-delivery-failures.js";
 import { SimEventBridgeCfnResourceFactory } from "./cfn/sim-event-bridge-cfn-resource-factory.js";
 import { SimEventBridgeSdkCommandRouter } from "./sdk/sim-event-bridge-sdk-command-router.js";
-import { SimEventBridgeInspection } from "./sim-event-bridge-inspection.js";
+import { SimEventBridgePartners } from "./sim-event-bridge-partners.js";
+import { SimPartnerEventSourceStore } from "./source/sim-partner-event-source-store.js";
 
 interface SimEventBridgeProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -47,12 +47,14 @@ interface SimEventBridgeProperties {
  * matches nothing is gone. A rule carrying a schedule instead fires on the
  * simulation's own clock, so advancing time is what sends its event.
  */
-export class SimEventBridge extends SimEventBridgeInspection {
+export class SimEventBridge extends SimEventBridgePartners {
   protected readonly buses: SimEventBusStore;
   protected readonly rules = new SimEventRuleStore();
   protected readonly targets = new SimEventTargetStore();
-  private readonly commands: SimEventBridgeCommands;
-  private readonly background: BackgroundScheduler;
+  protected readonly partnerSources = new SimPartnerEventSourceStore();
+  protected readonly commands: SimEventBridgeCommands;
+  protected readonly background: BackgroundScheduler;
+  protected readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly sdkRouter = new SimEventBridgeSdkCommandRouter(this);
   private readonly cfnFactory = new SimEventBridgeCfnResourceFactory({
     eventBridge: this,
@@ -69,6 +71,7 @@ export class SimEventBridge extends SimEventBridgeInspection {
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
     this.background = background;
+    this.accountRegionScope = accountRegionScope;
     this.buses = new SimEventBusStore(
       SimEventBus.default({ accountRegionScope, createdAt: background.now() }),
     );
@@ -76,21 +79,12 @@ export class SimEventBridge extends SimEventBridgeInspection {
       buses: this.buses,
       rules: this.rules,
       targets: this.targets,
+      partnerSources: this.partnerSources,
       deliveryTargets: properties.deliveryTargets,
       iam,
       background,
       accountRegionScope,
     });
-  }
-
-  /**
-   * Every event this scope's rules could not get to a target.
-   *
-   * Real EventBridge tells the caller nothing about a failed delivery, and
-   * neither does this. A target that is unexpectedly empty is explained here.
-   */
-  get deliveryFailures(): readonly SimEventBridgeDeliveryFailure[] {
-    return this.commands.router.deliveryFailures;
   }
 
   /**
@@ -135,6 +129,17 @@ export class SimEventBridge extends SimEventBridgeInspection {
   ): Promise<simEventBridgeCommands.SimListEventBusesCommandOutput> {
     await this.background.sequence();
     return this.commands.buses.listEventBuses(command, options);
+  }
+
+  /**
+   * Handle a DescribeEventSource Command from the SDK.
+   */
+  async describeEventSource(
+    command: simEventBridgeCommands.SimDescribeEventSourceCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimDescribeEventSourceCommandOutput> {
+    await this.background.sequence();
+    return this.commands.eventSources.handle(command, options);
   }
 
   /**

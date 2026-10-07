@@ -3,6 +3,7 @@ import {
   DeleteEventBusCommand,
   DeleteRuleCommand,
   DescribeEventBusCommand,
+  DescribeEventSourceCommand,
   DescribeRuleCommand,
   DisableRuleCommand,
   EnableRuleCommand,
@@ -176,5 +177,28 @@ describe("EventBridge SDK interception", () => {
     assertArrayEquals(byTarget.RuleNames ?? [], ["orders"]);
     assertIdentical(removed.FailedEntryCount, 0);
     assertArrayEmpty(afterRemove.Targets ?? []);
+  });
+
+  it("routes DescribeEventSource to a partner source shared with the Region", async () => {
+    // Given Stripe's partner event source shared with one Region.
+    using simSdk = new SimSdk();
+    simSdk.intercept(EventBridgeClient);
+
+    const name = "aws.partner/stripe.com/ed_test_billing";
+    simSdk.simAws
+      .account(simSdk.simAws.defaultAccountId)
+      .region("eu-west-2")
+      .eventBridge()
+      .addPartnerEventSource(name);
+
+    // When a client in that Region describes it.
+    const client = new EventBridgeClient({ region: "eu-west-2" });
+    const described = await client.send(
+      new DescribeEventSourceCommand({ Name: name }),
+    );
+
+    // Then it is the pending source the partner shared.
+    assertIdentical(described.Name, name);
+    assertIdentical(described.State, "PENDING");
   });
 });

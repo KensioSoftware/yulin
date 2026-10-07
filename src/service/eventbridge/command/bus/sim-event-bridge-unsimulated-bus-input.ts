@@ -23,11 +23,6 @@ type SimEventBridgeBusRefusal = readonly [
  */
 const refusals: readonly SimEventBridgeBusRefusal[] = [
   [
-    (input): unknown => input.EventSourceName,
-    "Partner event buses are not simulated, so CreateEventBus refuses an " +
-      "EventSourceName rather than creating a bus no partner can reach",
-  ],
-  [
     (input): unknown => input.KmsKeyIdentifier,
     "Event bus encryption with a customer managed key is not simulated, so " +
       "CreateEventBus refuses a KmsKeyIdentifier rather than creating a bus " +

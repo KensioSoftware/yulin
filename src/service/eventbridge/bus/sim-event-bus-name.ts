@@ -1,7 +1,5 @@
-import {
-  SimEventBridgeUnsimulatedInputException,
-  SimEventBridgeValidationException,
-} from "../error/sim-event-bridge.error.js";
+import { SimEventBridgeValidationException } from "../error/sim-event-bridge.error.js";
+import { isPartnerEventSourceName } from "../source/sim-partner-event-source-name.js";
 
 /**
  * The name of the event bus every Account has without creating one.
@@ -15,7 +13,8 @@ export const defaultEventBusName = "default";
 /**
  * Real EventBridge allows alphanumerics, full stops, hyphens and underscores,
  * up to 256 characters. The `/` character is in the API's own pattern but only
- * for partner event bus names, which take the form `aws.partner/...`.
+ * for partner event bus names, which take the name of their partner event
+ * source, `aws.partner/<partner>/<name>`.
  */
 const eventBusNamePattern = /^[.\-_A-Za-z0-9]{1,256}$/;
 
@@ -63,23 +62,24 @@ export class SimEventBusName {
    * refuse.
    */
   static of(value: string): SimEventBusName {
-    if (value.includes(partnerNameSeparator)) {
-      throw new SimEventBridgeUnsimulatedInputException(
-        `Event bus name '${value}' carries a '/', which only a partner event ` +
-          `bus name does. Partner event buses are not simulated.`,
-      );
+    if (eventBusNamePattern.test(value) || isPartnerEventSourceName(value)) {
+      return new this(value);
     }
 
-    if (!eventBusNamePattern.test(value)) {
-      throw new SimEventBridgeValidationException(
-        `Invalid parameter: Name Reason: '${value}' is not a valid event bus ` +
-          `name. Event bus names are made up of only letters, numbers, full ` +
-          `stops, hyphens and underscores, and are between 1 and 256 ` +
-          `characters long.`,
-      );
-    }
+    throw new SimEventBridgeValidationException(
+      `Invalid parameter: Name Reason: '${value}' is not a valid event bus ` +
+        `name. Event bus names are made up of only letters, numbers, full ` +
+        `stops, hyphens and underscores, and are between 1 and 256 ` +
+        `characters long. Only a partner event bus name carries a '/', and ` +
+        `it takes the form aws.partner/<partner>/<name>.`,
+    );
+  }
 
-    return new this(value);
+  /**
+   * Whether this is the name of a partner event bus.
+   */
+  get isPartner(): boolean {
+    return this.value.includes(partnerNameSeparator);
   }
 
   /**

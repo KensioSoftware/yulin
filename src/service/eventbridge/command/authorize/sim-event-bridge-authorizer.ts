@@ -89,6 +89,18 @@ export class SimEventBridgeAuthorizer {
   }
 
   /**
+   * Ensure the caller may perform an action on a partner event source, named
+   * by its ARN.
+   */
+  authorizeEventSource(
+    action: string,
+    sourceArn: string,
+    options?: SimEventBridgeRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, sourceArn, options);
+  }
+
+  /**
    * Ensure the caller may perform an action that names no particular bus.
    */
   authorizeAnyBus(
