@@ -1282,12 +1282,12 @@ no permission for.
 - Targets deliver to Lambda, SQS and SNS, and run a task in ECS. A target ARN naming any other
   service is refused as the target is added, ahead of any matching event.
 - Target `InputPath` and `InputTransformer` are refused. A target `RoleArn` is refused except on an
-  ECS target.
+  ECS target. That is the one target type that runs as a role, where the others run as the service
+  principal.
 - A target with no `RetryPolicy` is delivered once. Real EventBridge retries such a target for up to
   24 hours and 185 times. Retry waits are deterministic powers of two seconds, where real
   EventBridge uses exponential backoff with jitter. The fixed sequence lets a test move the clock to
   a known retry.
-  That is the one target type that runs as a role, where the others run as the service principal.
 - An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
   `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
   there is no placement and no network here for them to apply to. Anything else it can carry, such
