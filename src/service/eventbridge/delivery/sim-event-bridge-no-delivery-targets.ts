@@ -1,5 +1,6 @@
 import { SimEventBridgeTargetNotFound } from "../error/sim-event-bridge-delivery.error.js";
 import type {
+  SimEventBridgeDeadLetterRequest,
   SimEventBridgeDeliveryRequest,
   SimEventBridgeDeliveryTargets,
 } from "./sim-event-bridge-delivery.js";
@@ -23,6 +24,20 @@ export class SimEventBridgeNoDeliveryTargets implements SimEventBridgeDeliveryTa
         `This simulated EventBridge has no targets to deliver to, so ` +
           `${request.target.arn.value} was not reached. Reach EventBridge ` +
           `through SimAws for a rule that delivers.`,
+      ),
+    );
+  }
+
+  /**
+   * Refuse the dead letter, saying why there was nowhere to send it.
+   */
+  deadLetter(request: SimEventBridgeDeadLetterRequest): Promise<void> {
+    return Promise.reject(
+      new SimEventBridgeTargetNotFound(
+        `This simulated EventBridge has no queues to send dead letters to, ` +
+          `so the dead-letter queue of target ${request.delivery.target.id} ` +
+          `was not reached. Reach EventBridge through SimAws for a ` +
+          `dead-letter queue that receives.`,
       ),
     );
   }

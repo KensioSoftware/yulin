@@ -1,5 +1,8 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimEventTargetDeadLetterConfigInput } from "../../target/sim-event-target-dead-letter-config.js";
+import type { SimEventTargetRetryPolicyInput } from "../../target/sim-event-target-retry-policy.js";
+import { simCfnEventRuleTargetDelivery } from "./sim-cfn-event-rule-target-delivery.js";
 
 /**
  * One target of a rule, as this simulation takes it.
@@ -8,6 +11,8 @@ export interface SimCfnEventRuleTarget {
   readonly Id: string;
   readonly Arn: string;
   readonly Input?: string | undefined;
+  readonly DeadLetterConfig?: SimEventTargetDeadLetterConfigInput | undefined;
+  readonly RetryPolicy?: SimEventTargetRetryPolicyInput | undefined;
 }
 
 /**
@@ -25,8 +30,6 @@ const unsimulatedTargetProperties: readonly (readonly [string, string])[] = [
     "a rule reaches its target as the EventBridge service principal, and an " +
       "ECS target, which does carry a role, is written with PutTargets",
   ],
-  ["DeadLetterConfig", "a failed delivery is recorded rather than sent on"],
-  ["RetryPolicy", "a delivery is attempted once"],
   ["SqsParameters", "a FIFO queue target is not simulated"],
   ["KinesisParameters", "Kinesis is not a simulated target"],
   [
@@ -88,7 +91,14 @@ function readTarget(
     throw refuse(`target ${id} Input must be a string of JSON`);
   }
 
-  return { Id: id, Arn: arn, Input: input };
+  return {
+    Id: id,
+    Arn: arn,
+    Input: input,
+    ...simCfnEventRuleTargetDelivery(target, (reason) =>
+      refuse(`target ${id} ${reason}`),
+    ),
+  };
 }
 
 /**

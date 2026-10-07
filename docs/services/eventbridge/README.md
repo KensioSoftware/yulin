@@ -1066,6 +1066,125 @@ no is a modelled outcome a test may be asking for on purpose.
 `JSON.stringify` on a failure carries the message alongside the rule, the target and the event it
 names.
 
+## Retrying and dead-lettering a delivery
+
+A target can carry a `RetryPolicy` and a `DeadLetterConfig`, from `PutTargets` or from a target in an
+`AWS::Events::Rule`. The dead-letter queue receives an event once EventBridge gives up delivering it.
+
+```typescript sim-event-bridge-dead-letter
+/**
+ * Sending an event a target refused to its dead-letter queue.
+ */
+
+import {
+  PutEventsCommand,
+  PutRuleCommand,
+  PutTargetsCommand,
+} from "@aws-sdk/client-eventbridge";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dlqArn = "arn:aws:sqs:us-east-1:888888888888:undelivered-orders";
+
+// A dead-letter queue admitting EventBridge for the rule.
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "undelivered-orders" }));
+await simAws.sqs().setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "events.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: dlqArn,
+            Condition: {
+              ArnEquals: {
+                "aws:SourceArn":
+                  "arn:aws:events:us-east-1:888888888888:rule/orders",
+              },
+            },
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+// A target queue that was never created, so every delivery fails.
+await simAws.eventBridge().putRule(
+  new PutRuleCommand({
+    Name: "orders",
+    EventPattern: JSON.stringify({ source: ["orders.service"] }),
+  }),
+);
+await simAws.eventBridge().putTargets(
+  new PutTargetsCommand({
+    Rule: "orders",
+    Targets: [
+      {
+        Id: "fulfilment",
+        Arn: "arn:aws:sqs:us-east-1:888888888888:fulfilment",
+        RetryPolicy: { MaximumRetryAttempts: 2 },
+        DeadLetterConfig: { Arn: dlqArn },
+      },
+    ],
+  }),
+);
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      { Source: "orders.service", DetailType: "OrderPlaced", Detail: "{}" },
+    ],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const { Messages } = await simAws
+  .sqs()
+  .receiveMessage(
+    new ReceiveMessageCommand({ QueueUrl, MessageAttributeNames: ["All"] }),
+  );
+
+console.log(Messages?.[0]?.MessageAttributes?.["ERROR_CODE"]?.StringValue);
+// "NO_RESOURCE"
+```
+
+The message body is the event, as JSON. Its attributes are the ones EventBridge documents.
+`RULE_ARN` and `TARGET_ARN` name where the event was going. `ERROR_CODE` and `ERROR_MESSAGE` say why
+it failed, and `RETRY_ATTEMPTS` counts the retries made. `EXHAUSTED_RETRY_CONDITION` is
+`MaximumRetryAttempts` or `MaximumEventAgeInSeconds` when a retry limit ran out.
+
+`ERROR_CODE` is `NO_PERMISSIONS` for a target that refused EventBridge and `NO_RESOURCE` for one
+that is not there. Every other failure is `ERROR_FROM_TARGET`. EventBridge lists these codes
+without saying which failure gets which.
+
+A missing target and a refusal are never retried, because the same request gets the same answer.
+EventBridge sends both straight to the dead-letter queue, and so does Yulin. Any other failure is
+retried on the simulation's clock. The first retry is due one second after the failed attempt, and
+each following wait doubles to 2, 4, 8 seconds and so on. Retries stop at `MaximumRetryAttempts`, or
+once the event is `MaximumEventAgeInSeconds` old. A retry only runs as `advanceBy(...)` moves the
+clock past it.
+
+EventBridge sends to the dead-letter queue as `events.amazonaws.com`, with the rule ARN as
+`aws:SourceArn`, so the queue policy has to admit it. A dead-letter queue that is missing or refuses
+EventBridge leaves the failure in `deliveryFailures`. An event that reached its dead-letter queue
+leaves nothing there.
+
+A Lambda target is invoked asynchronously. Once Lambda accepts the invocation the delivery is done,
+and a handler error is left to the function's own retries and destinations.
+
 ## Permissions
 
 Most operations are authorized by simulated IAM against the bus ARN. The two that name no bus
@@ -1148,6 +1267,8 @@ no permission for.
 - Targets in another account or region of the same simulation, admitted by the target's own resource
   policy on `aws:SourceArn` or `aws:SourceAccount`, as real EventBridge does.
 - A target's fixed `Input`, and `deliveryFailures` for a delivery that failed.
+- A target's `RetryPolicy`, retried on the simulation's clock, and its `DeadLetterConfig`, with the
+  dead-letter message attributes EventBridge documents.
 - The `default` bus in every account and region, without one being created.
 - Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged
   listings.
@@ -1160,9 +1281,13 @@ no permission for.
 
 - Targets deliver to Lambda, SQS and SNS, and run a task in ECS. A target ARN naming any other
   service is refused as the target is added, ahead of any matching event.
-- Target `InputPath` and `InputTransformer` are refused, as are dead letter queues and retry
-  policies. A delivery is attempted once. A target `RoleArn` is refused except on an ECS target.
-  That is the one target type that runs as a role, where the others run as the service principal.
+- Target `InputPath` and `InputTransformer` are refused. A target `RoleArn` is refused except on an
+  ECS target. That is the one target type that runs as a role, where the others run as the service
+  principal.
+- A target with no `RetryPolicy` is delivered once. Real EventBridge retries such a target for up to
+  24 hours and 185 times. Retry waits are deterministic powers of two seconds, where real
+  EventBridge uses exponential backoff with jitter. The fixed sequence lets a test move the clock to
+  a known retry.
 - An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
   `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
   there is no placement and no network here for them to apply to. Anything else it can carry, such

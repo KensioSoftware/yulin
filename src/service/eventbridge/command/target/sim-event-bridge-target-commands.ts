@@ -97,6 +97,8 @@ export class SimEventBridgeTargetCommands {
         Input: target.input,
         RoleArn: target.ecs?.roleArn,
         EcsParameters: target.ecs?.task.parameters.declared,
+        RetryPolicy: target.retryPolicy?.declared,
+        DeadLetterConfig: target.deadLetterConfig?.declared,
       }));
     const page = new SimEventBridgePage(listed, input.Limit, input.NextToken);
 

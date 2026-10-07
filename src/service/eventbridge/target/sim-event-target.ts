@@ -1,6 +1,14 @@
 import { SimEventBridgeValidationException } from "../error/sim-event-bridge.error.js";
 import { SimEventTargetArn } from "./sim-event-target-arn.js";
 import {
+  SimEventTargetDeadLetterConfig,
+  type SimEventTargetDeadLetterConfigInput,
+} from "./sim-event-target-dead-letter-config.js";
+import {
+  SimEventTargetRetryPolicy,
+  type SimEventTargetRetryPolicyInput,
+} from "./sim-event-target-retry-policy.js";
+import {
   SimEventTargetEcs,
   type SimEventTargetTaskProperties,
 } from "./sim-event-target-ecs.js";
@@ -16,6 +24,8 @@ interface SimEventTargetProperties {
   readonly arn: SimEventTargetArn;
   readonly input: string | undefined;
   readonly ecs: SimEventTargetEcs | undefined;
+  readonly retryPolicy: SimEventTargetRetryPolicy | undefined;
+  readonly deadLetterConfig: SimEventTargetDeadLetterConfig | undefined;
 }
 
 /**
@@ -50,11 +60,28 @@ export class SimEventTarget {
    */
   public readonly ecs: SimEventTargetEcs | undefined;
 
+  /**
+   * How long and how often a failed delivery is retried, where the target
+   * says.
+   *
+   * A target without one is delivered once. Real EventBridge retries such a
+   * target for up to 24 hours by default, and that divergence is documented.
+   */
+  public readonly retryPolicy: SimEventTargetRetryPolicy | undefined;
+
+  /**
+   * The queue an event goes to once delivery is given up, where the target
+   * names one.
+   */
+  public readonly deadLetterConfig: SimEventTargetDeadLetterConfig | undefined;
+
   private constructor(properties: SimEventTargetProperties) {
     this.id = properties.id;
     this.arn = properties.arn;
     this.input = properties.input;
     this.ecs = properties.ecs;
+    this.retryPolicy = properties.retryPolicy;
+    this.deadLetterConfig = properties.deadLetterConfig;
   }
 
   /**
@@ -64,6 +91,10 @@ export class SimEventTarget {
     properties: SimEventTargetTaskProperties & {
       readonly Id?: string | undefined;
       readonly Arn?: string | undefined;
+      readonly RetryPolicy?: SimEventTargetRetryPolicyInput | undefined;
+      readonly DeadLetterConfig?:
+        | SimEventTargetDeadLetterConfigInput
+        | undefined;
     },
   ): SimEventTarget {
     const arn = SimEventTargetArn.of(properties.Arn);
@@ -73,6 +104,10 @@ export class SimEventTarget {
       arn,
       input: this.readInput(properties.Input),
       ecs: SimEventTargetEcs.of(arn, properties),
+      retryPolicy: SimEventTargetRetryPolicy.optional(properties.RetryPolicy),
+      deadLetterConfig: SimEventTargetDeadLetterConfig.optional(
+        properties.DeadLetterConfig,
+      ),
     });
   }
 
