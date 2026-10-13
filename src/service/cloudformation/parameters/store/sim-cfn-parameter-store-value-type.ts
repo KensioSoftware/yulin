@@ -1,3 +1,5 @@
+import { isSimCfnParameterListType } from "../sim-cfn-parameter-list-type.js";
+
 /** The Parameter type that holds a Parameter Store name. */
 const parameterStoreValuePrefix = "AWS::SSM::Parameter::Value<";
 
@@ -34,6 +36,6 @@ export function simCfnParameterStoreValueType(
   const innerType = declaredType.slice(parameterStoreValuePrefix.length, -1);
 
   return {
-    list: innerType === "CommaDelimitedList" || innerType.startsWith("List<"),
+    list: isSimCfnParameterListType(innerType),
   };
 }

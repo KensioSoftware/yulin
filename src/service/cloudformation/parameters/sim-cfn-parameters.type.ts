@@ -6,9 +6,10 @@ import type { SimCfnParameterStoreReader } from "./store/sim-cfn-parameter-store
  * defaults and Parameter Store reads have been applied.
  *
  * A Parameter is given its value as a string, because AWS CloudFormation
- * command inputs provide ParameterValue as one. A Parameter declared as
- * `AWS::SSM::Parameter::Value<List<String>>` is given a parameter name and
- * resolves to the stored value split into a list, so a resolved value can be
+ * command inputs provide ParameterValue as one. A `CommaDelimitedList` or
+ * `List<...>` Parameter resolves to that string split into a list. So does an
+ * `AWS::SSM::Parameter::Value<List<String>>` Parameter, which is given a
+ * parameter name and splits the value stored under it. A resolved value can be
  * either.
  */
 export type SimCloudFormationParameterValue = string | string[];
@@ -73,8 +74,9 @@ export type SimCfnParametersContext = Pick<
  *
  * Most fields are recorded for structural typing/documentation. Runtime
  * behavior applies string Default values when a command does not provide an
- * explicit Parameter value, and reads an `AWS::SSM::Parameter::Value<...>`
- * Type from simulated Parameter Store.
+ * explicit Parameter value, splits the value of a `CommaDelimitedList` or
+ * `List<...>` Type, and reads an `AWS::SSM::Parameter::Value<...>` Type from
+ * simulated Parameter Store.
  */
 export interface SimCfnParameterDefinition {
   readonly Type?: string | undefined;
