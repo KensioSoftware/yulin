@@ -948,8 +948,20 @@ console.log(
 
 A parameter with no supplied value takes the template default, when the template has one.
 
-A parameter's `Type` is read for the `AWS::SSM::Parameter::Value<...>` types, which hold a Parameter
-Store name and resolve to the value stored under it. See
+A `CommaDelimitedList` or `List<...>` parameter (`List<String>`, `List<Number>`,
+`List<AWS::EC2::Subnet::Id>` and the rest) is given one comma-separated string. A `Ref` to it
+resolves to the list of members, each trimmed of the spaces around it. `Fn::Join` and `Fn::Select`
+read that list as they read any other:
+
+```json
+{ "Fn::Join": ["-", { "Ref": "Names" }] }
+```
+
+With `Names` declared as a `CommaDelimitedList` and given `a, b, c`, this resolves to `a-b-c`. The
+members of a `List<Number>` are strings, as CloudFormation gives them.
+
+The `AWS::SSM::Parameter::Value<...>` types hold a Parameter Store name and resolve to the value
+stored under it. See
 [reading a parameter through a template Parameter](https://yulinsim.dev/services/ssm/#reading-a-parameter-through-a-template-parameter).
 Every other type is accepted and its value used as written, with no validation of the value against
 the type.
@@ -1224,9 +1236,9 @@ The second argument may also be a function that returns the whole list. CDK writ
 { "Fn::Join": [",", { "Fn::GetAtt": ["Zone", "NameServers"] }] }
 ```
 
-`Fn::Split`, an `Fn::FindInMap` of a list value and `Fn::If` can supply the list the same way. A list
-that resolves to anything but strings fails the deployment. That includes a number, and a list
-nested inside the list (CloudFormation joins one level only).
+`Fn::Split`, an `Fn::FindInMap` of a list value, `Fn::If` and a `Ref` to a list parameter can supply
+the list the same way. A list that resolves to anything but strings fails the deployment. That
+includes a number, and a list nested inside the list (CloudFormation joins one level only).
 
 ### `Fn::Sub`
 
