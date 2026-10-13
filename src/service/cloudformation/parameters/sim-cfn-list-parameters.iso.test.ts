@@ -28,7 +28,7 @@ async function resolvedProperty(
         },
       },
     },
-    ...(!(supplied === undefined) && { parameters: { Names: supplied } }),
+    ...(supplied !== undefined && { parameters: { Names: supplied } }),
   });
   const resource = stack.getResource("Handle");
   assertNonNullable(resource);
