@@ -1079,7 +1079,7 @@ A delete on a versioned Bucket raises `s3:ObjectRemoved:DeleteMarkerCreated` rat
 
 - MFA delete is refused with `NotImplemented` rather than stored. Nothing here could enforce it, and
   a Bucket reporting a protection it does not apply is worse than one that says so. `MFADelete:
-"Disabled"` is taken, and any other value is refused with `InvalidArgument`.
+  "Disabled"` is taken, and any other value is refused with `InvalidArgument`.
 - A `versionId` in a `CopySource` is still refused with `NotImplemented`. A copy reads the current
   version.
 - `NoncurrentVersionTransitions` is stored and unread, because storage classes are left out. An

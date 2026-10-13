@@ -415,6 +415,6 @@ service guide lists its supported commands.
 - `yulin watch` does not preserve simulated state across a restart or reload changed Lambda and
   CloudFront Function code inside the current process.
 - The shared AWS API endpoint refuses unsupported protocols and operations with `501 Not
-Implemented`.
+  Implemented`.
 - Some service functionality is available only through `SimAws` or SDK interception. Check the
   relevant service guide before depending on access through the local endpoint.

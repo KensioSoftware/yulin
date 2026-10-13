@@ -1214,7 +1214,7 @@ Current documented limitations:
 - A Lambda event source mapping polls one batch at a time. Real Lambda runs several pollers at once
   and scales them with the queue, and what that concurrency does to ordering is invisible here. See
   [simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
-source mapping docs") for the rest of the mapping limitations.
+  source mapping docs") for the rest of the mapping limitations.
 - `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` are the SQS resource types CloudFormation creates.
   Any other is reported as unsupported and skipped. A queue attribute outside the range real SQS
   accepts fails the resource, and a property it has no behaviour for is recorded and the queue
