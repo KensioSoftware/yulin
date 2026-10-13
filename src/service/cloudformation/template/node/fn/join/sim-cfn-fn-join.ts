@@ -1,6 +1,7 @@
 import { SimCfnNode } from "../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
+import { isSimCfnUnresolvedExpression } from "../../../value/sim-cfn-unresolved-expression.js";
 
 /**
  * Simulated CloudFormation `Fn::Join` intrinsic function.
@@ -10,23 +11,29 @@ import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-cont
  * {
  *   "Fn::Join": ["-", ["a", "b", { "Ref": "Name" }]]
  * }
+ *
+ * The values may also come from one function that returns the whole list:
+ *
+ * {
+ *   "Fn::Join": [",", { "Fn::GetAtt": ["Zone", "NameServers"] }]
+ * }
  */
 export class SimCfnFnJoin extends SimCfnNode {
   constructor(
     private readonly delimiter: string,
-    private readonly values: readonly SimCfnNode[],
+    private readonly values: SimCfnNode,
   ) {
     super();
   }
 
   /**
-   * Resolve each value and join them with the delimiter.
+   * Resolve the values and join them with the delimiter.
    *
-   * Joining happens only when every value has resolved to a string. If any
-   * value is still an unresolved expression (for example a Resource `Ref`
-   * during the up-front pass before Resources exist), this node re-emits
-   * itself in template form. A later resolution pass can finish it once the
-   * referenced Resources are available.
+   * Joining happens only when the values have resolved to a list of strings.
+   * If the list, or any value in it, is still an unresolved expression (for
+   * example a Resource `Ref` during the up-front pass before Resources exist),
+   * this node re-emits itself in template form. A later resolution pass can
+   * finish it once the referenced Resources are available.
    *
    * A dynamic reference can be assembled out of the joined values, as CDK
    * writes one whenever the secret it reads sits in the same Stack: the
@@ -36,53 +43,64 @@ export class SimCfnFnJoin extends SimCfnNode {
    * out of its variables.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
-    const resolved = this.values.map((value) =>
-      this.resolveValue(value, context),
-    );
+    const values = this.values.resolve(context);
 
-    if (resolved.every((value): value is string => typeof value === "string")) {
-      const joined = resolved.join(this.delimiter);
+    if (isSimCfnUnresolvedExpression(values)) {
+      return { "Fn::Join": [this.delimiter, values] };
+    }
+
+    if (!Array.isArray(values)) {
+      throw new TypeError(
+        `Sim CloudFormation Fn::Join values must resolve to a list, got ${describe(values)}`,
+      );
+    }
+
+    for (const value of values) {
+      this.assertJoinable(value);
+    }
+
+    if (values.every((value): value is string => typeof value === "string")) {
+      const joined = values.join(this.delimiter);
 
       return context.dynamicReferences?.substitute(joined) ?? joined;
     }
 
-    return { "Fn::Join": [this.delimiter, resolved] };
+    return { "Fn::Join": [this.delimiter, values] };
   }
 
   /**
-   * Collect referenced names from every joined value.
+   * Collect referenced names from the values.
    */
   override referencedNames(): string[] {
-    return this.values.flatMap((value) => value.referencedNames());
+    return this.values.referencedNames();
   }
 
-  private resolveValue(
-    value: SimCfnNode,
-    context: SimCfnResolveContext,
-  ): SimCfnTemplateValue {
-    const resolved = value.resolve(context);
-
-    if (typeof resolved === "string") {
-      return resolved;
-    }
-
-    if (this.isDeferredExpression(resolved)) {
-      return resolved;
+  /**
+   * Refuse a value that can never become a string.
+   *
+   * A string joins now, and an unresolved expression may join on a later
+   * pass. Anything else (a number, a nested list, a plain object) is a type
+   * error, as CloudFormation joins a list of strings only.
+   */
+  private assertJoinable(value: SimCfnTemplateValue): void {
+    if (typeof value === "string" || isSimCfnUnresolvedExpression(value)) {
+      return;
     }
 
     throw new TypeError(
-      `Sim CloudFormation Fn::Join values must each resolve to a string, got ${typeof resolved}`,
+      `Sim CloudFormation Fn::Join values must each resolve to a string, got ${describe(value)}`,
     );
   }
+}
 
-  /**
-   * Whether a resolved value is still an unresolved intrinsic expression.
-   *
-   * Only object-shaped values (a preserved `Ref` or nested function object)
-   * are treated as deferred. Other non-string primitives such as numbers are
-   * genuine type errors.
-   */
-  private isDeferredExpression(value: SimCfnTemplateValue): boolean {
-    return typeof value === "object" && value !== null;
+/**
+ * Name a resolved value's type for an error message, telling a list and a
+ * null apart from an object.
+ */
+function describe(value: SimCfnTemplateValue): string {
+  if (Array.isArray(value)) {
+    return "list";
   }
+
+  return value === null ? "null" : typeof value;
 }
