@@ -11,10 +11,13 @@ import type { SimCfnValueParser } from "../../value/sim-cfn-value-parser.type.js
  *   "Fn::Join": ["-", ["a", { "Ref": "Name" }]]
  * }
  *
- * The parser validates only the Fn::Join envelope: a string delimiter and an
- * array of values. Each joined value is parsed through the recursive value
- * parser, because join entries may themselves be literals, Refs, other
- * intrinsic functions, arrays, or plain objects.
+ * The values argument goes through the recursive value parser. It may be a
+ * literal list, whose entries may themselves be literals, Refs or other
+ * intrinsic functions, or a function that returns a whole list (such as
+ * `Fn::GetAtt` on a hosted zone's `NameServers`, or `Fn::Split`). Whether it
+ * resolves to a list of strings is a resolution-time question, so it belongs
+ * to the node. A string, number or boolean in its place can never become a
+ * list, and is refused here.
  */
 export class SimCfnFnJoinParser {
   constructor(private readonly valueParser: SimCfnValueParser) {}
@@ -37,15 +40,13 @@ export class SimCfnFnJoinParser {
       );
     }
 
-    if (!Array.isArray(values)) {
+    if (typeof values !== "object" || values === null) {
       throw new TypeError(
-        "Sim CloudFormation Fn::Join values must be an array",
+        "Sim CloudFormation Fn::Join values must be a list or a function " +
+          "that returns one",
       );
     }
 
-    return new SimCfnFunctionJoin(
-      delimiter,
-      values.map((item) => this.valueParser.parse(item)),
-    );
+    return new SimCfnFunctionJoin(delimiter, this.valueParser.parse(values));
   }
 }

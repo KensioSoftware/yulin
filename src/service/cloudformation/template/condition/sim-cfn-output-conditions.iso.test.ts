@@ -101,7 +101,7 @@ describe("SimCfnStack Output Condition", () => {
     // Then the import finds nothing, because nothing was published.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Resource BackupsCopy value at Properties.BucketName: " +
+      "Sim CloudFormation Resource BackupsCopy value at Properties.BucketName[0]: " +
         "No export named BackupsBucketName found",
     );
   });

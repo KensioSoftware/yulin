@@ -193,7 +193,7 @@ describe("SimCfnNodeParser", () => {
     );
   });
 
-  it("throws when Fn::Join values are not an array", () => {
+  it("throws when Fn::Join values are a string", () => {
     const parser = new SimCfnNodeParser();
 
     const error = assertThrowsError(() => {
@@ -205,7 +205,7 @@ describe("SimCfnNodeParser", () => {
     assertInstanceOf(error, TypeError);
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::Join values must be an array",
+      "Sim CloudFormation Fn::Join values must be a list or a function that returns one",
     );
   });
 

@@ -1217,6 +1217,17 @@ await simAws.cloudFormation().deployTemplate({
 });
 ```
 
+The second argument may also be a function that returns the whole list. CDK writes this for
+`Fn.join(",", zone.hostedZoneNameServers)`:
+
+```json
+{ "Fn::Join": [",", { "Fn::GetAtt": ["Zone", "NameServers"] }] }
+```
+
+`Fn::Split`, an `Fn::FindInMap` of a list value and `Fn::If` can supply the list the same way. A list
+that resolves to anything but strings fails the deployment. That includes a number, and a list
+nested inside the list (CloudFormation joins one level only).
+
 ### `Fn::Sub`
 
 ```typescript sim-cloudformation-fn-sub
@@ -4545,9 +4556,9 @@ Each service's own docs describe what its resource types support.
   would reject as well. The simulator just rejects them later rather than up front.
 - `Fn::If` is a condition function inside the `Conditions` section, and is not a value an
   `Fn::Equals` can compare. Real CloudFormation allows only `Ref` and `Fn::FindInMap` there.
-- `Fn::Split` and `Fn::Select` accept any argument that resolves to the type they need. Real
-  CloudFormation allows only a named set of functions inside each of them. A template the simulator
-  resolves may still be one CloudFormation rejects.
+- `Fn::Join`, `Fn::Split` and `Fn::Select` accept any argument that resolves to the type they
+  need. Real CloudFormation allows only a named set of functions inside each of them. A template the
+  simulator resolves may still be one CloudFormation rejects.
 - The SAM transform is expanded for `AWS::Serverless::Function`, `AWS::Serverless::SimpleTable`,
   `AWS::Serverless::HttpApi` and `AWS::Serverless::Api`. Every other `AWS::Serverless::*` resource
   type is recorded as unsupported. `Api`, `HttpApi`, `SQS`, `DynamoDB`, `SNS`, `S3`, `Cognito`,
