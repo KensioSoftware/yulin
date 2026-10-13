@@ -556,7 +556,7 @@ Important behavior:
 
 - every action is evaluated against `SimDynamoDbItemSnapshot` of the item as it stood before the
   request, rather than against the item being built. `REMOVE a SET b = a, c = b` on `{ a: 1, b: 2,
-c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left to right answers
+  c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left to right answers
   differently.
 - UpdateItem upserts. With nothing stored under the key, the new item is built from the `Key` plus
   the SET actions, and the snapshot every action reads holds nothing.

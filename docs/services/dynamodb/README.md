@@ -3940,7 +3940,7 @@ is written.
   `AWS::DynamoDB::Table` path does, with the replica's `TableClass`, `DeletionProtectionEnabled` and
   `Tags` read off it, the table's writes and the replica's reads put back together into one
   provisioned capacity for the table and for each global secondary index, and `Ref`, `Fn::GetAtt …
-Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `TableV2` stack deploys
+  Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `TableV2` stack deploys
   through it without hand-editing.
 - SDK interception, and an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
   simulation.
@@ -4035,7 +4035,7 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 - Time to live expiry is dispatched by moving the clock through `simAws.clock()`, not by real time
   elapsing. An item whose window goes by while a running-mode clock tracks the host stays where it
   is until something moves the clock. A simulated DynamoDB constructed standalone as `new
-SimDynamoDb()` has no clock control at all. No item there ever expires.
+  SimDynamoDb()` has no clock control at all. No item there ever expires.
 - A Lambda event source mapping is the only simulated service integration that consumes a stream.
   Anything else reads one through the Streams API itself. A Kinesis Data Streams destination is
   absent.

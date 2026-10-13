@@ -20,6 +20,10 @@ export default defineConfig({
   files: ["**/*.cff.js"],
   extends: [tseslint.configs.disableTypeChecked],
   languageOptions: {
+    // The typescript-eslint rules below read scope information only its own
+    // parser produces. Under ESLint's default parser, `no-unused-vars` takes
+    // every reference for a type-only one and reports each variable.
+    parser: tseslint.parser,
     parserOptions: {
       projectService: false,
     },

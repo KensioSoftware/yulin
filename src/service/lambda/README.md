@@ -122,7 +122,7 @@ one of those two API primitives. The simulator supports both, plus a sim-only co
 3. **A zip object in sim S3** via `Code.S3Bucket`/`S3Key`. The fetch goes through the sim S3
    GetObject operation as the creating caller, so simulated IAM applies to the code object, and S3
    lookup failures are wrapped AWS-style (`Error occurred while GetObject. S3 Error Code:
-NoSuchKey. ...`). `S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning
+   NoSuchKey. ...`). `S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning
    yet. A standalone `SimLambda` has no sim S3; `SimAws`-created Lambda wires the same-scope sim S3
    automatically (real Lambda requires a same-region code bucket).
 
