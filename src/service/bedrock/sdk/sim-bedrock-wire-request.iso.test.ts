@@ -134,6 +134,25 @@ describe("Bedrock over the wire path", () => {
     await simAws.backgroundTasksComplete();
   });
 
+  it("answers a model id with a malformed escape with an error", async () => {
+    // Given a simulation reached over the wire.
+    const simAws = new SimAws({ defaultRegionName: region });
+    const dispatcher = new SimSdkWireDispatcher(simAws);
+
+    // When an invocation's model id carries an escape that does not decode.
+    const response = await dispatcher.dispatch(
+      bedrockRequest({ path: "/model/titan%E0%A4%A/invoke" }),
+    );
+
+    // Then the failure is an answer the SDK can read.
+    assertIdentical(response.statusCode, 400);
+    assertObjectMatches(JSON.parse(bodyText(response)) as object, {
+      __type: "URIError",
+    });
+
+    await simAws.backgroundTasksComplete();
+  });
+
   for (const [description, request] of [
     ["a path that is no model invocation", { path: "/foundation-models" }],
     ["an action Bedrock Runtime lacks", { path: `/model/${titan}/translate` }],

@@ -51,12 +51,14 @@ export function readSimSdkWireBedrockCall(
     return undefined;
   }
 
-  const modelId = decodeURIComponent(groups["modelId"] ?? "");
+  // A malformed escape fails decoding, which is the service's answer to the
+  // request, so the model id is decoded when the input is read.
+  const encodedModelId = groups["modelId"] ?? "";
 
   return {
     serviceId: bedrockRuntimeServiceId,
     commandName: action.commandName,
-    input: () => action.input(modelId, request),
+    input: () => action.input(decodeURIComponent(encodedModelId), request),
     outputResponse: async (output) => await action.outputResponse(output),
     errorResponse: (error) =>
       simSdkWireErrorResponse(error, simSdkWireBedrockJsonContentType),
