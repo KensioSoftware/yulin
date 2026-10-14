@@ -3,12 +3,11 @@ import { SimSdkCommandDispatcher } from "../../../../../../sdk/sim-sdk-command-d
 import type { AwsRegionName } from "../../../../../aws/sim-aws-region.js";
 import type { SimAws } from "../../../../../aws/sim-aws.js";
 import { SimLambdaAwsApiOutbound } from "../../../outbound/sim-lambda-aws-api-outbound.js";
-import {
-  isSimLambdaHttpModuleSpecifier,
-  makeSimLambdaHttpModule,
-  simLambdaHttpModuleScheme,
-} from "../../../outbound/sim-lambda-http-module.js";
 import type { SimLambdaOutboundHttp } from "../../../outbound/sim-lambda-outbound-http.js";
+import {
+  isSimLambdaTransportModuleSpecifier,
+  makeSimLambdaTransportModule,
+} from "../../../outbound/sim-lambda-transport-module.js";
 import {
   isModuleNotFoundError,
   requireHostModule,
@@ -72,11 +71,11 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
   }
 
   /**
-   * Provide an intercepted AWS SDK package or HTTP transport module, or
-   * undefined for other specifiers.
+   * Provide an intercepted AWS SDK package or HTTP or HTTP/2 transport
+   * module, or undefined for other specifiers.
    */
   provideModule(specifier: string): unknown {
-    const isTransport = isSimLambdaHttpModuleSpecifier(specifier);
+    const isTransport = isSimLambdaTransportModuleSpecifier(specifier);
     if (!isTransport && !specifier.startsWith(awsSdkPackagePrefix)) {
       return undefined;
     }
@@ -88,11 +87,11 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
 
     const hostExports = this.hostModuleExports(specifier);
     const module = isTransport
-      ? makeSimLambdaHttpModule({
-          hostModule: hostExports as Record<string, unknown>,
-          outbound: this.outboundHttp,
-          scheme: simLambdaHttpModuleScheme(specifier),
-        })
+      ? makeSimLambdaTransportModule(
+          specifier,
+          hostExports as Record<string, unknown>,
+          this.outboundHttp,
+        )
       : this.interceptor.interceptModule(hostExports);
     this.providedModules.set(specifier, module);
     return module;

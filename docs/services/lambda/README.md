@@ -731,8 +731,8 @@ Some deployment packages inline the SDK rather than relying on the runtime to pr
 `NodejsFunction` does that when given `bundling: { externalModules: [] }`. There is then no
 `@aws-sdk/*` module left for the runtime to provide, and nothing to intercept.
 
-Those functions reach the simulation anyway. The runtime provides their HTTP transport, `node:http`
-and `node:https`, and a request addressed to an AWS API endpoint is answered from the same
+Those functions reach the simulation anyway. The runtime provides their HTTP transport, `node:http`,
+`node:https` and `node:http2`, and a request addressed to an AWS API endpoint is answered from the same
 simulated services, as the same execution role, instead of going to the network. The execution
 role credentials are in the function's environment, as real Lambda puts them there. The SDK resolves
 credentials inside the sandbox, where it would otherwise fail with `CredentialsProviderError`.
@@ -749,6 +749,13 @@ sends. A function can read and write Objects with an `S3Client` its archive inli
 Role authorizes each request, and a read it holds no `s3:GetObject` for comes back to the SDK as
 `AccessDenied`.
 
+Bedrock Runtime states its operation and its model in the path, and its client sends over HTTP/2.
+`Converse`, `ConverseStream`, `InvokeModel` and `InvokeModelWithResponseStream` from a bundled
+`BedrockRuntimeClient` return what `simAws.bedrock().responses()` declares, and the SDK reads the
+two streaming operations as it reads a real event stream. A model id given as an inference profile
+ARN works too. The execution Role authorizes each call, and a denial reaches the handler as
+`AccessDeniedException`.
+
 A bundled call to any other simulated service, such as SNS, SES or Lambda itself, fails with an
 error naming the service. Leaving the SDK out of that archive puts it back
 on the module interception path above, which every simulated service is reachable through.
@@ -764,8 +771,8 @@ hostname, along with everything else a handler asks for over HTTP.
 ## The HTTP requests function code makes
 
 A request from a handler to a hostname the simulation serves is answered by the simulation. It
-never leaves the process. `fetch`, `node:http` and `node:https` all reach it, so it makes no
-difference which client the handler was written with.
+never leaves the process. `fetch`, `node:http`, `node:https` and `node:http2` all reach it, so it
+makes no difference which client the handler was written with.
 
 Two kinds of hostname are served. Everything simulated Route53 resolves is answered over the same
 in-process HTTP entry point a browser on localhost reaches. That covers a
@@ -4361,9 +4368,9 @@ Sim Lambda currently supports:
 - Per-function environment variables with `Environment.Variables`
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment
-- `fetch`, `node:http` and `node:https` requests from function code, answered by the simulation for
-  every hostname it serves, including a Cognito user pool domain's OAuth endpoints and the JWKS a
-  token verifier fetches from the regional Cognito endpoint
+- `fetch`, `node:http`, `node:https` and `node:http2` requests from function code, answered by the
+  simulation for every hostname it serves, including a Cognito user pool domain's OAuth endpoints
+  and the JWKS a token verifier fetches from the regional Cognito endpoint
 - Execution roles, evaluated against simulated IAM
 - Published versions and aliases, with `PublishVersion`, `ListVersionsByFunction`, `CreateAlias`,
   `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke`,
@@ -4473,7 +4480,7 @@ Current documented limitations:
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value
   instead. See [Environment variables](#environment-variables).
-- Outbound HTTP is routed for `fetch`, `node:http` and `node:https` alone. A handler using another
+- Outbound HTTP is routed for `fetch`, `node:http`, `node:https` and `node:http2` alone. A handler using another
   client, or a request made from a handler module while it is being imported, reaches the network.
   A routed response comes back as the simulation answered it, with redirects left for the caller to
   follow. See [The HTTP requests function code makes](#the-http-requests-function-code-makes).
