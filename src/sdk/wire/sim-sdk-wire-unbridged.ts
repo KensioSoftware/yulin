@@ -23,8 +23,8 @@ export function simSdkUnbridgedWireRequest(
 
   return new SimSdkUnbridgedWireRequestError(
     `Cannot answer a request to ${service} from the simulation: a ` +
-      "serialized AWS API request can only be routed for a service using " +
-      "the AWS JSON protocol. Where this is an AWS SDK bundled into " +
+      "serialized AWS API request can only be routed for S3, Bedrock " +
+      "Runtime and the services using the AWS JSON protocol. Where this is an AWS SDK bundled into " +
       "function code, leaving the SDK out of the deployment package puts it " +
       "back on the module interception path, which every simulated service " +
       "is reachable through.",

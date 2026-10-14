@@ -1,6 +1,5 @@
 import { faker } from "@faker-js/faker";
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
@@ -12,8 +11,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { bundleHandler } from "../../../../../../test/lambda/bundled-handler.js";
+import { executionRoleArn } from "../../../../../../test/lambda/execution-role.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
-import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaCodeZip } from "../make-lambda-code-zip.js";
 
 /**
@@ -286,48 +285,6 @@ describe("sim Lambda vm code with a bundled AWS SDK", () => {
     await simAws.backgroundTasksComplete();
   });
 });
-
-/**
- * What an execution Role is created to be allowed, which is the one thing the
- * test's handler does and nothing else.
- */
-interface ExecutionRoleInput {
-  readonly roleName: string;
-  readonly action: string;
-  readonly resource: string;
-}
-
-/**
- * Create an execution role allowed one action, so what the handler does is
- * authorized as the role rather than as anything ambient.
- */
-async function executionRoleArn(
-  simAws: SimAws,
-  role: ExecutionRoleInput,
-): Promise<string> {
-  const creation = await simAws.iam().createRole(
-    new CreateRoleCommand({
-      RoleName: role.roleName,
-      AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
-        Statement: {
-          Principal: { Service: "lambda.amazonaws.com" },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-  await simAws.iam().putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: role.roleName,
-      PolicyName: `${role.roleName}Policy`,
-      PolicyDocument: simIamPolicyDocumentFactory.make({
-        Statement: { Action: role.action, Resource: role.resource },
-      }),
-    }),
-  );
-
-  return creation.Role.Arn;
-}
 
 function payload(payloadBytes: Uint8Array | undefined): string {
   assertNonNullable(payloadBytes);

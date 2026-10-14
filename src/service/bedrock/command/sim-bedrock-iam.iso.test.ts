@@ -153,4 +153,38 @@ describe("Bedrock IAM authorization", () => {
       "Tone sandhi.",
     );
   });
+
+  it("names the service control policy that denied an invocation", async () => {
+    // Given a Role allowed to invoke a model, in an Account whose organization
+    // denies every Bedrock invocation.
+    const simAws = new SimAws({ defaultAccountId: accountIdOneOnes });
+    const roleArn = await givenARoleAllowedTo(
+      simAws,
+      "bedrock:InvokeModel",
+      sonnetArn,
+    );
+    simAws.organizations().attachServiceControlPolicy(accountIdOneOnes, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Deny",
+        Action: "bedrock:InvokeModel",
+        Resource: "*",
+      },
+    });
+
+    // When it invokes the model.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.bedrock().converse(askingOf(sonnet), {
+          caller: { kind: "arn", arn: roleArn },
+        }),
+    );
+
+    // Then the denial blames the organization's policy, not the Role's.
+    assertIdentical(error.name, "AccessDeniedException");
+    assertStringIncludes(
+      error.message,
+      "with an explicit deny in a service control policy",
+    );
+  });
 });

@@ -39,10 +39,17 @@ export class SimBedrockAuthorizer {
     });
 
     if (decision.isDenied) {
+      // A service control policy denial names the policy, as other services'
+      // denials do.
+      const reason =
+        decision.denialReason ??
+        `because no identity-based policy allows the ${action} action`;
+
+      const caller = this.callerIdentifier.format(decision.caller.principal);
+
       throw new SimBedrockAccessDeniedException(
-        `User: ${this.callerIdentifier.format(decision.caller.principal)} is ` +
-          `not authorized to perform: ${action} on resource: ${resource} ` +
-          `because no identity-based policy allows the ${action} action`,
+        `User: ${caller} is not authorized to perform: ${action} on ` +
+          `resource: ${resource} ${reason}`,
       );
     }
 

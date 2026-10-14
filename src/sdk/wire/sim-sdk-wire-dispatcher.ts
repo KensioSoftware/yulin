@@ -6,15 +6,8 @@ import {
   makeSimSdkWireClient,
   makeSimSdkWireCommand,
 } from "./sim-sdk-wire-command.js";
-import { readSimSdkWireInput } from "./sim-sdk-wire-json.js";
-import {
-  readSimSdkWireCredentialScope,
-  readSimSdkWireOperation,
-} from "./sim-sdk-wire-operation.js";
-import {
-  simSdkWireErrorResponse,
-  simSdkWireOutputResponse,
-} from "./sim-sdk-wire-response.js";
+import { readSimSdkWireCall } from "./sim-sdk-wire-call.js";
+import { readSimSdkWireCredentialScope } from "./sim-sdk-wire-operation.js";
 import { simSdkUnbridgedWireRequest } from "./sim-sdk-wire-unbridged.js";
 import type {
   SimSdkWireRequest,
@@ -66,33 +59,29 @@ export class SimSdkWireDispatcher {
     request: SimSdkWireRequest,
     caller?: SimAwsCaller,
   ): Promise<SimSdkWireResponse> {
-    const operation = readSimSdkWireOperation(request);
-    if (operation === undefined) {
+    const call = readSimSdkWireCall(request);
+    if (call === undefined) {
       throw simSdkUnbridgedWireRequest(request);
     }
 
     // The operation runs in the Region it was signed for or, unsigned, the
     // Region of the code that sent it.
     const scope = readSimSdkWireCredentialScope(request);
-    const contentType = request.headers["content-type"];
 
     try {
       const output = await this.dispatcher.dispatch(
-        makeSimSdkWireCommand(
-          operation.commandName,
-          readSimSdkWireInput(request.body),
-        ),
+        makeSimSdkWireCommand(call.commandName, call.input()),
         makeSimSdkWireClient(
-          operation.serviceId,
+          call.serviceId,
           scope?.regionName ?? this.regionName,
         ),
         undefined,
         caller,
       );
 
-      return simSdkWireOutputResponse(output, contentType);
+      return await call.outputResponse(output);
     } catch (error) {
-      return simSdkWireErrorResponse(error, contentType);
+      return call.errorResponse(error);
     }
   }
 }
