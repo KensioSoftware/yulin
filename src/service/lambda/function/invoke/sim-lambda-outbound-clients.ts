@@ -1,7 +1,9 @@
 import http from "node:http";
+import http2 from "node:http2";
 import https from "node:https";
 import { syncBuiltinESMExports } from "node:module";
 import { makeSimLambdaHttpModule } from "../outbound/sim-lambda-http-module.js";
+import { makeSimLambdaHttp2Module } from "../outbound/sim-lambda-http2-module.js";
 import { makeSimLambdaOutboundFetch } from "../outbound/sim-lambda-outbound-fetch.js";
 import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 
@@ -27,6 +29,9 @@ const transportModules = [
  * modules export as it was. The built-in modules' named ES module exports are
  * a snapshot of those properties, so they are re-synchronised afterwards for
  * the handler that imported `request` by name rather than the module.
+ *
+ * `node:http2` has `connect` replaced the same way. Bedrock Runtime's SDK
+ * client sends over HTTP/2.
  */
 export function installSimLambdaOutboundClients(
   outbound: SimLambdaOutboundHttp,
@@ -46,6 +51,12 @@ export function installSimLambdaOutboundClients(
     patched["request"] = routed["request"];
     patched["get"] = routed["get"];
   }
+
+  const http2Module = http2 as unknown as Record<string, unknown>;
+  http2Module["connect"] = makeSimLambdaHttp2Module({
+    hostModule: http2Module,
+    outbound,
+  })["connect"];
 
   syncBuiltinESMExports();
 }
