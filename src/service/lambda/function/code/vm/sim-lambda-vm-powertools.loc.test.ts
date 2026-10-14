@@ -1,10 +1,10 @@
-import { build } from "esbuild";
 import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
 } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
+import { bundleHandler } from "../../../../../../test/lambda/bundled-handler.js";
 import { simLambdaVmZipFunctionFactory } from "../sim-lambda-vm-zip-function.factory.js";
 
 /**
@@ -37,7 +37,7 @@ describe("sim Lambda vm code with AWS Lambda Powertools", () => {
     // Given a function whose deployment package bundles Powertools, as a
     // CDK NodejsFunction build produces.
     const simFunction = simLambdaVmZipFunctionFactory.make({
-      code: await bundleHandler(),
+      code: await bundleHandler(handlerSource),
     });
     const written = captureHostStdout();
 
@@ -61,32 +61,6 @@ describe("sim Lambda vm code with AWS Lambda Powertools", () => {
     assertStringIncludes(JSON.stringify(emf["_aws"]), '"Namespace":"Orders"');
   });
 });
-
-/**
- * Bundle the handler into one CommonJS module, as a deployment package build
- * does, so the archive carries Powertools rather than the runtime providing
- * it.
- */
-async function bundleHandler(): Promise<string> {
-  const bundled = await build({
-    stdin: {
-      contents: handlerSource,
-      loader: "ts",
-      resolveDir: import.meta.dirname,
-      sourcefile: "index.ts",
-    },
-    bundle: true,
-    write: false,
-    platform: "node",
-    target: "node24",
-    format: "cjs",
-  });
-
-  const output = bundled.outputFiles[0];
-  assertNonNullable(output);
-
-  return output.text;
-}
 
 /**
  * Read the embedded metric format document out of what was printed.

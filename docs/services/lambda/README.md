@@ -152,6 +152,9 @@ The vm runtime models the real Node.js runtime closely:
   (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, `AWS_LAMBDA_FUNCTION_MEMORY_SIZE`, ...).
 - The sandbox provides writable `process.stdout` and `process.stderr`, with its `console` built
   over them, as the real runtime does. See [What a handler prints](#what-a-handler-prints).
+- The sandbox provides the other globals of the Node.js runtime, including `global`, the WHATWG
+  streams, `EventTarget`, `atob`, `performance` and `navigator`. `Date` and the timers follow the
+  simulated clock. `performance.now()` reads host time.
 - Import and handler problems surface as invocation errors, with the real runtime error types
   (`Runtime.ImportModuleError`, `Runtime.HandlerNotFound`, `Runtime.UserCodeSyntaxError`,
   `Runtime.MalformedHandlerName`). Creation succeeds either way.
