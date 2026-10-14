@@ -21,6 +21,7 @@ import {
   simLambdaSetTimeout,
 } from "../../invoke/timer/sim-lambda-process-timers.js";
 import type { SimLambdaOutboundHttp } from "../../outbound/sim-lambda-outbound-http.js";
+import { simLambdaVmHostGlobals } from "./sim-lambda-vm-host-globals.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
 
 /**
@@ -53,7 +54,7 @@ export interface SimLambdaVmContextProperties {
 /**
  * Create the sandbox vm context that sim Lambda function code runs in.
  *
- * The context provides the common globals a Node.js Lambda runtime offers,
+ * The context provides the globals a Node.js Lambda runtime offers,
  * including an AWS-like process.env holding the standard runtime variables
  * and any variables declared for the function, and the writable standard
  * streams function code writes its output to. Everything else must be part
@@ -87,12 +88,12 @@ export function makeSimLambdaVmContext(
   stdout.recordTo(sink);
   stderr.recordTo(sink);
 
-  return vm.createContext({
+  const context = vm.createContext({
+    ...simLambdaVmHostGlobals(),
     // The sandbox's console is built over those streams, as the real
     // runtime's is, so everything function code prints goes to one place
     // whether it printed through the console or wrote to the stream itself.
     console: new Console({ stdout, stderr }),
-    Buffer,
     process: {
       env: environment.variables(),
       stdout,
@@ -109,25 +110,15 @@ export function makeSimLambdaVmContext(
     clearTimeout: simLambdaClearTimeout,
     setInterval: simLambdaSetInterval,
     clearInterval: simLambdaClearInterval,
-    setImmediate,
-    queueMicrotask,
-    TextEncoder,
-    TextDecoder,
-    URL,
-    URLSearchParams,
-    structuredClone,
-    crypto,
-    // The Fetch API the Node.js runtime provides, with the client itself
-    // routed into the simulation. The rest are the host's own, so the objects
-    // a handler builds and the ones the simulation answers with are the same
-    // kind of thing.
+    // The Fetch API client, routed into the simulation. The types it works
+    // with are the host's own.
     fetch: makeSimLambdaOutboundFetch(outboundHttp),
-    Headers,
-    Request,
-    Response,
-    FormData,
-    Blob,
-    AbortController,
-    AbortSignal,
   });
+
+  // Node.js names its global object `global` as well as `globalThis`, and
+  // bundlers emit references to it for older packages. It has to be the
+  // sandbox's own global, which only exists once the context does.
+  vm.runInContext("globalThis.global = globalThis;", context);
+
+  return context;
 }

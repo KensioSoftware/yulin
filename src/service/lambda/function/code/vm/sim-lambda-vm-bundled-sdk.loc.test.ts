@@ -3,7 +3,6 @@ import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { build } from "esbuild";
 import {
   assertIdentical,
   assertNonNullable,
@@ -12,6 +11,7 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { bundleHandler } from "../../../../../../test/lambda/bundled-handler.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaCodeZip } from "../make-lambda-code-zip.js";
@@ -119,7 +119,9 @@ describe("sim Lambda vm code with a bundled AWS SDK", () => {
 
     // And a function whose deployment package bundles the SDK, as a CDK
     // NodejsFunction with no external modules produces.
-    const zipFile = makeLambdaCodeZip(await bundle(readItemHandlerSource));
+    const zipFile = makeLambdaCodeZip(
+      await bundleHandler(readItemHandlerSource),
+    );
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
         FunctionName: "reader",
@@ -169,7 +171,9 @@ describe("sim Lambda vm code with a bundled AWS SDK", () => {
       action: "s3:GetObject",
       resource: `arn:aws:s3:::${bucketName}/*`,
     });
-    const zipFile = makeLambdaCodeZip(await bundle(readObjectHandlerSource));
+    const zipFile = makeLambdaCodeZip(
+      await bundleHandler(readObjectHandlerSource),
+    );
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
         FunctionName: "object-reader",
@@ -220,7 +224,9 @@ describe("sim Lambda vm code with a bundled AWS SDK", () => {
       action: "s3:PutObject",
       resource: `arn:aws:s3:::${bucketName}/*`,
     });
-    const zipFile = makeLambdaCodeZip(await bundle(readObjectHandlerSource));
+    const zipFile = makeLambdaCodeZip(
+      await bundleHandler(readObjectHandlerSource),
+    );
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
         FunctionName: "object-reader",
@@ -252,7 +258,9 @@ describe("sim Lambda vm code with a bundled AWS SDK", () => {
     // Given a function bundling an SDK client for a service that neither uses
     // the AWS JSON protocol nor has an endpoint reading its own.
     const simAws = new SimAws();
-    const zipFile = makeLambdaCodeZip(await bundle(sendEmailHandlerSource));
+    const zipFile = makeLambdaCodeZip(
+      await bundleHandler(sendEmailHandlerSource),
+    );
     await simAws.lambda().createFunction(
       new CreateFunctionCommand({
         FunctionName: "notifier",
@@ -332,29 +340,4 @@ function payload(payloadBytes: Uint8Array | undefined): string {
  */
 function payloadDocument(payloadBytes: Uint8Array | undefined): unknown {
   return JSON.parse(payload(payloadBytes)) as unknown;
-}
-
-/**
- * Bundle a handler into one CommonJS module with its dependencies inlined, as
- * a deployment package build with no external modules produces.
- */
-async function bundle(source: string): Promise<string> {
-  const bundled = await build({
-    stdin: {
-      contents: source,
-      loader: "ts",
-      resolveDir: import.meta.dirname,
-      sourcefile: "index.ts",
-    },
-    bundle: true,
-    write: false,
-    platform: "node",
-    target: "node24",
-    format: "cjs",
-  });
-
-  const output = bundled.outputFiles[0];
-  assertNonNullable(output);
-
-  return output.text;
 }
