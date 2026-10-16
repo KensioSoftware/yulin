@@ -105,15 +105,14 @@ interface SimLambdaAwsApiOutboundProperties {
  * operation it names.
  */
 export class SimLambdaAwsApiOutbound implements SimLambdaOutboundHttp {
+  private readonly simAws: SimAws;
   private readonly dispatcher: SimSdkWireDispatcher;
   private readonly s3: SimS3ApiEndpoint;
 
-  constructor(properties: SimLambdaAwsApiOutboundProperties) {
-    this.dispatcher = new SimSdkWireDispatcher(
-      properties.simAws,
-      properties.regionName,
-    );
-    this.s3 = new SimS3ApiEndpoint({ simAws: properties.simAws });
+  constructor({ simAws, regionName }: SimLambdaAwsApiOutboundProperties) {
+    this.simAws = simAws;
+    this.dispatcher = new SimSdkWireDispatcher(simAws, regionName);
+    this.s3 = new SimS3ApiEndpoint({ simAws });
   }
 
   /**
@@ -132,22 +131,29 @@ export class SimLambdaAwsApiOutbound implements SimLambdaOutboundHttp {
    * credentials the runtime puts in the environment, and the invocation is
    * already running as the execution Role, the ambient caller every other call
    * out of function code runs as.
+   *
+   * Every answer is stamped with simulated time, as real AWS stamps every API
+   * response with server time. The SDK corrects its clock skew from that
+   * header, and an answer missing it would be stamped with host time by the
+   * HTTP/2 server answering it.
    */
   async fetch(request: Request): Promise<Response> {
     const wireRequest = await simLambdaOutboundWireRequest(request);
     const scope = readSimSdkWireCredentialScope(wireRequest);
+    const response =
+      scope?.signingName === s3SigningName
+        ? await this.s3.handle(
+            request,
+            wireRequest.body,
+            undefined,
+            scope.regionName,
+          )
+        : simLambdaOutboundWireResponse(
+            await this.dispatcher.dispatch(wireRequest),
+          );
 
-    if (scope?.signingName === s3SigningName) {
-      return await this.s3.handle(
-        request,
-        wireRequest.body,
-        undefined,
-        scope.regionName,
-      );
-    }
+    response.headers.set("date", this.simAws.now().toUTCString());
 
-    return simLambdaOutboundWireResponse(
-      await this.dispatcher.dispatch(wireRequest),
-    );
+    return response;
   }
 }

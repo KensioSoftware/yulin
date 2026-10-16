@@ -8,6 +8,7 @@ import { describe, it } from "vitest";
 import { bundleHandler } from "../../../../../../test/lambda/bundled-handler.js";
 import { executionRoleArn } from "../../../../../../test/lambda/execution-role.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimFixedClock } from "../../../../../util/clock/sim-clock.js";
 import { makeLambdaCodeZip } from "../make-lambda-code-zip.js";
 
 /**
@@ -50,6 +51,29 @@ export const handler = async () => {
   }
 
   return [conversed.output?.message?.content?.[0]?.text, text];
+};
+`;
+
+/**
+ * A handler sending a conversation with no messages, which Bedrock rejects as
+ * invalid, and reporting how the SDK saw the rejection.
+ */
+const rejectedConverseHandlerSource = `
+import {
+  BedrockRuntimeClient,
+  ConverseCommand,
+} from "@aws-sdk/client-bedrock-runtime";
+
+const bedrock = new BedrockRuntimeClient({});
+
+export const handler = async () => {
+  try {
+    await bedrock.send(
+      new ConverseCommand({ modelId: "qwen.qwen3-32b-v1:0", messages: [] }),
+    );
+  } catch (error) {
+    return [error.$metadata.httpStatusCode, error.$metadata.attempts];
+  }
 };
 `;
 
@@ -120,6 +144,42 @@ describe("sim Lambda vm code with a bundled Bedrock Runtime client", () => {
       Buffer.from(output.Payload).toString(),
       '["Tone sandhi.","Tone sandhi."]',
     );
+
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("fails a rejected Bedrock call once under a clock far from the host's", async () => {
+    // Given a simulation whose clock is years behind the host's, and a
+    // function bundling a Bedrock Runtime client.
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2020-01-01T09:00:00.000Z")),
+    });
+    const roleArn = await executionRoleArn(simAws, {
+      roleName: "AssistantRole",
+      action: "bedrock:InvokeModel",
+      resource: "*",
+    });
+    const zipFile = makeLambdaCodeZip(
+      await bundleHandler(rejectedConverseHandlerSource),
+    );
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "assistant",
+        Role: roleArn,
+        Handler: "index.handler",
+        Code: { ZipFile: zipFile },
+      }),
+    );
+
+    // When the function is invoked.
+    const output = await simAws
+      .lambda()
+      .invoke(new InvokeCommand({ FunctionName: "assistant" }));
+
+    // Then the call failed with a 400 on its first attempt.
+    assertUndefined(output.FunctionError);
+    assertNonNullable(output.Payload);
+    assertIdentical(Buffer.from(output.Payload).toString(), "[400,1]");
 
     await simAws.backgroundTasksComplete();
   });
