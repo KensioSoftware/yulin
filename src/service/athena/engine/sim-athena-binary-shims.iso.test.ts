@@ -217,9 +217,9 @@ describe("Trino's binary encodings on SQLite", () => {
   it("refuses text the encoding cannot carry", async () => {
     // Given text that is no hex and text that is no base64.
     // When each is read back.
-    // Then the statement raises and the query falls back. Trino fails the
-    // query, and reading as much of the text as parses would answer with
-    // bytes nobody wrote.
+    // Then the statement raises and the query fails, as Trino's does. The
+    // alternative is reading as much of the text as parses, which answers
+    // with bytes nobody wrote.
     await assertThrowsErrorAsync(async () =>
       anAnsweredExpression("from_hex('zz')"),
     );
@@ -295,7 +295,7 @@ describe("reading bytes back as text", () => {
     // Given a replacement longer than one character, and bytes already
     // carrying a replacement character of their own.
     // When each is read back with a replacement named.
-    // Then the statement raises and the query falls back. Trino takes a
+    // Then the statement raises and the query fails. Trino takes a
     // replacement of one character or none, and there is nothing left after
     // decoding to tell a character the bytes carried from one the decoder
     // wrote.

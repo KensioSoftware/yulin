@@ -181,10 +181,10 @@ describe("Trino's array functions on SQLite", () => {
     );
   });
 
-  it("turns the query down rather than guessing", async () => {
+  it("fails the query where it would have to guess", async () => {
     // Given a run starting at zero and an array of objects.
     // When each is used.
-    // Then the statement raises, which leaves the declared result to answer.
+    // Then the statement raises, and the engine fails the query.
     await assertThrowsErrorAsync(async () =>
       anAnsweredExpression("slice('[1,2,3]', 0, 1)"),
     );

@@ -96,7 +96,7 @@ function joined(
  * One element written out.
  *
  * Trino refuses to join an array whose elements are not text, and raising here
- * turns the query down to its declared result instead.
+ * fails the query the same way.
  */
 function scalarText(value: unknown): string {
   if (typeof value === "string") {

@@ -383,8 +383,8 @@ test's own statement about a query the engine gets wrong.
 
 ### Failing a statement Athena refuses
 
-One failure ignores strict mode. Where the engine can see that Athena would refuse a statement
-outright, the query fails whether strict mode is on or off. A turn-down means the engine reached its
+Two failures ignore strict mode. This section covers the first. Where the engine can see that
+Athena would refuse a statement outright, the query fails whether strict mode is on or off. A turn-down means the engine reached its
 limits, and a declaration is a fair answer to that. A rejection means the SQL is invalid, and
 answering from a declaration would leave a test green on a query that fails against AWS.
 
@@ -410,6 +410,18 @@ well, since the two names differ and nothing shadows.
 
 Trino and SQLite resolve names by different rules in other places too, and the engine catches this
 one. A statement that behaves differently under the two is worth reporting.
+
+### Failing a value a function cannot read
+
+The second failure that ignores strict mode comes from a Trino function the engine runs. Where one
+cannot answer faithfully for a value the statement hands it, the query fails with a
+`StateChangeReason` naming the function and the value. `date_add('fortnight', ...)` fails this way,
+and so does `CAST(sku AS DATE)` over a column holding no date.
+
+The engine took the statement on and ran it, so falling back would answer from rows a declaration
+wrote for some other purpose. A query with no declaration of its own would answer from the
+default, which is often no rows at all, and a test reading it would see an empty result with no
+error. A declaration written against the exact query text still answers it.
 
 ### The objects it reads
 
@@ -560,7 +572,7 @@ call written inside a string literal is left alone as well.
 instant it froze, and the same test answers the same way on every machine. Athena reads both at the
 instant the query started, which is what the execution records.
 
-A function that cannot answer faithfully raises rather than guessing, and the query falls back.
+A function that cannot answer faithfully raises rather than guessing, and the query fails.
 `date_add` with a unit Trino does not name, `slice` starting at zero, `array_join` over an array of
 objects, `least` over a `varbinary`, and `regexp_extract` naming a capture group the pattern has not
 got all land there. A null
@@ -1064,7 +1076,7 @@ Current documented limitations:
   statement comparing the answer against a bare string matches on one and not the other.
 - A timestamp carrying a numeric UTC offset falls outside the date functions, and so does one
   written finer than the millisecond. A value written with a `Z` or with no zone at all reads as
-  UTC, and a value the date functions cannot read turns the query down.
+  UTC, and a value the date functions cannot read fails the query.
 - A JSON number beyond about fifteen significant digits loses the digits past that, wherever the
   engine reads JSON. An identifier of that size in a JSON lines object comes back rounded, and a
   filter on it can then match the wrong row.
@@ -1088,9 +1100,9 @@ Current documented limitations:
   written any other way gets whatever slicing that text comes to.
 - A `varbinary` in a result row reads as its bytes decoded as UTF-8. A digest read that way loses
   whatever in it was no UTF-8. A query answering with one wants `to_hex` or `to_base64` around it.
-- `from_hex` and `from_base64` turn the query down over text the encoding cannot carry. Trino fails
-  the query, and reading as much of the text as parses would answer with bytes nobody wrote.
-- `from_utf8` with a replacement named turns the query down where the bytes already carry the
+- `from_hex` and `from_base64` fail the query over text the encoding cannot carry, as Trino does.
+  The alternative, reading as much of the text as parses, would answer with bytes nobody wrote.
+- `from_utf8` with a replacement named fails the query where the bytes already carry the
   replacement character. Trino writes the replacement only where a sequence was broken, and nothing
   survives decoding to tell one of those apart from a character the bytes held.
 - `spooky_hash_v2_32` and `spooky_hash_v2_64` are absent, and so are the other Trino hashes with no
@@ -1107,7 +1119,11 @@ Current documented limitations:
   runs.
 - `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
   Athena answers null, which is the same forgiving direction as the cast above. Reading the
-  statement without the rewrite would turn the whole query down.
+  statement without the rewrite would turn the whole query down. A `try_cast` to `DATE` over text
+  that is no date fails the query, where Athena answers null.
+- `CAST(x AS DATE)` and `date(x)` read ISO-8601 text. A timestamp keeps its date, and any other
+  text fails the cast. The answer is text in a `varchar` column, where Athena reports a `date`.
+  Casts to `TIMESTAMP` and the other types are SQLite's own.
 - A `decimal` column is held as a double. A value carrying more than about fifteen significant
   digits loses the ones past that, and a filter, a sum or a group on it can then answer
   differently from Athena's exact arithmetic.

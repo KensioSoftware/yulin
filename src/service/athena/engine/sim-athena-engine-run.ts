@@ -2,12 +2,17 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAthenaPlannedTable } from "../execution/sim-athena-query-refusal.js";
 import {
   simAthenaEngineAnswered,
+  simAthenaEngineRejected,
   simAthenaEngineTurnedDown,
   type SimAthenaEngineAnswer,
 } from "./sim-athena-engine-answer.js";
-import { simAthenaRunFailure } from "./sim-athena-turn-down.js";
+import {
+  simAthenaRunFailure,
+  simAthenaUnevaluable,
+} from "./sim-athena-turn-down.js";
 import { simAthenaEngineResult } from "./sim-athena-engine-result.js";
 import type { SimAthenaSqlParser } from "./sim-athena-parser-module.js";
+import { SimAthenaShimRefusal } from "./sim-athena-shim-refusal.js";
 import { simAthenaSqliteDatabase } from "./sim-athena-sqlite-database.js";
 import type { SimAthenaSqliteModule } from "./sim-athena-sqlite-module.js";
 import { simAthenaLoadedTables } from "./sim-athena-loaded-tables.js";
@@ -40,6 +45,10 @@ export interface SimAthenaEngineRun {
  *
  * Each of them carries a reason out, which a strict engine fails the query
  * with.
+ *
+ * A function shim refusing one of the statement's values is the exception. The
+ * engine ran the statement and could not evaluate it, and the query fails
+ * whether or not the engine is strict.
  */
 export async function simAthenaEngineRun(
   run: SimAthenaEngineRun,
@@ -71,6 +80,10 @@ export async function simAthenaEngineRun(
       database.close();
     }
   } catch (error) {
+    if (error instanceof SimAthenaShimRefusal) {
+      return simAthenaEngineRejected(simAthenaUnevaluable(error));
+    }
+
     return simAthenaEngineTurnedDown(simAthenaRunFailure(error));
   }
 }

@@ -49,7 +49,7 @@ describe("Trino's regular expression functions on SQLite", () => {
   it("refuses a capture group the pattern has not got", async () => {
     // Given a pattern with one group.
     // When a group outside it is asked for.
-    // Then the statement raises, which leaves the declared result to answer.
+    // Then the statement raises, and the engine fails the query.
     // A negative index would otherwise count back from the end and answer.
     await assertThrowsErrorAsync(async () =>
       anAnsweredExpression("regexp_extract('abc', '(a)', 5)"),

@@ -1,4 +1,8 @@
-import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertObjectEquals,
+  assertStringIncludes,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
@@ -108,7 +112,7 @@ describe("the Trino functions a query reaches for", () => {
     assertObjectEquals(answered.rows, [["declared"]]);
   });
 
-  it("falls back where a shim will not guess", async () => {
+  it("fails where a shim will not guess", async () => {
     // Given the requests, with the engine on.
     const simulation = await aRequestSimulation();
 
@@ -118,10 +122,11 @@ describe("the Trino functions a query reaches for", () => {
       "SELECT date_add('fortnight', 1, at) AS later FROM rainlytics.requests",
     );
 
-    // Then the declaration answers it. A shim that cannot answer faithfully
-    // raises, and raising turns the query down.
-    assertIdentical(answered.answeredBy, "declaration");
-    assertObjectEquals(answered.rows, [["declared"]]);
+    // Then the query fails, with the engine lenient. A shim that cannot
+    // answer faithfully raises, and the declaration would answer with rows
+    // that have nothing to do with the data.
+    assertIdentical(answered.state, "FAILED");
+    assertStringIncludes(answered.reason, "fortnight is no date unit");
   });
 });
 

@@ -13,7 +13,12 @@ export interface SimAthenaEngineAnswer {
   /** What the engine could not do, where it turned the query down. */
   readonly turnedDown: string | undefined;
 
-  /** Why Athena refuses the statement, where the engine found it invalid. */
+  /**
+   * Why the query fails whether or not the engine is strict.
+   *
+   * That is a statement Athena refuses, or one the engine ran and could not
+   * evaluate.
+   */
   readonly rejected: string | undefined;
 }
 
@@ -32,11 +37,11 @@ export function simAthenaEngineTurnedDown(
 }
 
 /**
- * One statement Athena refuses, and why.
+ * One statement that fails whatever mode the engine is in, and why.
  *
- * The engine ran nothing. A query that reaches this fails whether or not the
- * engine is strict, since the alternative is a green test on SQL the service
- * rejects.
+ * Athena refusing the statement is one reason, and the alternative there is a
+ * green test on SQL the service rejects. A function shim refusing a value is
+ * the other, and the alternative there is a query losing every row in silence.
  */
 export function simAthenaEngineRejected(
   rejected: string,

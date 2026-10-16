@@ -168,12 +168,12 @@ in a format there is no reader for, an object the caller cannot open and a state
 run all end with no result and the declared result answering. `sim-athena-engine-run.ts` is where
 that catch sits.
 
-**A statement Athena refuses fails the query, strict or not.** This is the one outcome that skips
-the fallback, and `sim-athena-rejected-statement.ts` holds it. A turn-down says the engine reached
-its limits, and a declaration is a fair answer to that. A rejection says the statement is SQL the
-service would have refused, and falling back would leave the test green on a query that fails
-against AWS. The engine has to be on for any of this, so a project that never enables it sees no
-change.
+**A statement Athena refuses fails the query, strict or not.** This is one of two outcomes that skip
+the fallback, and `sim-athena-rejected-statement.ts` holds it. The other is a function shim refusing
+a value, below. A turn-down says the engine reached its limits, and a declaration is a fair answer
+to that. A rejection says the statement is SQL the service would have refused, and falling back
+would leave the test green on a query that fails against AWS. The engine has to be on for any of
+this, so a project that never enables it sees no change.
 
 The shape it catches is an `ORDER BY` aggregate over an output alias that is itself an aggregate.
 `SELECT sku, coalesce(sum(qty), 0) AS qty ... ORDER BY sum(qty) DESC` is the statement that reached
@@ -255,12 +255,21 @@ it would have printed.
 list grows as a query in a real test reaches for something absent from it, rather than by working
 through the Trino reference.
 
-Three rules shape what goes in.
+Four rules shape what goes in.
 
-**A shim that cannot answer faithfully raises.** A thrown error reaches `simAthenaEngineRun`, which
-turns the query down and lets the declared result answer. A null would be a wrong answer wearing
-the shape of a right one, and that is the failure this engine can least afford. `date_add` with an
-unknown unit, `slice` starting at zero and `array_join` over objects all take that route.
+**A shim that cannot answer faithfully raises, and the query fails.** `simAthenaScalarShim` wraps
+whatever a shim throws in a `SimAthenaShimRefusal`, and `simAthenaEngineRun` fails the query on one
+whether or not the engine is strict. A null would be a wrong answer wearing the shape of a right
+one. Falling back is no better, since a query with no declaration of its own answers from the
+default, which is usually no rows at all. `date_add` with an unknown unit, `slice` starting at zero
+and `array_join` over objects all take that route. A declaration written against the exact query
+still answers it.
+
+**A cast to `DATE` goes to a shim.** SQLite gives a `DATE` column numeric affinity, so its own
+`CAST('2026-08-15' AS DATE)` answers `2026`. `sim-athena-cast-rewrite.ts` hands every cast to `DATE`
+in the tree to `sim_athena_cast_date`, which keeps the date of an ISO-8601 value and refuses
+anything else. A one-argument `date(x)` is Trino's name for the same cast and goes to the same shim.
+Casts to other types are left to SQLite.
 
 **A function SQLite already gets right is left alone.** `substr` and `format` both count from one
 and take the same format specifiers, and registering a name shadows the built-in, so a shim there

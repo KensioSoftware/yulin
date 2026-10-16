@@ -1,5 +1,7 @@
 import type { DatabaseSync, SQLInputValue, SQLOutputValue } from "node:sqlite";
 
+import { SimAthenaShimRefusal } from "./sim-athena-shim-refusal.js";
+
 /** One Trino scalar function, as SQLite will call it. */
 export type SimAthenaScalarShim = (
   ...values: SQLOutputValue[]
@@ -11,14 +13,27 @@ export type SimAthenaScalarShim = (
  * Every shim takes any number of arguments, because SQLite checks the count
  * against the JavaScript function's own arity otherwise and a Trino function
  * with an optional argument would stop resolving.
+ *
+ * Anything the shim raises comes back out as a `SimAthenaShimRefusal` naming
+ * the function as a statement wrote it, which fails the query. `described`
+ * is that name where it differs from the one registered.
  */
 export function simAthenaScalarShim(
   database: DatabaseSync,
   name: string,
   implementation: SimAthenaScalarShim,
+  described = name,
 ): void {
-  database.function(name, { varargs: true, deterministic: true }, (...values) =>
-    withEmptyBytes(implementation(...values)),
+  database.function(
+    name,
+    { varargs: true, deterministic: true },
+    (...values) => {
+      try {
+        return withEmptyBytes(implementation(...values));
+      } catch (error) {
+        throw new SimAthenaShimRefusal(described, error);
+      }
+    },
   );
 }
 
