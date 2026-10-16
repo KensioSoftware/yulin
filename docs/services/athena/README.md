@@ -1119,11 +1119,16 @@ Current documented limitations:
   runs.
 - `try_cast` runs as a plain cast. `try_cast('abc' AS integer)` therefore answers 0 where real
   Athena answers null, which is the same forgiving direction as the cast above. Reading the
-  statement without the rewrite would turn the whole query down. A `try_cast` to `DATE` over text
-  that is no date fails the query, where Athena answers null.
-- `CAST(x AS DATE)` and `date(x)` read ISO-8601 text. A timestamp keeps its date, and any other
-  text fails the cast. The answer is text in a `varchar` column, where Athena reports a `date`.
-  Casts to `TIMESTAMP` and the other types are SQLite's own.
+  statement without the rewrite would turn the whole query down. A `try_cast` to `DATE` or
+  `TIMESTAMP` over text the cast cannot read fails the query, where Athena answers null.
+- `CAST(x AS DATE)`, `date(x)` and `CAST(x AS TIMESTAMP)` read text the way Trino's cast from
+  `varchar` does. A date is `yyyy-MM-dd` and nothing else. A timestamp is a date, optionally
+  followed by a space and a time, with no `T` and no zone. A timestamp renders as
+  `2026-08-15 10:00:00.000`, and a fraction finer than the millisecond is rounded.
+- A cast reads its value as text only where it is a string literal or a column the catalog declares
+  as `string`, `varchar` or `char`. Anything else, such as a `timestamp` column or the answer of a
+  function, is taken to be a date or a timestamp already, and any ISO-8601 form of it is accepted.
+  The answer is text in a `varchar` column, where Athena reports a `date` or a `timestamp`.
 - A `decimal` column is held as a double. A value carrying more than about fifteen significant
   digits loses the ones past that, and a filter, a sum or a group on it can then answer
   differently from Athena's exact arithmetic.

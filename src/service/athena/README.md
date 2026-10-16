@@ -265,11 +265,14 @@ default, which is usually no rows at all. `date_add` with an unknown unit, `slic
 and `array_join` over objects all take that route. A declaration written against the exact query
 still answers it.
 
-**A cast to `DATE` goes to a shim.** SQLite gives a `DATE` column numeric affinity, so its own
-`CAST('2026-08-15' AS DATE)` answers `2026`. `sim-athena-cast-rewrite.ts` hands every cast to `DATE`
-in the tree to `sim_athena_cast_date`, which keeps the date of an ISO-8601 value and refuses
-anything else. A one-argument `date(x)` is Trino's name for the same cast and goes to the same shim.
-Casts to other types are left to SQLite.
+**A cast to `DATE` or `TIMESTAMP` goes to a shim.** SQLite gives both types numeric affinity, so
+its own `CAST('2026-08-15' AS DATE)` answers `2026`. `sim-athena-cast-rewrite.ts` hands every such
+cast in the tree to `sim_athena_cast_date` or `sim_athena_cast_timestamp`, and a one-argument
+`date(x)` goes to the first of them as well. The rewrite tells the shim whether the value is text,
+from a string literal or a column the catalog declares as text. Text is held to the formats Trino's
+cast from `varchar` takes (`sim-athena-cast-text.ts`). Anything else is taken to be a date or a
+timestamp already, since the engine has no types for what a function answers with. Casts to other
+types are left to SQLite.
 
 **A function SQLite already gets right is left alone.** `substr` and `format` both count from one
 and take the same format specifiers, and registering a name shadows the built-in, so a shim there

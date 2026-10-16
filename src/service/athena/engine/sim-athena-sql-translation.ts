@@ -73,7 +73,7 @@ export function simAthenaSqliteSql(
       return simAthenaTurnedDownSql(simAthenaUnrewrittenUnnest);
     }
 
-    simAthenaRewriteCasts(ast);
+    simAthenaRewriteCasts(ast, request.tables);
 
     // Read before the tree is written back out, since the rewrites above can
     // move a select item and the scale travels by position.

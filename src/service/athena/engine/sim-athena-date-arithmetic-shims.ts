@@ -2,7 +2,6 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimAthenaSetUpError } from "../error/sim-athena.error.js";
-import { simAthenaDateCast } from "./sim-athena-cast-rewrite.js";
 import {
   isDateUnit,
   simAthenaDateAdded,
@@ -25,9 +24,6 @@ import {
  * ones Trino names and a value that is no ISO-8601 timestamp both land there,
  * and the engine fails the query with the reason. A shim answering a null
  * would be a wrong answer wearing the shape of a right one.
- *
- * A cast to `DATE` is here too, since it reads its value the way the others
- * do. A timestamp keeps its date, which is what Trino's cast does to one.
  */
 export function simAthenaInstallDateArithmeticShims(
   database: DatabaseSync,
@@ -56,13 +52,6 @@ export function simAthenaInstallDateArithmeticShims(
 
     return simAthenaDateDifference(unitOf(unit), start.instant, end.instant);
   });
-
-  simAthenaScalarShim(
-    database,
-    simAthenaDateCast,
-    (value) => instantOf(value)?.text.slice(0, 10) ?? null,
-    "CAST(... AS DATE)",
-  );
 
   simAthenaScalarShim(database, "at_timezone", (timestamp, zone) =>
     inZone(instantOf(timestamp), shimText(zone)),

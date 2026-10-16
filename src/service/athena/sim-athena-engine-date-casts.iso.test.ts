@@ -6,47 +6,9 @@ import {
 import { describe, it } from "vitest";
 
 import { anAnsweredQuery } from "./sim-athena-answered-query.fixture.js";
-import {
-  aCatalogTable,
-  anEngineSimulation,
-  aSeededJson,
-  type SimAthenaEngineSimulation,
-} from "./sim-athena-engine.fixture.js";
+import { aSnapshotSimulation } from "./sim-athena-snapshot-table.fixture.js";
 
 describe("casting to DATE in the simulated Athena query engine", () => {
-  /**
-   * A table of snapshots partitioned by a string `day`, with the engine on and
-   * a default declaration that a fallback would answer with.
-   */
-  async function aSnapshotSimulation(): Promise<SimAthenaEngineSimulation> {
-    const simulation = await anEngineSimulation();
-
-    aCatalogTable(simulation.simAws, {
-      name: "snapshots",
-      columns: [
-        { Name: "sku", Type: "string" },
-        { Name: "taken_at", Type: "string" },
-      ],
-      partitionKeys: [{ Name: "day", Type: "string" }],
-    });
-
-    await aSeededJson(
-      simulation.simAws,
-      "snapshots/day=2026-08-15/part-0.json",
-      [
-        { sku: "bolt", taken_at: "2026-08-15T23:30:00Z" },
-        { sku: "nut", taken_at: "2026-08-14T08:00:00Z" },
-      ],
-    );
-    await simulation.simAws.athena().engine().enable();
-    simulation.simAws
-      .athena()
-      .results()
-      .byDefault({ columns: ["fallback"], rows: [["declared"]] });
-
-    return simulation;
-  }
-
   it("reads a partition column cast to DATE as the date it holds", async () => {
     // Given snapshots partitioned by a string day.
     const simulation = await aSnapshotSimulation();
@@ -77,7 +39,7 @@ describe("casting to DATE in the simulated Athena query engine", () => {
     // Then the inner call fails the query too. Left to SQLite it would answer
     // null, and the outer cast would pass the null through.
     assertIdentical(answered.state, "FAILED");
-    assertStringIncludes(answered.reason, "is no ISO-8601 timestamp");
+    assertStringIncludes(answered.reason, "Value cannot be cast to date: bolt");
   });
 
   it("moves a cast day and casts it back to VARCHAR", async () => {
@@ -119,21 +81,70 @@ describe("casting to DATE in the simulated Athena query engine", () => {
   });
 
   it("keeps the date of a timestamp cast to DATE", async () => {
-    // Given snapshots carrying an ISO-8601 timestamp in a data column.
+    // Given snapshots carrying a Glue timestamp column.
     const simulation = await aSnapshotSimulation();
 
-    // When a query casts the timestamp to a DATE.
+    // When a query casts the timestamp to a DATE, and calls date() on it.
     const answered = await anAnsweredQuery(
       simulation,
-      "SELECT sku, CAST(taken_at AS DATE) AS taken_on " +
+      "SELECT sku, CAST(taken_at AS DATE) AS taken_on, date(taken_at) AS d " +
         "FROM rainlytics.snapshots ORDER BY sku",
     );
 
     // Then the date part answers, as Trino's cast of a timestamp does.
     assertObjectEquals(answered.rows, [
-      ["bolt", "2026-08-15"],
-      ["nut", "2026-08-14"],
+      ["bolt", "2026-08-15", "2026-08-15"],
+      ["nut", "2026-08-14", "2026-08-14"],
     ]);
+  });
+
+  it("reads text the way Trino's cast from varchar does", async () => {
+    // Given snapshots, with a lenient engine and a default declaration.
+    const simulation = await aSnapshotSimulation();
+
+    // When a query casts a date with spaces around it to a DATE.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT DISTINCT CAST(' 2026-08-05 ' AS DATE) AS d " +
+        "FROM rainlytics.snapshots",
+    );
+
+    // Then the cast trims the text before reading it, as Trino's does.
+    assertObjectEquals(answered.rows, [["2026-08-05"]]);
+  });
+
+  it("fails a cast to DATE of text carrying a time", async () => {
+    // Given snapshots whose noted_at is text holding a date and a time.
+    const simulation = await aSnapshotSimulation();
+
+    // When a query casts that text to a DATE.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT CAST(noted_at AS DATE) AS noted_on FROM rainlytics.snapshots",
+    );
+
+    // Then the query fails. Trino reads only a date out of text, and only a
+    // timestamp value loses its time to the cast.
+    assertIdentical(answered.state, "FAILED");
+    assertStringIncludes(
+      answered.reason,
+      "Value cannot be cast to date: 2026-08-15 10:00:00",
+    );
+  });
+
+  it("fails a cast to DATE of a day the calendar has not got", async () => {
+    // Given snapshots, with a lenient engine.
+    const simulation = await aSnapshotSimulation();
+
+    // When a query casts the 30th of February.
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT CAST('2026-02-30' AS DATE) AS d FROM rainlytics.snapshots",
+    );
+
+    // Then the query fails rather than rolling over into March.
+    assertIdentical(answered.state, "FAILED");
+    assertStringIncludes(answered.reason, "Value cannot be cast to date");
   });
 
   it("fails a cast of text that is no date, with the engine lenient", async () => {
@@ -150,7 +161,7 @@ describe("casting to DATE in the simulated Athena query engine", () => {
     // back would answer with the declaration's rows.
     assertIdentical(answered.state, "FAILED");
     assertStringIncludes(answered.reason, "CAST(... AS DATE)");
-    assertStringIncludes(answered.reason, "is no ISO-8601 timestamp");
+    assertStringIncludes(answered.reason, "Value cannot be cast to date: bolt");
   });
 
   it("fails date() over text that is no date, as the cast it names", async () => {
@@ -166,7 +177,7 @@ describe("casting to DATE in the simulated Athena query engine", () => {
     // Then the query fails as the cast does. SQLite's own date() would
     // answer null for every row.
     assertIdentical(answered.state, "FAILED");
-    assertStringIncludes(answered.reason, "is no ISO-8601 timestamp");
+    assertStringIncludes(answered.reason, "Value cannot be cast to date: bolt");
   });
 
   it("fails a function that will not guess, with the engine lenient", async () => {
