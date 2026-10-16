@@ -71,6 +71,9 @@ export class SimLambdaHttp2Session {
    *
    * A request the simulation cannot answer fails the client's stream with the
    * error that explains it, which is what the SDK rejects the call with.
+   *
+   * The answer carries the `date` the simulation gave it, or none. The server
+   * would otherwise date it from the host clock.
    */
   private async respond(
     request: http2.Http2ServerRequest,
@@ -83,6 +86,7 @@ export class SimLambdaHttp2Session {
       );
       const body = Buffer.from(await answered.arrayBuffer());
 
+      response.sendDate = false;
       response.writeHead(
         answered.status,
         simLambdaHttp2ResponseHeaders(answered.headers),

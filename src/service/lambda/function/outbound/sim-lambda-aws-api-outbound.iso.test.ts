@@ -12,6 +12,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { SimFixedClock } from "../../../../util/clock/sim-clock.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 import {
@@ -180,6 +181,49 @@ describe("The AWS service API a sim Lambda's requests reach", () => {
     // being refused for carrying no operation header.
     assertResponseStatus(response, 200, await describeResponse(response));
     assertIdentical(await response.text(), greeting);
+  });
+
+  it("stamps every answer with simulated time", async () => {
+    // Given a simulation whose clock is years behind the host's, and the
+    // outbound HTTP a function in it reaches AWS through.
+    const now = new Date("2020-01-01T09:00:00.000Z");
+    const simAws = new SimAws({
+      clock: new SimFixedClock(now),
+      defaultRegionName: "eu-west-2",
+    });
+    const outbound = new SimLambdaAwsApiOutbound({
+      simAws,
+      regionName: "eu-west-2",
+    });
+    const tableName = faker.string.alpha(10);
+    const bucketName = faker.string.alpha({ length: 10, casing: "lower" });
+
+    // When a Command and a request signed for S3 arrive, both of which the
+    // simulation rejects.
+    const commandResponse = await outbound.fetch(
+      new Request("https://dynamodb.eu-west-2.amazonaws.com/", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-amz-json-1.0",
+          "x-amz-target": "DynamoDB_20120810.GetItem",
+        },
+        body: JSON.stringify({
+          TableName: tableName,
+          Key: { orderId: { S: "order-1" } },
+        }),
+      }),
+    );
+    const s3Response = await outbound.fetch(
+      new Request(
+        `https://${bucketName}.s3.eu-west-2.amazonaws.com/greeting.txt?x-id=GetObject`,
+        { headers: { authorization: signedFor("s3") } },
+      ),
+    );
+
+    // Then each answer is dated with simulated time, which is what the SDK
+    // corrects its clock skew from.
+    assertIdentical(commandResponse.headers.get("date"), now.toUTCString());
+    assertIdentical(s3Response.headers.get("date"), now.toUTCString());
   });
 
   it("runs an S3 request as the caller the function is running as", async () => {
