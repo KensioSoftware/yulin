@@ -64,6 +64,22 @@ describe("casting to DATE in the simulated Athena query engine", () => {
     assertObjectEquals(answered.rows, [["2026-08-15", "2026-08-15"]]);
   });
 
+  it("rewrites a cast nested inside another", async () => {
+    // Given snapshots carrying a column that holds no date.
+    const simulation = await aSnapshotSimulation();
+
+    // When a query wraps date() of that column inside another date().
+    const answered = await anAnsweredQuery(
+      simulation,
+      "SELECT date(date(sku)) AS made_on FROM rainlytics.snapshots",
+    );
+
+    // Then the inner call fails the query too. Left to SQLite it would answer
+    // null, and the outer cast would pass the null through.
+    assertIdentical(answered.state, "FAILED");
+    assertStringIncludes(answered.reason, "is no ISO-8601 timestamp");
+  });
+
   it("moves a cast day and casts it back to VARCHAR", async () => {
     // Given snapshots partitioned by a string day.
     const simulation = await aSnapshotSimulation();
