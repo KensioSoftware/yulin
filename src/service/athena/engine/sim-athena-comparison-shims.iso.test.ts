@@ -64,12 +64,12 @@ describe("Trino's least and greatest on SQLite", () => {
     );
   });
 
-  it("turns the query down over a varbinary", async () => {
+  it("fails the query over a varbinary", async () => {
     // Given two digests, which are bytes rather than text.
     // When they are ordered.
     // Then the shim raises. Trino orders a varbinary by its bytes and nothing
-    // written out here orders the same way, so the query falls back rather
-    // than answering from a rendering of them.
+    // written out here orders the same way. The query fails before it answers
+    // from a rendering of them.
     await assertThrowsErrorAsync(async () =>
       anAnsweredExpression("least(to_utf8('a'), to_utf8('b'))"),
     );

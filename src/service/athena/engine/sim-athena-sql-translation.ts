@@ -10,36 +10,15 @@ import {
   simAthenaUnwrittenStatement,
 } from "./sim-athena-turn-down.js";
 import { simAthenaRejectedStatement } from "./sim-athena-rejected-statement.js";
+import { simAthenaRewriteCasts } from "./sim-athena-cast-rewrite.js";
 import { simAthenaRoundScales } from "./sim-athena-round-scales.js";
+import {
+  simAthenaRejectedSql,
+  simAthenaTranslated,
+  simAthenaTurnedDownSql,
+  type SimAthenaTranslatedSql,
+} from "./sim-athena-translated-sql.js";
 import { simAthenaRewriteUnnest } from "./sim-athena-unnest-rewrite.js";
-
-/** One statement translated for SQLite, or why it was not. */
-export type SimAthenaTranslatedSql =
-  | {
-      readonly sql: string;
-
-      /**
-       * The decimal places each result column was rounded to, by position.
-       *
-       * Read here because the syntax tree is the only place that knows, and
-       * the tree is gone by the time the answer is rendered.
-       */
-      readonly scales: ReadonlyMap<number, number>;
-      readonly turnedDown: undefined;
-      readonly rejected: undefined;
-    }
-  | {
-      readonly sql: undefined;
-      readonly scales: undefined;
-      readonly turnedDown: string;
-      readonly rejected: undefined;
-    }
-  | {
-      readonly sql: undefined;
-      readonly scales: undefined;
-      readonly turnedDown: undefined;
-      readonly rejected: string;
-    };
 
 interface SimAthenaSqlTranslationRequest {
   readonly parser: SimAthenaSqlParser;
@@ -74,18 +53,13 @@ export function simAthenaSqliteSql(
     read = simAthenaSqlForParser(request.athenaSql);
     ast = parser.astify(read.sql, { database: "athena" });
   } catch {
-    return turnedDown(simAthenaUnparsedStatement);
+    return simAthenaTurnedDownSql(simAthenaUnparsedStatement);
   }
 
   const rejected = simAthenaRejectedStatement(ast);
 
   if (rejected !== undefined) {
-    return {
-      sql: undefined,
-      scales: undefined,
-      turnedDown: undefined,
-      rejected,
-    };
+    return simAthenaRejectedSql(rejected);
   }
 
   try {
@@ -96,29 +70,20 @@ export function simAthenaSqliteSql(
         tables: request.tables,
       })
     ) {
-      return turnedDown(simAthenaUnrewrittenUnnest);
+      return simAthenaTurnedDownSql(simAthenaUnrewrittenUnnest);
     }
+
+    simAthenaRewriteCasts(ast, request.tables);
 
     // Read before the tree is written back out, since the rewrites above can
     // move a select item and the scale travels by position.
     const scales = simAthenaRoundScales(ast);
 
-    return {
-      sql: simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" })),
+    return simAthenaTranslated(
+      simAthenaSqlForSqlite(parser.sqlify(ast, { database: "sqlite" })),
       scales,
-      turnedDown: undefined,
-      rejected: undefined,
-    };
+    );
   } catch {
-    return turnedDown(simAthenaUnwrittenStatement);
+    return simAthenaTurnedDownSql(simAthenaUnwrittenStatement);
   }
-}
-
-function turnedDown(reason: string): SimAthenaTranslatedSql {
-  return {
-    sql: undefined,
-    scales: undefined,
-    turnedDown: reason,
-    rejected: undefined,
-  };
 }

@@ -28,8 +28,8 @@ const encodedReplacement = Buffer.from([0xef, 0xbf, 0xbd]);
  * One encoded string read back to bytes, or null where it is null.
  *
  * Trino fails the query over text the encoding cannot carry, and `Buffer` reads
- * as much of it as it can and drops the rest. Raising here turns the query down
- * instead, which is nearer to Trino's answer than bytes nobody wrote.
+ * as much of it as it can and drops the rest. Raising here fails the query the
+ * way Trino does.
  */
 export function simAthenaDecodedText(
   text: string | undefined,

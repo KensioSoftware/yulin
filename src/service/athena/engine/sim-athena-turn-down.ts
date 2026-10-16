@@ -33,6 +33,20 @@ export function simAthenaRunFailure(error: unknown): string {
 }
 
 /**
+ * A function shim that could not answer for one of the statement's values.
+ *
+ * This fails the query whether or not the engine is strict, so the reason
+ * points at the one declaration that still answers it.
+ */
+export function simAthenaUnevaluable(refusal: Error): string {
+  return (
+    `${engine} cannot evaluate this statement. ${refusal.message} ` +
+    `Declare what this exact query answers with through results() to answer ` +
+    `it without the engine.`
+  );
+}
+
+/**
  * One table the engine has no reader for.
  *
  * The SerDe is what decides, so the SerDe is what the reason names. A table

@@ -22,7 +22,7 @@ const calendarUnits: ReadonlyMap<string, number> = new Map([
  *
  * A shim answering a unit it does not know would be answering wrongly, so the
  * ones here are the whole of what `date_add` and `date_diff` take. Anything
- * else raises, and the engine turns the query down.
+ * else raises, and the query fails.
  */
 export function isDateUnit(unit: string): boolean {
   return clockUnits.has(unit) || calendarUnits.has(unit);

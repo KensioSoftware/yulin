@@ -76,8 +76,7 @@ function isNumeric(value: SQLOutputValue): value is bigint | number {
  * One argument as the text it orders by.
  *
  * A `varbinary` orders by its bytes in Trino, and nothing written out here
- * orders the same way. A call over one raises and the query falls back to its
- * declared result.
+ * orders the same way. A call over one raises and the query fails.
  */
 function comparableText(value: SQLOutputValue): string {
   if (value instanceof Uint8Array) {

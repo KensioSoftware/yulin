@@ -59,8 +59,8 @@ function matches(
  *
  * Trino counts the groups from one and calls the whole match zero, which is
  * what a regular expression counts them as anywhere. Trino also refuses a group
- * the pattern has not got, and raising here turns the query down rather than
- * letting a negative index quietly count back from the end.
+ * the pattern has not got, and raising here fails the query where a negative
+ * index would quietly count back from the end.
  */
 function extracted(
   value: string | undefined,

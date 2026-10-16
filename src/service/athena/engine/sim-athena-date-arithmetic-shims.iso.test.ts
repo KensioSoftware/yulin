@@ -182,10 +182,10 @@ describe("Trino's date arithmetic on SQLite", () => {
     );
   });
 
-  it("turns the query down rather than guessing", async () => {
+  it("fails the query where it would have to guess", async () => {
     // Given a unit Trino does not name and text that is no timestamp.
     // When each is used.
-    // Then the statement raises, which leaves the declared result to answer.
+    // Then the statement raises, and the engine fails the query.
     // A null would be a wrong answer wearing the shape of a right one.
     await assertThrowsErrorAsync(async () =>
       anAnsweredExpression("date_add('fortnight', 1, '2026-08-30')"),

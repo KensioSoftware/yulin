@@ -176,7 +176,7 @@ describe("Trino's string functions on SQLite", () => {
   it("refuses an empty delimiter and a limit below one", async () => {
     // Given a value to split.
     // When the delimiter is empty and when the limit is zero.
-    // Then the statement raises, which leaves the declared result to answer.
+    // Then the statement raises, and the engine fails the query.
     // Trino refuses both, where JavaScript would split an empty delimiter a
     // character at a time and answer something else.
     await assertThrowsErrorAsync(async () =>

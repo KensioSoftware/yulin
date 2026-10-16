@@ -60,7 +60,8 @@ interface SimAthenaQueryAnswerRequest {
  *
  * A statement Athena refuses fails whichever mode the engine is in. That is
  * SQL the service would never have run, and falling back would leave the query
- * green on it.
+ * green on it. So does a statement the engine ran and could not evaluate,
+ * where falling back to the default would answer with no rows at all.
  */
 export async function simAthenaQueryAnswer(
   request: SimAthenaQueryAnswerRequest,
