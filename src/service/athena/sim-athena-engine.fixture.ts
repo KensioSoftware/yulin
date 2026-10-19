@@ -161,6 +161,9 @@ const writeCompressors = {
     new Uint8Array(brotliCompressSync(bytes)),
   DEFLATE: (bytes: Uint8Array): Uint8Array =>
     new Uint8Array(deflateSync(bytes)),
+  // A label without the compression. The reader has no LZ4 decompressor, and
+  // a file it has to turn down needs only to claim the codec.
+  LZ4_RAW: (bytes: Uint8Array): Uint8Array => bytes,
 };
 
 /**
