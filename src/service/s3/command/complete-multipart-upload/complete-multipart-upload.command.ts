@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3WritePrecondition } from "../object/sim-s3-write-precondition.js";
 
 /**
  * Minimal structural sim S3 CompleteMultipartUpload command.
@@ -21,7 +22,7 @@ export interface SimCompletedUploadPart {
  * The parts are named by the request rather than assumed by S3, so a client can
  * finish an upload it sent a part of twice.
  */
-export interface SimCompleteMultipartUploadCommandInput {
+export interface SimCompleteMultipartUploadCommandInput extends SimS3WritePrecondition {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   readonly UploadId?: string | undefined;

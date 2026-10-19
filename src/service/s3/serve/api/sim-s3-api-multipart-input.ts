@@ -1,4 +1,5 @@
 import { optional, optionalNumber } from "./sim-s3-api-input.js";
+import { writePreconditionInput } from "./sim-s3-api-object-input.js";
 import type { SimS3ApiRequest } from "./sim-s3-api-request.js";
 import { readSimS3CompletedUpload } from "./sim-s3-api-xml-read.js";
 
@@ -38,6 +39,7 @@ export function uploadPartInput(request: SimS3ApiRequest): object {
 export function completeMultipartUploadInput(request: SimS3ApiRequest): object {
   return {
     ...uploadInput(request),
+    ...writePreconditionInput(request),
     MultipartUpload: readSimS3CompletedUpload(request.body),
   };
 }

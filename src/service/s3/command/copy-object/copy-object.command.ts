@@ -2,6 +2,8 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
 import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
 import type { SimS3ObjectWriteTagging } from "../../object/s3-write-tagging.js";
+import type { SimS3WritePrecondition } from "../object/sim-s3-write-precondition.js";
+import type { SimS3CopySourcePrecondition } from "./copy-object-precondition.js";
 
 /**
  * Minimal structural sim S3 CopyObject command.
@@ -21,7 +23,9 @@ export interface SimCopyObjectCommandInput
   extends
     SimS3ObjectWriteMetadata,
     SimS3ObjectWriteStorage,
-    SimS3ObjectWriteTagging {
+    SimS3ObjectWriteTagging,
+    SimS3WritePrecondition,
+    SimS3CopySourcePrecondition {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   /** The source Object, as `sourceBucket/sourceKey`, URL-encoded. */

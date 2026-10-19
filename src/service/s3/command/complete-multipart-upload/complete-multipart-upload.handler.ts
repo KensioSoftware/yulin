@@ -12,6 +12,7 @@ import {
   SimS3MultipartAccess,
   type SimS3MultipartAccessProperties,
 } from "../multipart/sim-s3-multipart-access.js";
+import { simS3RequireWritePrecondition } from "../object/sim-s3-write-precondition.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type {
   SimCompleteMultipartUploadCommand,
@@ -58,6 +59,7 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
 
     const { bucket, caller } = await this.access.reach(Bucket, Key, options);
     const upload = this.access.requireUpload(bucket, UploadId);
+    await simS3RequireWritePrecondition(bucket, Key, command.input);
 
     const object = simS3CompletedUploadObject({
       upload,

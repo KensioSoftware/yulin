@@ -16,9 +16,11 @@ import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notif
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
 import { GetObjectAuthorizer } from "../get-object/get-object-authorizer.js";
 import { PutObjectAuthorizer } from "../put-object/put-object-authorizer.js";
+import { simS3RequireWritePrecondition } from "../object/sim-s3-write-precondition.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { CopyObjectBuilder } from "./copy-object-builder.js";
+import { simS3RequireCopySourcePrecondition } from "./copy-object-precondition.js";
 import {
   simS3CopySource,
   simS3CopySourceObject,
@@ -79,6 +81,10 @@ export class CopyObjectCommandHandler implements CommandHandler<
    * decision. That keeps a malformed request and a missing Bucket answering
    * what real S3 answers. The source Object is read after authorization, which
    * leaves a refused caller knowing nothing about which keys exist.
+   *
+   * The conditions on the source are checked once it has been read, and the
+   * conditions on the destination after that. Either one failing refuses the
+   * copy before anything is written.
    */
   async handle(
     command: SimCopyObjectCommand,
@@ -114,6 +120,9 @@ export class CopyObjectCommandHandler implements CommandHandler<
     );
 
     const stored = await simS3CopySourceObject(source, from.key);
+    simS3RequireCopySourcePrecondition(stored, command.input);
+    await simS3RequireWritePrecondition(destination, key, command.input);
+
     const object = this.objectBuilder.build(
       command.input,
       key,
