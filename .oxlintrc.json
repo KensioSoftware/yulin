@@ -535,7 +535,10 @@
     "unicorn-js/prefer-string-trim-start-end": "error",
     "unicorn-js/prefer-structured-clone": "error",
     "unicorn-js/prefer-switch": "error",
-    "unicorn-js/prefer-ternary": "error",
+    // Off since Unicorn 75, which extended it to a guard clause followed by a
+    // return. That reached about 1,200 early returns this codebase writes on
+    // purpose, often with a comment on the branch a ternary would have to drop.
+    "unicorn-js/prefer-ternary": "off",
     "unicorn-js/prefer-toggle-attribute": "error",
     "unicorn-js/prefer-top-level-await": "error",
     "unicorn-js/prefer-type-error": "error",
