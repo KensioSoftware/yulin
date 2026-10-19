@@ -156,10 +156,12 @@ function listingEntries(request: SimS3ObjectPageRequest): SimS3ListingEntry[] {
       continue;
     }
 
-    if (commonPrefix !== rolledUp) {
-      rolledUp = commonPrefix;
-      entries.push({ name: commonPrefix });
+    if (commonPrefix === rolledUp) {
+      continue;
     }
+
+    rolledUp = commonPrefix;
+    entries.push({ name: commonPrefix });
   }
 
   return entries;

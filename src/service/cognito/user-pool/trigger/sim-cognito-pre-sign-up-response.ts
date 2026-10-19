@@ -59,15 +59,10 @@ export class SimCognitoPreSignUpResponse {
    * The attributes the handler asked to have marked verified.
    */
   get verifiedAttributeNames(): readonly string[] {
-    const names: string[] = [];
-
-    if (this.autoVerifyEmail) {
-      names.push("email");
-    }
-
-    if (this.autoVerifyPhone) {
-      names.push("phone_number");
-    }
+    const names: string[] = [
+      ...(this.autoVerifyEmail ? ["email"] : []),
+      ...(this.autoVerifyPhone ? ["phone_number"] : []),
+    ];
 
     return names;
   }

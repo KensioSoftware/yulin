@@ -25,11 +25,10 @@ export function simRestApiView(restApi: SimRestApi): SimRestApiView {
     createdDate: new Date(restApi.createdDate),
     rootResourceId: restApi.rootResource.resourceId,
     disableExecuteApiEndpoint: restApi.disableExecuteApiEndpoint,
+    ...(restApi.description !== undefined && {
+      description: restApi.description,
+    }),
   };
-
-  if (restApi.description !== undefined) {
-    view.description = restApi.description;
-  }
 
   return view;
 }

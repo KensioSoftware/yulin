@@ -49,9 +49,9 @@ export class SimS3BucketVersioning {
   static fromConfiguration(
     configuration: SimS3VersioningConfiguration,
   ): SimS3BucketVersioning {
-    return configuration.Status === "Enabled"
-      ? new SimS3BucketVersioning("Enabled")
-      : new SimS3BucketVersioning("Suspended");
+    return new SimS3BucketVersioning(
+      configuration.Status === "Enabled" ? "Enabled" : "Suspended",
+    );
   }
 
   /**

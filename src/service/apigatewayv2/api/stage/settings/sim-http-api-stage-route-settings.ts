@@ -57,15 +57,14 @@ export class SimHttpApiStageRouteSettings {
    * What CreateStage and GetStages report of these settings.
    */
   view(): SimHttpApiRouteSettingsView {
-    const view: SimHttpApiRouteSettingsView = {};
-
-    if (this.#defaultRouteSettings !== undefined) {
-      view.DefaultRouteSettings = { ...this.#defaultRouteSettings };
-    }
-
-    if (this.#routeSettings.size > 0) {
-      view.RouteSettings = Object.fromEntries(this.#routeSettings);
-    }
+    const view: SimHttpApiRouteSettingsView = {
+      ...(this.#defaultRouteSettings !== undefined && {
+        DefaultRouteSettings: { ...this.#defaultRouteSettings },
+      }),
+      ...(this.#routeSettings.size > 0 && {
+        RouteSettings: Object.fromEntries(this.#routeSettings),
+      }),
+    };
 
     return view;
   }

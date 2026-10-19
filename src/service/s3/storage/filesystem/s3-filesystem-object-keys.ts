@@ -84,15 +84,17 @@ export class FilesystemS3ObjectKeys {
         continue;
       }
 
-      if (entry.isFile()) {
-        const key = path
-          .relative(this.directoryPath, entryPath)
-          .split(path.sep)
-          .join("/");
+      if (!entry.isFile()) {
+        continue;
+      }
 
-        if (this.safety.isAllowedObjectKeyExtension(key)) {
-          keys.push(key);
-        }
+      const key = path
+        .relative(this.directoryPath, entryPath)
+        .split(path.sep)
+        .join("/");
+
+      if (this.safety.isAllowedObjectKeyExtension(key)) {
+        keys.push(key);
       }
     }
 

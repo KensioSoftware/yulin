@@ -61,15 +61,9 @@ const strictTransportSecurityValue: SimCfnCfRhPolicySecurityValue = (
 ) => {
   const directives = [
     `max-age=${requiredInteger(item, "AccessControlMaxAgeSec", context, refuse)}`,
+    ...(item["IncludeSubdomains"] === true ? ["includeSubDomains"] : []),
+    ...(item["Preload"] === true ? ["preload"] : []),
   ];
-
-  if (item["IncludeSubdomains"] === true) {
-    directives.push("includeSubDomains");
-  }
-
-  if (item["Preload"] === true) {
-    directives.push("preload");
-  }
 
   return directives.join("; ");
 };

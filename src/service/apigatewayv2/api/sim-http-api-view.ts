@@ -46,11 +46,10 @@ export function simHttpApiView(parts: SimHttpApiViewParts): SimHttpApiView {
     ProtocolType: parts.protocolType,
     CreatedDate: new Date(parts.createdDate),
     DisableExecuteApiEndpoint: parts.disableExecuteApiEndpoint,
+    ...(parts.description !== undefined && {
+      Description: parts.description,
+    }),
   };
-
-  if (parts.description !== undefined) {
-    view.Description = parts.description;
-  }
 
   return view;
 }

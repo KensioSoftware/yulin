@@ -121,16 +121,9 @@ export class SimLogsMetricFilter {
 function byPeriod(
   events: readonly SimLogsStoredEvent[],
 ): ReadonlyMap<number, readonly SimLogsStoredEvent[]> {
-  const grouped = new Map<number, SimLogsStoredEvent[]>();
-
-  for (const event of events) {
-    const period =
-      Math.floor(event.ingestionTime / periodMilliseconds) * periodMilliseconds;
-    const inPeriod = grouped.get(period) ?? [];
-
-    inPeriod.push(event);
-    grouped.set(period, inPeriod);
-  }
-
-  return grouped;
+  return Map.groupBy(
+    events,
+    (event) =>
+      Math.floor(event.ingestionTime / periodMilliseconds) * periodMilliseconds,
+  );
 }

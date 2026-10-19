@@ -82,11 +82,10 @@ export class SimMessageLogConsole {
     const medium = message.medium === "EMAIL" ? "email" : "SMS";
     const lines = [
       `sim Cognito ${message.userPoolId}: ${medium} to ${message.recipient} (${message.occasion})`,
+      ...(message.subject === undefined
+        ? []
+        : [`${bodyIndent}Subject: ${message.subject}`]),
     ];
-
-    if (message.subject !== undefined) {
-      lines.push(`${bodyIndent}Subject: ${message.subject}`);
-    }
 
     return [...lines, ...indented(message.body)];
   }

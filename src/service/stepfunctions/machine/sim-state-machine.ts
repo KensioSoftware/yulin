@@ -93,9 +93,11 @@ export class SimStateMachine {
   }): void {
     this.#roleArn = changes.roleArn ?? this.#roleArn;
 
-    if (changes.definition !== undefined && changes.parsed !== undefined) {
-      this.#definition = changes.definition;
-      this.#parsed = changes.parsed;
+    if (changes.definition === undefined || changes.parsed === undefined) {
+      return;
     }
+
+    this.#definition = changes.definition;
+    this.#parsed = changes.parsed;
   }
 }

@@ -117,38 +117,44 @@ function readersOf(
     Delete: remove,
     ConditionCheck: check,
   } = item;
-  const readers: SimDynamoDbTransactWriteReader[] = [];
-
-  if (put !== undefined) {
-    readers.push({
-      name: "Put",
-      read: (): SimDynamoDbTransactWrite => readSimDynamoDbTransactPut(put),
-    });
-  }
-
-  if (update !== undefined) {
-    readers.push({
-      name: "Update",
-      read: (): SimDynamoDbTransactWrite =>
-        readSimDynamoDbTransactUpdate(update),
-    });
-  }
-
-  if (remove !== undefined) {
-    readers.push({
-      name: "Delete",
-      read: (): SimDynamoDbTransactWrite =>
-        readSimDynamoDbTransactDelete(remove),
-    });
-  }
-
-  if (check !== undefined) {
-    readers.push({
-      name: "ConditionCheck",
-      read: (): SimDynamoDbTransactWrite =>
-        readSimDynamoDbTransactConditionCheck(check),
-    });
-  }
+  const readers: SimDynamoDbTransactWriteReader[] = [
+    ...(put === undefined
+      ? []
+      : [
+          {
+            name: "Put",
+            read: (): SimDynamoDbTransactWrite =>
+              readSimDynamoDbTransactPut(put),
+          },
+        ]),
+    ...(update === undefined
+      ? []
+      : [
+          {
+            name: "Update",
+            read: (): SimDynamoDbTransactWrite =>
+              readSimDynamoDbTransactUpdate(update),
+          },
+        ]),
+    ...(remove === undefined
+      ? []
+      : [
+          {
+            name: "Delete",
+            read: (): SimDynamoDbTransactWrite =>
+              readSimDynamoDbTransactDelete(remove),
+          },
+        ]),
+    ...(check === undefined
+      ? []
+      : [
+          {
+            name: "ConditionCheck",
+            read: (): SimDynamoDbTransactWrite =>
+              readSimDynamoDbTransactConditionCheck(check),
+          },
+        ]),
+  ];
 
   return readers;
 }

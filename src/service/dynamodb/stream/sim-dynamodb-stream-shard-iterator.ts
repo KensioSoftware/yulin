@@ -48,9 +48,7 @@ function readPosition(value: unknown): SimDynamoDbStreamPosition {
     refuse();
   }
 
-  return kind === "at"
-    ? { kind: "at", sequenceNumber }
-    : { kind: "after", sequenceNumber };
+  return { kind: kind === "at" ? "at" : "after", sequenceNumber };
 }
 
 /**

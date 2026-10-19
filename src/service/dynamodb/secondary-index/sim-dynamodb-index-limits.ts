@@ -101,12 +101,14 @@ export function assertSimDynamoDbProjectedAttributeCount(
     0,
   );
 
-  if (projected > maxProjectedAttributes) {
-    const most = maxProjectedAttributes.toString();
-
-    throw new SimDynamoDbValidationException(
-      `${projected.toString()} NonKeyAttributes are projected across the ` +
-        `table's indexes, and a table projects at most ${most}`,
-    );
+  if (projected <= maxProjectedAttributes) {
+    return;
   }
+
+  const most = maxProjectedAttributes.toString();
+
+  throw new SimDynamoDbValidationException(
+    `${projected.toString()} NonKeyAttributes are projected across the ` +
+      `table's indexes, and a table projects at most ${most}`,
+  );
 }

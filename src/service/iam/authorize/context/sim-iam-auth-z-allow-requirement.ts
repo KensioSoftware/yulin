@@ -34,15 +34,13 @@ export class SimIamAuthZAllowRequirement {
   ): SimIamAllowRequirement {
     const requirements: SimIamAllowRequirement[] = [
       callerAccount.allowRequirement,
+      ...(input.requiresResourcePolicyAllow === true
+        ? [new SimIamMandatoryResourcePolicyRequirement()]
+        : []),
+      ...(input.withCallerPermissions === true
+        ? [new SimIamCallerPermissionRequirement()]
+        : []),
     ];
-
-    if (input.requiresResourcePolicyAllow === true) {
-      requirements.push(new SimIamMandatoryResourcePolicyRequirement());
-    }
-
-    if (input.withCallerPermissions === true) {
-      requirements.push(new SimIamCallerPermissionRequirement());
-    }
 
     return new SimIamEveryAllowRequirement(requirements);
   }

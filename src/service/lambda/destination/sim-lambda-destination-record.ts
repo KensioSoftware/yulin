@@ -67,15 +67,14 @@ export function makeSimLambdaDestinationRecord(
     },
     requestPayload: properties.requestPayload,
     responsePayload: properties.responsePayload,
+    ...(properties.ran && {
+      responseContext: {
+        statusCode: 200,
+        executedVersion: properties.executedVersion,
+        functionError: properties.functionError,
+      },
+    }),
   };
-
-  if (properties.ran) {
-    record.responseContext = {
-      statusCode: 200,
-      executedVersion: properties.executedVersion,
-      functionError: properties.functionError,
-    };
-  }
 
   return record;
 }

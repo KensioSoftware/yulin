@@ -57,11 +57,10 @@ export class SimRestApiDeployment {
     const view: SimRestApiDeploymentView = {
       id: this.deploymentId,
       createdDate: new Date(this.createdDate),
+      ...(this.description !== undefined && {
+        description: this.description,
+      }),
     };
-
-    if (this.description !== undefined) {
-      view.description = this.description;
-    }
 
     return view;
   }

@@ -88,11 +88,10 @@ export class SimHttpApiIntegration {
       IntegrationType: this.integrationType,
       IntegrationUri: this.integrationUri,
       PayloadFormatVersion: this.payloadFormatVersion,
+      ...(this.description !== undefined && {
+        Description: this.description,
+      }),
     };
-
-    if (this.description !== undefined) {
-      view.Description = this.description;
-    }
 
     return view;
   }

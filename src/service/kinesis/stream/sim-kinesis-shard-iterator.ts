@@ -63,9 +63,7 @@ function readPosition(value: unknown): SimKinesisStreamPosition {
     refuse();
   }
 
-  return kind === "at"
-    ? { kind: "at", sequenceNumber }
-    : { kind: "after", sequenceNumber };
+  return { kind: kind === "at" ? "at" : "after", sequenceNumber };
 }
 
 /**
