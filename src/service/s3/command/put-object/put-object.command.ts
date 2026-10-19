@@ -3,6 +3,7 @@ import type { SimS3WriteBody } from "../../object/s3-write-body.js";
 import type { SimS3ObjectWriteMetadata } from "../../object/s3-write-metadata.js";
 import type { SimS3ObjectWriteStorage } from "../../object/s3-write-storage.js";
 import type { SimS3ObjectWriteTagging } from "../../object/s3-write-tagging.js";
+import type { SimS3WritePrecondition } from "../object/sim-s3-write-precondition.js";
 
 /**
  * Minimal structural sim S3 PutObject command.
@@ -22,7 +23,8 @@ export interface SimPutObjectCommandInput
   extends
     SimS3ObjectWriteMetadata,
     SimS3ObjectWriteStorage,
-    SimS3ObjectWriteTagging {
+    SimS3ObjectWriteTagging,
+    SimS3WritePrecondition {
   readonly Bucket?: string | undefined;
   readonly Key?: string | undefined;
   readonly Body?: SimPutObjectBody;

@@ -1,5 +1,5 @@
 import { simS3WriteMetadataHeaders } from "../../object/s3-write-metadata.js";
-import { optional, utf8 } from "./sim-s3-api-input.js";
+import { optional, optionalDate, utf8 } from "./sim-s3-api-input.js";
 import type { SimS3ApiRequest } from "./sim-s3-api-request.js";
 import { readSimS3Tagging } from "./sim-s3-api-tagging-read.js";
 
@@ -62,7 +62,23 @@ export function getObjectInput(request: SimS3ApiRequest): object {
  * them.
  */
 export function putObjectInput(request: SimS3ApiRequest): object {
-  return { ...createMultipartUploadInput(request), Body: request.body };
+  return {
+    ...createMultipartUploadInput(request),
+    ...writePreconditionInput(request),
+    Body: request.body,
+  };
+}
+
+/**
+ * The conditions a write places on the Object already under its key, which
+ * PutObject, CopyObject and CompleteMultipartUpload all read from the same two
+ * headers.
+ */
+export function writePreconditionInput(request: SimS3ApiRequest): object {
+  return {
+    ...optional("IfMatch", request.headers.get("if-match")),
+    ...optional("IfNoneMatch", request.headers.get("if-none-match")),
+  };
 }
 
 /**
@@ -76,6 +92,8 @@ export function putObjectInput(request: SimS3ApiRequest): object {
 export function copyObjectInput(request: SimS3ApiRequest): object {
   return {
     ...createMultipartUploadInput(request),
+    ...writePreconditionInput(request),
+    ...copySourcePreconditionInput(request),
     ...optional("CopySource", request.headers.get(simS3CopySourceHeader)),
     ...optional(
       "MetadataDirective",
@@ -85,6 +103,24 @@ export function copyObjectInput(request: SimS3ApiRequest): object {
       "TaggingDirective",
       request.headers.get("x-amz-tagging-directive"),
     ),
+  };
+}
+
+/**
+ * The conditions a copy places on its source Object.
+ *
+ * The two date headers are HTTP dates, which the SDK hands the operation as
+ * `Date` values.
+ */
+function copySourcePreconditionInput(request: SimS3ApiRequest): object {
+  const header = (name: string): string | null =>
+    request.headers.get(`x-amz-copy-source-if-${name}`);
+
+  return {
+    ...optional("CopySourceIfMatch", header("match")),
+    ...optional("CopySourceIfNoneMatch", header("none-match")),
+    ...optionalDate("CopySourceIfModifiedSince", header("modified-since")),
+    ...optionalDate("CopySourceIfUnmodifiedSince", header("unmodified-since")),
   };
 }
 

@@ -12,6 +12,7 @@ import {
   SimS3MultipartAccess,
   type SimS3MultipartAccessProperties,
 } from "../multipart/sim-s3-multipart-access.js";
+import { simS3RequireWritePrecondition } from "../object/sim-s3-write-precondition.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type {
   SimCompleteMultipartUploadCommand,
@@ -65,7 +66,11 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
       completedAt: this.access.now(),
     });
 
-    const version = await bucket.putObject(object);
+    const version = await bucket.writeKey(Key, async () => {
+      await simS3RequireWritePrecondition(bucket, Key, command.input);
+
+      return await bucket.putObject(object);
+    });
     bucket.getMultipartUploads().discard(UploadId);
 
     this.notifications.objectCreated({

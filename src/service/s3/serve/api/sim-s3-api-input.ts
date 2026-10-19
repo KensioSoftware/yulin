@@ -78,6 +78,22 @@ export function optional(
 }
 
 /**
+ * The date form of the same, dropping a value that is not a date.
+ */
+export function optionalDate(
+  name: string,
+  value: string | null,
+): Record<string, Date> {
+  if (value === null) {
+    return {};
+  }
+
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime()) ? {} : { [name]: parsed };
+}
+
+/**
  * The numeric form of the same, dropping a value that is not a number.
  */
 export function optionalNumber(

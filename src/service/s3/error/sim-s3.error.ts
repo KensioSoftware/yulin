@@ -280,3 +280,17 @@ export class SimS3InvalidTag extends SimS3Error {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated S3 PreconditionFailed error.
+ *
+ * Real S3 answers this when a conditional request's condition does not hold.
+ * A write refused this way leaves the Object under its key as it was.
+ */
+export class SimS3PreconditionFailed extends SimS3Error {
+  public override readonly name = "PreconditionFailed";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 412 });
+  }
+}

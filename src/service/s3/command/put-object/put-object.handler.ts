@@ -22,6 +22,7 @@ import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 import { simS3QuotedETag } from "../../object/s3-object-etag.js";
+import { simS3RequireWritePrecondition } from "../object/sim-s3-write-precondition.js";
 
 interface PutObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
@@ -89,7 +90,11 @@ export class PutObjectCommandHandler implements CommandHandler<
       command,
       bucket.getEncryption().algorithm,
     );
-    const version = await bucket.putObject(object);
+    const version = await bucket.writeKey(Key, async () => {
+      await simS3RequireWritePrecondition(bucket, Key, command.input);
+
+      return await bucket.putObject(object);
+    });
     const versionId = version?.versionId;
 
     // Every write path funnels through here, so this one call covers the SDK,

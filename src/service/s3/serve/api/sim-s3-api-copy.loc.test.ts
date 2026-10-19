@@ -318,4 +318,52 @@ describe("Copying an Object over the served S3 REST endpoint", () => {
     assertIdentical(error.name, "NotImplemented");
     assertStringIncludes(error.message, "UploadPartCopyCommand");
   });
+  it("refuses a conditional copy onto a key that is taken", async () => {
+    // Given an Object to copy and a destination that already holds one
+    await givenReport("conditional.txt");
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "archive",
+        Key: "taken.txt",
+        Body: "already here",
+      }),
+    );
+
+    // When the copy is sent with If-None-Match through the endpoint
+    const error = await assertThrowsErrorAsync(async () =>
+      client.send(
+        new CopyObjectCommand({
+          Bucket: "archive",
+          Key: "taken.txt",
+          CopySource: "/inbox/conditional.txt",
+          IfNoneMatch: "*",
+        }),
+      ),
+    );
+
+    // Then the endpoint answers S3's error and the destination is untouched
+    assertIdentical(error.name, "PreconditionFailed");
+    assertIdentical(await storedText("archive", "taken.txt"), "already here");
+  });
+
+  it("reads the source conditions from their headers", async () => {
+    // Given an Object to copy
+    await givenReport("dated.txt");
+
+    // When the copy asks for a source unchanged since a date in the past
+    const error = await assertThrowsErrorAsync(async () =>
+      client.send(
+        new CopyObjectCommand({
+          Bucket: "archive",
+          Key: "dated.txt",
+          CopySource: "/inbox/dated.txt",
+          CopySourceIfModifiedSince: new Date("2000-01-01T00:00:00Z"),
+          CopySourceIfUnmodifiedSince: new Date("2000-01-01T00:00:00Z"),
+        }),
+      ),
+    );
+
+    // Then the endpoint refuses the copy
+    assertIdentical(error.name, "PreconditionFailed");
+  });
 });

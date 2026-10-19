@@ -531,6 +531,74 @@ reports it there.
 An Object uploaded in parts gets a different form. See
 [Uploading an Object in parts](#uploading-an-object-in-parts).
 
+## Conditional writes
+
+`PutObject`, `CopyObject` and `CompleteMultipartUpload` take `IfNoneMatch` and `IfMatch`, which
+state what the key has to hold before the write goes ahead. `IfNoneMatch: "*"` writes only to a key
+that holds nothing. `IfMatch` writes only over an Object with that ETag. A write whose condition
+fails is refused with `PreconditionFailed` (status `412`), and the Object already under the key is
+left as it was.
+
+```typescript sim-s3-conditional-write
+/**
+ * Writing a simulated S3 Object only where the key is free.
+ */
+
+import {
+  CopyObjectCommand,
+  CreateBucketCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "audio-bucket" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "audio-bucket",
+    Key: "uploads/take-1.mp3",
+    Body: "first take",
+  }),
+);
+
+for (let attempt = 0; attempt < 2; attempt++) {
+  try {
+    await simS3.copyObject(
+      new CopyObjectCommand({
+        Bucket: "audio-bucket",
+        Key: "shared/take.mp3",
+        CopySource: "audio-bucket/uploads/take-1.mp3",
+        IfNoneMatch: "*",
+      }),
+    );
+    console.log("copied");
+  } catch (error) {
+    // The second attempt finds the shared key taken.
+    if (error instanceof Error && error.name === "PreconditionFailed") {
+      console.log("already there");
+    } else {
+      throw error;
+    }
+  }
+}
+```
+
+Writes to one key run one at a time. Of several conditional writes racing for an empty key, the first
+to finish succeeds and the rest are refused. `IfMatch` on a key holding nothing answers `NoSuchKey`. On a versioned Bucket both conditions look at
+the current version, and a delete marker counts as nothing. `IfNoneMatch` on a write accepts only
+`*`, and real S3 refuses anything else with `NotImplemented`.
+
+A copy also takes conditions on its source. `CopySourceIfMatch`, `CopySourceIfNoneMatch`,
+`CopySourceIfModifiedSince` and `CopySourceIfUnmodifiedSince` refuse the copy with
+`PreconditionFailed` when the source does not meet them. An ETag condition outranks the date
+condition paired with it, as RFC 7232 has it. The served endpoint reads all of these from the same
+headers real S3 does.
+
+A failed completion leaves the upload in place, and it can be completed again.
+
 ## Uploading an Object in parts
 
 Yulin supports multipart upload through the SDK and served S3 endpoint. This covers the operations
@@ -834,9 +902,6 @@ See [Serve simulated S3 on localhost](#serve-simulated-s3-on-localhost) for sett
 - Both Buckets have to belong to the same simulated S3. A copy across Accounts or Regions is left
   out.
 - A presigned copy is left out, and so is a copy reaching a Bucket through simulated CloudFront.
-- `CopySourceIfMatch`, `CopySourceIfNoneMatch`, `CopySourceIfModifiedSince` and
-  `CopySourceIfUnmodifiedSince` are ignored. A conditional copy happens whatever the condition
-  says.
 - `ACL` is ignored. Sim S3 models no Object ACL.
 - A `versionId` in `CopySource` is refused with `NotImplemented`.
 - A copy of an Object that was uploaded in parts gets a plain ETag rather than the multipart form.
