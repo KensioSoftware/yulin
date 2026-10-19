@@ -4,6 +4,7 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketObjects } from "./sim-s3-bucket-objects.js";
+import { SimS3KeyWrites } from "./sim-s3-key-writes.js";
 import type { SimS3ObjectDeletion } from "./sim-s3-object-deletion.js";
 import type { SimS3TaggableObject } from "./tagging/sim-s3-taggable-object.js";
 import type { SimS3BucketObjectLock } from "./lock/sim-s3-bucket-object-lock.js";
@@ -32,6 +33,7 @@ export class SimS3Bucket extends SimS3BucketConfiguration {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly systemMetadata = new SimS3BucketSystemMetadata();
   private readonly objects: SimS3BucketObjects;
+  private readonly keyWrites = new SimS3KeyWrites();
 
   constructor(properties: SimS3BucketProperties) {
     super(properties);
@@ -58,6 +60,16 @@ export class SimS3Bucket extends SimS3BucketConfiguration {
     object: SimS3Object,
   ): Promise<SimS3ObjectVersion | undefined> {
     return await this.objects.put(object);
+  }
+
+  /**
+   * Run a write to a key once every earlier write to it has finished.
+   *
+   * A write that checks the key before replacing it does both inside this,
+   * so no other write to the key lands between the check and the put.
+   */
+  async writeKey<T>(key: string, write: () => Promise<T>): Promise<T> {
+    return await this.keyWrites.exclusive(key, write);
   }
 
   /** Get a simulated S3 Object from storage. */

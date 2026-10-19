@@ -121,7 +121,6 @@ export class CopyObjectCommandHandler implements CommandHandler<
 
     const stored = await simS3CopySourceObject(source, from.key);
     simS3RequireCopySourcePrecondition(stored, command.input);
-    await simS3RequireWritePrecondition(destination, key, command.input);
 
     const object = this.objectBuilder.build(
       command.input,
@@ -129,7 +128,11 @@ export class CopyObjectCommandHandler implements CommandHandler<
       stored,
       destination.getEncryption().algorithm,
     );
-    const version = await destination.putObject(object);
+    const version = await destination.writeKey(key, async () => {
+      await simS3RequireWritePrecondition(destination, key, command.input);
+
+      return await destination.putObject(object);
+    });
 
     this.notifications.objectCreated({
       bucket: destination,

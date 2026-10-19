@@ -586,7 +586,8 @@ for (let attempt = 0; attempt < 2; attempt++) {
 }
 ```
 
-`IfMatch` on a key holding nothing answers `NoSuchKey`. On a versioned Bucket both conditions look at
+Writes to one key run one at a time. Of several conditional writes racing for an empty key, the first
+to finish succeeds and the rest are refused. `IfMatch` on a key holding nothing answers `NoSuchKey`. On a versioned Bucket both conditions look at
 the current version, and a delete marker counts as nothing. `IfNoneMatch` on a write accepts only
 `*`, and real S3 refuses anything else with `NotImplemented`.
 

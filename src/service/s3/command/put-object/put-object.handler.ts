@@ -85,13 +85,16 @@ export class PutObjectCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     const caller = this.authorizer.authorize(bucket, Key, options);
-    await simS3RequireWritePrecondition(bucket, Key, command.input);
 
     const object = this.objectBuilder.build(
       command,
       bucket.getEncryption().algorithm,
     );
-    const version = await bucket.putObject(object);
+    const version = await bucket.writeKey(Key, async () => {
+      await simS3RequireWritePrecondition(bucket, Key, command.input);
+
+      return await bucket.putObject(object);
+    });
     const versionId = version?.versionId;
 
     // Every write path funnels through here, so this one call covers the SDK,

@@ -59,7 +59,6 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
 
     const { bucket, caller } = await this.access.reach(Bucket, Key, options);
     const upload = this.access.requireUpload(bucket, UploadId);
-    await simS3RequireWritePrecondition(bucket, Key, command.input);
 
     const object = simS3CompletedUploadObject({
       upload,
@@ -67,7 +66,11 @@ export class CompleteMultipartUploadCommandHandler implements CommandHandler<
       completedAt: this.access.now(),
     });
 
-    const version = await bucket.putObject(object);
+    const version = await bucket.writeKey(Key, async () => {
+      await simS3RequireWritePrecondition(bucket, Key, command.input);
+
+      return await bucket.putObject(object);
+    });
     bucket.getMultipartUploads().discard(UploadId);
 
     this.notifications.objectCreated({
