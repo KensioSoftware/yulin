@@ -27,18 +27,21 @@ export async function simAthenaPartitionedObjects(
       objects: await simAthenaObjectsUnder(listing, partition.prefix),
     })),
   );
+  const reached = listed.flatMap((partition) =>
+    partition.objects.map((object) => ({ object, values: partition.values })),
+  );
   const seen = new Set<string>();
   const objects: SimAthenaPartitionedObject[] = [];
 
-  for (const partition of listed) {
-    for (const object of partition.objects) {
-      const identity = `${object.bucket}/${object.key}`;
+  for (const entry of reached) {
+    const identity = `${entry.object.bucket}/${entry.object.key}`;
 
-      if (!seen.has(identity)) {
-        seen.add(identity);
-        objects.push({ object, values: partition.values });
-      }
+    if (seen.has(identity)) {
+      continue;
     }
+
+    seen.add(identity);
+    objects.push(entry);
   }
 
   return objects;

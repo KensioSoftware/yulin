@@ -77,10 +77,12 @@ export class SimDynamoDbTimeToLive {
       return;
     }
 
-    if (this.#status === "DISABLING") {
-      this.#status = "DISABLED";
-      this.#attributeName = undefined;
+    if (this.#status !== "DISABLING") {
+      return;
     }
+
+    this.#status = "DISABLED";
+    this.#attributeName = undefined;
   }
 
   /**

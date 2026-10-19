@@ -78,15 +78,10 @@ export class SimS3NotificationFilter {
    * filters nothing.
    */
   toOutput(): SimS3NotificationFilterInput | undefined {
-    const rules: SimS3NotificationFilterRuleInput[] = [];
-
-    if (this.prefix !== "") {
-      rules.push({ Name: "prefix", Value: this.prefix });
-    }
-
-    if (this.suffix !== "") {
-      rules.push({ Name: "suffix", Value: this.suffix });
-    }
+    const rules: SimS3NotificationFilterRuleInput[] = [
+      ...(this.prefix === "" ? [] : [{ Name: "prefix", Value: this.prefix }]),
+      ...(this.suffix === "" ? [] : [{ Name: "suffix", Value: this.suffix }]),
+    ];
 
     if (rules.length === 0) {
       return undefined;

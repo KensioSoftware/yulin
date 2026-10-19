@@ -91,26 +91,20 @@ export class SimRestApiStage {
    * the stored one could change when the stage says it was created.
    */
   view(): SimRestApiStageView {
+    const methodSettings = this.methodSettings?.view();
     const view: SimRestApiStageView = {
       stageName: this.stageName,
       deploymentId: this.deploymentId,
       createdDate: new Date(this.createdDate),
       lastUpdatedDate: new Date(this.lastUpdatedDate),
+      ...(Object.keys(this.variables).length > 0 && {
+        variables: { ...this.variables },
+      }),
+      ...(this.description !== undefined && {
+        description: this.description,
+      }),
+      ...(methodSettings !== undefined && { methodSettings }),
     };
-
-    if (Object.keys(this.variables).length > 0) {
-      view.variables = { ...this.variables };
-    }
-
-    if (this.description !== undefined) {
-      view.description = this.description;
-    }
-
-    const methodSettings = this.methodSettings?.view();
-
-    if (methodSettings !== undefined) {
-      view.methodSettings = methodSettings;
-    }
 
     return view;
   }

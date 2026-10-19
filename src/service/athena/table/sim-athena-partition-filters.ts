@@ -62,12 +62,14 @@ export function simAthenaPartitionFilters(
       continue;
     }
 
-    if (operator?.kind === "word" && operator.text === "in") {
-      const values = literalList(tokens, position + 2);
+    if (operator?.kind !== "word" || operator.text !== "in") {
+      continue;
+    }
 
-      if (values !== undefined) {
-        narrow(byColumn, token.text, values);
-      }
+    const values = literalList(tokens, position + 2);
+
+    if (values !== undefined) {
+      narrow(byColumn, token.text, values);
     }
   }
 

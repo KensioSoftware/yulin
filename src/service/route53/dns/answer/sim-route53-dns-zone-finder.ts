@@ -26,12 +26,14 @@ export class SimRoute53DnsZoneFinder {
       const zoneName = simRoute53ZoneName(hostedZone);
 
       if (
-        zoneContainsName(zoneName, name) &&
-        zoneName.length > bestZoneNameLength
+        !zoneContainsName(zoneName, name) ||
+        zoneName.length <= bestZoneNameLength
       ) {
-        bestZone = hostedZone;
-        bestZoneNameLength = zoneName.length;
+        continue;
       }
+
+      bestZone = hostedZone;
+      bestZoneNameLength = zoneName.length;
     }
 
     return bestZone;

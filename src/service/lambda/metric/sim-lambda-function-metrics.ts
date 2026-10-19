@@ -106,17 +106,18 @@ function invocationData(
       value: outcome.durationMilliseconds,
       unit: "Milliseconds",
     },
+    ...(outcome.failed
+      ? [
+          {
+            namespace: simLambdaMetricNamespace,
+            metricName: "Errors",
+            dimensions,
+            value: 1,
+            unit: "Count" as const,
+          },
+        ]
+      : []),
   ];
-
-  if (outcome.failed) {
-    data.push({
-      namespace: simLambdaMetricNamespace,
-      metricName: "Errors",
-      dimensions,
-      value: 1,
-      unit: "Count",
-    });
-  }
 
   return data;
 }

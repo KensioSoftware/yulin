@@ -99,23 +99,19 @@ export class SimRestApiMethod {
       httpMethod: this.httpMethod,
       authorizationType: this.authorizationType,
       apiKeyRequired: this.apiKeyRequired,
+      ...(this.operationName !== undefined && {
+        operationName: this.operationName,
+      }),
+      ...(this.authorizerId !== undefined && {
+        authorizerId: this.authorizerId,
+      }),
+      ...(!this.authorizationScopes.isEmpty && {
+        authorizationScopes: [...this.authorizationScopes.values],
+      }),
+      ...(this.integration !== undefined && {
+        methodIntegration: this.integration.view(),
+      }),
     };
-
-    if (this.operationName !== undefined) {
-      view.operationName = this.operationName;
-    }
-
-    if (this.authorizerId !== undefined) {
-      view.authorizerId = this.authorizerId;
-    }
-
-    if (!this.authorizationScopes.isEmpty) {
-      view.authorizationScopes = [...this.authorizationScopes.values];
-    }
-
-    if (this.integration !== undefined) {
-      view.methodIntegration = this.integration.view();
-    }
 
     return view;
   }

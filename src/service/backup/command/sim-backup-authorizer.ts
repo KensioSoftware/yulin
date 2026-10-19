@@ -22,13 +22,15 @@ export class SimBackupAuthorizer {
       caller: options?.caller,
     });
 
-    if (decision.isDenied) {
-      const caller = this.callerIdentifier.format(decision.caller.principal);
-
-      throw new SimBackupAccessDeniedException(
-        `User: ${caller} is not authorized to perform: ${action} on ` +
-          `resource: ${resource}`,
-      );
+    if (!decision.isDenied) {
+      return;
     }
+
+    const caller = this.callerIdentifier.format(decision.caller.principal);
+
+    throw new SimBackupAccessDeniedException(
+      `User: ${caller} is not authorized to perform: ${action} on ` +
+        `resource: ${resource}`,
+    );
   }
 }

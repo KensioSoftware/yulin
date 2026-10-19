@@ -40,33 +40,21 @@ function secretProperties(
   properties: SecretTemplateProperties,
 ): SimCfnTemplateValueRecord {
   const { name, description, kmsKeyId, tags, secretString } = properties;
-  const declared: SimCfnTemplateValueRecord = {};
-
-  if (name !== undefined) {
-    declared["Name"] = name;
-  }
-
-  if (description !== undefined) {
-    declared["Description"] = description;
-  }
-
-  if (kmsKeyId !== undefined) {
-    declared["KmsKeyId"] = kmsKeyId;
-  }
-
-  if (tags !== undefined) {
-    declared["Tags"] = [...tags];
-  }
-
-  if (secretString === undefined) {
-    declared["GenerateSecretString"] = {
-      SecretStringTemplate: "{}",
-      GenerateStringKey: "current",
-      PasswordLength: properties.passwordLength ?? 64,
-    };
-  } else {
-    declared["SecretString"] = secretString;
-  }
+  const declared: SimCfnTemplateValueRecord = {
+    ...(name !== undefined && { Name: name }),
+    ...(description !== undefined && { Description: description }),
+    ...(kmsKeyId !== undefined && { KmsKeyId: kmsKeyId }),
+    ...(tags !== undefined && { Tags: [...tags] }),
+    ...(secretString === undefined
+      ? {
+          GenerateSecretString: {
+            SecretStringTemplate: "{}",
+            GenerateStringKey: "current",
+            PasswordLength: properties.passwordLength ?? 64,
+          },
+        }
+      : { SecretString: secretString }),
+  };
 
   return declared;
 }

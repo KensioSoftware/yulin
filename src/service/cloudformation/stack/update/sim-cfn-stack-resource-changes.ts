@@ -106,27 +106,38 @@ interface SpreadToDependentsProperties {
  * those.
  */
 function spreadToDependents(properties: SpreadToDependentsProperties): void {
-  const { current, updated, replaced } = properties;
-
   // Each pass replaces the Resources naming one already being replaced, until a
   // pass finds none, which is the end of the dependency chain.
   let spreading = true;
 
   while (spreading) {
-    spreading = false;
-
-    for (const [logicalId, resource] of updated) {
-      const spreads =
-        current.has(logicalId) &&
-        !replaced.has(logicalId) &&
-        resource.dependencies().some((dependency) => replaced.has(dependency));
-
-      if (spreads) {
-        replaced.add(logicalId);
-        spreading = true;
-      }
-    }
+    spreading = spreadOnePass(properties);
   }
+}
+
+/**
+ * Replace the Resources naming one already being replaced, saying whether there
+ * were any.
+ */
+function spreadOnePass(properties: SpreadToDependentsProperties): boolean {
+  const { current, updated, replaced } = properties;
+  let spreading = false;
+
+  for (const [logicalId, resource] of updated) {
+    const spreads =
+      current.has(logicalId) &&
+      !replaced.has(logicalId) &&
+      resource.dependencies().some((dependency) => replaced.has(dependency));
+
+    if (!spreads) {
+      continue;
+    }
+
+    replaced.add(logicalId);
+    spreading = true;
+  }
+
+  return spreading;
 }
 
 /**

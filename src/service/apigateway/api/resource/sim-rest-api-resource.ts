@@ -108,21 +108,20 @@ export class SimRestApiResource {
     const view: SimRestApiResourceView = {
       id: this.resourceId,
       path: this.path,
+      ...(this.parentId !== undefined && { parentId: this.parentId }),
+      ...(this.pathPart !== undefined && {
+        pathPart: this.pathPart.pathPart,
+      }),
+      ...(options.methods === true &&
+        this.methods.size > 0 && {
+          resourceMethods: Object.fromEntries(
+            this.listMethods().map((method) => [
+              method.httpMethod,
+              method.view(),
+            ]),
+          ),
+        }),
     };
-
-    if (this.parentId !== undefined) {
-      view.parentId = this.parentId;
-    }
-
-    if (this.pathPart !== undefined) {
-      view.pathPart = this.pathPart.pathPart;
-    }
-
-    if (options.methods === true && this.methods.size > 0) {
-      view.resourceMethods = Object.fromEntries(
-        this.listMethods().map((method) => [method.httpMethod, method.view()]),
-      );
-    }
 
     return view;
   }

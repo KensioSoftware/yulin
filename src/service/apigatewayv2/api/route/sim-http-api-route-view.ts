@@ -29,15 +29,13 @@ export function simHttpApiRouteView(
     RouteKey: route.routeKey,
     Target: route.target,
     AuthorizationType: route.authorizationType,
+    ...(route.authorizerId !== undefined && {
+      AuthorizerId: route.authorizerId,
+    }),
+    ...(!route.authorizationScopes.isEmpty && {
+      AuthorizationScopes: [...route.authorizationScopes.values],
+    }),
   };
-
-  if (route.authorizerId !== undefined) {
-    view.AuthorizerId = route.authorizerId;
-  }
-
-  if (!route.authorizationScopes.isEmpty) {
-    view.AuthorizationScopes = [...route.authorizationScopes.values];
-  }
 
   return view;
 }

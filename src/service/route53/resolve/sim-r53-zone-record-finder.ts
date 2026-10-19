@@ -32,10 +32,12 @@ export class SimRoute53HostedZoneRecordFinder {
       }
 
       const record = hostedZone.records.get(name, type);
-      if (record !== undefined && zoneName.length > bestZoneNameLength) {
-        bestRecord = record;
-        bestZoneNameLength = zoneName.length;
+      if (record === undefined || zoneName.length <= bestZoneNameLength) {
+        continue;
       }
+
+      bestRecord = record;
+      bestZoneNameLength = zoneName.length;
     }
 
     return bestRecord;
@@ -60,10 +62,12 @@ export class SimRoute53HostedZoneRecordFinder {
         continue;
       }
 
-      if (zoneName.length > bestZoneNameLength) {
-        bestHostedZone = hostedZone;
-        bestZoneNameLength = zoneName.length;
+      if (zoneName.length <= bestZoneNameLength) {
+        continue;
       }
+
+      bestHostedZone = hostedZone;
+      bestZoneNameLength = zoneName.length;
     }
 
     return bestHostedZone;

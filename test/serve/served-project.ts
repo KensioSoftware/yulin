@@ -129,13 +129,15 @@ export class ServedProject {
       // the script prints on its way out, among them — sends another signal at
       // a script that has already given its handlers up.
       if (
-        !signalled &&
-        options.signal !== undefined &&
-        output.stdout.includes("watching ")
+        signalled ||
+        options.signal === undefined ||
+        !output.stdout.includes("watching ")
       ) {
-        signalled = true;
-        child.kill(options.signal);
+        return;
       }
+
+      signalled = true;
+      child.kill(options.signal);
     });
 
     child.stderr.setEncoding("utf8");

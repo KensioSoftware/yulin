@@ -158,11 +158,10 @@ export class SimSqsMessage {
         "ApproximateFirstReceiveTimestamp",
         String(this.visibility.firstReceived.getTime()),
       ],
+      ...(this.deadLetterSourceArn === undefined
+        ? []
+        : [["DeadLetterQueueSourceArn", this.deadLetterSourceArn] as const]),
     ]);
-
-    if (this.deadLetterSourceArn !== undefined) {
-      values.set("DeadLetterQueueSourceArn", this.deadLetterSourceArn);
-    }
 
     return values;
   }

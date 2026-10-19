@@ -111,24 +111,22 @@ export class SimLambdaPermission {
    */
   private condition(): SimIamPolicyDocumentCondition | undefined {
     const stringEquals = this.stringEqualsConditions();
-    const condition: Record<string, Record<string, SimIamConditionValue>> = {};
-
-    if (Object.keys(stringEquals).length > 0) {
-      condition["StringEquals"] = stringEquals;
-    }
-
-    if (this.sourceArn !== undefined) {
-      condition["ArnLike"] = {
-        [simLambdaSourceArnConditionKey]: this.sourceArn,
-      };
-    }
-
-    if (this.invokedViaFunctionUrl !== undefined) {
-      condition["Bool"] = {
-        [simLambdaInvokedViaFunctionUrlConditionKey]:
-          this.invokedViaFunctionUrl,
-      };
-    }
+    const condition: Record<string, Record<string, SimIamConditionValue>> = {
+      ...(Object.keys(stringEquals).length > 0 && {
+        StringEquals: stringEquals,
+      }),
+      ...(this.sourceArn !== undefined && {
+        ArnLike: {
+          [simLambdaSourceArnConditionKey]: this.sourceArn,
+        },
+      }),
+      ...(this.invokedViaFunctionUrl !== undefined && {
+        Bool: {
+          [simLambdaInvokedViaFunctionUrlConditionKey]:
+            this.invokedViaFunctionUrl,
+        },
+      }),
+    };
 
     return Object.keys(condition).length === 0 ? undefined : condition;
   }

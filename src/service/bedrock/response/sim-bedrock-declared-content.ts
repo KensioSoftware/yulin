@@ -37,19 +37,11 @@ function checkedBlock(
 function namedMessageMembers(
   declared: SimBedrockDeclaredResponse,
 ): readonly string[] {
-  const named: string[] = [];
-
-  if (declared.text !== undefined) {
-    named.push("text");
-  }
-
-  if (declared.chunks !== undefined) {
-    named.push("chunks");
-  }
-
-  if (declared.content !== undefined) {
-    named.push("content");
-  }
+  const named: string[] = [
+    ...(declared.text === undefined ? [] : ["text"]),
+    ...(declared.chunks === undefined ? [] : ["chunks"]),
+    ...(declared.content === undefined ? [] : ["content"]),
+  ];
 
   return named;
 }

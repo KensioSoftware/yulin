@@ -86,5 +86,5 @@ export function boundsOf(
 
   const only = valueOf(spec, written);
 
-  return stepped ? [only, spec.maximum] : [only, only];
+  return [only, stepped ? spec.maximum : only];
 }

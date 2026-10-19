@@ -93,10 +93,8 @@ async function queryRoleFor(
     Effect: "Allow",
     Action: "dynamodb:Query",
     Resource: resources,
+    ...(condition !== undefined && { Condition: condition }),
   };
-  if (condition !== undefined) {
-    statement["Condition"] = condition;
-  }
   const creation = await iam.createRole(
     new CreateRoleCommand({
       RoleName: roleName,

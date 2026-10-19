@@ -89,19 +89,16 @@ export class SimHttpApiStage {
       AutoDeploy: this.autoDeploy,
       CreatedDate: new Date(this.createdDate),
       ...this.routeSettings?.view(),
+      ...(Object.keys(this.stageVariables).length > 0 && {
+        StageVariables: { ...this.stageVariables },
+      }),
+      ...(this.description !== undefined && {
+        Description: this.description,
+      }),
+      ...(this.accessLogSettings !== undefined && {
+        AccessLogSettings: this.accessLogSettings.view(),
+      }),
     };
-
-    if (Object.keys(this.stageVariables).length > 0) {
-      view.StageVariables = { ...this.stageVariables };
-    }
-
-    if (this.description !== undefined) {
-      view.Description = this.description;
-    }
-
-    if (this.accessLogSettings !== undefined) {
-      view.AccessLogSettings = this.accessLogSettings.view();
-    }
 
     return view;
   }
