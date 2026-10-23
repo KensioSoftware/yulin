@@ -18,7 +18,11 @@ function expectsAbsentKey(expected: SimIamConditionValue): boolean | undefined {
     return true;
   }
 
-  return expected === "false" ? false : undefined;
+  if (expected === "false") {
+    return false;
+  }
+
+  return undefined;
 }
 
 /**

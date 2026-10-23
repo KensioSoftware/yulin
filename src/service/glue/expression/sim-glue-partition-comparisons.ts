@@ -23,7 +23,7 @@ export function simGlueComparisonFilter(
       literal,
     );
 
-    return placed === undefined ? false : holds(placed);
+    return placed !== undefined && holds(placed);
   };
 }
 
