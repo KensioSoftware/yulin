@@ -66,6 +66,12 @@ describe("Moving an Object between simulated Buckets with the aws CLI", () => {
     const simIam = simAws.iam();
 
     await files.resolvePath();
+    // CRT uses streaming payload trailers, which the simulator rejects.
+    // https://docs.aws.amazon.com/cli/latest/topic/s3-config.html#preferred-transfer-client
+    await files.writeFile(
+      "aws-config",
+      "[default]\ns3 =\n    preferred_transfer_client = classic\n",
+    );
 
     await simIam.createUser(new CreateUserCommand({ UserName: "Archivist" }));
     await simIam.putUserPolicy(
