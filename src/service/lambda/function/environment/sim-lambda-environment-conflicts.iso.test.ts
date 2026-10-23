@@ -190,19 +190,19 @@ describe("sim Lambda environment conflicts", () => {
     // Given two functions differing on a name, checked before any code read
     // it.
     const name = uniqueName();
-    const conflicts = new SimLambdaEnvironmentConflicts();
     const existing = simLambdaEnvironmentFactory.make({
       functionName: "reader",
       declaredVariables: { [name]: "widgets" },
     });
+    const created = simLambdaEnvironmentFactory.make({
+      functionName: "writer",
+      declaredVariables: { [name]: "gadgets" },
+    });
+    const conflicts = new SimLambdaEnvironmentConflicts({
+      currentEnvironments: () => [existing, created],
+    });
     const checked = warningsFrom(() => {
-      conflicts.check(
-        simLambdaEnvironmentFactory.make({
-          functionName: "writer",
-          declaredVariables: { [name]: "gadgets" },
-        }),
-        [existing],
-      );
+      conflicts.check(created, [existing]);
     });
 
     // When code reads it outside an invocation, as a handler module imported
@@ -216,7 +216,37 @@ describe("sim Lambda environment conflicts", () => {
     // Then the check said nothing, and the first invocation reported it once.
     assertArrayEmpty(checked);
     assertArrayLength(invoked, 1);
+    assertStringIncludes(invoked[0], "reader");
+    assertStringIncludes(invoked[0], "writer");
     assertStringIncludes(invoked[0], name);
+  });
+
+  it("stays quiet at invocation about a function deleted since the check", () => {
+    // Given two functions differing on a name nothing had read, one of which
+    // has since been deleted.
+    const name = uniqueName();
+    const existing = simLambdaEnvironmentFactory.make({
+      functionName: "reader",
+      declaredVariables: { [name]: "widgets" },
+    });
+    const deleted = simLambdaEnvironmentFactory.make({
+      functionName: "writer",
+      declaredVariables: { [name]: "gadgets" },
+    });
+    const conflicts = new SimLambdaEnvironmentConflicts({
+      currentEnvironments: () => [existing],
+    });
+    conflicts.check(deleted, [existing]);
+
+    // When code reads the name outside an invocation and the remaining
+    // function is invoked.
+    readEarly(name);
+    const invoked = warningsFrom(() => {
+      conflicts.reportReads();
+    });
+
+    // Then nothing is reported, since one value for the name is left.
+    assertArrayEmpty(invoked);
   });
 
   it("stays quiet when functions agree on the value", () => {

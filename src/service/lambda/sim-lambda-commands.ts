@@ -33,6 +33,7 @@ import type { SimCloudWatchServiceWriter } from "../cloudwatch/write/sim-cloudwa
 import type { SimLogsServiceWriter } from "../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaOutboundHttp } from "./function/outbound/sim-lambda-outbound-http.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
+import type { SimLambdaEnvironment } from "./function/environment/sim-lambda-environment.js";
 import { SimLambdaOutput } from "./function/logging/sim-lambda-output.js";
 import { SimLambdaEventInvokeConfigStore } from "./function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import {
@@ -224,7 +225,10 @@ export class SimLambdaCommands {
       runAsOwner: properties.runAsOwner,
       // Shared across function creations so a conflicting environment variable
       // is only reported once for this simulated Lambda.
-      environmentConflicts: new SimLambdaEnvironmentConflicts(),
+      environmentConflicts: new SimLambdaEnvironmentConflicts({
+        currentEnvironments: (): Iterable<SimLambdaEnvironment> =>
+          properties.functions.values().map((existing) => existing.environment),
+      }),
       eventInvokeConfigs: this.eventInvokeConfigStore,
       destinations,
       codeStore,

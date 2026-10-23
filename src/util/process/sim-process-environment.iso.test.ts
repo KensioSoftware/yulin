@@ -6,6 +6,7 @@ import {
 } from "@kensio/smartass";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "vitest";
+import { assertDefined } from "../type-guard/defined.js";
 import { simProcessEnvironment } from "./sim-process-environment.js";
 
 /**
@@ -242,6 +243,28 @@ describe("The process env an in-process handler run sees", () => {
 
     // Then that read is on record.
     assertTrue(simProcessEnvironment.wasReadOutsideRun(name));
+  });
+
+  it("records a read of a listed key when no copy follows the listing", () => {
+    // Given a host variable, and a listing of the keys with no copy after it.
+    const name = uniqueName();
+    // oxlint-disable-next-line security/detect-object-injection
+    process.env[name] = "host value";
+
+    try {
+      const keys = Object.keys(process.env);
+
+      // When code reads the first listed key by itself.
+      const first = keys[0];
+      assertDefined(first, "The first listed key");
+      // oxlint-disable-next-line security/detect-object-injection
+      void process.env[first];
+
+      // Then that read is on record.
+      assertTrue(simProcessEnvironment.wasReadOutsideRun(first));
+    } finally {
+      Reflect.deleteProperty(process.env, name);
+    }
   });
 
   it("coerces a value written outside a run to a string", () => {

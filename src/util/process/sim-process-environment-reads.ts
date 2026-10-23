@@ -12,9 +12,10 @@
  * and so does any tool that snapshots it, and none of that is handler code
  * capturing a value it later depends on. An enumeration is recognised by its
  * shape: the property reads that follow a listing of the keys, in the order
- * the listing gave them. The first read out of that order ends it and counts.
- * A module copying the environment with a spread at module scope is missed as
- * a result.
+ * the listing gave them. Its reads are recorded as they happen and taken off
+ * the record again once every key has been read, so a listing that is not
+ * followed by a complete copy hides nothing. A module copying the environment
+ * with a spread at module scope is missed as a result.
  */
 export class SimProcessEnvironmentReads {
   private readonly names = new Set<string>();
@@ -29,7 +30,14 @@ export class SimProcessEnvironmentReads {
    * The keys of an enumeration in progress, and how far its reads have got.
    */
   private enumeration:
-    | { readonly keys: readonly (string | symbol)[]; next: number }
+    | {
+        readonly keys: readonly (string | symbol)[];
+        next: number;
+        /**
+         * The names the enumeration's reads put on record for the first time.
+         */
+        readonly added: string[];
+      }
     | undefined;
 
   /**
@@ -57,7 +65,7 @@ export class SimProcessEnvironmentReads {
       set: (watched, key, value): boolean => Reflect.set(watched, key, value),
       ownKeys: (watched): (string | symbol)[] => {
         const keys = Reflect.ownKeys(watched);
-        this.enumeration = { keys, next: 0 };
+        this.enumeration = { keys, next: 0, added: [] };
         return keys;
       },
     });
@@ -74,19 +82,32 @@ export class SimProcessEnvironmentReads {
   }
 
   /**
-   * Note a read, unless it is the next step of an enumeration.
+   * Note a read, and take an enumeration's reads off the record once it has
+   * read every key.
    */
   private recordRead(name: string): void {
     const enumeration = this.enumeration;
-    if (enumeration?.keys[enumeration.next] === name) {
-      enumeration.next += 1;
-      if (enumeration.next === enumeration.keys.length) {
-        this.enumeration = undefined;
-      }
+    if (
+      enumeration === undefined ||
+      enumeration.keys[enumeration.next] !== name
+    ) {
+      this.enumeration = undefined;
+      this.names.add(name);
       return;
     }
 
+    enumeration.next += 1;
+    if (!this.names.has(name)) {
+      this.names.add(name);
+      enumeration.added.push(name);
+    }
+    if (enumeration.next < enumeration.keys.length) {
+      return;
+    }
+
+    for (const added of enumeration.added) {
+      this.names.delete(added);
+    }
     this.enumeration = undefined;
-    this.names.add(name);
   }
 }
