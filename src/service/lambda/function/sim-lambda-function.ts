@@ -261,6 +261,7 @@ export class SimLambdaFunction {
     });
 
     this.logging.recordFrom(this.#code);
+    this.properties.environmentConflicts?.reportReads();
 
     return await this.metrics.around(String(this.name), async () =>
       simAwsRunAsContext.run(

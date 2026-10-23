@@ -269,8 +269,8 @@ set, which is where an in-process handler's configuration comes from when the fu
 none. A function declaring variables runs with only its own, as a deployed one does.
 
 This is the only place the simulator patches a process global, so it is deliberately narrow. The
-patch is installed on the first invocation that needs it, it is inert whenever no invocation is
-running, and it is never removed, since removing it would be unsafe while another
+patch is installed when Yulin is imported, it passes everything through to the host environment
+whenever no invocation is running, and it is never removed, since removing it would be unsafe while another
 invocation is in flight and buys nothing. It lives under `util/` rather than here because simulated
 ECS applies a container's environment variables through the same object: two patches would each
 install a getter, and the second would capture whatever the first was reporting as its host
@@ -281,6 +281,13 @@ The limitation it cannot reach is a read that already happened: a handler module
 before any invocation. `SimLambdaEnvironmentConflicts` warns about that in the two cases where it
 changes what the code sees, and stays quiet otherwise (see the usage docs section on reading
 environment variables inside the handler).
+
+It decides from evidence of the read. Outside an invocation the getter hands out the host
+environment behind a `Proxy` (`SimProcessEnvironmentReads`), which records each name read through
+it. A conflict whose name has no such read is held, and checked again as each function is invoked,
+which catches a handler module imported after its function was created. The reads that follow an
+enumeration of the keys, in the listing's order, are not recorded. Node.js copies `process.env`
+that way to spawn a child process, and counting it would put every name on record.
 
 ### The clock function code reads
 

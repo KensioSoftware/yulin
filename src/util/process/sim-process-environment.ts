@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { SimProcessEnvironmentReads } from "./sim-process-environment-reads.js";
 
 /**
  * The process.env in-process handler code sees while a simulated run lasts.
@@ -22,15 +23,26 @@ import { AsyncLocalStorage } from "node:async_hooks";
  *
  * The one thing this cannot reach is a read that already happened. A handler
  * module doing `const TABLE = process.env.TABLE_NAME` at module scope is
- * evaluated when the test file imports it, long before any run, so it captures
+ * evaluated when the test file imports it, long before any run, and captures
  * the host value. Reads inside the handler body see the run's own variables.
- * See SimLambdaEnvironmentConflicts, which warns when that distinction
- * actually changes what the code sees.
+ *
+ * Outside a run, process.env is the host environment behind a
+ * SimProcessEnvironmentReads view, which records the names read. The patch is
+ * installed when this module loads, which is when Yulin is imported, so a
+ * module-scope read in a handler imported after Yulin is on record.
+ * SimLambdaEnvironmentConflicts warns from that record, and only for a name
+ * whose early read changed what the code saw. A read made before Yulin was
+ * imported is invisible to it.
  */
 class SimProcessEnvironment {
   private readonly storage = new AsyncLocalStorage<Record<string, string>>();
+  private readonly reads = new SimProcessEnvironmentReads();
   private hostEnvironment: NodeJS.ProcessEnv = process.env;
-  private installed = false;
+  private hostView: NodeJS.ProcessEnv = process.env;
+
+  constructor() {
+    this.install();
+  }
 
   /**
    * Run something with the given variables as its process.env.
@@ -39,8 +51,16 @@ class SimProcessEnvironment {
     variables: Record<string, string>,
     run: () => Promise<T>,
   ): Promise<T> {
-    this.install();
     return await this.storage.run(variables, run);
+  }
+
+  /**
+   * Whether code read the name from process.env while no run was active.
+   *
+   * Reads made before this module loaded are not on record.
+   */
+  wasReadOutsideRun(name: string): boolean {
+    return this.reads.wasRead(name);
   }
 
   /**
@@ -75,29 +95,36 @@ class SimProcessEnvironment {
    *
    * process.env is a plain configurable data property on process, so it can
    * be replaced with a getter. Outside a simulated run the getter hands back
-   * the untouched host environment object, so the patch is inert: anything
-   * that reads, writes, or stubs process.env normally is unaffected.
+   * the host environment behind a view that records the names read, and
+   * passes every read, write and delete through to it. Anything that reads,
+   * writes, or stubs process.env normally is unaffected.
    *
-   * Installed once and never removed. Removing it would be unsafe while
-   * another run is in flight, and there is nothing to gain: an installed patch
-   * with no run in progress behaves exactly like no patch at all.
+   * Installed once, at construction, and never removed. Removing it would be
+   * unsafe while another run is in flight, and there is nothing to gain. With
+   * no run in progress, the patch passes everything through to the host
+   * environment.
    */
   private install(): void {
-    if (this.installed) {
-      return;
-    }
-
-    this.hostEnvironment = process.env;
+    this.useHostEnvironment(process.env);
     Object.defineProperty(process, "env", {
       configurable: true,
       enumerable: true,
-      get: (): NodeJS.ProcessEnv =>
-        this.storage.getStore() ?? this.hostEnvironment,
+      get: (): NodeJS.ProcessEnv => this.storage.getStore() ?? this.hostView,
       set: (replacement: NodeJS.ProcessEnv): void => {
         this.replaceVariables(replacement);
       },
     });
-    this.installed = true;
+  }
+
+  /**
+   * Make the environment the host environment, and watch reads of it.
+   *
+   * Code saving process.env and assigning it back hands over the watching
+   * view, which is unwrapped so that views do not nest.
+   */
+  private useHostEnvironment(environment: NodeJS.ProcessEnv): void {
+    this.hostEnvironment = this.reads.unwrap(environment);
+    this.hostView = this.reads.watch(this.hostEnvironment);
   }
 
   /**
@@ -117,7 +144,7 @@ class SimProcessEnvironment {
   private replaceVariables(replacement: NodeJS.ProcessEnv): void {
     const store = this.storage.getStore();
     if (store === undefined) {
-      this.hostEnvironment = replacement;
+      this.useHostEnvironment(replacement);
       return;
     }
 
