@@ -3317,6 +3317,22 @@ The `getBucketWebsiteUrl(...)` method returns the simulated S3 website URL for t
 `localUrl(...)` method on the localhost server adapts that URL so the request is sent to the local
 server while preserving the simulated S3 website hostname.
 
+### AWS CLI uploads
+
+Set `preferred_transfer_client` to `classic` in the AWS config file used for the simulated
+endpoint:
+
+```ini
+[default]
+s3 =
+    preferred_transfer_client = classic
+```
+
+The CLI's [automatic transfer-client selection](https://docs.aws.amazon.com/cli/latest/topic/s3-config.html#preferred-transfer-client)
+can choose CRT. Its uploads use streaming payload trailers, which Yulin's signature verifier
+does not support. Those requests fail with `403`. The classic client supports the single-file
+and multipart uploads exercised by Yulin's CLI tests.
+
 ## Presigned URLs
 
 Sim S3 serves a REST API endpoint alongside the website endpoint, and it accepts presigned URLs
