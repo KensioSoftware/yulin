@@ -158,6 +158,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       ...input,
       code,
       environment,
+      environmentConflicts: this.environmentConflicts,
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
       clock: this.background,

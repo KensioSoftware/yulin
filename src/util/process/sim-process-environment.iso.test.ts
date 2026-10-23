@@ -1,4 +1,10 @@
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertFalse,
+  assertIdentical,
+  assertTrue,
+  assertUndefined,
+} from "@kensio/smartass";
+import { randomUUID } from "node:crypto";
 import { describe, it } from "vitest";
 import { simProcessEnvironment } from "./sim-process-environment.js";
 
@@ -10,6 +16,14 @@ async function tick(milliseconds: number): Promise<void> {
   await new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+/**
+ * A variable name no other test reads, since a read outside a run stays on
+ * record for the rest of the test run.
+ */
+function uniqueName(): string {
+  return `YULIN_${randomUUID().replaceAll("-", "_").toUpperCase()}`;
 }
 
 describe("The process env an in-process handler run sees", () => {
@@ -169,6 +183,81 @@ describe("The process env an in-process handler run sees", () => {
       assertIdentical(process.env["YULIN_REPLACED"], "replaced");
     } finally {
       process.env = hostVariables;
+    }
+  });
+
+  it("records a name read outside a run", () => {
+    // Given a name nothing has read.
+    const name = uniqueName();
+
+    // When code reads it with no run in progress, as module scope does.
+    // oxlint-disable-next-line security/detect-object-injection
+    void process.env[name];
+
+    // Then the read is on record.
+    assertTrue(simProcessEnvironment.wasReadOutsideRun(name));
+  });
+
+  it("leaves a name read inside a run off the record", async () => {
+    // Given a name nothing has read outside a run.
+    const name = uniqueName();
+
+    // When a run reads it.
+    await simProcessEnvironment.run({}, () =>
+      // oxlint-disable-next-line security/detect-object-injection
+      Promise.resolve(process.env[name]),
+    );
+
+    // Then no early read is on record.
+    assertFalse(simProcessEnvironment.wasReadOutsideRun(name));
+  });
+
+  it("leaves a copy of the whole environment off the record", () => {
+    // Given a host variable nothing has read by name.
+    const name = uniqueName();
+    // oxlint-disable-next-line security/detect-object-injection
+    process.env[name] = "host value";
+
+    try {
+      // When the environment is copied key by key, as spawning a child
+      // process does.
+      const copied = Object.entries(process.env);
+
+      // Then the copy holds it, and no read of the name is on record.
+      assertTrue(copied.some(([key]) => key === name));
+      assertFalse(simProcessEnvironment.wasReadOutsideRun(name));
+    } finally {
+      Reflect.deleteProperty(process.env, name);
+    }
+  });
+
+  it("records a read made straight after a copy", () => {
+    // Given a copy of the environment that has just been taken.
+    const name = uniqueName();
+    void { ...process.env };
+
+    // When code then reads a name by itself.
+    // oxlint-disable-next-line security/detect-object-injection
+    void process.env[name];
+
+    // Then that read is on record.
+    assertTrue(simProcessEnvironment.wasReadOutsideRun(name));
+  });
+
+  it("coerces a value written outside a run to a string", () => {
+    // Given a name to write.
+    const name = uniqueName();
+
+    try {
+      // When a number is assigned to it, which process.env stores as text.
+      // oxlint-disable-next-line security/detect-object-injection
+      Reflect.set(process.env, name, 42);
+
+      // Then it reads back as a string, as on an unpatched process.env.
+      // oxlint-disable-next-line security/detect-object-injection
+      assertIdentical(process.env[name], "42");
+    } finally {
+      Reflect.deleteProperty(process.env, name);
     }
   });
 });

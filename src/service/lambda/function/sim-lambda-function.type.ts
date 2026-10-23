@@ -8,6 +8,7 @@ import type { SimLambdaOutput } from "./logging/sim-lambda-output.js";
 import type { SimLogsServiceWriter } from "../../logs/write/sim-logs-service-writer.js";
 import type { SimLambdaExecutableCode } from "./code/sim-lambda-executable-code.js";
 import type { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
+import type { SimLambdaEnvironmentConflicts } from "./environment/sim-lambda-environment-conflicts.js";
 import type { SimLambdaOutboundHttp } from "./outbound/sim-lambda-outbound-http.js";
 import type { SimLambdaFunctionState } from "./sim-lambda-function-configuration.js";
 import type { SimLambdaHandler } from "./sim-lambda-handler.type.js";
@@ -33,6 +34,13 @@ export interface SimLambdaFunctionProperties {
   timeoutSeconds?: number | undefined;
   memorySizeMb?: number | undefined;
   environment?: SimLambdaEnvironment | undefined;
+  /**
+   * The check that warns about declared variables read too early, shared with
+   * every other function of the same simulated Lambda. It reports, as this
+   * function is invoked, a difference found earlier whose name has since been
+   * read outside an invocation. A function built standalone has none.
+   */
+  environmentConflicts?: SimLambdaEnvironmentConflicts | undefined;
   /**
    * The queue or topic this function's abandoned asynchronous events are sent
    * to, which is what `DeadLetterConfig.TargetArn` names.

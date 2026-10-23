@@ -3355,6 +3355,12 @@ console in the two situations where the difference changes what your code sees:
 - a declared variable whose name the host process also sets, with a different value
 - two simulated functions declaring the same variable name with different values
 
+Either one is reported only once code has read that name from `process.env` with no invocation
+running. Yulin records those reads from the moment it is imported. A read made earlier is invisible
+to it (a handler module imported ahead of Yulin, or a setup file that loads first), and so is a copy
+of the whole environment such as `{ ...process.env }`. Neither produces a warning. A handler that
+reads its variables inside the handler function produces none either.
+
 ## The time inside a handler
 
 A function runs on its simulation's clock, and so does the function code. `Date.now()` and
