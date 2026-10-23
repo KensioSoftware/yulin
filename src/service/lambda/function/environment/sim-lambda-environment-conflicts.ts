@@ -1,26 +1,10 @@
 import type { SimLambdaEnvironment } from "./sim-lambda-environment.js";
+import {
+  type SimLambdaEnvironmentConflict,
+  simLambdaFunctionConflict,
+  simLambdaHostConflict,
+} from "./sim-lambda-environment-conflict.js";
 import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
-
-/**
- * The advice that follows each warning, given the name that was read early.
- */
-function moveTheReadAdvice(name: string): string {
-  return (
-    `Code read process.env.${name} outside any invocation, as a read at ` +
-    "module scope does when the module is imported, and saw the host value " +
-    "instead. Move the read inside the handler function."
-  );
-}
-
-/**
- * A difference between declared values that matters once the name is read
- * outside an invocation.
- */
-interface SimLambdaEnvironmentConflict {
-  readonly key: string;
-  readonly name: string;
-  readonly message: string;
-}
 
 interface SimLambdaEnvironmentConflictsProperties {
   /**
@@ -157,14 +141,7 @@ export class SimLambdaEnvironmentConflicts {
       return;
     }
 
-    this.report({
-      key: `host:${name}`,
-      name,
-      message:
-        `Sim Lambda function "${environment.functionName}" declares ` +
-        `environment variable ${name}, which the host process also sets ` +
-        `with a different value. ${moveTheReadAdvice(name)}`,
-    });
+    this.report(simLambdaHostConflict(environment, name));
   }
 
   /**
@@ -183,14 +160,7 @@ export class SimLambdaEnvironmentConflicts {
         continue;
       }
 
-      this.report({
-        key: `function:${name}`,
-        name,
-        message:
-          `Sim Lambda functions "${existing.functionName}" and ` +
-          `"${environment.functionName}" declare different values for ` +
-          `environment variable ${name}. ${moveTheReadAdvice(name)}`,
-      });
+      this.report(simLambdaFunctionConflict(existing, environment, name));
       return;
     }
   }
