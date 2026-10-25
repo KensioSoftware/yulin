@@ -31,6 +31,11 @@ export function simSdkWireOutputResponse(
  * AWS exception name and the status real AWS answers with, so a handler
  * catching `ResourceNotFoundException` catches the same thing here as in
  * production.
+ *
+ * The body also carries the exception's modelled members, such as the
+ * `CancellationReasons` of a DynamoDB `TransactionCanceledException`. The SDK
+ * maps those from the body onto the exception it throws, so a member left out
+ * here is undefined on the caller's side.
  */
 export function simSdkWireErrorResponse(
   error: unknown,
@@ -47,11 +52,28 @@ export function simSdkWireErrorResponse(
     },
     body: simSdkWireJsonBody(
       Object.fromEntries([
+        ...errorMembers(error),
         ["__type", errorType],
         ["message", message],
       ]),
     ),
   };
+}
+
+/**
+ * The modelled members a simulated service error carries.
+ *
+ * AWS names the members of its exception shapes in PascalCase, as it names
+ * the members of every other shape. The lower-case properties of an Error are
+ * either JavaScript's own or the simulator's diagnostics, such as the
+ * principal an IAM denial names, and none of them is part of the response.
+ */
+function errorMembers(error: unknown): [string, unknown][] {
+  if (!(error instanceof Error)) {
+    return [];
+  }
+
+  return Object.entries(error).filter(([name]) => /^[A-Z]/u.test(name));
 }
 
 /**
