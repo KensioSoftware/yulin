@@ -18,6 +18,7 @@ export interface SimStatesTaskInvocation {
    * work.
    */
   readonly roleArn: string;
+  readonly stateMachineArn: string;
 }
 
 /**

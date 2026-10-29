@@ -8,6 +8,7 @@ import {
   type SimServiceRoleTarget,
   simServiceRoleTarget,
 } from "../../sts/service-role/sim-service-role-target.js";
+import type { SimServiceRoleSource } from "../../sts/service-role/sim-service-role-source.js";
 import { SimStatesTaskFailure } from "../error/sim-step-functions.error.js";
 
 /**
@@ -72,6 +73,7 @@ const refusals: SimServiceRoleRefusals = {
 export async function assumeSimStatesExecutionRole(
   target: SimServiceRoleTarget,
   scope: SimAwsAccountRegionContainer,
+  source: SimServiceRoleSource,
 ): Promise<SimAwsCaller> {
   return await assumeSimServiceRole({
     target,
@@ -79,5 +81,6 @@ export async function assumeSimStatesExecutionRole(
     sessionName,
     scope,
     refusals,
+    source,
   });
 }

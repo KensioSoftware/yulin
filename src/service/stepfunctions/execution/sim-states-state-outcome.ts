@@ -89,6 +89,7 @@ export interface SimStatesWalkContext {
    * The state machine's execution role, which a task assumes.
    */
   readonly roleArn: string;
+  readonly stateMachineArn: string;
 
   /**
    * What the walk is recording itself on, which a `Parallel` state's branch
