@@ -3,7 +3,10 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import { simIamPolicyDocumentFactory } from "../../src/service/iam/policy/sim-iam-policy-document.factory.js";
-import type { SimIamPolicyDocumentStatement } from "../../src/service/iam/policy/sim-iam-policy.js";
+import type {
+  SimIamPolicyDocumentCondition,
+  SimIamPolicyDocumentStatement,
+} from "../../src/service/iam/policy/sim-iam-policy.js";
 
 /**
  * What a state machine asks for when it wants a role to run its tasks as.
@@ -21,6 +24,7 @@ export interface StatesExecutionRoleInput {
    * The service principal the trust policy admits.
    */
   readonly trusts: string;
+  readonly trustConditions: SimIamPolicyDocumentCondition | undefined;
 }
 
 /**
@@ -53,6 +57,7 @@ export const statesExecutionRoleFactory = new AsyncMappedFactory<
       { Effect: "Allow", Action: "lambda:InvokeFunction", Resource: "*" },
     ],
     trusts: "states.amazonaws.com",
+    trustConditions: undefined,
   }),
   async (input, simAws) => {
     const simIam = simAws.iam();
@@ -64,6 +69,7 @@ export const statesExecutionRoleFactory = new AsyncMappedFactory<
           Statement: {
             Principal: { Service: input.trusts },
             Action: "sts:AssumeRole",
+            Condition: input.trustConditions,
           },
         }),
       }),

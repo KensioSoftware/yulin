@@ -15,6 +15,7 @@ interface SimStatesWalksProperties {
    * The state machine's execution role, which a task assumes.
    */
   readonly roleArn: string;
+  readonly stateMachineArn: string;
 }
 
 /**
@@ -37,6 +38,7 @@ export function simStatesWalks(
         contextObject: child.contextObject,
         tasks: properties.tasks,
         roleArn: properties.roleArn,
+        stateMachineArn: properties.stateMachineArn,
         walkChild: walks,
       },
       ...(child.onSettled !== undefined && { onSettled: child.onSettled }),

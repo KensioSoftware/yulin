@@ -51,7 +51,12 @@ export class SimAwsStatesTaskTargets implements SimStatesTaskTargets {
       role.accountId,
       this.#accountRegionScope.regionName,
     );
-    const caller = await assumeSimStatesExecutionRole(role, roleScope);
+    // Step Functions supplies the state machine as the trust policy source.
+    // https://docs.aws.amazon.com/step-functions/latest/dg/procedure-create-iam-role.html
+    const caller = await assumeSimStatesExecutionRole(role, roleScope, {
+      arn: invocation.stateMachineArn,
+      accountId: this.#accountRegionScope.accountId,
+    });
 
     return await target.run({
       stateName,

@@ -28,6 +28,7 @@ export async function runSimStatesTask(
     target: state.target,
     payload: simStatesEffectiveInput(input, state, context.contextObject),
     roleArn: context.roleArn,
+    stateMachineArn: context.stateMachineArn,
   });
 
   const output = simStatesEffectiveOutput(

@@ -98,6 +98,7 @@ export class SimStatesExecutionStart {
       background: this.#background,
       tasks: this.#tasks,
       roleArn: stateMachine.roleArn,
+      stateMachineArn: stateMachine.arn,
     })({
       definition: stateMachine.parsedDefinition,
       record: execution,
