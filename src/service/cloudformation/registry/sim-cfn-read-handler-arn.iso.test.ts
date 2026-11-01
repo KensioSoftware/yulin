@@ -109,6 +109,43 @@ describe("the ARN a read handler's calls are authorized on", () => {
     );
   });
 
+  it("takes a Ref that is an ARN as the whole ARN", async () => {
+    // Given a topic with a generated name, whose Ref is its ARN, read by an
+    // output, and a role denied the topic's read call.
+    const { simAws, accountId } = readHandlerSimulation();
+    const role = await deployRole(simAws, accountId, [
+      { Effect: "Allow", Action: "*", Resource: "*" },
+      { Effect: "Deny", Action: "sns:GetTopicAttributes", Resource: "*" },
+    ]);
+    const cloudFormation = simAws.cloudFormation();
+    const resources = { Alerts: { Type: "AWS::SNS::Topic" } };
+    const outputs = {
+      Alerts: { Value: { "Fn::GetAtt": ["Alerts", "TopicName"] } },
+    };
+    const stack = await cloudFormation.deployTemplate({
+      stackName: "alerts",
+      caller: role,
+      template: { Resources: resources, Outputs: outputs },
+    });
+    const topicArn = stack.getResource("Alerts")?.refValue;
+    assertStringNotEmpty(topicArn);
+
+    // When a Bucket is added.
+    await updateStack(simAws, "alerts", {
+      Resources: { ...resources, Logs: addedBucket },
+      Outputs: outputs,
+    });
+    const error = await assertThrowsErrorAsync(async () => {
+      await cloudFormation.waitForStackUpdateComplete("alerts");
+    });
+
+    // Then the call was refused on the topic's ARN, not on one nesting it.
+    assertStringIncludes(
+      error.message,
+      `sns:GetTopicAttributes on resource: ${topicArn}`,
+    );
+  });
+
   it("decides a read call IAM scopes to no resource type on any resource", async () => {
     // Given a Batch job queue, which sim CloudFormation skips, read by an
     // output, and a role denied the queue's describe call.

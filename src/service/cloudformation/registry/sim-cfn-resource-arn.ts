@@ -16,8 +16,8 @@ const variablePattern = /\$\{(?<name>[^}]+)\}/gu;
  * Resource's own properties, which is the whole of it for a Resource whose
  * template names it (`DomainName` and `RepositoryName` on a CodeArtifact
  * repository). A Resource whose name CloudFormation generated holds no such
- * property. Its ARN comes from its `Arn` attribute, or from its Ref where the
- * format has one variable left, both of which a service answers once it has
+ * property. Its ARN comes from its `Arn` attribute, from a Ref that is an ARN, or
+ * from its Ref where the format has one variable left, all of which a service answers once it has
  * created the Resource.
  *
  * An ARN that cannot be built is refused. Authorizing the calls on a guessed
@@ -53,6 +53,13 @@ export class SimCfnResourceArn {
     }
 
     const refValue = this.deployedValue(() => this.resource.refValue);
+
+    // An SNS topic's Ref is its whole ARN, where a hosted zone's is the one
+    // identifier its ARN format lacks.
+    if (refValue?.startsWith("arn:") === true) {
+      return refValue;
+    }
+
     const [onlyUnfilled] = unfilled;
 
     if (refValue !== undefined && unfilled.length === 1) {
