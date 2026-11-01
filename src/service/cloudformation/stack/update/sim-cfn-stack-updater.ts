@@ -41,8 +41,9 @@ interface SimCfnStackUpdaterProperties {
  * SimCfnStackUpdateLifecycle owns the first and SimCfnStack the second.
  */
 export class SimCfnStackUpdater {
+  /** What the update does to the Stack's Resources. */
+  public readonly plan: SimCfnStackUpdatePlan;
   private readonly properties: SimCfnStackUpdaterProperties;
-  private readonly plan: SimCfnStackUpdatePlan;
 
   constructor(properties: SimCfnStackUpdaterProperties) {
     const { accountRegionScope, background, resources, updated } = properties;

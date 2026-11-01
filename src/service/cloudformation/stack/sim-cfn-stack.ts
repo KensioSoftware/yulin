@@ -13,6 +13,7 @@ import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resourc
 import { SimCfnStackResourceLookup } from "./resource-map/sim-cfn-stack-resource-lookup.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
+import { SimCfnReadHandlerAuthorizer } from "../registry/sim-cfn-read-handler-authorizer.js";
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import type { SimCfnDeployedStack } from "./sim-cfn-deployed-stack.type.js";
@@ -201,6 +202,14 @@ export class SimCfnStack implements SimCfnDeployedStack {
     await this.updating.update({
       apply: async (): Promise<void> => {
         await updater.apply();
+        // Resolving an output reads an untouched Resource through its read
+        // handler. A rollback makes no such call, so it has no step here.
+        await new SimCfnReadHandlerAuthorizer({
+          context: this.operations.context,
+        }).authorizeUpdate(updater.plan, {
+          updated: template,
+          resources: this.resourceMap,
+        });
         this.resolveOutputs();
       },
       rollBack: async (): Promise<void> => {

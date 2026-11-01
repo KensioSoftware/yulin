@@ -67,12 +67,13 @@ interface SimCfnStackResourceOperationsProperties {
  * ordering of the work itself.
  */
 export class SimCfnStackResourceOperations {
+  /** What the Stack deploys from, into and as. */
+  public readonly context: SimCfnStackDeployContext;
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stackName: SimCloudFormationStackName;
   private readonly bindings: readonly SimCfnBinding[] | undefined;
   private readonly resourceOrder: SimCfnResourceOrder | undefined;
-  private readonly context: SimCfnStackDeployContext;
 
   /**
    * Resources an update kept in simulated AWS.

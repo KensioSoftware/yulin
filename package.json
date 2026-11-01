@@ -15,6 +15,7 @@
     "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm oxlint:config && pnpm docs:index",
     "oxlint:config": "pnpm tsx scripts/mts/write-oxlint-config.mts",
     "docs:index": "pnpm tsx scripts/mts/write-llms-index.mts",
+    "cfn:read-handlers": "pnpm tsx scripts/mts/write-cfn-read-handlers.mts",
     "build:check": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm build",
     "verify:pack": "pnpm tsx scripts/mts/verify-pack.mts",
