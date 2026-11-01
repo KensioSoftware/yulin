@@ -1,5 +1,7 @@
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import { SimCfnResourceRetention } from "../../resource/delete/sim-cfn-resource-retention.js";
+import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
+import { simCfnAttributeReads } from "../../registry/sim-cfn-attribute-reads.js";
 import {
   simCfnStackResourceChanges,
   type SimCfnStackInPlaceUpdates,
@@ -52,6 +54,12 @@ export class SimCfnStackUpdatePlan {
 
   public readonly updated: ReadonlyMap<string, SimCfnResource>;
 
+  /**
+   * The deployed Resources the new template describes unchanged, which the
+   * update leaves where they are.
+   */
+  public readonly untouched: readonly SimCfnResource[];
+
   constructor(properties: SimCfnStackUpdatePlanProperties) {
     const { current, updated, inPlaceUpdates } = properties;
     const { replaced, updatedInPlace } = simCfnStackResourceChanges({
@@ -90,6 +98,16 @@ export class SimCfnStackUpdatePlan {
         );
       })
       .toArray();
+    this.untouched = current
+      .values()
+      .filter(({ logicalId }) => {
+        return (
+          updated.has(logicalId) &&
+          !replaced.has(logicalId) &&
+          !updatedInPlace.has(logicalId)
+        );
+      })
+      .toArray();
   }
 
   /**
@@ -109,6 +127,16 @@ export class SimCfnStackUpdatePlan {
         ]),
       ),
     });
+  }
+
+  /**
+   * The untouched Resources whose attributes the template reads, through
+   * `Fn::GetAtt` or `Fn::Sub`.
+   */
+  untouchedReadBy(template: CfnTemplateBodyRecord): SimCfnResource[] {
+    const reads = simCfnAttributeReads(template);
+
+    return this.untouched.filter(({ logicalId }) => reads.has(logicalId));
   }
 
   /**

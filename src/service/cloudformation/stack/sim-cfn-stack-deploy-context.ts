@@ -1,3 +1,4 @@
+import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 
@@ -20,6 +21,9 @@ export interface SimCfnStackUpdateContext {
  * values the deployment started with.
  */
 export class SimCfnStackDeployContext {
+  /** The simulation the Stack deploys into, which an update never moves. */
+  public readonly simAws: SimAws;
+
   /** The CDK cloud assembly the Stack's template was synthesized into. */
   public cdkOutContext: SimCdkOutContext | undefined;
 
@@ -29,7 +33,10 @@ export class SimCfnStackDeployContext {
   /** The principal the Stack's CDK file assets are published as. */
   public assetsCaller: SimAwsCaller | undefined;
 
-  constructor(properties: SimCfnStackUpdateContext) {
+  constructor(
+    properties: SimCfnStackUpdateContext & { readonly simAws: SimAws },
+  ) {
+    this.simAws = properties.simAws;
     this.cdkOutContext = properties.cdkOutContext;
     this.caller = properties.caller;
     this.assetsCaller = properties.assetsCaller;

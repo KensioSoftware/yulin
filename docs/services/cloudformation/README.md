@@ -2165,6 +2165,100 @@ console.log(stacks.size);
 See [simulated IAM](https://yulinsim.dev/services/iam/ "Simulated IAM usage docs") for the documents
 it takes.
 
+### The read calls an update makes
+
+CloudFormation calls a resource's read handler when it needs the resource's attributes and holds no
+fresh copy of them. A stack update that leaves a resource unchanged, while the new template reads one
+of its attributes through `Fn::GetAtt` or `Fn::Sub`, is one such case. The handler runs as the
+stack's execution role. Yulin authorizes each of its calls as the deployment's principal, after the
+update's own changes and before its outputs are resolved. A denied call fails the update, which is
+rolled back.
+
+The calls come from the resource type's entry in the CloudFormation registry. Yulin keeps the ones in
+the type's own service and authorizes them on the resource's ARN, built from the stack's account and
+Region and the resource's properties. A resource yulin skips is authorized the same way, since the
+snapshot and the properties are all this takes. A call IAM scopes to no resource type is
+authorized on `*`.
+
+```typescript sim-cloudformation-read-handler
+/**
+ * An update refused because the deploy Role may not read an unchanged
+ * resource whose attribute an output reads.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultRegionName: "eu-west-2",
+});
+
+const deployer = await simAws.iam().makeDeployRole({
+  roleName: "cdk-exec",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: {
+      Effect: "Allow",
+      Action: [
+        "s3:*",
+        "codeartifact:CreateDomain",
+        "codeartifact:CreateRepository",
+        "codeartifact:DescribeRepository",
+        "codeartifact:ListTagsForResource",
+      ],
+      Resource: "*",
+    },
+  },
+});
+
+const mirror = {
+  Domain: {
+    Type: "AWS::CodeArtifact::Domain",
+    Properties: { DomainName: "example" },
+  },
+  Repository: {
+    Type: "AWS::CodeArtifact::Repository",
+    Properties: { DomainName: "example", RepositoryName: "npm" },
+    DependsOn: "Domain",
+  },
+};
+const outputs = {
+  RepositoryArn: { Value: { "Fn::GetAtt": ["Repository", "Arn"] } },
+};
+
+const cloudFormation = simAws.cloudFormation();
+
+await cloudFormation.deployTemplate({
+  stackName: "artifacts",
+  template: { Resources: mirror, Outputs: outputs },
+  caller: deployer,
+});
+
+await cloudFormation.updateStack({
+  input: {
+    StackName: "artifacts",
+    TemplateBody: JSON.stringify({
+      Resources: { ...mirror, Sources: { Type: "AWS::S3::Bucket" } },
+      Outputs: outputs,
+    }),
+  },
+});
+
+try {
+  await cloudFormation.waitForStackUpdateComplete("artifacts");
+} catch (error) {
+  // "... is not authorized to perform:
+  // codeartifact:GetRepositoryPermissionsPolicy on resource:
+  // arn:aws:codeartifact:eu-west-2:123456789012:repository/example/npm"
+  console.log((error as Error).message);
+}
+```
+
+A resource the update creates or changes needs no read, because its own handler returned its
+attributes. A resource whose ARN cannot be built fails the update with the ARN variable it was
+missing. That happens to a resource yulin skips whose ARN holds an identifier its service would have
+generated, since only a created resource can give one.
+
 ### One caller for an assembly, and one per Stack
 
 `deployCdkOut(...)` takes a caller for every Stack in the assembly. A Stack deployed by a different
@@ -4579,4 +4673,16 @@ Each service's own docs describe what its resource types support.
   `InvokeRole` and `AddDefaultAuthorizerToCorsPreflight` fail the transform by name.
   `AutoPublishAlias` and `DeploymentPreference` are left out, because the simulator has one version
   of a function and nothing to shift traffic between.
+- A stack update authorizes the read handler calls of an unchanged resource whose attributes the
+  new template reads, and no other handler calls. The create, update and delete calls are the ones
+  each service makes itself. Creating a resource of a type yulin skips authorizes nothing. Of the read
+  calls, only those in the resource type's own service are authorized. The registry also lists calls
+  into other services (a KMS key, a role a property names), and a handler makes those only when a
+  property leads to them. See [the read calls an update makes](#the-read-calls-an-update-makes).
+- The read handler calls come from a snapshot of the registry and the Service Authorization
+  Reference, which `pnpm run cfn:read-handlers` refreshes. A resource type the snapshot leaves out is
+  not authorized at all. It leaves out a type whose read handler is unpublished, and one with no
+  resource type in the Service Authorization Reference named after it.
+- An `Fn::GetAtt` inside an `Fn::If` branch the conditions rule out still counts as reading the
+  resource.
 - Many advanced CloudFormation features are outside the simulation.
