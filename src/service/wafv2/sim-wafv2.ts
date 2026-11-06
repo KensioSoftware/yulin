@@ -127,9 +127,10 @@ export class SimWafV2 extends SimWafSets {
   evaluateRequest(evaluation: SimWafEvaluationRequest): SimWafDecision {
     const webAcl = this.requireWebAcl(evaluation.webAclArn);
     const limitBytes = webAcl.bodyInspectionLimitBytes(evaluation.resourceType);
+    const { request, body, sourceIp } = evaluation;
 
     return webAcl.evaluate(
-      simWafInspectedRequest(evaluation.request, evaluation.body, limitBytes),
+      simWafInspectedRequest(request, body, limitBytes, sourceIp),
     );
   }
 

@@ -771,6 +771,12 @@ was created, exactly as `runAs` behaves. The header is stripped before the reque
 simulated service. A Lambda handler echoing `event.headers` sees none of the simulator's control
 metadata.
 
+`x-sim-aws-source-ip` is a control header of the same kind. It names the client address a request
+comes from (one IPv4 or IPv6 address), and a request naming none comes from `127.0.0.1`. A web ACL
+reads it (see
+[where a request comes from](https://yulinsim.dev/services/wafv2/#where-a-request-comes-from)). IAM
+policy evaluation does not read it.
+
 ```typescript sim-iam-served-request-caller
 /**
  * Naming the caller of an HTTP request into simulated AWS.

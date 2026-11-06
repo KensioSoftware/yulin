@@ -124,6 +124,7 @@ export class SimWafAssociations implements SimWafProtection {
         request.request,
         request.body,
         association.webAcl.bodyInspectionLimitBytes(association.resourceType),
+        request.sourceIp,
       ),
     );
   }

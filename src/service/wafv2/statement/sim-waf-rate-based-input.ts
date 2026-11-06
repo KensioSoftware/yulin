@@ -1,4 +1,3 @@
-import { simAwsProxiedSourceIp } from "../../../serve/http/sim-aws-proxied-connection.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
 import type { SimWafRateBasedStatementInput } from "./sim-waf-rate-based.type.js";
 import type { SimWafStatementInput } from "./sim-waf-statement.type.js";
@@ -108,10 +107,11 @@ export function simWafRateWindowMilliseconds(
 /**
  * Read how a rate-based statement groups the requests it counts.
  *
- * `IP` counts each client address on its own. Every request in this simulation
- * reports `simAwsProxiedSourceIp`, leaving one client for the whole
- * simulation. A rate limiting test sends its requests from one client and
- * expects the rule to trip, so that is the case anybody would write.
+ * `IP` counts each client address on its own. A request comes from
+ * `127.0.0.1` unless it states another address with `x-sim-aws-source-ip`, so
+ * a test that states none has one client for the whole simulation. That is
+ * the case a rate limiting test is usually written about: one client, sending
+ * until the rule trips.
  *
  * `CONSTANT` counts every request the statement sees together, and AWS asks
  * for a scope-down statement alongside it to say which requests those are. A
@@ -126,7 +126,7 @@ export function simWafRateAggregation(
   refuseUnsimulatedSimWafRateKeyType(keyType, ruleName);
 
   if (keyType === "IP") {
-    return (): string => simAwsProxiedSourceIp;
+    return (request): string => request.sourceIp;
   }
 
   if (keyType === "CONSTANT") {

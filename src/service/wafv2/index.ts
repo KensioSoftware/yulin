@@ -67,6 +67,7 @@ export type { SimWafDecision } from "./evaluate/sim-waf-decision.js";
 export { SimWafRequestLabels } from "./evaluate/sim-waf-request-labels.js";
 export {
   SimWafManagedRules,
+  type SimWafManagedAddressDeclaration,
   type SimWafManagedMatchDeclaration,
 } from "./managed/sim-waf-managed-rules.js";
 export type { SimWafBotDeclaration } from "./managed/sim-waf-bot-declaration.js";
@@ -86,6 +87,7 @@ export {
   type SimWafInspectedRequest,
   simWafInspectedRequest,
 } from "./evaluate/sim-waf-inspected-request.js";
+export { simAwsSourceIpHeaderName } from "../iam/request/sim-aws-source-ip-header.js";
 export { simWafHeaderInspectionLimitBytes } from "./statement/sim-waf-field-content.js";
 export {
   type SimWafAssociationConfigInput,
