@@ -40,6 +40,7 @@ export function simWafBlockedResponse(
     contentType: body?.contentType ?? fallback.contentType,
     body: body?.content ?? fallback.body,
     headers: simWafResponseHeaders(customResponse.ResponseHeaders),
+    isCustom: true,
   };
 }
 
