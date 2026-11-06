@@ -77,11 +77,10 @@ export class ListFunctionsCommandHandler implements CommandHandler<
 
     const listed = this.functions
       .values()
-      .flatMap(
-        (simFunction: SimLambdaFunction): readonly SimLambdaFunction[] =>
-          command.input.FunctionVersion === allVersions
-            ? this.versions.all(simFunction)
-            : [simFunction],
+      .flatMap((simFunction: SimLambdaFunction): readonly SimLambdaFunction[] =>
+        command.input.FunctionVersion === allVersions
+          ? this.versions.all(simFunction)
+          : [simFunction],
       )
       .toArray();
 
