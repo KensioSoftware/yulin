@@ -38,6 +38,10 @@ export {
   simAwsSourceArnHeaderName,
 } from "./request/sim-aws-request-source.js";
 export {
+  simAwsRequestSourceIp,
+  simAwsSourceIpHeaderName,
+} from "./request/sim-aws-source-ip-header.js";
+export {
   isSimAwsRequestAuthFailure,
   SimAwsInvalidCallerHeader,
   type SimAwsRequestAuthFailure,

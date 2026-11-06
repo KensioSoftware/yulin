@@ -9,6 +9,9 @@ interface SimRestApiInspectionInput {
   /** The first path segment of the request, which names the stage. */
   readonly stageName: string;
   readonly request: Request;
+
+  /** The client address the request came from. */
+  readonly sourceIp: string;
 }
 
 /**
@@ -34,6 +37,7 @@ export class SimRestApiWebAclInspection {
       protection: restApi.webAcls,
       resourceArn: restApi.stageArn(input.stageName),
       request,
+      sourceIp: input.sourceIp,
       forwardBody: true,
     });
   }

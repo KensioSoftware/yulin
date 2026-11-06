@@ -282,10 +282,11 @@ lets evaluation continue, the way it does for every other statement kind.
 window is measured against [simulated time](https://yulinsim.dev/time/), so `advanceBy` past it drops
 what the rule counted.
 
-`AggregateKeyType` is `IP` or `CONSTANT`. `IP` counts each client address on its own. Every request
-in this simulation reports `127.0.0.1`, leaving a web ACL with one client for the whole simulation.
-That is the case a rate limiting test is written about anyway (one client, sending until the rule
-trips), and it behaves here as it does on AWS. `CONSTANT` counts every request the statement sees
+`AggregateKeyType` is `IP` or `CONSTANT`. `IP` counts each client address on its own. A request
+comes from `127.0.0.1` unless it names another address (see
+[Where a request comes from](#where-a-request-comes-from)). A test that names none has one client for
+the whole simulation. That is the case a rate limiting test is usually written about (one client,
+sending until the rule trips). `CONSTANT` counts every request the statement sees
 together, and AWS requires a `ScopeDownStatement` alongside it to say which requests those are.
 
 A `ScopeDownStatement` narrows what the rule counts. Every statement kind in
@@ -463,17 +464,103 @@ are.
 
 ### Groups that read the caller
 
-The IP reputation, anonymous IP and Bot Control groups decide by who sent a request, and every
-request in this simulation comes from `127.0.0.1`. Each of their rules is declared-only. The group
-labels the request, takes the rule's documented action and honours overrides, as the groups that
-read the request do.
+The IP reputation, anonymous IP and Bot Control groups decide by who sent a request. AWS publishes
+their rule names, actions and labels, and none of the address lists or bot signatures behind them.
+Each of their rules is declared-only. The group labels the request, takes the rule's documented
+action and honours overrides, as the groups that read the request do.
 
 `AWSManagedRulesAmazonIpReputationList` holds `AWSManagedIPReputationList` and
 `AWSManagedReconnaissanceList`, which block, and `AWSManagedIPDDoSList`, which counts as AWS ships
 it. `AWSManagedRulesAnonymousIpList` holds `AnonymousIPList` (VPNs, proxies and Tor) and
 `HostingProviderIPList` (hosting and cloud providers other than AWS), which both block. A test
-declares a match by rule name, as above, and says which requests come from a flagged address that
-way.
+declares which addresses those five rules flag, and sends requests from them.
+
+#### Where a request comes from
+
+A request reaches this simulation in process or over loopback, and comes from `127.0.0.1`. The
+`x-sim-aws-source-ip` header names another client address (one IPv4 or IPv6 address). It works
+through `SimAwsHttp` and `serveSimAws` alike, and it is stripped before the request reaches the
+simulated service, as `x-sim-aws-caller` is. A value that is no address is refused with a 400 and
+`InvalidRequestCaller`. `evaluateRequest` takes the address as `sourceIp`.
+
+The address reaches the web ACL in front of a Cognito user pool or a REST API stage. The IP
+reputation and anonymous IP rules read it, and so does a rate limit aggregating on `IP`.
+
+`managedRules().onAddress` says which of those rules flag one address or a CIDR range. Only the
+rules of the IP reputation and anonymous IP groups can be declared by address, and a rule of any
+other group is refused. Declaring the same range again replaces it. An address inside two declared
+ranges is flagged by the rules of both, and a match declared for the request's path with
+`onRequest` applies beside them.
+
+```typescript sim-wafv2-anonymous-ip-list
+/**
+ * Blocking sign-ups from a Tor exit range with the anonymous IP list.
+ */
+
+import { CreateWebACLCommand } from "@aws-sdk/client-wafv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const waf = new SimAws().wafV2();
+
+const visibility = {
+  SampledRequestsEnabled: false,
+  CloudWatchMetricsEnabled: false,
+  MetricName: "pool",
+};
+
+const created = await waf.createWebAcl(
+  new CreateWebACLCommand({
+    Name: "pool-acl",
+    Scope: "REGIONAL",
+    DefaultAction: { Allow: {} },
+    VisibilityConfig: visibility,
+    Rules: [
+      {
+        Name: "anonymous-ip",
+        Priority: 0,
+        OverrideAction: { None: {} },
+        Statement: {
+          ManagedRuleGroupStatement: {
+            VendorName: "AWS",
+            Name: "AWSManagedRulesAnonymousIpList",
+          },
+        },
+        VisibilityConfig: { ...visibility, MetricName: "anonymous-ip" },
+      },
+    ],
+  }),
+);
+
+waf.managedRules().onAddress("185.220.101.0/24", {
+  matches: ["AnonymousIPList"],
+});
+
+const signUp = (sourceIp: string): string =>
+  waf.evaluateRequest({
+    webAclArn: created.Summary!.ARN,
+    request: new Request("https://myapp-login.example.com/signup", {
+      headers: { "user-agent": "Mozilla/5.0" },
+    }),
+    sourceIp,
+  }).action;
+
+// "BLOCK"
+console.log(signUp("185.220.101.7"));
+
+// "ALLOW"
+console.log(signUp("203.0.113.9"));
+```
+
+A request over HTTP names its address in the header instead:
+
+```text
+POST /signup HTTP/1.1
+Host: myapp-login.auth.eu-west-2.amazoncognito.com
+x-sim-aws-source-ip: 185.220.101.7
+```
+
+The other kinds of statement that read the address are still held (see [Held input](#held-input)).
 
 Bot Control labels a request by the bot that sent it, and a verified bot is labelled and matches no
 rule. A test declares the bot.
@@ -865,6 +952,9 @@ and records no message.
 
 The pages are usually the point. `/signup`, `/confirm` and `/forgotPassword` are the ones that
 create an account or send an email, and a real web ACL on a user pool is usually written for them.
+A request to them can name the client it comes from in the `x-sim-aws-source-ip` header, for the
+anonymous IP list and the IP reputation list to decide on (see
+[Where a request comes from](#where-a-request-comes-from)).
 
 ```typescript sim-wafv2-cognito-user-pool
 /**
@@ -1537,9 +1627,10 @@ where AWS blocks every address outside the list and the simulation blocks none.
 
 A rule is held for any of these statement kinds:
 
-- `IPSetReferenceStatement`, `GeoMatchStatement` and `AsnMatchStatement`. Every request in this
-  simulation reports a source address of `127.0.0.1`, and a rule on where a request came from would
-  see one client for the whole simulation.
+- `IPSetReferenceStatement`, `GeoMatchStatement` and `AsnMatchStatement`. A request has a client
+  address (see [Where a request comes from](#where-a-request-comes-from)), and these statements are
+  not yet written to read it. A country or an ASN would also need an address database the simulation
+  does not have.
 - `SqliMatchStatement` and `XssMatchStatement`. AWS publishes no description of the detection they
   run.
 - `RuleGroupReferenceStatement`. A rule group of your own is a resource in its own right, and none
@@ -1551,7 +1642,7 @@ A rule is held for any of these statement kinds:
 
 A `RateBasedStatement` is evaluated (see [Rate limiting](#rate-limiting)). A rule using two of its
 aggregation key types is held. `FORWARDED_IP` and `ForwardedIPConfig` read the address from a
-forwarding header, which needs the source address variety an IP set is waiting on. `CUSTOM_KEYS` and
+forwarding header, and are held along with the IP set statement. `CUSTOM_KEYS` and
 `CustomKeys` aggregate on headers, cookies and query arguments, and are feasible and not part of
 this yet. `GetRateBasedStatementManagedKeys` is not simulated.
 

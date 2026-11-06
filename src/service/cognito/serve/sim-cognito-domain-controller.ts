@@ -58,6 +58,7 @@ export class SimCognitoDomainController {
       pool,
       cognito,
       request: serviceRequest.request,
+      sourceIp: serviceRequest.sourceIp,
     });
 
     if (inspected.blocked !== undefined) {
@@ -127,6 +128,7 @@ function forwarded(
     request,
     caller: serviceRequest.caller,
     source: serviceRequest.source,
+    sourceIp: serviceRequest.sourceIp,
     body: serviceRequest.body,
   });
 }

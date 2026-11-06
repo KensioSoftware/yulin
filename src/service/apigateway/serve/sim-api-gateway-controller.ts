@@ -100,6 +100,7 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
       restApi,
       stageName: restApiRequest.segments[0] ?? "",
       request: serviceRequest.request,
+      sourceIp: serviceRequest.sourceIp,
     });
 
     if (inspected.blocked !== undefined) {
