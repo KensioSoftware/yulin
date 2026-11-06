@@ -48,7 +48,8 @@ export class SimCloudFrontRequestPipeline {
     // Put the request through the Distribution's web ACL, if it has one.
     // CloudFront asks WAF before any content handling, so a blocked request is
     // answered at the edge without a Behavior, a CloudFront Function or the
-    // Origin ever seeing it.
+    // Origin ever seeing it. Its 403 still goes through the Distribution's
+    // custom error responses, unless the block action named its own response.
     const webAclResult = await this.stages.webAclGuard.apply(
       requestReference,
       distro,

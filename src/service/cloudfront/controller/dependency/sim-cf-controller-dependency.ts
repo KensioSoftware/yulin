@@ -64,6 +64,12 @@ export class SimCloudFrontControllerDependenciesFactory {
       properties.originFetcher ?? new SimCloudFrontOriginFetcher();
     const edgeFunctions = new SimAwsCfEdgeFunctions(simAws);
 
+    // A request the web ACL blocks with WAF's default 403 gets the same custom
+    // error response an Origin's 403 would, so the one responder serves both.
+    const customErrorResponder =
+      properties.customErrorResponder ??
+      new SimCfCustomErrorResponder({ behaviourResolver, originFetcher });
+
     return {
       distroRouter:
         properties.distroRouter ??
@@ -73,7 +79,10 @@ export class SimCloudFrontControllerDependenciesFactory {
         }),
       webAclGuard:
         properties.webAclGuard ??
-        new SimCfWebAclGuard(makeSimCfWebAclResolver(simAws)),
+        new SimCfWebAclGuard(
+          makeSimCfWebAclResolver(simAws),
+          customErrorResponder,
+        ),
       behaviourResolver,
       cffApplicator: properties.cffApplicator ?? new SimCffApplicator(),
       edgeApplicator:
@@ -85,8 +94,7 @@ export class SimCloudFrontControllerDependenciesFactory {
           properties.edgeOriginApplicator ??
             new SimLambdaEdgeOriginApplicator({ edgeFunctions }),
         ),
-        properties.customErrorResponder ??
-          new SimCfCustomErrorResponder({ behaviourResolver, originFetcher }),
+        customErrorResponder,
       ),
       responseHeadersApplicator:
         properties.responseHeadersApplicator ??

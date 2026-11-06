@@ -260,6 +260,11 @@ Origin again. A rule carrying it alone, with no `ResponsePagePath`, configures e
 status the Distribution serves no page for. See
 [What a Distribution stores](#what-a-distribution-stores).
 
+A request the Distribution's [web ACL](#web-acls) blocks gets the custom error response for 403
+as well. CloudFront cannot tell WAF's 403 from the Origin's, so a site mapping 403 to its not-found
+page serves that page to a blocked request too. A block action with a `CustomResponse` of its own
+is the exception (see [Web ACLs](#web-acls)).
+
 ## Serve simulated CloudFront on localhost
 
 Use `serveSimAws` to send HTTP requests through the simulated distribution on localhost.
@@ -1846,7 +1851,7 @@ the site serves from the Origin (see [Limitations](#limitations)).
 
 A Distribution can put a WAFv2 web ACL in front of everything it serves. Name the web ACL's ARN in
 `WebACLId` and the Distribution evaluates it against every request that arrives. A request the web
-ACL blocks gets 403 from the edge. A request it allows carries on to the cache Behavior and the
+ACL blocks is answered at the edge. A request it allows carries on to the cache Behavior and the
 Origin.
 
 CloudFront takes its web ACL this way. WAFv2's `AssociateWebACL` covers the regional resource types.
@@ -1858,6 +1863,17 @@ simulation never created, is refused with `InvalidWebACLId` at `CreateDistributi
 
 The web ACL decides before any other stage sees the request. A blocked request never reaches a
 viewer-request CloudFront Function, a cache Behavior, a response headers policy or the Origin.
+
+What a blocked request gets depends on the block action. A `CustomResponse` on the action is sent
+as the rule describes it, whatever its status, and the Distribution's `CustomErrorResponses` have no
+say. With no `CustomResponse`, WAF answers 403 and the Distribution treats it as it treats a 403
+from the Origin. A custom error response for 403 with a `ResponsePagePath` replaces it with the
+response page and its `ResponseCode`. Without one, the viewer gets WAF's 403. The order is the one
+[AWS documents for blocked requests](https://docs.aws.amazon.com/waf/latest/developerguide/customizing-the-response-for-blocked-requests.html).
+
+A blocked request's answer is never stored in the Distribution's cache, so `ErrorCachingMinTTL`
+has no effect on it. The next viewer to ask for the same URL is answered by WAF's decision about
+their own request.
 
 A CloudFormation Distribution naming a web ACL this simulation does not hold deploys without one.
 The `WebACLId` lands on `stack.ignoredProperties` and every request is served, including the ones

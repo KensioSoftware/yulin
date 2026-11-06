@@ -1096,8 +1096,14 @@ its assets are outside the simulation.
 ## Protecting a CloudFront distribution
 
 A simulated CloudFront distribution names its web ACL in `WebACLId` on its `DistributionConfig`,
-and evaluates it against every request that reaches the distribution. A blocked request gets 403
+and evaluates it against every request that reaches the distribution. A blocked request is answered
 before a cache behaviour, a viewer-request CloudFront Function or the origin sees it.
+
+WAF's default 403 goes through the distribution's custom error responses, as a 403 from the origin
+would. A distribution mapping 403 to a not-found page serves that page, with its `ResponseCode`, to
+a request the web ACL blocked. A block action with a `CustomResponse` takes precedence. Its status
+and body reach the viewer unchanged, even when the distribution has a custom error response for the
+same status.
 
 CloudFront is associated this way and not through `AssociateWebACL`, which real WAF keeps for the
 regional resource types. The ARN has to name a `CLOUDFRONT` [scope](#scopes) web ACL. See

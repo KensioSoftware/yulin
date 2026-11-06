@@ -8,6 +8,19 @@ export interface SimWafBlockedResponse {
   readonly contentType: string;
   readonly body: string;
   readonly headers: readonly SimWafHeader[];
+
+  /**
+   * Whether the block action named a `CustomResponse` of its own.
+   *
+   * A fronting service treats the two differently. A custom response goes to
+   * the client exactly as the rule describes it, and the service's own error
+   * handling has no say in it. WAF's default 403 is handed to the service as
+   * any other 403 would be, so a CloudFront custom error response for 403
+   * replaces it.
+   *
+   * https://docs.aws.amazon.com/waf/latest/developerguide/customizing-the-response-for-blocked-requests.html
+   */
+  readonly isCustom: boolean;
 }
 
 /**
@@ -28,6 +41,7 @@ export function simWafDefaultBlockedResponse(): SimWafBlockedResponse {
       "<html><head><title>403 Forbidden</title></head>" +
       "<body>Request blocked by AWS WAF.</body></html>",
     headers: [],
+    isCustom: false,
   };
 }
 

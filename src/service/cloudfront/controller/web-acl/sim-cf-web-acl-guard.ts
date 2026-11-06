@@ -1,11 +1,13 @@
 import {
   simWafBlockedHttpResponse,
   simWafDefaultBlockedResponse,
+  type SimWafBlockedResponse,
 } from "../../../wafv2/evaluate/sim-waf-blocked-response.js";
 import type { SimWafDecision } from "../../../wafv2/evaluate/sim-waf-decision.js";
 import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontInvalidWebAclId } from "../../error/sim-cloudfront.error.js";
 import type { SimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl.js";
+import type { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
 
 /**
  * Puts a request through the web ACL a Distribution names, before anything
@@ -13,11 +15,21 @@ import type { SimCfWebAclResolver } from "../../web-acl/sim-cf-web-acl.js";
  *
  * CloudFront asks WAF ahead of every content-handling stage, so a blocked
  * request never reaches a viewer-request CloudFront Function, a cache
- * Behavior, a response headers policy or the Origin. It is answered at the
- * edge with the 403 the web ACL's block action describes.
+ * Behavior, a response headers policy or the Origin.
+ *
+ * A blocked request is answered with the custom response its block action
+ * names, where it names one. Otherwise WAF hands CloudFront its default 403,
+ * and CloudFront treats that like a 403 from the Origin: a custom error
+ * response the Distribution configures for 403 replaces it. CloudFront cannot
+ * tell the two 403s apart, so one rule covers both.
+ *
+ * https://docs.aws.amazon.com/waf/latest/developerguide/cloudfront-waf-use-cases.html
  */
 export class SimCfWebAclGuard {
-  constructor(private readonly resolveWebAcl: SimCfWebAclResolver) {}
+  constructor(
+    private readonly resolveWebAcl: SimCfWebAclResolver,
+    private readonly customErrorResponder: SimCfCustomErrorResponder,
+  ) {}
 
   /**
    * Answer with the request to carry on with, or the response a blocked
@@ -56,11 +68,45 @@ export class SimCfWebAclGuard {
       resourceType: "CLOUDFRONT",
     });
 
-    return decision.action === "BLOCK"
-      ? simWafBlockedHttpResponse(
-          decision.blocked ?? simWafDefaultBlockedResponse(),
-        )
-      : allowedRequest(request, decision);
+    if (decision.action === "BLOCK") {
+      return await this.blockedResponse(
+        request,
+        distribution,
+        decision.blocked ?? simWafDefaultBlockedResponse(),
+      );
+    }
+
+    return allowedRequest(request, decision);
+  }
+
+  /**
+   * The response a blocked request gets.
+   *
+   * A custom response from the block action takes precedence over anything
+   * the Distribution configures, whatever its status. WAF's default 403 goes
+   * through the Distribution's custom error responses instead.
+   *
+   * The answer is not stored in the Distribution's cache. WAF decides every
+   * request before the cache is consulted, so a blocked response stored under
+   * the request's cache key would only ever be served to a request WAF had
+   * already allowed.
+   */
+  private async blockedResponse(
+    request: Request,
+    distribution: SimCloudFrontDistribution,
+    blocked: SimWafBlockedResponse,
+  ): Promise<Response> {
+    const response = simWafBlockedHttpResponse(blocked);
+
+    if (blocked.isCustom) {
+      return response;
+    }
+
+    return await this.customErrorResponder.apply(
+      request,
+      distribution,
+      response,
+    );
   }
 }
 
