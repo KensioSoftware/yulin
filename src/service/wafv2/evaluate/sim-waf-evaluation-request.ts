@@ -10,6 +10,12 @@ export interface SimWafEvaluationRequest {
   readonly request: Request;
 
   /**
+   * The client address the request came from. A request naming none comes
+   * from `127.0.0.1`, as every request does that states no other address.
+   */
+  readonly sourceIp?: string | undefined;
+
+  /**
    * The request body, when the rules might inspect it. A request body is a
    * stream that cannot be read twice, so it is passed in already buffered.
    */

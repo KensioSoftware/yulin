@@ -233,6 +233,67 @@ describe("AWS::WAFv2::WebACLAssociation", () => {
     assertFalse(simAws.wafV2().protection().protects(poolArn));
   });
 
+  it("evaluates the anonymous IP list in front of a user pool by client address", async () => {
+    // Given a template putting the anonymous IP list in front of a user pool,
+    // and a Tor exit range declared to be on the list.
+    const simAws = simAwsInEuWest2();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "pool",
+      template: {
+        ...userPoolTemplate,
+        Resources: {
+          ...userPoolTemplate.Resources,
+          OrdersAcl: {
+            Type: "AWS::WAFv2::WebACL",
+            Properties: {
+              ...webAclResource.Properties,
+              Rules: [
+                {
+                  Name: "anonymous-ip",
+                  Priority: 0,
+                  OverrideAction: { None: {} },
+                  Statement: {
+                    ManagedRuleGroupStatement: {
+                      VendorName: "AWS",
+                      Name: "AWSManagedRulesAnonymousIpList",
+                    },
+                  },
+                  VisibilityConfig: {
+                    ...visibility,
+                    MetricName: "anonymous-ip",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    const poolArn = stack.outputs.get("PoolArn")?.value;
+    assertTypeString(poolArn);
+
+    const waf = simAws.wafV2();
+    waf.managedRules().onAddress("185.220.101.0/24", {
+      matches: ["AnonymousIPList"],
+    });
+
+    // When a sign-up reaches the pool from a Tor exit and from elsewhere.
+    const decide = (sourceIp: string): string | undefined =>
+      waf.protection().decide({
+        resourceArn: poolArn,
+        request: new Request("https://auth.example.test/signup", {
+          headers: { "user-agent": "Mozilla/5.0" },
+        }),
+        sourceIp,
+      })?.action;
+
+    // Then the web ACL the template declared blocks the one from Tor alone.
+    assertIdentical(decide("185.220.101.7"), "BLOCK");
+    assertIdentical(decide("203.0.113.9"), "ALLOW");
+  });
+
   it("answers Ref with the pair of ARNs the association is", async () => {
     // Given a deployed association whose Ref is an output.
     const simAws = simAwsInEuWest2();

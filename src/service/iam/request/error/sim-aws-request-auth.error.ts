@@ -2,7 +2,7 @@ import { SimIamSigV4Error } from "../../sigv4/error/sim-iam-sigv4.error.js";
 
 /**
  * Raised when the `x-sim-aws-caller` header does not name a principal the
- * simulator understands.
+ * simulator understands, or `x-sim-aws-source-ip` names no address.
  *
  * This is a simulator control header rather than anything real AWS defines, so
  * a bad value is the caller's mistake in using Yulin, not a failed AWS

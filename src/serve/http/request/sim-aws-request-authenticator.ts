@@ -5,6 +5,7 @@ import {
   type SimAwsServiceTarget,
 } from "../../controller/sim-service-controller.js";
 import { SimAwsRequestSource } from "../../../service/iam/request/sim-aws-request-source.js";
+import { simAwsRequestSourceIp } from "../../../service/iam/request/sim-aws-source-ip-header.js";
 import { SimAwsReceivedRequest } from "./sim-aws-received-request.js";
 
 interface SimAwsRequestAuthenticatorProperties {
@@ -56,12 +57,14 @@ export class SimAwsRequestAuthenticator {
     });
 
     const source = SimAwsRequestSource.fromHeaders(request.headers);
+    const sourceIp = simAwsRequestSourceIp(request.headers);
 
     return new SimAwsServiceRequest({
       target,
       request: received.forService(),
       caller,
       ...(source !== undefined && { source }),
+      sourceIp,
       body: received.body,
     });
   }

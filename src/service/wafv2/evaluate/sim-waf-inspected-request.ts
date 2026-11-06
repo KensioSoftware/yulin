@@ -1,4 +1,8 @@
+import { isIP } from "node:net";
+
+import { simAwsProxiedSourceIp } from "../../../serve/http/sim-aws-proxied-connection.js";
 import { simAwsRequestHostname } from "../../../serve/http/url/sim-aws-request-hostname.js";
+import { SimWafDeclarationError } from "../error/sim-wafv2.error.js";
 import { simWafBodyInspectionLimitBytes } from "../web-acl/sim-waf-association-config.js";
 import { SimWafRequestLabels } from "./sim-waf-request-labels.js";
 
@@ -27,6 +31,15 @@ export interface SimWafInspectedRequest {
    * header with the Yulin-local suffix taken off it.
    */
   readonly host: string;
+
+  /**
+   * The client address the request came from, which is what the IP-based
+   * rules read.
+   *
+   * Nothing reaches this simulation over a public network, so this is
+   * `127.0.0.1` unless the request said otherwise with `x-sim-aws-source-ip`.
+   */
+  readonly sourceIp: string;
 
   /** The request body, or nothing when the request carried none. */
   readonly body: Uint8Array | undefined;
@@ -60,12 +73,23 @@ export interface SimWafInspectedRequest {
  * The body inspection limit defaults to the 16 KB every resource type this
  * simulation protects reads by default. A web ACL raising it with
  * `AssociationConfig` passes the raised figure in.
+ *
+ * The client address defaults to loopback, which is where a request comes from
+ * when it states no other address.
  */
 export function simWafInspectedRequest(
   request: Request,
   body?: Uint8Array,
   bodyInspectionLimitBytes: number = simWafBodyInspectionLimitBytes,
+  sourceIp: string = simAwsProxiedSourceIp,
 ): SimWafInspectedRequest {
+  if (isIP(sourceIp) === 0) {
+    throw new SimWafDeclarationError(
+      `A request's source address must be one IPv4 or IPv6 address, and ` +
+        `${sourceIp} is neither`,
+    );
+  }
+
   const url = new URL(request.url);
 
   return {
@@ -77,6 +101,7 @@ export function simWafInspectedRequest(
     queryString: url.search.replace(/^\?/u, ""),
     headers: request.headers,
     host: simAwsRequestHostname(request),
+    sourceIp,
     body,
     bodyInspectionLimitBytes,
     labels: new SimWafRequestLabels(),

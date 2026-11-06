@@ -176,9 +176,8 @@ therefore all a test needs to watch a limited client be served again.
 
 `sim-waf-rate-based-input.ts` reads `Limit`, `EvaluationWindowSec` and `AggregateKeyType`, and
 `sim-waf-unsimulated-rate-based.ts` beside it stops at the two aggregation key types that need
-something this simulation has none of. `IP` reads `simAwsProxiedSourceIp`, the address every request in this simulation reports, leaving a
-web ACL with one client. That is the case a rate limiting test covers, and the keyed counter is the
-seam if source addresses ever vary.
+something this simulation has none of. `IP` reads the request's `sourceIp`. That is `127.0.0.1` (`simAwsProxiedSourceIp`) unless the
+request named another address in `x-sim-aws-source-ip`, so each named address is counted on its own.
 
 A rate-based statement is compiled at the rule level (`web-acl/sim-waf-rule-evaluator.ts`) for the
 reason a managed rule group is. Both are the whole of a rule's statement on real WAFv2, and
@@ -209,7 +208,9 @@ Every rule declares a tier, in `managed/sim-waf-managed-rule.type.ts`.
 - `documented` matches the patterns AWS published for the rule and nothing beyond them.
 - `declared` detects nothing and matches a request a test declared a match for. The four
   `CrossSiteScripting_*` rules run detection AWS documents none of. Every rule of the three groups
-  that read the caller is declared, since every request here comes from `127.0.0.1`.
+  that read the caller is declared. AWS publishes none of the address lists or bot signatures. The
+  IP reputation and anonymous IP groups set `readsSourceAddress`, and their rules can be declared by
+  address with `onAddress` (`managed/sim-waf-managed-address-declaration.ts`) as well as by path.
 
 A rule blocks by default unless it sets `counts` (`AWSManagedIPDDoSList` is the one AWS ships
 counting), and it can carry `labels` beside its own. A Bot Control rule adds the
@@ -280,9 +281,9 @@ address outside the list and the simulation blocks none.
 The message names the rule and what in it was left out, because a web ACL is a list of rules that
 all look alike from the outside and the name is the only thing that says which one to go and look
 at. The reasons are worth knowing. `IPSetReferenceStatement`, `GeoMatchStatement` and
-`AsnMatchStatement` are not evaluated because every request in this simulation reports a source
-address of `127.0.0.1` (`simAwsProxiedSourceIp`), and a rule on where a request came from would see
-one client for the whole simulation. AWS publishes no description of the detection
+`AsnMatchStatement` are not evaluated yet. A request carries `sourceIp` (read from
+`x-sim-aws-source-ip` at the HTTP boundary, `127.0.0.1` otherwise), and an IP set could be matched
+against it. A country or an ASN would need an address database as well. AWS publishes no description of the detection
 `SqliMatchStatement` and `XssMatchStatement` run. A rule group of the reader's own
 (`RuleGroupReferenceStatement`) is a resource in its own right, and none is simulated.
 

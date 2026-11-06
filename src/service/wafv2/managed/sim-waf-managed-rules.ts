@@ -1,15 +1,16 @@
 import { SimWafDeclarationError } from "../error/sim-wafv2.error.js";
 import type { SimWafInspectedRequest } from "../evaluate/sim-waf-inspected-request.js";
-import {
-  findSimWafManagedRule,
-  type SimWafManagedRuleEntry,
-} from "./sim-waf-managed-rule-groups.js";
+import { requiredSimWafManagedRule } from "./sim-waf-managed-rule-groups.js";
 import {
   type SimWafManagedRuleReport,
   simWafManagedRuleReports,
 } from "./sim-waf-managed-rule-report.js";
 
 import type { SimWafManagedRuleTier } from "./sim-waf-managed-rule.type.js";
+import {
+  type SimWafManagedAddressDeclaration,
+  SimWafDeclaredAddresses,
+} from "./sim-waf-managed-address-declaration.js";
 import {
   type SimWafDeclared,
   type SimWafManagedMatchDeclaration,
@@ -21,6 +22,7 @@ export type {
   SimWafDeclared,
   SimWafManagedMatchDeclaration,
 } from "./sim-waf-managed-declaration.js";
+export type { SimWafManagedAddressDeclaration } from "./sim-waf-managed-address-declaration.js";
 
 /**
  * The managed rule matches this simulated WAFv2 answers with, and what it
@@ -47,12 +49,23 @@ export type {
  * });
  * ```
  *
+ * The IP reputation and anonymous IP groups decide by the client address, so
+ * their matches can be declared by address instead, for a request that states
+ * where it came from with the `x-sim-aws-source-ip` header:
+ *
+ * ```typescript
+ * simAws.wafV2().managedRules().onAddress("185.220.101.0/24", {
+ *   matches: ["AnonymousIPList"],
+ * });
+ * ```
+ *
  * A declared match is a match, and everything after it is what the group would
  * have done anyway: the rule adds its label, an action override applies to it,
  * and the group blocks by that rule.
  */
 export class SimWafManagedRules {
   readonly #byUriPath = new Map<string, SimWafDeclared>();
+  readonly #byAddress = new SimWafDeclaredAddresses();
 
   /**
    * Declare which managed rules claim a request to one URI path.
@@ -73,24 +86,45 @@ export class SimWafManagedRules {
       uriPath,
       simWafReadDeclaration(
         declaration,
-        (name) => this.requiredRule(name).rule.name,
+        (name) => requiredSimWafManagedRule(name).rule.name,
       ),
     );
   }
 
   /**
+   * Declare which managed rules flag the requests from one address or one
+   * CIDR range of addresses.
+   *
+   * Only the rules of a group that decides by the client address can be
+   * declared this way, which is the IP reputation list and the anonymous IP
+   * list. A request states its address with the `x-sim-aws-source-ip` header,
+   * and one that states none comes from `127.0.0.1`.
+   *
+   * Declaring the same range again replaces it.
+   */
+  onAddress(range: string, declaration: SimWafManagedAddressDeclaration): void {
+    this.#byAddress.declare(range, declaration.matches);
+  }
+
+  /**
    * What a test declared about one request: the rules that claim it, and the
    * labels a group adds to it whatever its rules decide.
+   *
+   * A request is claimed by what was declared for its path and for its
+   * address together.
    */
   declared(request: SimWafInspectedRequest): SimWafDeclared {
-    return this.#byUriPath.get(request.uriPath) ?? simWafNothingDeclared;
+    return this.#byAddress.joinedWith(
+      this.#byUriPath.get(request.uriPath) ?? simWafNothingDeclared,
+      request.sourceIp,
+    );
   }
 
   /**
    * What this simulation covers of one managed rule.
    */
   tierOf(ruleName: string): SimWafManagedRuleTier {
-    return this.requiredRule(ruleName).rule.tier;
+    return requiredSimWafManagedRule(ruleName).rule.tier;
   }
 
   /**
@@ -102,19 +136,5 @@ export class SimWafManagedRules {
    */
   rules(): readonly SimWafManagedRuleReport[] {
     return simWafManagedRuleReports();
-  }
-
-  private requiredRule(ruleName: string): SimWafManagedRuleEntry {
-    const entry = findSimWafManagedRule(ruleName);
-
-    if (entry === undefined) {
-      throw new SimWafDeclarationError(
-        `No simulated AWS managed rule group holds a rule named ` +
-          `${ruleName}. The rules that are simulated are reported by ` +
-          `managedRules().rules().`,
-      );
-    }
-
-    return entry;
   }
 }

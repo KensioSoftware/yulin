@@ -11,6 +11,9 @@ interface SimWafInspectionInput {
 
   readonly request: Request;
 
+  /** The client address the request came from. */
+  readonly sourceIp: string;
+
   /**
    * Whether the fronting service forwards the request body to AWS WAF.
    *
@@ -56,14 +59,19 @@ export class SimWafRequestInspection {
    * Put one request to whatever protects the resource it addressed.
    */
   async inspect(input: SimWafInspectionInput): Promise<SimWafInspected> {
-    const { protection, resourceArn, request } = input;
+    const { protection, resourceArn, request, sourceIp } = input;
 
     if (!protection.protects(resourceArn)) {
       return new SimWafInspected({ request });
     }
 
     const body = input.forwardBody ? await inspectedBody(request) : undefined;
-    const decision = protection.decide({ resourceArn, request, body });
+    const decision = protection.decide({
+      resourceArn,
+      request,
+      sourceIp,
+      body,
+    });
 
     // A decision carries a blocked response when its action was to block, and
     // carries none when the request was allowed. That one reading is what

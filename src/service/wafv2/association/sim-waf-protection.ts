@@ -10,6 +10,12 @@ export interface SimWafProtectedRequest {
   readonly request: Request;
 
   /**
+   * The client address the request came from, which is loopback when nothing
+   * says otherwise.
+   */
+  readonly sourceIp?: string | undefined;
+
+  /**
    * The request body, when the rules might inspect it. A request body is a
    * stream that cannot be read twice, so it is passed in already buffered.
    */

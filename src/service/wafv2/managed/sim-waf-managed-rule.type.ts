@@ -66,5 +66,11 @@ export interface SimWafManagedRuleGroupDefinition {
   /** The WCUs the group costs, which `DescribeManagedRuleGroup` reports. */
   readonly capacity: number;
 
+  /**
+   * Whether the group decides by the client address alone, which is what lets
+   * a test declare its matches by address with `managedRules().onAddress`.
+   */
+  readonly readsSourceAddress?: boolean | undefined;
+
   readonly rules: readonly SimWafManagedRuleDefinition[];
 }

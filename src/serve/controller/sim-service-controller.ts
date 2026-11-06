@@ -1,4 +1,5 @@
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
+import { simAwsProxiedSourceIp } from "../http/sim-aws-proxied-connection.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 import type { SimAwsRequestSource } from "../../service/iam/request/sim-aws-request-source.js";
@@ -37,6 +38,7 @@ interface SimAwsServiceRequestProperties {
   readonly request: Request;
   readonly caller?: SimAwsRequestCaller | undefined;
   readonly source?: SimAwsRequestSource | undefined;
+  readonly sourceIp?: string | undefined;
   readonly body?: Uint8Array | undefined;
 }
 
@@ -62,6 +64,11 @@ export class SimAwsServiceRequest {
    * conditioned on, and most requests state none.
    */
   public readonly source: SimAwsRequestSource | undefined;
+  /**
+   * The client address the request came from, which is loopback unless the
+   * request stated another with `x-sim-aws-source-ip`.
+   */
+  public readonly sourceIp: string;
   public readonly body?: Uint8Array | undefined;
 
   constructor(properties: SimAwsServiceRequestProperties) {
@@ -70,6 +77,7 @@ export class SimAwsServiceRequest {
     // An unattributed request is anonymous, never the Account root.
     this.caller = properties.caller ?? SimAwsRequestCaller.anonymous();
     this.source = properties.source;
+    this.sourceIp = properties.sourceIp ?? simAwsProxiedSourceIp;
     this.body = properties.body;
   }
 }

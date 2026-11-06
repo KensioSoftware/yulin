@@ -1,3 +1,4 @@
+import { SimWafDeclarationError } from "../error/sim-wafv2.error.js";
 import { simWafAdminProtectionRuleSet } from "./group/sim-waf-admin-protection.js";
 import { simWafBotControlRuleSet } from "./group/sim-waf-bot-control.js";
 import { simWafCommonRuleSet } from "./group/sim-waf-common-rule-set.js";
@@ -75,6 +76,27 @@ export function findSimWafManagedRule(
   name: string,
 ): SimWafManagedRuleEntry | undefined {
   return rulesByName.get(name);
+}
+
+/**
+ * Find one managed rule by name, refusing a name no simulated group holds.
+ *
+ * A declaration naming a rule that is absent is refused where it is made,
+ * since it would otherwise sit there matching nothing.
+ */
+export function requiredSimWafManagedRule(
+  name: string,
+): SimWafManagedRuleEntry {
+  const entry = rulesByName.get(name);
+
+  if (entry === undefined) {
+    throw new SimWafDeclarationError(
+      `No simulated AWS managed rule group holds a rule named ${name}. The ` +
+        `rules that are simulated are reported by managedRules().rules().`,
+    );
+  }
+
+  return entry;
 }
 
 /**

@@ -12,6 +12,9 @@ interface SimCognitoInspectionInput {
   readonly cognito: SimCognitoIdentityProvider;
 
   readonly request: Request;
+
+  /** The client address the request came from. */
+  readonly sourceIp: string;
 }
 
 /**
@@ -39,6 +42,7 @@ export class SimCognitoWebAclInspection {
       protection: input.cognito.webAcls(),
       resourceArn: input.pool.arn.value,
       request: input.request,
+      sourceIp: input.sourceIp,
       forwardBody: false,
     });
   }

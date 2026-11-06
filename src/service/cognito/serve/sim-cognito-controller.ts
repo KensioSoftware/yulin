@@ -99,7 +99,7 @@ export class SimCognitoServiceController implements SimAwsServiceController {
     // The web ACL sits in front of the endpoint rather than behind it, so a
     // request it blocks is answered before the method is judged. A write the
     // rules turned away gets WAF's 403 and never learns the endpoint reads.
-    const blocked = await this.blocked(pool, segment, request);
+    const blocked = await this.blocked(pool, segment, serviceRequest);
 
     if (blocked !== undefined) {
       return blocked;
@@ -127,7 +127,7 @@ export class SimCognitoServiceController implements SimAwsServiceController {
   private async blocked(
     pool: SimCognitoUserPool,
     segment: string,
-    request: Request,
+    serviceRequest: SimAwsServiceRequest,
   ): Promise<Response | undefined> {
     if (!simCognitoProtectedSegment(segment)) {
       return undefined;
@@ -136,7 +136,8 @@ export class SimCognitoServiceController implements SimAwsServiceController {
     const inspected = await this.webAcl.inspect({
       pool,
       cognito: simCognitoPoolScope(this.simAws, pool),
-      request,
+      request: serviceRequest.request,
+      sourceIp: serviceRequest.sourceIp,
     });
 
     return inspected.blocked;
