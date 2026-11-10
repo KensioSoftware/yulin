@@ -78,7 +78,10 @@
     { "name": "security", "specifier": "eslint-plugin-security" },
     { "name": "no-secrets", "specifier": "eslint-plugin-no-secrets" },
     { "name": "smartass", "specifier": "@kensio/smartass/oxlint" },
-    { "name": "yulin", "specifier": "./src/config/lint/repo-lint-plugin.ts" }
+    {
+      "name": "yulin",
+      "specifier": "./src/config/lint/repository-lint-plugin.ts"
+    }
   ],
 
   "rules": {
@@ -679,7 +682,7 @@
 
     // ── This repository's own restrictions (3) ──
     // Named rules rather than a `no-restricted-syntax` block, which Oxlint has
-    // no equivalent of. See src/config/lint/repo-lint-plugin.ts.
+    // no equivalent of. See src/config/lint/repository-lint-plugin.ts.
     "yulin/assert-defined-guard": "error",
     "yulin/assert-not-null-guard": "error",
     "yulin/no-reused-props": "error"

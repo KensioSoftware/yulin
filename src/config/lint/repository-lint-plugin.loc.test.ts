@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
 
-import { repoLintPluginName } from "./repo-lint-plugin.js";
+import { repositoryLintPluginName } from "./repository-lint-plugin.js";
 
 const projectRoot = path.resolve(import.meta.dirname, "../../..");
 
@@ -23,13 +23,13 @@ const jsPlugins: readonly {
   readonly specifier: string;
 }[] = [
   {
-    name: repoLintPluginName,
+    name: repositoryLintPluginName,
     specifier: path.join(
       projectRoot,
       "src",
       "config",
       "lint",
-      "repo-lint-plugin.ts",
+      "repository-lint-plugin.ts",
     ),
   },
   {
@@ -55,7 +55,7 @@ const cases: readonly {
   readonly source: string;
 }[] = [
   {
-    plugin: repoLintPluginName,
+    plugin: repositoryLintPluginName,
     rule: "assert-defined-guard",
     source: [
       "export function read(value: string | undefined): string {",
@@ -65,7 +65,7 @@ const cases: readonly {
     ].join("\n"),
   },
   {
-    plugin: repoLintPluginName,
+    plugin: repositoryLintPluginName,
     rule: "assert-not-null-guard",
     source: [
       "export function read(value: string | null): string {",
@@ -75,7 +75,7 @@ const cases: readonly {
     ].join("\n"),
   },
   {
-    plugin: repoLintPluginName,
+    plugin: repositoryLintPluginName,
     rule: "no-reused-props",
     source: [
       "export class Thing {",

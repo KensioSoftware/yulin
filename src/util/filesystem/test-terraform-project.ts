@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { execa } from "execa";
-import { repoPath } from "./path.js";
+import { repositoryPath } from "./path.js";
 import { TemporaryDirectory } from "./temporary-directory.js";
 
 export interface TestTerraformProjectProperties {
@@ -35,7 +35,7 @@ export class TestTerraformProject {
     public readonly name: string,
     properties: TestTerraformProjectProperties = {},
   ) {
-    this.directory = repoPath(`test/terraform/${name}`);
+    this.directory = repositoryPath(`test/terraform/${name}`);
     this.toleratesDataSourceErrors =
       properties.toleratesDataSourceErrors ?? false;
   }

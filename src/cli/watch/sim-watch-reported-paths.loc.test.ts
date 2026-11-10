@@ -4,16 +4,16 @@ import { afterEach, describe, it } from "vitest";
 import { SimWatchArguments } from "./sim-watch-arguments.js";
 import { SimWatchReporter } from "./sim-watch-reporter.js";
 import { SimWatchSupervisor } from "./sim-watch-supervisor.js";
-import { repoPath } from "../../util/filesystem/path.js";
+import { repositoryPath } from "../../util/filesystem/path.js";
 import { WatchProject, watchPause } from "../../../test/cli/watch-project.js";
 import {
   runSupervisor,
   stopSupervisors,
 } from "../../../test/cli/running-supervisors.js";
 
-const yulin = repoPath("src/index.js");
-const yulinWatch = repoPath("src/watch/index.js");
-const tsx = repoPath(path.join("node_modules", ".bin", "tsx"));
+const yulin = repositoryPath("src/index.js");
+const yulinWatch = repositoryPath("src/watch/index.js");
+const tsx = repositoryPath(path.join("node_modules", ".bin", "tsx"));
 
 /**
  * The paths Yulin holds that a module graph never mentions, watched without the

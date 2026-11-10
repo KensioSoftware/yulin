@@ -39,7 +39,7 @@ import type {
 /**
  * One thing this repository will not have written in it.
  */
-export interface RepoSyntaxRestriction {
+export interface RepositorySyntaxRestriction {
   readonly selector: string;
   readonly message: string;
 }
@@ -47,12 +47,12 @@ export interface RepoSyntaxRestriction {
 /**
  * The name Oxlint reports these rules under.
  */
-export const repoLintPluginName = "yulin";
+export const repositoryLintPluginName = "yulin";
 
 /**
  * The restrictions this repository sets on itself.
  */
-export const repoSyntaxRestrictions = {
+export const repositorySyntaxRestrictions = {
   "assert-defined-guard": {
     selector:
       "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Identifier'][test.left.name='undefined'], [test.right.type='Identifier'][test.right.name='undefined']):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
@@ -71,7 +71,7 @@ export const repoSyntaxRestrictions = {
     message:
       "Do not reuse `this.props`. Destructure constructor props into class members instead.",
   },
-} satisfies Readonly<Record<string, RepoSyntaxRestriction>>;
+} satisfies Readonly<Record<string, RepositorySyntaxRestriction>>;
 
 /**
  * The one message id every rule here reports under.
@@ -84,7 +84,7 @@ const messageId = "restriction";
 /**
  * Builds the rule that reports one restriction.
  */
-function restrictionRule(restriction: RepoSyntaxRestriction): LintRule {
+function restrictionRule(restriction: RepositorySyntaxRestriction): LintRule {
   return {
     meta: {
       type: "problem",
@@ -101,7 +101,7 @@ function restrictionRule(restriction: RepoSyntaxRestriction): LintRule {
 
 function buildRules(): Record<string, LintRule> {
   return Object.fromEntries(
-    Object.entries(repoSyntaxRestrictions).map(([name, restriction]) => [
+    Object.entries(repositorySyntaxRestrictions).map(([name, restriction]) => [
       name,
       restrictionRule(restriction),
     ]),
@@ -115,9 +115,9 @@ function buildRules(): Record<string, LintRule> {
  * does, but nothing in `exports` points at it: these are house rules for
  * yulin, not advice for anyone installing yulin.
  */
-export const repoLintPlugin: LintPlugin = {
-  meta: { name: repoLintPluginName },
+export const repositoryLintPlugin: LintPlugin = {
+  meta: { name: repositoryLintPluginName },
   rules: buildRules(),
 };
 
-export default repoLintPlugin;
+export default repositoryLintPlugin;

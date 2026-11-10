@@ -1,13 +1,13 @@
 import { mkdir, mkdtemp, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
-import { repoPath } from "./path.js";
+import { repositoryPath } from "./path.js";
 import { assertDefined } from "../type-guard/defined.js";
 
 /**
  * Create a temporary directory and return its path.
  */
 export async function makeTemporaryDirectory(): Promise<string> {
-  const temporaryDirectoryPath = repoPath(".tmp");
+  const temporaryDirectoryPath = repositoryPath(".tmp");
 
   // oxlint-disable-next-line security/detect-non-literal-fs-filename
   await mkdir(temporaryDirectoryPath, { recursive: true });

@@ -1,5 +1,5 @@
 import { execa } from "execa";
-import { repoPath } from "./path.js";
+import { repositoryPath } from "./path.js";
 import { TemporaryDirectory as TemporaryDirectory } from "./temporary-directory.js";
 
 interface TestCdkProjectProperties {
@@ -46,7 +46,7 @@ export class TestCdkProject {
 }
 
 function cdkBinPath(): string {
-  return repoPath(
+  return repositoryPath(
     `node_modules/.bin/${process.platform === "win32" ? "cdk.cmd" : "cdk"}`,
   );
 }
