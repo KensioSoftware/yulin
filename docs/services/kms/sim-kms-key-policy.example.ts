@@ -6,7 +6,7 @@ import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import { CreateKeyCommand, EncryptCommand } from "@aws-sdk/client-kms";
 
 import { SimAws } from "@kensio/yulin";
-import { SimIamAccessDenied } from "@kensio/yulin/iam";
+import { SimKmsAccessDeniedException } from "@kensio/yulin/kms";
 
 const simAws = new SimAws();
 const accountId = simAws.defaultAccountId;
@@ -60,5 +60,5 @@ try {
     }),
   );
 } catch (error) {
-  console.log(error instanceof SimIamAccessDenied); // true
+  console.log(error instanceof SimKmsAccessDeniedException); // true
 }

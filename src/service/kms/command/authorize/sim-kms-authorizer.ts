@@ -1,6 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../error/sim-kms.error.js";
 import { SimKmsCallerAccountCondition } from "../../key/sim-kms-caller-account.js";
 import type { SimKmsKey } from "../../key/sim-kms-key.js";
 import { SimKmsViaService } from "../../key/sim-kms-via-service.js";
@@ -63,7 +63,7 @@ export class SimKmsAuthorizer {
     });
 
     if (decision.isDenied) {
-      throw new SimIamAccessDenied({
+      throw new SimKmsAccessDeniedException({
         principal: decision.caller.principal,
         reason: decision.denialReason,
         action,
@@ -87,7 +87,7 @@ export class SimKmsAuthorizer {
     });
 
     if (decision.isDenied) {
-      throw new SimIamAccessDenied({
+      throw new SimKmsAccessDeniedException({
         principal: decision.caller.principal,
         reason: decision.denialReason,
         action,

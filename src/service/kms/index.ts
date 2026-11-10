@@ -13,6 +13,7 @@ export type { SimKmsKeyMetadata } from "./key/sim-kms-key-metadata.js";
 export { SimKmsKeySpec, SimKmsKeyUsage } from "./key/spec/sim-kms-key-spec.js";
 export { simKmsKeySpecs } from "./key/spec/sim-kms-key-specs.js";
 export {
+  SimKmsAccessDeniedException,
   SimKmsAlreadyExistsException,
   SimKmsDisabledException,
   SimKmsError,

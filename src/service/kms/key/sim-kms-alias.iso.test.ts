@@ -17,9 +17,9 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { SimKms } from "../sim-kms.js";
 import {
+  SimKmsAccessDeniedException,
   SimKmsAlreadyExistsException,
   SimKmsInvalidStateException,
   SimKmsValidationException,
@@ -322,6 +322,6 @@ describe("KMS AWS managed keys", () => {
     // Then the key policy denies it before the key is asked, as on real AWS:
     // the policy of an AWS managed key delegates nothing beyond reading its
     // metadata.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 });

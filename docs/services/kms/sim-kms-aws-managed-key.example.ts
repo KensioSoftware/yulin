@@ -5,7 +5,7 @@
 import { EncryptCommand, GetKeyPolicyCommand } from "@aws-sdk/client-kms";
 
 import { SimAws } from "@kensio/yulin";
-import { SimIamAccessDenied } from "@kensio/yulin/iam";
+import { SimKmsAccessDeniedException } from "@kensio/yulin/kms";
 
 const simAws = new SimAws();
 
@@ -30,7 +30,7 @@ try {
     }),
   );
 } catch (error) {
-  console.log(error instanceof SimIamAccessDenied); // true
+  console.log(error instanceof SimKmsAccessDeniedException); // true
 }
 
 // Reading the key's metadata is allowed, because that much is delegated.

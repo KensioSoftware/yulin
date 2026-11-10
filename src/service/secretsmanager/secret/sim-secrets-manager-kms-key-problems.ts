@@ -1,4 +1,7 @@
-import { SimKmsError } from "../../kms/error/sim-kms.error.js";
+import {
+  SimKmsAccessDeniedException,
+  SimKmsError,
+} from "../../kms/error/sim-kms.error.js";
 import {
   SimSecretsManagerDecryptionFailure,
   SimSecretsManagerEncryptionFailure,
@@ -17,9 +20,10 @@ export type SimSecretsManagerKeyFailure = "encrypting" | "decrypting";
  *
  * Every key problem KMS raises becomes EncryptionFailure or DecryptionFailure
  * carrying the KMS message, which is what real Secrets Manager does for a key
- * that is missing, disabled or pending deletion. An access denial is not a KMS
- * error and passes through untouched, so a missing `kms:Decrypt` still reads
- * as a denial rather than a broken key.
+ * that is missing, disabled or pending deletion. KMS's AccessDeniedException
+ * passes through untouched, so a missing `kms:Decrypt` still reads as a denial
+ * rather than a broken key, and under the same name real Secrets Manager
+ * reports it with.
  */
 export async function reportingKeyProblems<TResult>(
   failure: SimSecretsManagerKeyFailure,
@@ -28,7 +32,10 @@ export async function reportingKeyProblems<TResult>(
   try {
     return await call();
   } catch (error: unknown) {
-    if (error instanceof SimKmsError) {
+    if (
+      error instanceof SimKmsError &&
+      !(error instanceof SimKmsAccessDeniedException)
+    ) {
       throw keyFailure(failure, error.message);
     }
 

@@ -65,5 +65,5 @@ try {
     { caller },
   );
 } catch (error) {
-  console.log((error as Error).name); // "AccessDenied"
+  console.log((error as Error).name); // "AccessDeniedException"
 }

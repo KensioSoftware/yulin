@@ -14,7 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../kms/error/sim-kms.error.js";
 import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
 /**
@@ -233,6 +233,6 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
 
     // Then it is denied. The managed key is usable through Parameter Store and
     // not otherwise, so the parameter's own permissions stay in charge of it.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 });

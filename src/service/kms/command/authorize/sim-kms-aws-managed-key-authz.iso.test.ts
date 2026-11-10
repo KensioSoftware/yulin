@@ -15,7 +15,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../error/sim-kms.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
 
@@ -89,7 +89,7 @@ describe("KMS AWS managed key authorization", () => {
 
     // Then the key policy is not enough on its own: it admits whoever the
     // request came from, which is the service rather than the Role behind it.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("admits a caller holding the permission where the service passes its own on", async () => {
@@ -162,7 +162,7 @@ describe("KMS AWS managed key authorization", () => {
 
     // Then it is denied: an AWS managed key policy does not delegate use of
     // the key to IAM, so an identity grant reaches nothing.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:Decrypt");
   });
 
@@ -182,7 +182,7 @@ describe("KMS AWS managed key authorization", () => {
 
     // Then the policy's kms:ViaService condition does not match, and the key
     // stays reachable only through the service that owns it.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("denies a caller from another Account reaching the key through the service", async () => {
@@ -226,7 +226,7 @@ describe("KMS AWS managed key authorization", () => {
 
     // Then the policy's kms:CallerAccount condition refuses it: the key admits
     // its own Account's principals, not everyone using the service.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("lets the Account read the key's metadata but not use it", async () => {
@@ -249,7 +249,7 @@ describe("KMS AWS managed key authorization", () => {
     // Then the metadata comes back and the encryption does not: the policy
     // delegates reading the key to IAM and nothing more.
     assertIdentical(described.KeyMetadata?.KeyManager, "AWS");
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("gives the key the via-service policy rather than the customer default", async () => {

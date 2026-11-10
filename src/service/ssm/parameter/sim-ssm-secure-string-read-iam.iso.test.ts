@@ -10,7 +10,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../kms/error/sim-kms.error.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { simIamRoleWithPolicyFactory } from "../../iam/role/sim-iam-role-with-policy.factory.js";
 
@@ -229,7 +229,7 @@ describe("SSM SecureString read IAM authorization", () => {
 
     // Then it is denied, because kms:Decrypt is a separate permission from
     // ssm:GetParameter and this is the failure a deployment actually hits.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("reads the ciphertext without any key permission", async () => {

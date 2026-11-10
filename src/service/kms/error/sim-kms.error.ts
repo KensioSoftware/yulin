@@ -1,3 +1,7 @@
+import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIamAccessDeniedInput } from "../../iam/error/sim-iam.error.js";
+import { SimIamCallerIdentifier } from "../../iam/error/sim-iam-caller-identifier.js";
+
 /**
  * Minimal metadata shape for simulated KMS errors.
  */
@@ -150,5 +154,39 @@ export class SimKmsInvalidSignatureException extends SimKmsError {
 
   constructor(message: string) {
     super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated KMS AccessDeniedException error.
+ *
+ * Real KMS refuses a request its key policy, IAM policies and grants do not
+ * allow with this name rather than IAM's `AccessDenied`. The message keeps the
+ * IAM shape, naming the caller, the `kms:` action and the key ARN, and the
+ * status is 400 like every other KMS client error: the SDKs report
+ * `Status Code: 400; Error Code: AccessDeniedException` for it, even though the
+ * shared list of common AWS errors gives 403.
+ */
+export class SimKmsAccessDeniedException extends SimKmsError {
+  public override readonly name = "AccessDeniedException";
+
+  public readonly caller: SimAwsPrincipal;
+  public readonly action: string;
+  public readonly resource: string;
+
+  constructor(input: SimIamAccessDeniedInput) {
+    const callerIdentifier = new SimIamCallerIdentifier().format(
+      input.principal,
+    );
+    const reason = input.reason === undefined ? "" : ` ${input.reason}`;
+
+    super(
+      `User: ${callerIdentifier} is not authorized to perform: ${input.action} on resource: ${input.resource}${reason}`,
+      { httpStatusCode: 400 },
+    );
+
+    this.caller = input.principal;
+    this.action = input.action;
+    this.resource = input.resource;
   }
 }

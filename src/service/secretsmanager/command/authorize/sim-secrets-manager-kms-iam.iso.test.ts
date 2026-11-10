@@ -13,7 +13,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../../kms/error/sim-kms.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 
 describe("Secrets Manager KMS authorization", () => {
@@ -116,7 +116,7 @@ describe("Secrets Manager KMS authorization", () => {
 
     // Then it is denied, which is the deployment failure worth reproducing:
     // the secret is allowed and the key is not.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:Decrypt");
   });
 
@@ -223,7 +223,7 @@ describe("Secrets Manager KMS authorization", () => {
 
     // Then it is denied. Secrets Manager encrypts each version with a data key
     // from KMS, so a write needs kms:GenerateDataKey rather than kms:Encrypt.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:GenerateDataKey");
   });
 
