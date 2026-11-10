@@ -10,7 +10,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../kms/error/sim-kms.error.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 
 describe("SSM SecureString write IAM authorization", () => {
@@ -58,7 +58,7 @@ describe("SSM SecureString write IAM authorization", () => {
     );
 
     // Then it is denied: a standard tier write needs kms:Encrypt as well.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("writes for a caller allowed both the parameter and the key", async () => {

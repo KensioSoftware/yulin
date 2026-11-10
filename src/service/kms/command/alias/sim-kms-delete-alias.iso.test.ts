@@ -16,8 +16,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import {
+  SimKmsAccessDeniedException,
   SimKmsNotFoundException,
   SimKmsValidationException,
 } from "../../error/sim-kms.error.js";
@@ -145,7 +145,7 @@ describe("KMS DeleteAliasCommand", () => {
     );
 
     // Then IAM denies it, and the alias stays.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:DeleteAlias");
     assertInstanceOf(simKms.findAlias("alias/protected"), Object);
   });

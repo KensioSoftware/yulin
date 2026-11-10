@@ -16,8 +16,10 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimKmsValidationException } from "../../error/sim-kms.error.js";
+import {
+  SimKmsAccessDeniedException,
+  SimKmsValidationException,
+} from "../../error/sim-kms.error.js";
 
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
 
@@ -111,7 +113,7 @@ describe("KMS PutKeyPolicy", () => {
       ),
     );
 
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("accepts a policy document object as well as a JSON string", async () => {

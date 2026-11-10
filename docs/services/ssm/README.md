@@ -471,7 +471,7 @@ references use, so a reference can sit inside a longer value and inside `Fn::Sub
 
 Decryption goes to simulated KMS under the key the parameter was written with, as the caller
 deploying the stack. A caller lacking `kms:Decrypt` on a customer managed key fails the resource with
-the `AccessDenied` a decrypting `GetParameter` raises (see
+the `AccessDeniedException` a decrypting `GetParameter` raises (see
 [A customer managed key needs its own permission](#a-customer-managed-key-needs-its-own-permission)).
 A parameter under the `aws/ssm` managed key needs no KMS permission of the caller.
 
@@ -910,7 +910,7 @@ try {
     { caller },
   );
 } catch (error) {
-  console.log((error as Error).name); // "AccessDenied"
+  console.log((error as Error).name); // "AccessDeniedException"
 }
 ```
 

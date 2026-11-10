@@ -8,7 +8,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../../kms/error/sim-kms.error.js";
 
 const accountIdOneOnes = "111111111111";
 
@@ -174,6 +174,6 @@ describe("SSM CloudFormation ssm-secure dynamic references CloudFormation refuse
 
     // Then the Resource fails the way a decrypting GetParameter fails, rather
     // than being created with something that is not the password.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 });

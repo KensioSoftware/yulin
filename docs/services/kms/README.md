@@ -266,6 +266,10 @@ also permits the caller:
 - A statement naming the account root only delegates to that account's IAM. The caller still needs
   an identity policy allowing the action. The default key policy is of this kind.
 
+A refused request throws `SimKmsAccessDeniedException`, named `AccessDeniedException` as on real
+KMS rather than IAM's `AccessDenied`. Parameter Store and Secrets Manager pass it on unchanged when
+KMS refuses a request they make for the caller.
+
 ```typescript sim-kms-key-policy
 /**
  * A simulated KMS key policy deciding who can use the key.
@@ -275,7 +279,7 @@ import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import { CreateKeyCommand, EncryptCommand } from "@aws-sdk/client-kms";
 
 import { SimAws } from "@kensio/yulin";
-import { SimIamAccessDenied } from "@kensio/yulin/iam";
+import { SimKmsAccessDeniedException } from "@kensio/yulin/kms";
 
 const simAws = new SimAws();
 const accountId = simAws.defaultAccountId;
@@ -329,7 +333,7 @@ try {
     }),
   );
 } catch (error) {
-  console.log(error instanceof SimIamAccessDenied); // true
+  console.log(error instanceof SimKmsAccessDeniedException); // true
 }
 ```
 
@@ -370,7 +374,7 @@ own. No simulated service sets it.
 import { EncryptCommand, GetKeyPolicyCommand } from "@aws-sdk/client-kms";
 
 import { SimAws } from "@kensio/yulin";
-import { SimIamAccessDenied } from "@kensio/yulin/iam";
+import { SimKmsAccessDeniedException } from "@kensio/yulin/kms";
 
 const simAws = new SimAws();
 
@@ -395,7 +399,7 @@ try {
     }),
   );
 } catch (error) {
-  console.log(error instanceof SimIamAccessDenied); // true
+  console.log(error instanceof SimKmsAccessDeniedException); // true
 }
 
 // Reading the key's metadata is allowed, because that much is delegated.

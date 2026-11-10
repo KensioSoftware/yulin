@@ -14,7 +14,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimKmsAccessDeniedException } from "../../error/sim-kms.error.js";
 
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
 
@@ -106,7 +106,7 @@ describe("KMS key policy authorization", () => {
     );
 
     // Then it is denied: delegating to IAM is not the same as granting.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:Encrypt");
   });
 
@@ -150,7 +150,7 @@ describe("KMS key policy authorization", () => {
 
     // Then the key policy refuses it. This is the KMS rule worth testing: an
     // identity policy cannot reach a key its policy does not admit.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("lets a key policy grant a Role access with no identity policy", async () => {
@@ -243,7 +243,7 @@ describe("KMS key policy authorization", () => {
     // Then the statement admits a set of principals without naming one, and
     // the caller still needs the permission itself. Real IAM accepts no
     // wildcard inside a Principal ARN in the first place.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
   });
 
   it("authorizes Decrypt against the key the ciphertext names", async () => {
@@ -290,7 +290,7 @@ describe("KMS key policy authorization", () => {
     );
 
     // Then the denial names that key, even though the caller never named it.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.resource, restricted.KeyMetadata.Arn);
   });
 
@@ -309,7 +309,7 @@ describe("KMS key policy authorization", () => {
 
     // Then CreateKey is denied by identity policies alone, since there is no
     // key yet to hold a policy.
-    assertInstanceOf(error, SimIamAccessDenied);
+    assertInstanceOf(error, SimKmsAccessDeniedException);
     assertIdentical(error.action, "kms:CreateKey");
   });
 });
