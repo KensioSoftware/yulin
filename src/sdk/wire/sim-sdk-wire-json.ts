@@ -1,4 +1,5 @@
 import { isRecord } from "../../util/type-guard/record.js";
+import { SimSdkWireJsonDecoder } from "./sim-sdk-wire-json-decoder.js";
 
 /**
  * Read an AWS JSON protocol request body as the Command input it was
@@ -7,14 +8,23 @@ import { isRecord } from "../../util/type-guard/record.js";
  * An operation taking no input sends an empty body, which is the input `{}`.
  *
  * The wire shapes of the JSON protocols are the Command input shapes, member
- * for member, which is what makes this readable without the operation's
- * schema. The two exceptions are the shapes the JSON encoding cannot carry:
- * blobs travel base64-encoded and timestamps as epoch seconds, and only the
- * schema says which members those are. A value written and read back through
- * this bridge round-trips regardless, because both directions leave it
- * untouched.
+ * for member, apart from the two kinds of value JSON cannot carry. Blobs
+ * travel base64-encoded and timestamps as epoch seconds, and the operation's
+ * schema says which members those are, so they are decoded by it.
  */
-export function readSimSdkWireInput(body: Uint8Array): unknown {
+export function readSimSdkWireInput(
+  body: Uint8Array,
+  serviceId: string,
+  operationName: string,
+): unknown {
+  return SimSdkWireJsonDecoder.decodeInput(
+    serviceId,
+    operationName,
+    parseJsonBody(body),
+  );
+}
+
+function parseJsonBody(body: Uint8Array): unknown {
   if (body.byteLength === 0) {
     return {};
   }

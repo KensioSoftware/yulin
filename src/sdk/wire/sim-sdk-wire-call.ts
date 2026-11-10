@@ -64,7 +64,12 @@ function readSimSdkWireJsonCall(
 
   return {
     ...operation,
-    input: () => readSimSdkWireInput(request.body),
+    input: () =>
+      readSimSdkWireInput(
+        request.body,
+        operation.serviceId,
+        operation.commandName.replace(/Command$/, ""),
+      ),
     outputResponse: (output) =>
       Promise.resolve(simSdkWireOutputResponse(output, contentType)),
     errorResponse: (error) => simSdkWireErrorResponse(error, contentType),
