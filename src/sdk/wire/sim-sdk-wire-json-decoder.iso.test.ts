@@ -78,6 +78,21 @@ describe("reading an AWS JSON protocol body", () => {
     assertIdentical(fromString.Timestamp.getTime(), pointInTime.getTime());
   });
 
+  it("keeps the millisecond a fraction of a second names", () => {
+    // Given epoch seconds whose fraction has no exact binary form: 1.009
+    // multiplies out to 1008.999 milliseconds.
+    // When the timestamp is read.
+    const input = readSimSdkWireInput(
+      body({ StreamName: "s", ShardId: "x", Timestamp: 1.009 }),
+      "Kinesis",
+      "GetShardIterator",
+    ) as { Timestamp: unknown };
+
+    // Then it is the 1009th millisecond, not the one before it.
+    assertInstanceOf(input.Timestamp, Date);
+    assertIdentical(input.Timestamp.getTime(), 1009);
+  });
+
   it("passes on values that do not have the wire form their member calls for", () => {
     // Given a body no SDK would send, with each member in the wrong form.
     const malformed = {

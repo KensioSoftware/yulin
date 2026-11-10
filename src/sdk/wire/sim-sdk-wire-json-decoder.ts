@@ -132,10 +132,14 @@ function decodeBlob(value: unknown): unknown {
  * A timestamp member travels as epoch seconds, with a fraction for
  * milliseconds. A member whose schema names another format travels as the
  * date string that format gives, which Date reads either way.
+ *
+ * The milliseconds are rounded. A decimal fraction of a second has no exact
+ * binary form, and 1.009 seconds multiplies out to 1008.999 milliseconds,
+ * which Date would truncate to 1008.
  */
 function decodeTimestamp(value: unknown): unknown {
   if (typeof value === "number") {
-    return new Date(value * 1000);
+    return new Date(Math.round(value * 1000));
   }
   if (typeof value === "string") {
     return new Date(value);
