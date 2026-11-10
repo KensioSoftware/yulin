@@ -1,7 +1,7 @@
 import path from "node:path";
 import { assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { findRepoRootFrom, repoPath } from "./path.js";
+import { findRepositoryRootFrom, repositoryPath } from "./path.js";
 import { TemporaryDirectory } from "./temporary-directory.js";
 
 describe("Repository root resolution", () => {
@@ -11,7 +11,9 @@ describe("Repository root resolution", () => {
     const worktree = await checkoutIn(["worktrees", "some-branch"]);
 
     // When the root is resolved from a directory inside it
-    const foundRoot = findRepoRootFrom(path.join(worktree, "src", "util"));
+    const foundRoot = findRepositoryRootFrom(
+      path.join(worktree, "src", "util"),
+    );
 
     // Then it is the worktree, not the checkout the worktree sits inside
     assertIdentical(foundRoot, worktree);
@@ -24,10 +26,10 @@ describe("Repository root resolution", () => {
     await temporaryDirectory.writeFile(["nested", "tsconfig.json"], "{}");
 
     // When the root is resolved from inside that package
-    const foundRoot = findRepoRootFrom(temporaryDirectory.join("nested"));
+    const foundRoot = findRepositoryRootFrom(temporaryDirectory.join("nested"));
 
     // Then the walk continues past it, up to the checkout it belongs to
-    assertIdentical(foundRoot, repoPath());
+    assertIdentical(foundRoot, repositoryPath());
   });
 });
 

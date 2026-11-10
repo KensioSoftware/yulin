@@ -188,8 +188,8 @@ describe("Notifying a simulated SQS queue of an Object event", () => {
 
   it("reaches a function through an event source mapping on the queue", async () => {
     // Given a queue delivering to a function through an event source mapping
-    const source = await simAwsWithSqsEventSource();
-    const { simAws, queueArn, queueUrl, events } = source;
+    const { simAws, queueArn, queueUrl, events } =
+      await simAwsWithSqsEventSource();
 
     // And a queue policy letting a Bucket's events onto it
     await simAws.sqs().setQueueAttributes(

@@ -70,7 +70,7 @@ function nameOf(column: StatementColumnMetadata, index: number): string {
 
 function originOf(column: StatementColumnMetadata): string {
   return [column.database, column.table, column.column]
-    .map((part) => (part ?? "").toLowerCase())
+    .map((part) => part?.toLowerCase() ?? "")
     .join(".");
 }
 

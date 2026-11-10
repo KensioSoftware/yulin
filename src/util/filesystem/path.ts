@@ -7,21 +7,21 @@ import { fileURLToPath } from "node:url";
 const filename = fileURLToPath(import.meta.url);
 const directoryName = path.dirname(filename);
 
-const repoRoot = findRepoRoot([directoryName, process.cwd()]);
+const repositoryRoot = findRepositoryRoot([directoryName, process.cwd()]);
 
 /**
  * Resolves a path relative to the repository root.
  */
-export function repoPath(pathFromRepoRoot = ""): string {
-  return path.join(repoRoot, pathFromRepoRoot);
+export function repositoryPath(pathFromRepositoryRoot = ""): string {
+  return path.join(repositoryRoot, pathFromRepositoryRoot);
 }
 
 /**
  * Finds the repository root by walking upward from likely starting directories.
  */
-function findRepoRoot(startDirectories: readonly string[]): string {
+function findRepositoryRoot(startDirectories: readonly string[]): string {
   for (const startDirectory of startDirectories) {
-    const foundRoot = findRepoRootFrom(startDirectory);
+    const foundRoot = findRepositoryRootFrom(startDirectory);
 
     if (foundRoot !== undefined) {
       return foundRoot;
@@ -37,11 +37,13 @@ function findRepoRoot(startDirectories: readonly string[]): string {
 /**
  * Finds the repository root by walking upward from one directory.
  */
-export function findRepoRootFrom(startDirectory: string): string | undefined {
+export function findRepositoryRootFrom(
+  startDirectory: string,
+): string | undefined {
   let currentDirectory = path.resolve(startDirectory);
 
   for (let level = 0; level < 100; level++) {
-    if (isRepoRoot(currentDirectory)) {
+    if (isRepositoryRoot(currentDirectory)) {
       return currentDirectory;
     }
 
@@ -68,7 +70,7 @@ export function findRepoRootFrom(startDirectory: string): string | undefined {
  * further up. The three markers together are specific enough on their own,
  * with the workspace file ruling out a nested package.
  */
-function isRepoRoot(directory: string): boolean {
+function isRepositoryRoot(directory: string): boolean {
   return (
     fs.existsSync(path.join(directory, "package.json")) &&
     fs.existsSync(path.join(directory, "tsconfig.json")) &&

@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import type { SimAws } from "../../src/index.js";
-import { repoPath } from "../../src/util/filesystem/path.js";
+import { repositoryPath } from "../../src/util/filesystem/path.js";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
 import { assertNotNull } from "../../src/util/type-guard/defined.js";
 import { jsonStringify } from "../../src/util/type-guard/json.js";
 
-const yulin = repoPath("src/index.js");
-const yulinServe = repoPath("src/serve/index.js");
+const yulin = repositoryPath("src/index.js");
+const yulinServe = repositoryPath("src/serve/index.js");
 
 /**
  * How TypeScript is loaded into the process the dev script runs in.

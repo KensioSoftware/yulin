@@ -30,10 +30,10 @@ import type { SimCognitoAttributeType } from "./user/sim-cognito-user-attributes
  * Read the claims of a JWT, which are base64url encoded JSON.
  */
 function tokenClaims(token: string): JSONObject {
-  const [, claims] = token.split(".", 2);
+  const [, claims = ""] = token.split(".", 2);
 
   return JSON.parse(
-    Buffer.from(claims ?? "", "base64url").toString("utf8"),
+    Buffer.from(claims, "base64url").toString("utf8"),
   ) as JSONObject;
 }
 

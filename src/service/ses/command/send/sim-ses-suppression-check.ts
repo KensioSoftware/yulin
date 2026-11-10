@@ -49,7 +49,7 @@ export class SimSesSuppressionCheck {
         return [];
       }
 
-      return [{ emailAddress: recipient, reason: suppressed.reason }];
+      return { emailAddress: recipient, reason: suppressed.reason };
     });
   }
 }

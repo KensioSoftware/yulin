@@ -56,8 +56,8 @@ export class SimRestApiMatcher {
     restApi: SimRestApi,
     request: SimRestApiRequest,
   ): SimRestApiMatch | SimRestApiMiss {
-    const [stageName, ...segments] = request.segments;
-    const stage = restApi.stages.find(stageName ?? "");
+    const [stageName = "", ...segments] = request.segments;
+    const stage = restApi.stages.find(stageName);
 
     if (stage === undefined) {
       return "stage";

@@ -34,7 +34,7 @@ export function configureEdgeAssociations(
   let associations: SimCfEdgeAssociations = {};
 
   for (const association of items) {
-    const { EventType, LambdaFunctionARN, IncludeBody } = association;
+    const { EventType, LambdaFunctionARN, IncludeBody = false } = association;
 
     assertDefined(EventType, "Lambda@Edge association EventType");
     assertDefined(
@@ -44,7 +44,7 @@ export function configureEdgeAssociations(
 
     const configured = {
       functionArn: LambdaFunctionARN as SimArn,
-      includeBody: IncludeBody ?? false,
+      includeBody: IncludeBody,
     };
 
     associations = {

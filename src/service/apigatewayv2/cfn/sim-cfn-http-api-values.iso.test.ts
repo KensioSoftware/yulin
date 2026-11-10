@@ -47,8 +47,7 @@ describe("API Gateway v2 CloudFormation Ref and Fn::GetAtt", () => {
   it("resolves each Resource type the way CloudFormation resolves it", async () => {
     // Given a deployed API, integration, route and stage
     const simAws = simAwsInEuWest2();
-    const stack = await deployHttpApi(simAws, template);
-    const { outputs } = stack;
+    const { outputs } = await deployHttpApi(simAws, template);
 
     // When the deployed API is read back
     const httpApi = simAws.apiGatewayV2().findApi(output(outputs, "ApiRef"));

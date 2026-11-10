@@ -183,8 +183,11 @@ describe("deployed AWS::KinesisFirehose::DeliveryStream Resources", () => {
     await putOrderEvent(simAws, "order-events");
     await simAws.clock().advanceBy({ minutes: 3 });
 
-    const [key] = await deliveredObjectKeys(simAws, orderArchiveBucketName);
-    assertStringIncludes(key ?? "", "orders/archive/");
+    const [key = ""] = await deliveredObjectKeys(
+      simAws,
+      orderArchiveBucketName,
+    );
+    assertStringIncludes(key, "orders/archive/");
   });
 
   it("writes as the Role the template named", async () => {

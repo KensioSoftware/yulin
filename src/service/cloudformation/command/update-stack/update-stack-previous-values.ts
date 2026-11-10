@@ -56,7 +56,7 @@ export function simCfnUpdateStackParameters(
     const { ParameterKey: key, ParameterValue: value } = parameter;
 
     if (parameter.UsePreviousValue !== true) {
-      return [{ ParameterKey: key, ParameterValue: value }];
+      return { ParameterKey: key, ParameterValue: value };
     }
 
     assertNoValueAlongsidePrevious(parameter);
@@ -66,7 +66,7 @@ export function simCfnUpdateStackParameters(
 
     return previous === undefined
       ? []
-      : [{ ParameterKey: key, ParameterValue: previous }];
+      : { ParameterKey: key, ParameterValue: previous };
   });
 }
 

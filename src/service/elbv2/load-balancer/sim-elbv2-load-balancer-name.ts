@@ -12,8 +12,8 @@ const reservedPrefix = "internal-";
 /**
  * Read the name of a load balancer a request names.
  */
-export function simElbV2LoadBalancerName(value: string | undefined): string {
-  const name = readSimElbV2Name("LoadBalancerName", value ?? "");
+export function simElbV2LoadBalancerName(value = ""): string {
+  const name = readSimElbV2Name("LoadBalancerName", value);
 
   if (name.startsWith(reservedPrefix)) {
     throw new SimElbV2ValidationError(

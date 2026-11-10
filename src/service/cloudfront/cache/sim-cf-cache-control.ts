@@ -33,7 +33,7 @@ const uncacheableDirectives = ["no-store", "no-cache", "private"];
  * A directive naming something other than a whole number of seconds is read as
  * absent. `max-age=soon` falls through to whatever the response says next.
  */
-export function simCfCacheControl(header: string | null): SimCfCacheControl {
+export function simCfCacheControl(header: string): SimCfCacheControl {
   const directives = cacheControlDirectives(header);
 
   return {
@@ -51,9 +51,9 @@ export function simCfCacheControl(header: string | null): SimCfCacheControl {
  * A directive carrying no value is held under an empty string, which is what
  * makes `no-store` findable the same way as `max-age=60`.
  */
-function cacheControlDirectives(header: string | null): Map<string, string> {
+function cacheControlDirectives(header: string): Map<string, string> {
   const directives = new Map<string, string>();
-  const parts = (header ?? "").split(",");
+  const parts = header.split(",");
 
   for (const part of parts) {
     const trimmed = part.trim();

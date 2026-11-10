@@ -53,7 +53,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 
 const certificateArn = stack.output("CertificateArn");
 if (typeof certificateArn !== "string")
-  throw new Error("No CertificateArn Output");
+  throw new TypeError("No CertificateArn Output");
 
 const listOutput = await simAws
   .acm()

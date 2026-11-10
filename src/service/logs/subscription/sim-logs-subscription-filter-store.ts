@@ -65,11 +65,7 @@ export class SimLogsSubscriptionFilterStore {
   /**
    * The filters whose names start with a prefix, in the order they were put.
    */
-  withNamePrefix(
-    prefix: string | undefined,
-  ): readonly SimLogsSubscriptionFilter[] {
-    return this.all.filter((filter) =>
-      filter.filterName.startsWith(prefix ?? ""),
-    );
+  withNamePrefix(prefix = ""): readonly SimLogsSubscriptionFilter[] {
+    return this.all.filter((filter) => filter.filterName.startsWith(prefix));
   }
 }

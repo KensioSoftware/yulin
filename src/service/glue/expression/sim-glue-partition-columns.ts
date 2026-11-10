@@ -76,9 +76,9 @@ export class SimGluePartitionColumns {
  * only the word in front of them is read.
  */
 export function simGluePartitionComparison(
-  type: string | undefined,
+  type = "",
 ): SimGluePartitionComparison {
-  const declared = (type ?? "").trim().toLowerCase();
+  const declared = type.trim().toLowerCase();
   const bracket = declared.indexOf("(");
   const named = bracket === -1 ? declared : declared.slice(0, bracket);
 

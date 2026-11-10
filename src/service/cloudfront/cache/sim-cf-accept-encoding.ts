@@ -17,7 +17,7 @@ export function simCfNormalizedAcceptEncoding(
     ...(cacheKey.enableAcceptEncodingBrotli ? ["br"] : []),
     ...(cacheKey.enableAcceptEncodingGzip ? ["gzip"] : []),
   ];
-  const accepted = acceptedEncodings(headers.get("accept-encoding"));
+  const accepted = acceptedEncodings(headers.get("accept-encoding") ?? "");
 
   return enabled.filter((encoding) => accepted.has(encoding));
 }
@@ -26,9 +26,9 @@ export function simCfNormalizedAcceptEncoding(
  * The encodings a viewer said it accepts, by name alone. A quality value is
  * ignored, so a viewer that sent `gzip;q=0` is taken to accept gzip.
  */
-function acceptedEncodings(headerValue: string | null): Set<string> {
+function acceptedEncodings(headerValue: string): Set<string> {
   return new Set(
-    (headerValue ?? "").split(",").map((encoding) => {
+    headerValue.split(",").map((encoding) => {
       const [name = ""] = encoding.split(";", 1);
 
       return name.trim().toLowerCase();

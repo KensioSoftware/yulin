@@ -25,10 +25,8 @@ export class SimSqsQueueStore {
    *
    * No prefix means every queue, as an SQS listing with no prefix lists them all.
    */
-  withNamePrefix(prefix: string | undefined): readonly SimSqsQueue[] {
-    return this.all.filter((queue) =>
-      queue.name.value.startsWith(prefix ?? ""),
-    );
+  withNamePrefix(prefix = ""): readonly SimSqsQueue[] {
+    return this.all.filter((queue) => queue.name.value.startsWith(prefix));
   }
 
   /**

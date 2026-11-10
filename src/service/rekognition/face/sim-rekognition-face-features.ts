@@ -34,15 +34,13 @@ export class SimRekognitionFaceFeatures {
 
       const read = simRekognitionDeclaredFaceFeature(value);
 
-      return [
-        {
-          ...feature,
-          value: {
-            Value: read.value,
-            Confidence: confidence.of(subject, read.confidence),
-          },
+      return {
+        ...feature,
+        value: {
+          Value: read.value,
+          Confidence: confidence.of(subject, read.confidence),
         },
-      ];
+      };
     });
   }
 

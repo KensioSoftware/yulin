@@ -3,10 +3,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { repoPath } from "../util/filesystem/path.js";
+import { repositoryPath } from "../util/filesystem/path.js";
 
 const runFile = promisify(execFile);
-const binPath = path.join(repoPath(), "src", "cli", "yulin.ts");
+const binPath = path.join(repositoryPath(), "src", "cli", "yulin.ts");
 
 /**
  * The `yulin` command as a command, run the way a shell runs it. Everything it
@@ -17,7 +17,7 @@ describe("yulin command line", () => {
     // Given the command run with no arguments
     // When it is asked for help
     const { stdout } = await runFile("pnpm", ["tsx", binPath, "--help"], {
-      cwd: repoPath(),
+      cwd: repositoryPath(),
     });
 
     // Then the commands are listed
@@ -63,7 +63,7 @@ async function commandFailure(
     // The timeout is what tells a command that reported an error and exited
     // apart from one that reported it and then sat there.
     await runFile("pnpm", ["tsx", binPath, ...commandArguments], {
-      cwd: repoPath(),
+      cwd: repositoryPath(),
       timeout: 15_000,
     });
   } catch (error) {

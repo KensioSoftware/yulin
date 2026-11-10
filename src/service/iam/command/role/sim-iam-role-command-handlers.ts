@@ -229,8 +229,8 @@ export class SimIamRoleCommandHandlers {
   /**
    * The Role ARN a command operates on, for authorization.
    */
-  private roleArn(roleName: string | undefined): string {
-    return `arn:aws:iam::${this.accountId}:role/${roleName ?? "*"}`;
+  private roleArn(roleName = "*"): string {
+    return `arn:aws:iam::${this.accountId}:role/${roleName}`;
   }
 }
 

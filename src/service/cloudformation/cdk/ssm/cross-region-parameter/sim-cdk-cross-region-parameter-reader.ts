@@ -53,11 +53,11 @@ export class SimCdkCrossRegionParameterReaderResourceFactory implements SimCfnSe
       );
     }
 
-    const properties = new SimCdkCrossRegionParameterProperties(
-      resource.logicalId,
-      context.resolvedProperties ?? resource.properties,
-    );
-    const { parameterName, regionName } = properties;
+    const { parameterName, regionName } =
+      new SimCdkCrossRegionParameterProperties(
+        resource.logicalId,
+        context.resolvedProperties ?? resource.properties,
+      );
 
     return new SimCdkCrossRegionParameterReading({
       parameterName,

@@ -93,7 +93,7 @@ export class SimWafWebAcl extends SimWafResource {
       ...this.#rules.flatMap(({ name, unsimulatedReason }) =>
         unsimulatedReason === undefined
           ? []
-          : [{ part: `Rules.${name}`, reason: unsimulatedReason }],
+          : { part: `Rules.${name}`, reason: unsimulatedReason },
       ),
       ...unsimulatedSimWafWebAclMembers(this.#configuration.heldMembers ?? {}),
       ...this.#bodyInspectionLimits.unsimulated,

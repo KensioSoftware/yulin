@@ -29,8 +29,8 @@ const structuredPatternOpeners = new Map<string, string>([
 export class SimLogsFilterPattern {
   readonly #terms: readonly SimLogsFilterTerm[];
 
-  constructor(pattern?: string) {
-    this.#terms = simLogsFilterTerms(refuseStructured(pattern ?? "").trim());
+  constructor(pattern = "") {
+    this.#terms = simLogsFilterTerms(refuseStructured(pattern).trim());
   }
 
   /**

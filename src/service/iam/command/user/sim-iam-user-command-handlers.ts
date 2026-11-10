@@ -174,7 +174,7 @@ export class SimIamUserCommandHandlers {
   /**
    * The User ARN a command operates on, for authorization.
    */
-  private userArn(username: string | undefined): string {
-    return `arn:aws:iam::${this.accountId}:user/${username ?? "*"}`;
+  private userArn(username = "*"): string {
+    return `arn:aws:iam::${this.accountId}:user/${username}`;
   }
 }

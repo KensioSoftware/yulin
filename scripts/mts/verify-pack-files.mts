@@ -131,7 +131,7 @@ export async function assertDocumentationPublished(
   const index = await readFile(indexPath, "utf8");
   const pages = index
     .matchAll(/^- \[[^\]]+]\(([^\s)]+)\)/gm)
-    .map(([, page]) => page ?? "")
+    .map(([, page = ""]) => page)
     .toArray();
 
   if (pages.length === 0) {

@@ -33,9 +33,9 @@ interface SimCognitoTokens {
 /**
  * Read one part of a JWT, which is base64url encoded JSON.
  */
-function decodePart(part: string | undefined): JSONObject {
+function decodePart(part = ""): JSONObject {
   return JSON.parse(
-    Buffer.from(part ?? "", "base64url").toString("utf8"),
+    Buffer.from(part, "base64url").toString("utf8"),
   ) as JSONObject;
 }
 
