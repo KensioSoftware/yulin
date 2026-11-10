@@ -43,7 +43,8 @@ export const simSdkWireBedrockActions: ReadonlyMap<
     "converse",
     {
       commandName: "ConverseCommand",
-      input: simSdkWireConverseInput,
+      input: (modelId: string, request: SimSdkWireRequest): unknown =>
+        simSdkWireConverseInput("Converse", modelId, request),
       outputResponse: (output: unknown): Promise<SimSdkWireResponse> =>
         Promise.resolve(
           simSdkWireOutputResponse(output, simSdkWireBedrockJsonContentType),
@@ -54,7 +55,8 @@ export const simSdkWireBedrockActions: ReadonlyMap<
     "converse-stream",
     {
       commandName: "ConverseStreamCommand",
-      input: simSdkWireConverseInput,
+      input: (modelId: string, request: SimSdkWireRequest): unknown =>
+        simSdkWireConverseInput("ConverseStream", modelId, request),
       outputResponse: async (output: unknown): Promise<SimSdkWireResponse> =>
         await eventStreamResponse(
           (output as SimConverseStreamCommandOutput).stream,

@@ -401,7 +401,8 @@ history remains available through its inspection methods.
   services that use the AWS JSON protocol.
 
 The AWS JSON services include DynamoDB, DynamoDB Streams, SQS, Cognito Identity Provider,
-EventBridge, ECS, SSM, ACM, CloudWatch, CloudWatch Logs, KMS, Secrets Manager, and Rekognition. Each
+EventBridge, ECS, SSM, ACM, Athena, CloudWatch, CloudWatch Logs, Firehose, Glue, Kinesis, KMS,
+Personalize, Secrets Manager, Step Functions, and Rekognition. Each
 service guide lists its supported commands.
 
 ## Limitations

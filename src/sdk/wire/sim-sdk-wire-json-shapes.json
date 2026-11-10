@@ -1,0 +1,975 @@
+{
+  "ACM": {
+    "operations": {
+      "ExportCertificate": "ExportCertificateRequest",
+      "ImportCertificate": "ImportCertificateRequest",
+      "SearchCertificates": "SearchCertificatesRequest"
+    },
+    "shapes": {
+      "CertificateFilter": {
+        "X509AttributeFilter": "#X509AttributeFilter"
+      },
+      "CertificateFilterStatement": {
+        "And": "list:#CertificateFilterStatement",
+        "Filter": "#CertificateFilter",
+        "Not": "#CertificateFilterStatement",
+        "Or": "list:#CertificateFilterStatement"
+      },
+      "ExportCertificateRequest": {
+        "Passphrase": "blob"
+      },
+      "ImportCertificateRequest": {
+        "Certificate": "blob",
+        "CertificateChain": "blob",
+        "PrivateKey": "blob"
+      },
+      "SearchCertificatesRequest": {
+        "FilterStatement": "#CertificateFilterStatement"
+      },
+      "TimestampRange": {
+        "End": "timestamp",
+        "Start": "timestamp"
+      },
+      "X509AttributeFilter": {
+        "NotAfter": "#TimestampRange",
+        "NotBefore": "#TimestampRange"
+      }
+    }
+  },
+  "Athena": {
+    "operations": {},
+    "shapes": {}
+  },
+  "Bedrock Runtime": {
+    "operations": {
+      "ApplyGuardrail": "ApplyGuardrailRequest",
+      "Converse": "ConverseRequest",
+      "ConverseStream": "ConverseStreamRequest",
+      "CountTokens": "CountTokensRequest"
+    },
+    "shapes": {
+      "ApplyGuardrailRequest": {
+        "content": "list:#GuardrailContentBlock"
+      },
+      "AudioBlock": {
+        "source": "#AudioSource"
+      },
+      "AudioSource": {
+        "bytes": "blob"
+      },
+      "ContentBlock": {
+        "audio": "#AudioBlock",
+        "document": "#DocumentBlock",
+        "guardContent": "#GuardrailConverseContentBlock",
+        "image": "#ImageBlock",
+        "reasoningContent": "#ReasoningContentBlock",
+        "toolResult": "#ToolResultBlock",
+        "video": "#VideoBlock"
+      },
+      "ConverseRequest": {
+        "messages": "list:#Message",
+        "system": "list:#SystemContentBlock"
+      },
+      "ConverseStreamRequest": {
+        "messages": "list:#Message",
+        "system": "list:#SystemContentBlock"
+      },
+      "ConverseTokensRequest": {
+        "messages": "list:#Message",
+        "system": "list:#SystemContentBlock"
+      },
+      "CountTokensInput": {
+        "converse": "#ConverseTokensRequest",
+        "invokeModel": "#InvokeModelTokensRequest"
+      },
+      "CountTokensRequest": {
+        "input": "#CountTokensInput"
+      },
+      "DocumentBlock": {
+        "source": "#DocumentSource"
+      },
+      "DocumentSource": {
+        "bytes": "blob"
+      },
+      "GuardrailContentBlock": {
+        "image": "#GuardrailImageBlock"
+      },
+      "GuardrailConverseContentBlock": {
+        "image": "#GuardrailConverseImageBlock"
+      },
+      "GuardrailConverseImageBlock": {
+        "source": "#GuardrailConverseImageSource"
+      },
+      "GuardrailConverseImageSource": {
+        "bytes": "blob"
+      },
+      "GuardrailImageBlock": {
+        "source": "#GuardrailImageSource"
+      },
+      "GuardrailImageSource": {
+        "bytes": "blob"
+      },
+      "ImageBlock": {
+        "source": "#ImageSource"
+      },
+      "ImageSource": {
+        "bytes": "blob"
+      },
+      "InvokeModelTokensRequest": {
+        "body": "blob"
+      },
+      "Message": {
+        "content": "list:#ContentBlock"
+      },
+      "ReasoningContentBlock": {
+        "redactedContent": "blob"
+      },
+      "SystemContentBlock": {
+        "guardContent": "#GuardrailConverseContentBlock"
+      },
+      "ToolResultBlock": {
+        "content": "list:#ToolResultContentBlock"
+      },
+      "ToolResultContentBlock": {
+        "document": "#DocumentBlock",
+        "image": "#ImageBlock",
+        "video": "#VideoBlock"
+      },
+      "VideoBlock": {
+        "source": "#VideoSource"
+      },
+      "VideoSource": {
+        "bytes": "blob"
+      }
+    }
+  },
+  "CloudWatch": {
+    "operations": {
+      "DescribeAlarmHistory": "DescribeAlarmHistoryInput",
+      "GetInsightRuleReport": "GetInsightRuleReportInput",
+      "GetMetricData": "GetMetricDataInput",
+      "GetMetricStatistics": "GetMetricStatisticsInput",
+      "PutAlarmMuteRule": "PutAlarmMuteRuleInput",
+      "PutAnomalyDetector": "PutAnomalyDetectorInput",
+      "PutMetricData": "PutMetricDataInput"
+    },
+    "shapes": {
+      "AnomalyDetectorConfiguration": {
+        "ExcludedTimeRanges": "list:#Range"
+      },
+      "DescribeAlarmHistoryInput": {
+        "EndDate": "timestamp",
+        "StartDate": "timestamp"
+      },
+      "EntityMetricData": {
+        "MetricData": "list:#MetricDatum"
+      },
+      "GetInsightRuleReportInput": {
+        "EndTime": "timestamp",
+        "StartTime": "timestamp"
+      },
+      "GetMetricDataInput": {
+        "EndTime": "timestamp",
+        "StartTime": "timestamp"
+      },
+      "GetMetricStatisticsInput": {
+        "EndTime": "timestamp",
+        "StartTime": "timestamp"
+      },
+      "MetricDatum": {
+        "Timestamp": "timestamp"
+      },
+      "PutAlarmMuteRuleInput": {
+        "ExpireDate": "timestamp",
+        "StartDate": "timestamp"
+      },
+      "PutAnomalyDetectorInput": {
+        "Configuration": "#AnomalyDetectorConfiguration"
+      },
+      "PutMetricDataInput": {
+        "EntityMetricData": "list:#EntityMetricData",
+        "MetricData": "list:#MetricDatum"
+      },
+      "Range": {
+        "EndTime": "timestamp",
+        "StartTime": "timestamp"
+      }
+    }
+  },
+  "CloudWatch Logs": {
+    "operations": {},
+    "shapes": {}
+  },
+  "Cognito Identity Provider": {
+    "operations": {
+      "CreateManagedLoginBranding": "CreateManagedLoginBrandingRequest",
+      "SetUICustomization": "SetUICustomizationRequest",
+      "UpdateManagedLoginBranding": "UpdateManagedLoginBrandingRequest"
+    },
+    "shapes": {
+      "AssetType": {
+        "Bytes": "blob"
+      },
+      "CreateManagedLoginBrandingRequest": {
+        "Assets": "list:#AssetType"
+      },
+      "SetUICustomizationRequest": {
+        "ImageFile": "blob"
+      },
+      "UpdateManagedLoginBrandingRequest": {
+        "Assets": "list:#AssetType"
+      }
+    }
+  },
+  "DynamoDB": {
+    "operations": {
+      "BatchExecuteStatement": "BatchExecuteStatementInput",
+      "BatchGetItem": "BatchGetItemInput",
+      "BatchWriteItem": "BatchWriteItemInput",
+      "DeleteItem": "DeleteItemInput",
+      "ExecuteStatement": "ExecuteStatementInput",
+      "ExecuteTransaction": "ExecuteTransactionInput",
+      "ExportTableToPointInTime": "ExportTableToPointInTimeInput",
+      "GetItem": "GetItemInput",
+      "ListBackups": "ListBackupsInput",
+      "PutItem": "PutItemInput",
+      "Query": "QueryInput",
+      "RestoreTableToPointInTime": "RestoreTableToPointInTimeInput",
+      "Scan": "ScanInput",
+      "SearchVectors": "SearchVectorsInput",
+      "TransactGetItems": "TransactGetItemsInput",
+      "TransactWriteItems": "TransactWriteItemsInput",
+      "UpdateItem": "UpdateItemInput"
+    },
+    "shapes": {
+      "AttributeValue": {
+        "B": "blob",
+        "BS": "list:blob",
+        "L": "list:#AttributeValue",
+        "M": "map:#AttributeValue"
+      },
+      "AttributeValueUpdate": {
+        "Value": "#AttributeValue"
+      },
+      "BatchExecuteStatementInput": {
+        "Statements": "list:#BatchStatementRequest"
+      },
+      "BatchGetItemInput": {
+        "RequestItems": "map:#KeysAndAttributes"
+      },
+      "BatchStatementRequest": {
+        "Parameters": "list:#AttributeValue"
+      },
+      "BatchWriteItemInput": {
+        "RequestItems": "map:list:#WriteRequest"
+      },
+      "Condition": {
+        "AttributeValueList": "list:#AttributeValue"
+      },
+      "ConditionCheck": {
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Key": "map:#AttributeValue"
+      },
+      "Delete": {
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Key": "map:#AttributeValue"
+      },
+      "DeleteItemInput": {
+        "Expected": "map:#ExpectedAttributeValue",
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Key": "map:#AttributeValue"
+      },
+      "DeleteRequest": {
+        "Key": "map:#AttributeValue"
+      },
+      "ExecuteStatementInput": {
+        "Parameters": "list:#AttributeValue"
+      },
+      "ExecuteTransactionInput": {
+        "TransactStatements": "list:#ParameterizedStatement"
+      },
+      "ExpectedAttributeValue": {
+        "AttributeValueList": "list:#AttributeValue",
+        "Value": "#AttributeValue"
+      },
+      "ExportTableToPointInTimeInput": {
+        "ExportTime": "timestamp",
+        "FilterSpecification": "#FilterSpecification",
+        "IncrementalExportSpecification": "#IncrementalExportSpecification"
+      },
+      "FilterSpecification": {
+        "ExpressionAttributeValues": "map:#AttributeValue"
+      },
+      "Get": {
+        "Key": "map:#AttributeValue"
+      },
+      "GetItemInput": {
+        "Key": "map:#AttributeValue"
+      },
+      "IncrementalExportSpecification": {
+        "ExportFromTime": "timestamp",
+        "ExportToTime": "timestamp"
+      },
+      "KeysAndAttributes": {
+        "Keys": "list:map:#AttributeValue"
+      },
+      "ListBackupsInput": {
+        "TimeRangeLowerBound": "timestamp",
+        "TimeRangeUpperBound": "timestamp"
+      },
+      "ParameterizedStatement": {
+        "Parameters": "list:#AttributeValue"
+      },
+      "Put": {
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Item": "map:#AttributeValue"
+      },
+      "PutItemInput": {
+        "Expected": "map:#ExpectedAttributeValue",
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Item": "map:#AttributeValue"
+      },
+      "PutRequest": {
+        "Item": "map:#AttributeValue"
+      },
+      "QueryInput": {
+        "ExclusiveStartKey": "map:#AttributeValue",
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "KeyConditions": "map:#Condition",
+        "QueryFilter": "map:#Condition"
+      },
+      "RestoreTableToPointInTimeInput": {
+        "RestoreDateTime": "timestamp"
+      },
+      "ScanInput": {
+        "ExclusiveStartKey": "map:#AttributeValue",
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "ScanFilter": "map:#Condition"
+      },
+      "SearchVectorsInput": {
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "SearchVector": "list:#AttributeValue"
+      },
+      "TransactGetItem": {
+        "Get": "#Get"
+      },
+      "TransactGetItemsInput": {
+        "TransactItems": "list:#TransactGetItem"
+      },
+      "TransactWriteItem": {
+        "ConditionCheck": "#ConditionCheck",
+        "Delete": "#Delete",
+        "Put": "#Put",
+        "Update": "#Update"
+      },
+      "TransactWriteItemsInput": {
+        "TransactItems": "list:#TransactWriteItem"
+      },
+      "Update": {
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Key": "map:#AttributeValue"
+      },
+      "UpdateItemInput": {
+        "AttributeUpdates": "map:#AttributeValueUpdate",
+        "Expected": "map:#ExpectedAttributeValue",
+        "ExpressionAttributeValues": "map:#AttributeValue",
+        "Key": "map:#AttributeValue"
+      },
+      "WriteRequest": {
+        "DeleteRequest": "#DeleteRequest",
+        "PutRequest": "#PutRequest"
+      }
+    }
+  },
+  "DynamoDB Streams": {
+    "operations": {
+      "GetShardIterator": "GetShardIteratorInput"
+    },
+    "shapes": {
+      "GetShardIteratorInput": {
+        "Timestamp": "timestamp"
+      }
+    }
+  },
+  "ECS": {
+    "operations": {
+      "ListDaemonDeployments": "ListDaemonDeploymentsRequest",
+      "ListServiceDeployments": "ListServiceDeploymentsRequest",
+      "SubmitTaskStateChange": "SubmitTaskStateChangeRequest"
+    },
+    "shapes": {
+      "CreatedAt": {
+        "after": "timestamp",
+        "before": "timestamp"
+      },
+      "ListDaemonDeploymentsRequest": {
+        "createdAt": "#CreatedAt"
+      },
+      "ListServiceDeploymentsRequest": {
+        "createdAt": "#CreatedAt"
+      },
+      "SubmitTaskStateChangeRequest": {
+        "executionStoppedAt": "timestamp",
+        "pullStartedAt": "timestamp",
+        "pullStoppedAt": "timestamp"
+      }
+    }
+  },
+  "EventBridge": {
+    "operations": {
+      "PutEvents": "PutEventsRequest",
+      "PutPartnerEvents": "PutPartnerEventsRequest",
+      "StartReplay": "StartReplayRequest"
+    },
+    "shapes": {
+      "PutEventsRequest": {
+        "Entries": "list:#PutEventsRequestEntry"
+      },
+      "PutEventsRequestEntry": {
+        "Time": "timestamp"
+      },
+      "PutPartnerEventsRequest": {
+        "Entries": "list:#PutPartnerEventsRequestEntry"
+      },
+      "PutPartnerEventsRequestEntry": {
+        "Time": "timestamp"
+      },
+      "StartReplayRequest": {
+        "EventEndTime": "timestamp",
+        "EventStartTime": "timestamp"
+      }
+    }
+  },
+  "Firehose": {
+    "operations": {
+      "CreateDeliveryStream": "CreateDeliveryStreamInput",
+      "PutRecord": "PutRecordInput",
+      "PutRecordBatch": "PutRecordBatchInput"
+    },
+    "shapes": {
+      "CreateDeliveryStreamInput": {
+        "MSKSourceConfiguration": "#MSKSourceConfiguration"
+      },
+      "MSKSourceConfiguration": {
+        "ReadFromTimestamp": "timestamp"
+      },
+      "PutRecordBatchInput": {
+        "Records": "list:#Record"
+      },
+      "PutRecordInput": {
+        "Record": "#Record"
+      },
+      "Record": {
+        "Data": "blob"
+      }
+    }
+  },
+  "Glue": {
+    "operations": {
+      "BatchCreatePartition": "BatchCreatePartitionRequest",
+      "BatchGetPartition": "BatchGetPartitionRequest",
+      "BatchUpdatePartition": "BatchUpdatePartitionRequest",
+      "CreateJob": "CreateJobRequest",
+      "CreatePartition": "CreatePartitionRequest",
+      "CreateTable": "CreateTableRequest",
+      "GetMLTaskRuns": "GetMLTaskRunsRequest",
+      "GetMLTransforms": "GetMLTransformsRequest",
+      "GetPartitions": "GetPartitionsRequest",
+      "GetTable": "GetTableRequest",
+      "GetTables": "GetTablesRequest",
+      "GetUnfilteredPartitionMetadata": "GetUnfilteredPartitionMetadataRequest",
+      "GetUnfilteredPartitionsMetadata": "GetUnfilteredPartitionsMetadataRequest",
+      "GetUnfilteredTableMetadata": "GetUnfilteredTableMetadataRequest",
+      "ListDataQualityResults": "ListDataQualityResultsRequest",
+      "ListDataQualityResultsV2": "ListDataQualityResultsV2Request",
+      "ListDataQualityRuleRecommendationRuns": "ListDataQualityRuleRecommendationRunsRequest",
+      "ListDataQualityRulesetEvaluationRuns": "ListDataQualityRulesetEvaluationRunsRequest",
+      "ListDataQualityRulesets": "ListDataQualityRulesetsRequest",
+      "ListDataQualityStatisticAnnotations": "ListDataQualityStatisticAnnotationsRequest",
+      "ListDataQualityStatistics": "ListDataQualityStatisticsRequest",
+      "ListMLTransforms": "ListMLTransformsRequest",
+      "PublishDataQualityResultV2": "PublishDataQualityResultV2Request",
+      "UpdateColumnStatisticsForPartition": "UpdateColumnStatisticsForPartitionRequest",
+      "UpdateColumnStatisticsForTable": "UpdateColumnStatisticsForTableRequest",
+      "UpdateJob": "UpdateJobRequest",
+      "UpdatePartition": "UpdatePartitionRequest",
+      "UpdateTable": "UpdateTableRequest"
+    },
+    "shapes": {
+      "BatchCreatePartitionRequest": {
+        "PartitionInputList": "list:#PartitionInput"
+      },
+      "BatchGetPartitionRequest": {
+        "QuerySessionContext": "#QuerySessionContext"
+      },
+      "BatchUpdatePartitionRequest": {
+        "Entries": "list:#BatchUpdatePartitionRequestEntry"
+      },
+      "BatchUpdatePartitionRequestEntry": {
+        "PartitionInput": "#PartitionInput"
+      },
+      "CatalogKafkaSource": {
+        "StreamingOptions": "#KafkaStreamingSourceOptions"
+      },
+      "CatalogKinesisSource": {
+        "StreamingOptions": "#KinesisStreamingSourceOptions"
+      },
+      "CodeGenConfigurationNode": {
+        "CatalogKafkaSource": "#CatalogKafkaSource",
+        "CatalogKinesisSource": "#CatalogKinesisSource",
+        "DirectKafkaSource": "#DirectKafkaSource",
+        "DirectKinesisSource": "#DirectKinesisSource"
+      },
+      "ColumnStatistics": {
+        "AnalyzedTime": "timestamp",
+        "StatisticsData": "#ColumnStatisticsData"
+      },
+      "ColumnStatisticsData": {
+        "DateColumnStatisticsData": "#DateColumnStatisticsData",
+        "DecimalColumnStatisticsData": "#DecimalColumnStatisticsData"
+      },
+      "CreateJobRequest": {
+        "CodeGenConfigurationNodes": "map:#CodeGenConfigurationNode"
+      },
+      "CreatePartitionRequest": {
+        "PartitionInput": "#PartitionInput"
+      },
+      "CreateTableRequest": {
+        "TableInput": "#TableInput"
+      },
+      "DataQualityResultFilterCriteria": {
+        "StartedAfter": "timestamp",
+        "StartedBefore": "timestamp"
+      },
+      "DataQualityResultsV2FilterCriteria": {
+        "PublishedAfter": "timestamp",
+        "PublishedBefore": "timestamp"
+      },
+      "DataQualityRuleRecommendationRunFilter": {
+        "StartedAfter": "timestamp",
+        "StartedBefore": "timestamp"
+      },
+      "DataQualityRulesetEvaluationRunFilter": {
+        "StartedAfter": "timestamp",
+        "StartedBefore": "timestamp"
+      },
+      "DataQualityRulesetFilterCriteria": {
+        "CreatedAfter": "timestamp",
+        "CreatedBefore": "timestamp",
+        "LastModifiedAfter": "timestamp",
+        "LastModifiedBefore": "timestamp"
+      },
+      "DateColumnStatisticsData": {
+        "MaximumValue": "timestamp",
+        "MinimumValue": "timestamp"
+      },
+      "DecimalColumnStatisticsData": {
+        "MaximumValue": "#DecimalNumber",
+        "MinimumValue": "#DecimalNumber"
+      },
+      "DecimalNumber": {
+        "UnscaledValue": "blob"
+      },
+      "DirectKafkaSource": {
+        "StreamingOptions": "#KafkaStreamingSourceOptions"
+      },
+      "DirectKinesisSource": {
+        "StreamingOptions": "#KinesisStreamingSourceOptions"
+      },
+      "GetMLTaskRunsRequest": {
+        "Filter": "#TaskRunFilterCriteria"
+      },
+      "GetMLTransformsRequest": {
+        "Filter": "#TransformFilterCriteria"
+      },
+      "GetPartitionsRequest": {
+        "QueryAsOfTime": "timestamp"
+      },
+      "GetTableRequest": {
+        "QueryAsOfTime": "timestamp"
+      },
+      "GetTablesRequest": {
+        "QueryAsOfTime": "timestamp"
+      },
+      "GetUnfilteredPartitionMetadataRequest": {
+        "QuerySessionContext": "#QuerySessionContext"
+      },
+      "GetUnfilteredPartitionsMetadataRequest": {
+        "QuerySessionContext": "#QuerySessionContext"
+      },
+      "GetUnfilteredTableMetadataRequest": {
+        "QuerySessionContext": "#QuerySessionContext"
+      },
+      "JobUpdate": {
+        "CodeGenConfigurationNodes": "map:#CodeGenConfigurationNode"
+      },
+      "KafkaStreamingSourceOptions": {
+        "StartingTimestamp": "timestamp"
+      },
+      "KinesisStreamingSourceOptions": {
+        "StartingTimestamp": "timestamp"
+      },
+      "ListDataQualityResultsRequest": {
+        "Filter": "#DataQualityResultFilterCriteria"
+      },
+      "ListDataQualityResultsV2Request": {
+        "Filter": "#DataQualityResultsV2FilterCriteria"
+      },
+      "ListDataQualityRuleRecommendationRunsRequest": {
+        "Filter": "#DataQualityRuleRecommendationRunFilter"
+      },
+      "ListDataQualityRulesetEvaluationRunsRequest": {
+        "Filter": "#DataQualityRulesetEvaluationRunFilter"
+      },
+      "ListDataQualityRulesetsRequest": {
+        "Filter": "#DataQualityRulesetFilterCriteria"
+      },
+      "ListDataQualityStatisticAnnotationsRequest": {
+        "TimestampFilter": "#TimestampFilter"
+      },
+      "ListDataQualityStatisticsRequest": {
+        "TimestampFilter": "#TimestampFilter"
+      },
+      "ListMLTransformsRequest": {
+        "Filter": "#TransformFilterCriteria"
+      },
+      "PartitionInput": {
+        "LastAccessTime": "timestamp",
+        "LastAnalyzedTime": "timestamp"
+      },
+      "PublishDataQualityResultV2Request": {
+        "ExecutionCompletedOn": "timestamp",
+        "ExecutionStartedOn": "timestamp",
+        "Statistics": "list:#StatisticSummary"
+      },
+      "QuerySessionContext": {
+        "QueryStartTime": "timestamp"
+      },
+      "StatisticSummary": {
+        "InclusionAnnotation": "#TimestampedInclusionAnnotation",
+        "RecordedOn": "timestamp"
+      },
+      "TableInput": {
+        "LastAccessTime": "timestamp",
+        "LastAnalyzedTime": "timestamp"
+      },
+      "TaskRunFilterCriteria": {
+        "StartedAfter": "timestamp",
+        "StartedBefore": "timestamp"
+      },
+      "TimestampedInclusionAnnotation": {
+        "LastModifiedOn": "timestamp"
+      },
+      "TimestampFilter": {
+        "RecordedAfter": "timestamp",
+        "RecordedBefore": "timestamp"
+      },
+      "TransformFilterCriteria": {
+        "CreatedAfter": "timestamp",
+        "CreatedBefore": "timestamp",
+        "LastModifiedAfter": "timestamp",
+        "LastModifiedBefore": "timestamp"
+      },
+      "UpdateColumnStatisticsForPartitionRequest": {
+        "ColumnStatisticsList": "list:#ColumnStatistics"
+      },
+      "UpdateColumnStatisticsForTableRequest": {
+        "ColumnStatisticsList": "list:#ColumnStatistics"
+      },
+      "UpdateJobRequest": {
+        "JobUpdate": "#JobUpdate"
+      },
+      "UpdatePartitionRequest": {
+        "PartitionInput": "#PartitionInput"
+      },
+      "UpdateTableRequest": {
+        "TableInput": "#TableInput"
+      }
+    }
+  },
+  "KMS": {
+    "operations": {
+      "Decapsulate": "DecapsulateRequest",
+      "Decrypt": "DecryptRequest",
+      "DeriveSharedSecret": "DeriveSharedSecretRequest",
+      "Encrypt": "EncryptRequest",
+      "GenerateDataKey": "GenerateDataKeyRequest",
+      "GenerateDataKeyPair": "GenerateDataKeyPairRequest",
+      "GenerateMac": "GenerateMacRequest",
+      "GenerateRandom": "GenerateRandomRequest",
+      "ImportKeyMaterial": "ImportKeyMaterialRequest",
+      "ReEncrypt": "ReEncryptRequest",
+      "Sign": "SignRequest",
+      "Verify": "VerifyRequest",
+      "VerifyMac": "VerifyMacRequest"
+    },
+    "shapes": {
+      "DecapsulateRequest": {
+        "SharedSecretCiphertextBlob": "blob"
+      },
+      "DecryptRequest": {
+        "CiphertextBlob": "blob",
+        "Recipient": "#RecipientInfo"
+      },
+      "DeriveSharedSecretRequest": {
+        "PublicKey": "blob",
+        "Recipient": "#RecipientInfo"
+      },
+      "EncryptRequest": {
+        "Plaintext": "blob"
+      },
+      "GenerateDataKeyPairRequest": {
+        "Recipient": "#RecipientInfo"
+      },
+      "GenerateDataKeyRequest": {
+        "Recipient": "#RecipientInfo"
+      },
+      "GenerateMacRequest": {
+        "Message": "blob"
+      },
+      "GenerateRandomRequest": {
+        "Recipient": "#RecipientInfo"
+      },
+      "ImportKeyMaterialRequest": {
+        "EncryptedKeyMaterial": "blob",
+        "ImportToken": "blob",
+        "ValidTo": "timestamp"
+      },
+      "RecipientInfo": {
+        "AttestationDocument": "blob"
+      },
+      "ReEncryptRequest": {
+        "CiphertextBlob": "blob"
+      },
+      "SignRequest": {
+        "Message": "blob"
+      },
+      "VerifyMacRequest": {
+        "Mac": "blob",
+        "Message": "blob"
+      },
+      "VerifyRequest": {
+        "Message": "blob",
+        "Signature": "blob"
+      }
+    }
+  },
+  "Kinesis": {
+    "operations": {
+      "GetShardIterator": "GetShardIteratorInput",
+      "ListChannels": "ListChannelsInput",
+      "ListShards": "ListShardsInput",
+      "ListStreamConsumers": "ListStreamConsumersInput",
+      "PutRecord": "PutRecordInput",
+      "PutRecords": "PutRecordsInput",
+      "SubscribeToShard": "SubscribeToShardInput"
+    },
+    "shapes": {
+      "GetShardIteratorInput": {
+        "Timestamp": "timestamp"
+      },
+      "ListChannelsInput": {
+        "StreamFilter": "list:#StreamFilter"
+      },
+      "ListShardsInput": {
+        "ShardFilter": "#ShardFilter",
+        "StreamCreationTimestamp": "timestamp"
+      },
+      "ListStreamConsumersInput": {
+        "StreamCreationTimestamp": "timestamp"
+      },
+      "PutRecordInput": {
+        "Data": "blob"
+      },
+      "PutRecordsInput": {
+        "Records": "list:#PutRecordsRequestEntry"
+      },
+      "PutRecordsRequestEntry": {
+        "Data": "blob"
+      },
+      "ShardFilter": {
+        "Timestamp": "timestamp"
+      },
+      "StartingPosition": {
+        "Timestamp": "timestamp"
+      },
+      "StreamFilter": {
+        "StreamCreationTimestamp": "timestamp"
+      },
+      "SubscribeToShardInput": {
+        "StartingPosition": "#StartingPosition"
+      }
+    }
+  },
+  "Personalize": {
+    "operations": {},
+    "shapes": {}
+  },
+  "Rekognition": {
+    "operations": {
+      "CompareFaces": "CompareFacesRequest",
+      "DetectCustomLabels": "DetectCustomLabelsRequest",
+      "DetectFaces": "DetectFacesRequest",
+      "DetectLabels": "DetectLabelsRequest",
+      "DetectModerationLabels": "DetectModerationLabelsRequest",
+      "DetectProtectiveEquipment": "DetectProtectiveEquipmentRequest",
+      "DetectText": "DetectTextRequest",
+      "IndexFaces": "IndexFacesRequest",
+      "RecognizeCelebrities": "RecognizeCelebritiesRequest",
+      "SearchFacesByImage": "SearchFacesByImageRequest",
+      "SearchUsersByImage": "SearchUsersByImageRequest",
+      "UpdateDatasetEntries": "UpdateDatasetEntriesRequest"
+    },
+    "shapes": {
+      "CompareFacesRequest": {
+        "SourceImage": "#Image",
+        "TargetImage": "#Image"
+      },
+      "DatasetChanges": {
+        "GroundTruth": "blob"
+      },
+      "DetectCustomLabelsRequest": {
+        "Image": "#Image"
+      },
+      "DetectFacesRequest": {
+        "Image": "#Image"
+      },
+      "DetectLabelsRequest": {
+        "Image": "#Image"
+      },
+      "DetectModerationLabelsRequest": {
+        "Image": "#Image"
+      },
+      "DetectProtectiveEquipmentRequest": {
+        "Image": "#Image"
+      },
+      "DetectTextRequest": {
+        "Image": "#Image"
+      },
+      "Image": {
+        "Bytes": "blob"
+      },
+      "IndexFacesRequest": {
+        "Image": "#Image"
+      },
+      "RecognizeCelebritiesRequest": {
+        "Image": "#Image"
+      },
+      "SearchFacesByImageRequest": {
+        "Image": "#Image"
+      },
+      "SearchUsersByImageRequest": {
+        "Image": "#Image"
+      },
+      "UpdateDatasetEntriesRequest": {
+        "Changes": "#DatasetChanges"
+      }
+    }
+  },
+  "SFN": {
+    "operations": {},
+    "shapes": {}
+  },
+  "SQS": {
+    "operations": {
+      "SendMessage": "SendMessageRequest",
+      "SendMessageBatch": "SendMessageBatchRequest"
+    },
+    "shapes": {
+      "MessageAttributeValue": {
+        "BinaryListValues": "list:blob",
+        "BinaryValue": "blob"
+      },
+      "MessageSystemAttributeValue": {
+        "BinaryListValues": "list:blob",
+        "BinaryValue": "blob"
+      },
+      "SendMessageBatchRequest": {
+        "Entries": "list:#SendMessageBatchRequestEntry"
+      },
+      "SendMessageBatchRequestEntry": {
+        "MessageAttributes": "map:#MessageAttributeValue",
+        "MessageSystemAttributes": "map:#MessageSystemAttributeValue"
+      },
+      "SendMessageRequest": {
+        "MessageAttributes": "map:#MessageAttributeValue",
+        "MessageSystemAttributes": "map:#MessageSystemAttributeValue"
+      }
+    }
+  },
+  "SSM": {
+    "operations": {
+      "CreateActivation": "CreateActivationRequest",
+      "CreateOpsItem": "CreateOpsItemRequest",
+      "PutComplianceItems": "PutComplianceItemsRequest",
+      "RegisterTaskWithMaintenanceWindow": "RegisterTaskWithMaintenanceWindowRequest",
+      "StartChangeRequestExecution": "StartChangeRequestExecutionRequest",
+      "UpdateAssociationStatus": "UpdateAssociationStatusRequest",
+      "UpdateMaintenanceWindowTask": "UpdateMaintenanceWindowTaskRequest",
+      "UpdateOpsItem": "UpdateOpsItemRequest"
+    },
+    "shapes": {
+      "AssociationStatus": {
+        "Date": "timestamp"
+      },
+      "ComplianceExecutionSummary": {
+        "ExecutionTime": "timestamp"
+      },
+      "CreateActivationRequest": {
+        "ExpirationDate": "timestamp"
+      },
+      "CreateOpsItemRequest": {
+        "ActualEndTime": "timestamp",
+        "ActualStartTime": "timestamp",
+        "PlannedEndTime": "timestamp",
+        "PlannedStartTime": "timestamp"
+      },
+      "MaintenanceWindowLambdaParameters": {
+        "Payload": "blob"
+      },
+      "MaintenanceWindowTaskInvocationParameters": {
+        "Lambda": "#MaintenanceWindowLambdaParameters"
+      },
+      "PutComplianceItemsRequest": {
+        "ExecutionSummary": "#ComplianceExecutionSummary"
+      },
+      "RegisterTaskWithMaintenanceWindowRequest": {
+        "TaskInvocationParameters": "#MaintenanceWindowTaskInvocationParameters"
+      },
+      "StartChangeRequestExecutionRequest": {
+        "ScheduledEndTime": "timestamp",
+        "ScheduledTime": "timestamp"
+      },
+      "UpdateAssociationStatusRequest": {
+        "AssociationStatus": "#AssociationStatus"
+      },
+      "UpdateMaintenanceWindowTaskRequest": {
+        "TaskInvocationParameters": "#MaintenanceWindowTaskInvocationParameters"
+      },
+      "UpdateOpsItemRequest": {
+        "ActualEndTime": "timestamp",
+        "ActualStartTime": "timestamp",
+        "PlannedEndTime": "timestamp",
+        "PlannedStartTime": "timestamp"
+      }
+    }
+  },
+  "Secrets Manager": {
+    "operations": {
+      "CreateSecret": "CreateSecretRequest",
+      "PutSecretValue": "PutSecretValueRequest",
+      "UpdateSecret": "UpdateSecretRequest"
+    },
+    "shapes": {
+      "CreateSecretRequest": {
+        "SecretBinary": "blob"
+      },
+      "PutSecretValueRequest": {
+        "SecretBinary": "blob"
+      },
+      "UpdateSecretRequest": {
+        "SecretBinary": "blob"
+      }
+    }
+  }
+}

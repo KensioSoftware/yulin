@@ -25,10 +25,18 @@ const invokeHeaderMembers: readonly (readonly [string, string])[] = [
  * model id the path carries.
  */
 export function simSdkWireConverseInput(
+  operationName: string,
   modelId: string,
   request: SimSdkWireRequest,
 ): unknown {
-  return { ...(readSimSdkWireInput(request.body) as object), modelId };
+  return {
+    ...(readSimSdkWireInput(
+      request.body,
+      "Bedrock Runtime",
+      operationName,
+    ) as object),
+    modelId,
+  };
 }
 
 /**

@@ -241,6 +241,7 @@ services report the rejection as a plain `403`.
 The served AWS API supports CLI operations for these services:
 
 - ACM
+- Athena and Glue
 - CloudFormation
 - CloudWatch metrics and CloudWatch Logs
 - Cognito Identity Provider
@@ -248,11 +249,14 @@ The served AWS API supports CLI operations for these services:
 - ECS and Elastic Load Balancing v2
 - EventBridge
 - IAM and STS
+- Kinesis and Firehose
 - KMS and Secrets Manager
 - Lambda
+- Personalize
 - Rekognition
 - S3
 - SNS and SQS
+- Step Functions
 - SSM Parameter Store
 
 Profiles and role assumption work with the endpoint. Client-side features such as JMESPath queries
@@ -267,8 +271,3 @@ and output formatting work with simulated responses.
   `aws iam list-users` reports
   `Simulated IAM does not serve ListUsers`, and `aws lambda list-functions` names the path it
   arrived at.
-- `aws cloudwatch get-metric-statistics` and `aws cloudwatch get-metric-data` fail with
-  `TypeError: time.getTime is not a function`. The JSON protocol carries a timestamp as epoch
-  seconds and the endpoint hands that number to the simulation where a `Date` is expected. Both
-  reads work in process and through SDK interception. `put-metric-data` and `list-metrics` are
-  unaffected.

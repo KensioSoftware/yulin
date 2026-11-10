@@ -740,8 +740,9 @@ credentials inside the sandbox, where it would otherwise fail with `CredentialsP
 A serialized request states which operation it is and carries its input for the services using the
 AWS JSON protocol. Those are the ones that can be read back without the operation's schema:
 
-ACM, CloudWatch Logs, Cognito Identity Provider, DynamoDB, DynamoDB Streams, ECS, EventBridge, KMS,
-Rekognition, Secrets Manager, SQS and SSM.
+ACM, Athena, CloudWatch, CloudWatch Logs, Cognito Identity Provider, DynamoDB, DynamoDB Streams,
+ECS, EventBridge, Firehose, Glue, Kinesis, KMS, Personalize, Rekognition, Secrets Manager, SQS,
+SSM and Step Functions.
 
 S3 states its operation in the method and the path. A bundled S3 client reaches the endpoint that
 already serves S3 to a client given `--endpoint-url`, in either of the two addressing styles an SDK
@@ -760,9 +761,10 @@ A bundled call to any other simulated service, such as SNS, SES or Lambda itself
 error naming the service. Leaving the SDK out of that archive puts it back
 on the module interception path above, which every simulated service is reachable through.
 
-Values the JSON protocols encode travel in their encoded form. A binary attribute written through a
-bundled SDK is stored base64-encoded and decodes correctly when the same path reads it back, where
-an in-process intercepted client reading it sees the encoded string.
+The JSON protocols carry a blob as base64 text and a timestamp as epoch seconds. Each one is decoded
+by the operation's schema before the simulated service sees it. A KMS `Sign` from a bundled SDK signs
+the message bytes, and a binary DynamoDB attribute is stored as bytes. The schemas come from a
+snapshot of the `@aws-sdk/*` client packages (`pnpm run sdk:wire-shapes` refreshes it).
 
 Only service API endpoints are answered as Commands. The endpoint of one resource, such as a Lambda
 Function URL or an API Gateway HTTP API, carries an ordinary HTTP request. Those are routed by
