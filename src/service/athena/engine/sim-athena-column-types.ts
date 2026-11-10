@@ -52,8 +52,8 @@ const realTypes = new Set(["float", "double", "real", "decimal"]);
  * `decimal(10,2)` and `array<struct<a:int>>` both name their kind first, and
  * that is the whole of what either mapping below needs.
  */
-function baseType(glueType: string | undefined): string {
-  const named = /^\s*([\dA-Za-z_]+)/u.exec(glueType ?? "");
+function baseType(glueType = ""): string {
+  const named = /^\s*([\dA-Za-z_]+)/u.exec(glueType);
 
   return (named?.[1] ?? "").toLowerCase();
 }

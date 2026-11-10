@@ -51,15 +51,13 @@ export function simStsCallerUserId(
   if (kind === "assumed-role") {
     // A session ARN names the Role and then the session, and carries no path,
     // which is why these two are read by position.
-    const [roleName, sessionName] = segments;
+    const [roleName, sessionName = ""] = segments;
     const roleId =
       roleName === undefined
         ? undefined
         : iam.roles.get(roleName as SimIamRoleName)?.roleId;
 
-    return roleId === undefined
-      ? {}
-      : { UserId: `${roleId}:${sessionName ?? ""}` };
+    return roleId === undefined ? {} : { UserId: `${roleId}:${sessionName}` };
   }
 
   return {};

@@ -1183,7 +1183,7 @@ const signed = (
   ] as const
 )
   .filter(([, value]) => value !== undefined)
-  .map(([name, value]) => `${name}\n${value ?? ""}\n`)
+  .map(([name, value = ""]) => `${name}\n${value}\n`)
   .join("");
 
 // The certificate comes from the simulator rather than from the network: the

@@ -97,7 +97,8 @@ export class SimWafAssociations implements SimWafProtection {
       .flatMap(([resourceArn, { unsimulatedReason }]) =>
         unsimulatedReason === undefined
           ? []
-          : [{ part: `Association.${resourceArn}`, reason: unsimulatedReason }],
+          : // oxlint-disable-next-line unicorn-js/no-unnecessary-array-flat-map -- Iterator flatMap needs an iterable back, unlike Array flatMap.
+            [{ part: `Association.${resourceArn}`, reason: unsimulatedReason }],
       )
       .toArray();
   }

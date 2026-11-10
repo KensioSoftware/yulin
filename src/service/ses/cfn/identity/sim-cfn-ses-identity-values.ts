@@ -64,6 +64,6 @@ export function tagList(
 
     return key === undefined || tagValue === undefined
       ? []
-      : [{ Key: key, Value: tagValue }];
+      : { Key: key, Value: tagValue };
   });
 }

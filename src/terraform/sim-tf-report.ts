@@ -60,7 +60,7 @@ function skippedResources(
     const reason = settled.refused.get(resource.address);
 
     if (reason !== undefined) {
-      return [{ address: resource.address, type: resource.type, reason }];
+      return { address: resource.address, type: resource.type, reason };
     }
 
     const foldSkip = byAddress.get(resource.address);

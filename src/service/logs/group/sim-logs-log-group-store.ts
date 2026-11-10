@@ -89,10 +89,8 @@ export class SimLogsLogGroupStore {
   /**
    * The log groups whose names start with a prefix, in creation order.
    */
-  withNamePrefix(prefix: string | undefined): readonly SimLogsLogGroup[] {
-    return this.all.filter((group) =>
-      group.logGroupName.startsWith(prefix ?? ""),
-    );
+  withNamePrefix(prefix = ""): readonly SimLogsLogGroup[] {
+    return this.all.filter((group) => group.logGroupName.startsWith(prefix));
   }
 
   /**

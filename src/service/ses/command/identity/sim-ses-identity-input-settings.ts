@@ -55,7 +55,7 @@ function inputTags(
   return (tags ?? []).flatMap((tag) =>
     tag.Key === undefined || tag.Value === undefined
       ? []
-      : [{ Key: tag.Key, Value: tag.Value }],
+      : { Key: tag.Key, Value: tag.Value },
   );
 }
 

@@ -64,13 +64,11 @@ export class SimCdkAssetPublications {
 
         return location === undefined
           ? []
-          : [
-              {
-                sourcePath,
-                packaging: fileAsset.source?.packaging,
-                ...location,
-              },
-            ];
+          : {
+              sourcePath,
+              packaging: fileAsset.source?.packaging,
+              ...location,
+            };
       },
     );
   }

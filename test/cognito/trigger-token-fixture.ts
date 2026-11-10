@@ -55,9 +55,9 @@ export async function signInToTriggerPool(
  * The claims one signed token carries, which is the middle part of the JWT.
  */
 export function triggerTokenClaims(token: string): Record<string, unknown> {
-  const [, claims] = token.split(".", 2);
+  const [, claims = ""] = token.split(".", 2);
 
   return JSON.parse(
-    Buffer.from(claims ?? "", "base64url").toString("utf8"),
+    Buffer.from(claims, "base64url").toString("utf8"),
   ) as Record<string, unknown>;
 }

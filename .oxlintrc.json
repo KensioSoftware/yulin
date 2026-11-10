@@ -743,7 +743,10 @@
         "yulin/no-reused-props": "off",
         // Likewise the assertion helpers the advice points at: an example is
         // read by someone who has not installed @kensio/smartass.
-        "smartass/prefer-specific-assertions": "off"
+        "smartass/prefer-specific-assertions": "off",
+        // Some examples are a consumer's ESLint or Vitest config, which
+        // exports the result of calling `defineConfig`.
+        "unicorn-js/no-top-level-side-effects": "off"
       }
     },
     {

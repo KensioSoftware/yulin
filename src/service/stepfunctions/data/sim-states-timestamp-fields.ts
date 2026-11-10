@@ -41,8 +41,8 @@ export function simStatesTimestampFieldsHold(
  * A timestamp written in UTC carries no offset, and no offset is no hours and
  * no minutes away from it.
  */
-function readField(written: string | undefined): number {
-  return Number(written ?? 0);
+function readField(written = "0"): number {
+  return Number(written);
 }
 
 function isWithin(value: number, least: number, most: number): boolean {

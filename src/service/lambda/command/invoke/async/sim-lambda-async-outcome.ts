@@ -27,11 +27,11 @@ export interface SimLambdaAsyncOutcome {
  * The outcome of an invocation whose handler returned.
  */
 export function simLambdaSuccessOutcome(
-  result: unknown,
+  result: unknown = null,
 ): SimLambdaAsyncOutcome {
   return {
     condition: "Success",
-    responsePayload: result ?? null,
+    responsePayload: result,
     ran: true,
   };
 }

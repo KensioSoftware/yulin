@@ -32,7 +32,9 @@ interface SimCfCacheTtlProperties {
  */
 export function simCfCacheTtlSec(properties: SimCfCacheTtlProperties): number {
   const { response, policy, now } = properties;
-  const control = simCfCacheControl(response.headers.get("cache-control"));
+  const control = simCfCacheControl(
+    response.headers.get("cache-control") ?? "",
+  );
 
   if (control.uncacheable) {
     return policy.minTtlSec;

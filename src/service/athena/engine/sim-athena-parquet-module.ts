@@ -47,8 +47,7 @@ const missingPackage =
 export async function simAthenaParquetReader(
   packageName: string = parquetPackage,
 ): Promise<SimAthenaParquetReader> {
-  const module = await importedReader(packageName);
-  const { parquetReadObjects } = module;
+  const { parquetReadObjects } = await importedReader(packageName);
 
   if (typeof parquetReadObjects !== "function") {
     throw new SimAthenaSetUpError(
