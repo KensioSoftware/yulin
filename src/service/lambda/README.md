@@ -899,17 +899,17 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
-- the concurrency commands, tags on anything but a function, and tags as IAM condition keys
-- `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, the
+- provisioned concurrency, tags on anything but a function, and tags as IAM condition keys
+- `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, the
   settings simulated Lambda does not model on `UpdateFunctionConfiguration` (`Layers`, `VpcConfig`,
-  `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig`, `RevisionId`),
+  `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig`),
   and `MasterRegion` on `ListFunctions`
 - the previous code and settings answering invocations while a change is `InProgress`, a change
   ending `Failed`, and the refusal of a change to a function still `Pending`
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes twenty-four others
+- version and alias operations over the served HTTP API endpoint, which routes twenty-seven others
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

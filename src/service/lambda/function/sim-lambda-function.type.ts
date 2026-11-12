@@ -14,6 +14,7 @@ import type { SimLambdaFunctionState } from "./sim-lambda-function-configuration
 import type { SimLambdaHandler } from "./sim-lambda-handler.type.js";
 import type { SimLambdaFunction } from "./sim-lambda-function.js";
 import type { SimLambdaFunctionTags } from "./tags/sim-lambda-function-tags.js";
+import type { SimLambdaFunctionConcurrency } from "./concurrency/sim-lambda-function-concurrency.js";
 
 export type SimLambdaFunctionName = Brand<string, "SimLambdaFunctionName">;
 
@@ -53,6 +54,11 @@ export interface SimLambdaFunctionProperties {
    * function's own, because tags belong to the function and not to a version.
    */
   tags?: SimLambdaFunctionTags | undefined;
+  /**
+   * The function's reserved concurrency. A version published from a function
+   * is given the function's own, because the reservation covers every version.
+   */
+  concurrency?: SimLambdaFunctionConcurrency | undefined;
   /**
    * The version this is. A function is `$LATEST`, and a version published
    * from one is a copy of it under the number it was published as.

@@ -84,8 +84,14 @@ export class SimLambdaInvocationDispatcher {
     // caller as a request error rather than as a handler failure.
     const event = parseInvokeEvent(command.input.Payload);
 
+    const refusalsBefore = simFunction.concurrency.refusals;
+    const invocation = simFunction.invoke(event);
+    // Read straight after starting: the reservation turns an invocation away
+    // before anything awaits, so a refusal counted here is this invocation's.
+    const refused = simFunction.concurrency.refusals > refusalsBefore;
+
     try {
-      const result = await simFunction.invoke(event);
+      const result = await invocation;
       return {
         $metadata: {},
         StatusCode: 200,
@@ -93,6 +99,13 @@ export class SimLambdaInvocationDispatcher {
         Payload: resultPayload(result),
       };
     } catch (error) {
+      // A throttled invocation never ran, so real Lambda refuses the request
+      // rather than reporting a function error. A throttle the handler met
+      // while invoking another function is that handler's own error.
+      if (refused) {
+        throw error;
+      }
+
       return {
         $metadata: {},
         StatusCode: 200,

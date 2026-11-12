@@ -1,6 +1,7 @@
 import {
   CreateFunctionCommand,
   GetFunctionConfigurationCommand,
+  InvokeCommand,
   LambdaClient,
   PublishVersionCommand,
   TagResourceCommand,
@@ -11,13 +12,17 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertNotEqual,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimSdk } from "../../../../sdk/sim-sdk.js";
-import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
+import {
+  SimLambdaPreconditionFailedException,
+  SimLambdaResourceConflictException,
+} from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../code/lambda-zip-file-input.js";
 
 /**
@@ -137,5 +142,103 @@ describe("Lambda LastUpdateStatus", () => {
 
     // Then it sees LastUpdateStatus reach Successful.
     assertIdentical(waited.state, "SUCCESS");
+  });
+
+  it("moves the RevisionId on with each change", async () => {
+    const simAws = new SimAws();
+    await settledOrders(simAws);
+    const before = await simAws
+      .lambda()
+      .getFunctionConfiguration(
+        new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
+      );
+
+    const changed = await simAws
+      .lambda()
+      .updateFunctionConfiguration(timeoutChange(5));
+    await simAws.backgroundTasksComplete();
+
+    assertNotEqual(changed.RevisionId, before.RevisionId);
+  });
+
+  it("refuses a change naming a RevisionId the function has moved on from", async () => {
+    // Given a revision read before a change was made.
+    const simAws = new SimAws();
+    await settledOrders(simAws);
+    const { RevisionId } = await simAws
+      .lambda()
+      .getFunctionConfiguration(
+        new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
+      );
+    await simAws.lambda().updateFunctionConfiguration(timeoutChange(5));
+    await simAws.backgroundTasksComplete();
+
+    // When a code change and a publish name that stale revision.
+    const updating = await assertThrowsErrorAsync(async () =>
+      simAws.lambda().updateFunctionCode(
+        new UpdateFunctionCodeCommand({
+          FunctionName: "orders",
+          ZipFile: makeLambdaZipFileInput(() => "second"),
+          RevisionId,
+        }),
+      ),
+    );
+    const publishing = await assertThrowsErrorAsync(async () =>
+      simAws
+        .lambda()
+        .publishVersion(
+          new PublishVersionCommand({ FunctionName: "orders", RevisionId }),
+        ),
+    );
+
+    // Then both are refused, as real Lambda refuses them.
+    assertInstanceOf(updating, SimLambdaPreconditionFailedException);
+    assertInstanceOf(publishing, SimLambdaPreconditionFailedException);
+  });
+
+  it("applies a change naming the function's current RevisionId", async () => {
+    const simAws = new SimAws();
+    await settledOrders(simAws);
+    const { RevisionId } = await simAws
+      .lambda()
+      .getFunctionConfiguration(
+        new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
+      );
+
+    const changed = await simAws.lambda().updateFunctionConfiguration(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "orders",
+        Timeout: 9,
+        RevisionId,
+      }),
+    );
+
+    assertIdentical(changed.Timeout, 9);
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("changes nothing for a DryRun code update", async () => {
+    // Given a settled function.
+    const simAws = new SimAws();
+    await settledOrders(simAws);
+
+    // When its code is updated as a dry run.
+    const dryRun = await simAws.lambda().updateFunctionCode(
+      new UpdateFunctionCodeCommand({
+        FunctionName: "orders",
+        ZipFile: makeLambdaZipFileInput(() => "second"),
+        DryRun: true,
+      }),
+    );
+    const invoked = await simAws
+      .lambda()
+      .invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+    // Then no update began, and the function still runs its first code.
+    assertIdentical(dryRun.LastUpdateStatus, "Successful");
+    assertIdentical(
+      Buffer.from(invoked.Payload ?? new Uint8Array()).toString(),
+      '"first"',
+    );
   });
 });

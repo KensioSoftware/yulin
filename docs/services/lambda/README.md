@@ -573,6 +573,67 @@ A changed `Environment`, `MemorySize` or `Handler` reaches the code itself. The 
 
 Each change reports `LastUpdateStatus: "InProgress"` until it has rolled out, and `"Successful"` after. A change rolls out with the simulation's other background work, so `simAws.backgroundTasksComplete()` finishes it, and the SDK's `waitUntilFunctionUpdatedV2` waiter sees it finish. Real Lambda refuses `UpdateFunctionCode`, `UpdateFunctionConfiguration`, `PublishVersion` and `TagResource` with `ResourceConflictException` while a change is in progress, and so does simulated Lambda. A test making two changes in a row settles the simulation between them, as deploy code waits between them on AWS.
 
+A change can name the `RevisionId` the function reported. `UpdateFunctionCode`, `UpdateFunctionConfiguration` and `PublishVersion` then apply only while the function is still at that revision, and refuse with `PreconditionFailedException` once another change has moved it on. `DryRun: true` on `UpdateFunctionCode` checks the request and the caller's permission and changes nothing.
+
+## Reserved concurrency
+
+`PutFunctionConcurrencyCommand` reserves a number of simultaneous invocations for a function, `GetFunctionConcurrencyCommand` reads the reservation and `DeleteFunctionConcurrencyCommand` removes it. `GetFunction` reports it as `Concurrency`. The reservation covers the function and every version of it.
+
+```typescript sim-lambda-reserved-concurrency
+/**
+ * Switching a simulated Lambda function off with a reservation of zero.
+ */
+
+import {
+  CreateFunctionCommand,
+  DeleteFunctionConcurrencyCommand,
+  InvokeCommand,
+  PutFunctionConcurrencyCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+  }),
+);
+
+await lambda.putFunctionConcurrency(
+  new PutFunctionConcurrencyCommand({
+    FunctionName: "orders",
+    ReservedConcurrentExecutions: 0,
+  }),
+);
+
+try {
+  await lambda.invoke(new InvokeCommand({ FunctionName: "orders" }));
+} catch (error) {
+  console.log((error as Error).name); // TooManyRequestsException
+}
+
+await lambda.deleteFunctionConcurrency(
+  new DeleteFunctionConcurrencyCommand({ FunctionName: "orders" }),
+);
+
+const invoked = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "orders" }),
+);
+console.log(invoked.StatusCode); // 200
+
+await simAws.backgroundTasksComplete();
+```
+
+An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. A reservation of zero throttles every invocation, which is how a function is switched off. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
+
+`ReservedConcurrentExecutions` on an `AWS::Lambda::Function` or a SAM function makes the same reservation once the function exists. CDK writes it for `reservedConcurrentExecutions`.
+
 ## Listing the functions
 
 `ListFunctionsCommand` reports every function in the Account and Region, each described as `GetFunction` describes it. `FunctionVersion: "ALL"` adds each function's published versions to the listing.
@@ -3707,8 +3768,8 @@ records age before anything reads them gets back the interval it let pass. A bat
 threw is counted too, because the retry leaves the function further behind rather than caught up. A
 queue mapping publishes none of it, and neither does a direct invocation.
 
-`Throttles` and `ConcurrentExecutions` are absent. Both count what a concurrency limit turned away,
-and this simulation applies none.
+`Throttles` counts an invocation a reserved concurrency limit turned away. `ConcurrentExecutions` is
+absent.
 
 A function built outside a `SimAws` instance has no simulated CloudWatch to publish into. It runs and
 counts nothing.
@@ -4501,6 +4562,11 @@ Sim Lambda currently supports:
   `Timeout`, `MemorySize` and `Environment` a function runs with
 - `LastUpdateStatus`, reporting a code or settings change `InProgress` until it has rolled out, and
   refusing another change, a `PublishVersion` or a `TagResource` until then
+- `RevisionId` on a function's configuration, and as a precondition on `UpdateFunctionCode`,
+  `UpdateFunctionConfiguration` and `PublishVersion`, and `DryRun` on `UpdateFunctionCode`
+- `PutFunctionConcurrencyCommand`, `GetFunctionConcurrencyCommand` and
+  `DeleteFunctionConcurrencyCommand`, throttling an invocation beyond the reservation, and
+  `ReservedConcurrentExecutions` on a template function
 - `GetFunctionConfigurationCommand`, reading a function's or a version's configuration alone
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`, paged by `Marker` and `MaxItems` like the other listings
@@ -4594,26 +4660,30 @@ Sim Lambda currently supports:
 Current documented limitations:
 
 - The function, invoke, permission, version, alias, Function URL config, event invoke config,
-  event source mapping and tagging commands are supported. The concurrency commands
-  (`PutFunctionConcurrency`, `GetFunctionConcurrency` and the provisioned concurrency ones) are
-  absent so far.
+  event source mapping, tagging and reserved concurrency commands are supported. The provisioned
+  concurrency commands and `GetAccountSettings` are absent so far.
+- Reserved concurrency is the only concurrency limit applied. A function with none reserved scales
+  without limit, where real Lambda stops at the account's unreserved concurrency. Only a
+  synchronous `Invoke` answers a throttle with `TooManyRequestsException`. Every other path treats
+  a throttle as a failed invocation, so an asynchronous one counts it against
+  `MaximumRetryAttempts`, where real Lambda keeps retrying a throttled event for up to six hours.
 - Tags are kept on functions alone. Event source mappings and code signing configs take none, and
   `Tags` on `CreateEventSourceMapping` is refused. Tags are not available as IAM condition keys
   (`aws:ResourceTag/...`, `aws:RequestTag/...` and `aws:TagKeys`), so attribute-based access
   control on a function is not simulated. CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
-- `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
-  along with `Architectures` and `SourceKMSKeyArn`. `UpdateFunctionConfiguration` takes only the
-  settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
-  `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`. `ListFunctions` leaves out
+- `UpdateFunctionCode` leaves out `Architectures` and `SourceKMSKeyArn`.
+  `UpdateFunctionConfiguration` takes only the settings simulated Lambda models, leaving out
+  `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart` and
+  `LoggingConfig`. A function's `RevisionId` moves on when its code or settings change, and stays
+  where it is for a tag or permission change. `ListFunctions` leaves out
   `MasterRegion`. A listing's `Marker` is an offset into what that request selected, and a marker
   from a different selection is refused.
 - SAM's `EventInvokeConfig` on `AWS::Serverless::Function` configures `$LATEST`, since
   `AutoPublishAlias` is left out. A `Destination` written as an `Fn::If` that can resolve to
   `AWS::NoValue` is passed on as it stands, and no queue or topic is created for the branch naming
   none.
-- Throttling does not drive a retry. A retry follows a handler that threw or ran out of time, and
-  the `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was
-  accepted.
+- The `MaximumEventAgeInSeconds` an event invoke config carries is measured from when the
+  invocation was accepted.
 - Stream mappings support standard SQS and SNS `DestinationConfig.OnFailure` destinations.
   S3 destinations and `OnSuccess` are refused. Destination delivery is attempted once. A delivery
   failure rejects the background task after the discarded records have advanced the checkpoint.
@@ -4644,8 +4714,8 @@ Current documented limitations:
 - A function has at most one Function URL, and qualified (version or alias) Function URLs are left
   out.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
-  alone. The `CodeSha256` and `RevisionId` checks `PublishVersion` makes are left out, along with
-  alias `RoutingConfig` weights and provisioned concurrency. `CodeSha256`, `RuntimePolicy`
+  alone. The `CodeSha256` check `PublishVersion` makes is left out, along with
+  alias `RoutingConfig` weights, the `RevisionId` on `UpdateAlias`, and provisioned concurrency. `CodeSha256`, `RuntimePolicy`
   and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig` and
   `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
   `AutoPublishAlias` is left out.
@@ -4758,7 +4828,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves twenty-four of these operations over HTTP, listed in the
+- `serveSimAws` serves twenty-seven of these operations over HTTP, listed in the
   [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](https://yulinsim.dev/sdk/) instead.

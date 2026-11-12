@@ -15,6 +15,7 @@ import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-functio
 import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
 import { SimLambdaPermissionCommands } from "./command/permission/sim-lambda-permission-commands.js";
 import { SimLambdaTagCommands } from "./command/tag/sim-lambda-tag-commands.js";
+import { SimLambdaConcurrencyCommands } from "./command/concurrency/sim-lambda-concurrency-commands.js";
 import { SimLambdaVersionCommands } from "./command/version/sim-lambda-version-commands.js";
 import { SimLambdaEventSourcePollers } from "./event-source/sim-lambda-event-source-pollers.js";
 import { SimLambdaNoEventSourceQueues } from "./event-source/queue/sim-lambda-no-event-source-queues.js";
@@ -126,6 +127,7 @@ export class SimLambdaCommands {
   public readonly eventSourceMappings: SimLambdaEventSourceMappingCommands;
   public readonly eventInvokeConfigs: SimLambdaEventInvokeConfigCommands;
   public readonly tags: SimLambdaTagCommands;
+  public readonly concurrency: SimLambdaConcurrencyCommands;
 
   constructor(properties: SimLambdaCommandsProperties) {
     const {
@@ -184,6 +186,12 @@ export class SimLambdaCommands {
     this.tags = new SimLambdaTagCommands({
       accountRegionScope,
       functions: this.functionLookup,
+      iam,
+      background,
+    });
+    this.concurrency = new SimLambdaConcurrencyCommands({
+      functions: this.functionLookup,
+      functionMap: properties.functions,
       iam,
       background,
     });

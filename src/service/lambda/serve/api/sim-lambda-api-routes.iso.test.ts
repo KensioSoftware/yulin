@@ -160,7 +160,9 @@ describe("Resolving a Lambda operation from a served request", () => {
     assertUndefined(
       command("GET", "/2015-03-31/functions/orders/aliases/live"),
     );
-    assertUndefined(command("GET", "/2019-09-30/functions/orders/concurrency"));
+    assertUndefined(
+      command("GET", "/2019-09-25/functions/orders/event-invoke-config"),
+    );
   });
 
   it("reads the function or the mapping a path names", () => {

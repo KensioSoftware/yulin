@@ -14,11 +14,11 @@ import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-co
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaOutboundHttp } from "../../function/outbound/sim-lambda-outbound-http.js";
 import { simLambdaUnqualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
-import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import { UpdateFunctionCodeAuthorizer } from "./update-function-code-authorizer.js";
 import { requireUpdateFunctionCodeInput } from "./update-function-code-input.js";
+import { simLambdaAppliedCodeUpdate } from "./update-function-code-apply.js";
 import type {
   SimUpdateFunctionCodeCommand,
   SimUpdateFunctionCodeCommandOutput,
@@ -106,7 +106,7 @@ export class UpdateFunctionCodeCommandHandler implements CommandHandler<
     // Checked before the code is resolved as well as when the update begins:
     // real Lambda refuses the request as it arrives, and resolving S3 code
     // awaits long enough for an earlier update to finish meanwhile.
-    simFunction.updates.assertIdle(simFunction.arn);
+    simFunction.updates.assertIdle(simFunction.arn, input.revisionId);
     const code = await this.codeResolver.resolve(input.codeSource, {
       // The function's own handler name and environment stand, because
       // UpdateFunctionCode carries neither. UpdateFunctionConfiguration is
@@ -119,23 +119,15 @@ export class UpdateFunctionCodeCommandHandler implements CommandHandler<
         "in. Set one with UpdateFunctionConfiguration first.",
     });
 
-    simFunction.updates.begin(simFunction.arn, this.background);
-    simFunction.updateCode(code);
-
     return {
       $metadata: {},
-      ...this.publishedOrUpdated(simFunction, input.publish).configuration(),
+      ...simLambdaAppliedCodeUpdate({
+        simFunction,
+        code,
+        input,
+        background: this.background,
+        versions: this.versions,
+      }).configuration(),
     };
-  }
-
-  /**
-   * What the caller is answered with, which is a version of the updated code
-   * where `Publish` asked for one.
-   */
-  private publishedOrUpdated(
-    simFunction: SimLambdaFunction,
-    publish: boolean,
-  ): SimLambdaFunction {
-    return publish ? this.versions.publish(simFunction) : simFunction;
   }
 }

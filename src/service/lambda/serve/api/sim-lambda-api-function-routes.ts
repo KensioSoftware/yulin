@@ -45,6 +45,28 @@ export const simLambdaFunctionApiRoutes: readonly SimRestJsonRoute[] = [
   },
   {
     method: "PUT",
+    path: "/2017-10-31/functions/{FunctionName}/concurrency",
+    commandName: "PutFunctionConcurrencyCommand",
+    input: (input) => ({
+      ...input.json(),
+      FunctionName: input.label("FunctionName"),
+    }),
+  },
+  {
+    method: "GET",
+    path: "/2019-09-30/functions/{FunctionName}/concurrency",
+    commandName: "GetFunctionConcurrencyCommand",
+    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+  },
+  {
+    method: "DELETE",
+    path: "/2017-10-31/functions/{FunctionName}/concurrency",
+    commandName: "DeleteFunctionConcurrencyCommand",
+    status: 204,
+    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+  },
+  {
+    method: "PUT",
     path: "/2015-03-31/functions/{FunctionName}/code",
     commandName: "UpdateFunctionCodeCommand",
     input: updateFunctionCodeInput,

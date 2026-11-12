@@ -31,4 +31,9 @@ export interface SimGetFunctionCommandOutput {
    * request names. Left out for a function with none.
    */
   Tags?: Record<string, string> | undefined;
+  /**
+   * The function's reserved concurrency, which covers every version. Left out
+   * for a function with none reserved.
+   */
+  Concurrency?: { ReservedConcurrentExecutions: number } | undefined;
 }

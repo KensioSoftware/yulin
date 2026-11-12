@@ -1,11 +1,11 @@
 import type { SimCfnBinding } from "../../../cloudformation/bind/sim-cfn-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { simCfnLambdaCodeInput } from "./sim-cfn-lambda-code-input.js";
 import { SimCfnLambdaCreationSkips } from "./sim-cfn-lambda-creation-skips.js";
+import { simCfnLambdaCreatedFunction } from "./sim-cfn-lambda-reserved-concurrency.js";
 import {
   simCfnLambdaCreateFunctionInput,
   SimCfnLambdaFunctionPropertiesParser,
@@ -84,14 +84,10 @@ export class SimCfnLambdaFunctionCreator {
       throw error;
     }
 
-    const simFunction = this.lambda.getSimFunctionByName(
-      functionProperties.functionName,
+    return await simCfnLambdaCreatedFunction(
+      this.lambda,
+      functionProperties,
+      options,
     );
-    assertDefined(
-      simFunction,
-      `Sim Lambda function ${functionProperties.functionName} after CloudFormation creation`,
-    );
-
-    return simFunction;
   }
 }

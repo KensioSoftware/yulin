@@ -53,6 +53,7 @@ export interface SimLambdaFunctionConfiguration {
   Role: string;
   State: SimLambdaFunctionState;
   LastUpdateStatus: "InProgress" | "Successful";
+  RevisionId: string;
   Version: string;
   Timeout: number;
   MemorySize: number;

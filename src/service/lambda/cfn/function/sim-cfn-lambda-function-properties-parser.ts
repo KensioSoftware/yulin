@@ -29,6 +29,7 @@ export interface SimCfnLambdaFunctionProperties {
   readonly environment: SimLambdaFunctionEnvironment | undefined;
   readonly deadLetterConfig: SimLambdaDeadLetterConfigInput | undefined;
   readonly tags: Record<string, string> | undefined;
+  readonly reservedConcurrentExecutions: number | undefined;
 }
 
 /**
@@ -121,6 +122,11 @@ export class SimCfnLambdaFunctionPropertiesParser {
         properties["DeadLetterConfig"],
       ),
       tags: simCfnLambdaTags(properties["Tags"]),
+      reservedConcurrentExecutions: this.propertyParser.optionalNumber(
+        resource,
+        properties["ReservedConcurrentExecutions"],
+        "ReservedConcurrentExecutions",
+      ),
     };
   }
 

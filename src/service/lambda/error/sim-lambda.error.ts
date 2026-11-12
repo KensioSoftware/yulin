@@ -94,3 +94,38 @@ export class SimLambdaResourceInUseException extends SimLambdaError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+interface SimLambdaTooManyRequestsDetail {
+  readonly reason: string;
+}
+
+/**
+ * Simulated Lambda TooManyRequestsException error.
+ *
+ * Real Lambda throttles an invocation this way, with a `Reason` saying which
+ * limit it ran into and a `Type` of `User` for one the account set itself.
+ */
+export class SimLambdaTooManyRequestsException extends SimLambdaError {
+  public override readonly name = "TooManyRequestsException";
+  public readonly Reason: string;
+  public readonly Type = "User";
+
+  constructor(message: string, detail: SimLambdaTooManyRequestsDetail) {
+    super(message, { httpStatusCode: 429 });
+    this.Reason = detail.reason;
+  }
+}
+
+/**
+ * Simulated Lambda PreconditionFailedException error.
+ *
+ * Real Lambda refuses a change naming a `RevisionId` that is no longer the
+ * function's latest this way.
+ */
+export class SimLambdaPreconditionFailedException extends SimLambdaError {
+  public override readonly name = "PreconditionFailedException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 412 });
+  }
+}
