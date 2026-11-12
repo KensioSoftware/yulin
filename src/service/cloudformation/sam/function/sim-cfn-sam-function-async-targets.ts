@@ -47,10 +47,30 @@ export function samAsyncTargetPolicies(
           PolicyName: policyName,
           PolicyDocument: {
             Version: "2012-10-17",
-            Statement: [
-              { Effect: "Allow", Action: action, Resource: target.arn },
-            ],
+            Statement: deliveryStatements(action, target),
           },
         },
       ];
+}
+
+/**
+ * The statements allowing delivery to one target.
+ *
+ * An S3 destination writes objects into the bucket, which `s3:PutObject`
+ * allows on the objects' ARNs, and Lambda also lists the bucket.
+ */
+function deliveryStatements(
+  action: string,
+  target: SamAsyncTarget,
+): SimCfnTemplateValueRecord[] {
+  return target.type === "S3Bucket"
+    ? [
+        { Effect: "Allow", Action: "s3:ListBucket", Resource: target.arn },
+        {
+          Effect: "Allow",
+          Action: action,
+          Resource: { "Fn::Join": ["", [target.arn, "/*"]] },
+        },
+      ]
+    : [{ Effect: "Allow", Action: action, Resource: target.arn }];
 }

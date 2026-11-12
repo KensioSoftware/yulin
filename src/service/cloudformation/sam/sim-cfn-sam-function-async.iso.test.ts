@@ -164,4 +164,70 @@ describe("SAM Serverless Function asynchronous delivery and tags", () => {
     assertIdentical(record.requestContext.condition, "RetriesExhausted");
     assertIdentical(record.requestContext.approximateInvokeCount, 1);
   });
+
+  it("merges Globals Tags with a function's own", async () => {
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rates-stack",
+      template: simCfnSamFunctionTemplateFactory.make({
+        globals: { Tags: { stage: "test", team: "platform" } },
+        functionProperties: { Tags: { team: "payments" } },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    const simFunction = simAws.lambda().getSimFunctionByName("rates");
+    assertNonNullable(simFunction);
+    const listed = await simAws
+      .lambda()
+      .listTags(new ListTagsCommand({ Resource: simFunction.arn }));
+
+    assertObjectEquals(listed.Tags, {
+      "lambda:createdBy": "SAM",
+      stage: "test",
+      team: "payments",
+    });
+  });
+
+  it("keeps a Globals destination when a function states only its retries", async () => {
+    // Given a Globals EventInvokeConfig sending failures to a queue, and a
+    // function overriding only the retries.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rates-stack",
+      template: simCfnSamFunctionTemplateFactory.make({
+        globals: {
+          EventInvokeConfig: {
+            MaximumRetryAttempts: 2,
+            DestinationConfig: { OnFailure: { Type: "SQS" } },
+          },
+        },
+        functionProperties: { EventInvokeConfig: { MaximumRetryAttempts: 0 } },
+      }),
+      bindings: [
+        {
+          logicalId: samFunctionTemplateLogicalId,
+          handler: (): never => {
+            throw new Error("rates handler failed");
+          },
+        },
+      ],
+    });
+    await stack.waitForDeployComplete();
+
+    // When an asynchronous invocation fails.
+    await invokeAndExhaustRetries(simAws);
+
+    // Then the failure reaches the queue after the function's single attempt.
+    const createdQueue = stack.getResource(
+      "RatesEventInvokeConfigOnFailureQueue",
+    )?.simResource;
+    assertInstanceOf(createdQueue, SimSqsQueue);
+    const bodies = await queuedBodies(simAws, createdQueue.url);
+    assertArrayLength(bodies, 1);
+    const record = JSON.parse(bodies[0]) as {
+      requestContext: { approximateInvokeCount: number };
+    };
+    assertIdentical(record.requestContext.approximateInvokeCount, 1);
+  });
 });

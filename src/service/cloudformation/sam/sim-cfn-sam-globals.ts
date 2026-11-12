@@ -1,5 +1,6 @@
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
+import { samMergedMaps } from "./sim-cfn-sam-merged-maps.js";
 import { isSamTemplateRecord } from "./sim-cfn-sam-record.js";
 
 /**
@@ -66,7 +67,8 @@ export function samMergedApiProperties(
  *
  * A property the function states wins outright, apart from the environment
  * variables, which are merged key by key so a function adding one of its own
- * still gets the ones every function is given.
+ * still gets the ones every function is given, and the `Tags`,
+ * `EventInvokeConfig` and `DeadLetterQueue` maps, merged the same way.
  */
 export function samMergedFunctionProperties(
   globals: SimCfnTemplateValueRecord,
@@ -76,6 +78,7 @@ export function samMergedFunctionProperties(
     ...globals,
     ...properties,
     ...mergedEnvironment(globals["Environment"], properties["Environment"]),
+    ...samMergedMaps(globals, properties),
   };
 }
 

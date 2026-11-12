@@ -103,6 +103,10 @@ export class UpdateFunctionCodeCommandHandler implements CommandHandler<
     );
 
     const simFunction = this.functions.require(functionName);
+    // Checked before the code is resolved as well as when the update begins:
+    // real Lambda refuses the request as it arrives, and resolving S3 code
+    // awaits long enough for an earlier update to finish meanwhile.
+    simFunction.updates.assertIdle(simFunction.arn);
     const code = await this.codeResolver.resolve(input.codeSource, {
       // The function's own handler name and environment stand, because
       // UpdateFunctionCode carries neither. UpdateFunctionConfiguration is

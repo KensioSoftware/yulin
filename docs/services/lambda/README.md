@@ -4608,8 +4608,9 @@ Current documented limitations:
   `MasterRegion`. A listing's `Marker` is an offset into what that request selected, and a marker
   from a different selection is refused.
 - SAM's `EventInvokeConfig` on `AWS::Serverless::Function` configures `$LATEST`, since
-  `AutoPublishAlias` is left out. A `Tags` map in `Globals` is replaced by a function's own `Tags`.
-  SAM merges the two maps.
+  `AutoPublishAlias` is left out. A `Destination` written as an `Fn::If` that can resolve to
+  `AWS::NoValue` is passed on as it stands, and no queue or topic is created for the branch naming
+  none.
 - Throttling does not drive a retry. A retry follows a handler that threw or ran out of time, and
   the `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was
   accepted.
