@@ -33,6 +33,14 @@ export type {
   SimGetFunctionConfigurationCommandOutput,
 } from "./get-function-configuration/get-function-configuration.command.js";
 export type {
+  SimDeleteFunctionConcurrencyCommand,
+  SimDeleteFunctionConcurrencyCommandOutput,
+  SimGetFunctionConcurrencyCommand,
+  SimGetFunctionConcurrencyCommandOutput,
+  SimPutFunctionConcurrencyCommand,
+  SimPutFunctionConcurrencyCommandOutput,
+} from "./concurrency/concurrency.command.js";
+export type {
   SimListTagsCommand,
   SimListTagsCommandOutput,
   SimTagResourceCommand,

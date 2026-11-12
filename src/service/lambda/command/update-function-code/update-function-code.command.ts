@@ -18,10 +18,11 @@ export interface SimUpdateFunctionCodeCommand {
  * The code members sit at the top level here, unlike CreateFunction, which
  * nests the same members under `Code`.
  *
- * Real Lambda takes a `RevisionId` and a `DryRun` to update only code the
- * caller has already seen, and `Architectures` and `SourceKMSKeyArn` to
- * describe how the code was built and encrypted. None of those are simulated,
- * so all four are left out rather than accepted and ignored.
+ * `RevisionId` updates only a function still at that revision, and `DryRun`
+ * checks the request and the caller's permission without changing anything.
+ * Real Lambda also takes `Architectures` and `SourceKMSKeyArn` to describe how
+ * the code was built and encrypted. Neither is simulated, so both are left out
+ * rather than accepted and ignored.
  */
 export interface SimUpdateFunctionCodeCommandInput {
   readonly FunctionName?: string | undefined;
@@ -31,6 +32,8 @@ export interface SimUpdateFunctionCodeCommandInput {
   readonly S3ObjectVersion?: string | undefined;
   readonly ImageUri?: string | undefined;
   readonly Publish?: boolean | undefined;
+  readonly RevisionId?: string | undefined;
+  readonly DryRun?: boolean | undefined;
 }
 
 /**

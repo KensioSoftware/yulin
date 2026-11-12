@@ -1,9 +1,9 @@
 import {
   CreateFunctionCommand,
+  GetAccountSettingsCommand,
   DeleteFunctionCommand,
   GetFunctionCommand,
   InvokeCommand,
-  PutFunctionConcurrencyCommand,
   LambdaClient,
   ListFunctionsCommand,
   UpdateFunctionCodeCommand,
@@ -160,15 +160,10 @@ describe("simulated Lambda SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(
-        new PutFunctionConcurrencyCommand({
-          FunctionName: "orders",
-          ReservedConcurrentExecutions: 1,
-        }),
-      );
+      await client.send(new GetAccountSettingsCommand({}));
     });
 
-    assertStringIncludes(error.message, "PutFunctionConcurrencyCommand");
+    assertStringIncludes(error.message, "GetAccountSettingsCommand");
     assertStringIncludes(error.message, "InvokeCommand");
   });
 });

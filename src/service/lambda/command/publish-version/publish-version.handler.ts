@@ -88,7 +88,7 @@ export class PublishVersionCommandHandler implements CommandHandler<
     // Real Lambda refuses to publish a function an update is still being
     // applied to, since the version would copy settings that are not settled.
     const simFunction = this.functions.require(functionName);
-    simFunction.updates.assertIdle(simFunction.arn);
+    simFunction.updates.assertIdle(simFunction.arn, command.input.RevisionId);
 
     const version = this.versions.publish(
       simFunction,

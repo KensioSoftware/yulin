@@ -20,6 +20,7 @@ import type {
 import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import { simLambdaGetFunctionTags } from "./get-function-tags.js";
+import { simLambdaGetFunctionConcurrency } from "../../function/concurrency/sim-lambda-function-concurrency.js";
 import {
   GetFunctionAuthorizer,
   type GetFunctionAuthorizerAction,
@@ -105,6 +106,7 @@ export class GetFunctionCommandHandler implements CommandHandler<
       $metadata: {},
       Configuration: version.configuration(),
       ...simLambdaGetFunctionTags(this.iam, simFunction, options?.caller),
+      ...simLambdaGetFunctionConcurrency(simFunction.concurrency),
     };
   }
 

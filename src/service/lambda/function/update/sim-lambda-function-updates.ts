@@ -1,5 +1,10 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
+import { randomUUID } from "node:crypto";
+
+import {
+  SimLambdaPreconditionFailedException,
+  SimLambdaResourceConflictException,
+} from "../../error/sim-lambda.error.js";
 
 /**
  * The status of the last change made to a function's code or settings.
@@ -25,6 +30,7 @@ export type SimLambdaLastUpdateStatus = "InProgress" | "Successful";
  */
 export class SimLambdaFunctionUpdates {
   #status: SimLambdaLastUpdateStatus = "Successful";
+  #revisionId = randomUUID();
 
   /**
    * The status the function reports.
@@ -34,10 +40,27 @@ export class SimLambdaFunctionUpdates {
   }
 
   /**
-   * Refuse a change to the function while an earlier change is in progress,
-   * the way real Lambda refuses one.
+   * The revision the function is at, which every change moves on. A request
+   * naming a `RevisionId` changes the function only while it is still at that
+   * revision.
    */
-  assertIdle(functionArn: string): void {
+  get revisionId(): string {
+    return this.#revisionId;
+  }
+
+  /**
+   * Refuse a change to the function while an earlier change is in progress,
+   * or when the request names a revision the function has moved on from, the
+   * way real Lambda refuses either.
+   */
+  assertIdle(functionArn: string, revisionId?: string): void {
+    if (revisionId !== undefined && revisionId !== this.#revisionId) {
+      throw new SimLambdaPreconditionFailedException(
+        "The Revision Id provided does not match the latest Revision Id. " +
+          "Call the GetFunction/GetAlias API to retrieve the latest Revision Id",
+      );
+    }
+
     if (this.#status === "InProgress") {
       throw new SimLambdaResourceConflictException(
         "The operation cannot be performed at this time. An update is in " +
@@ -50,9 +73,14 @@ export class SimLambdaFunctionUpdates {
    * Start a change, which settles once the simulation's background work has
    * run.
    */
-  begin(functionArn: string, background: BackgroundScheduler): void {
-    this.assertIdle(functionArn);
+  begin(
+    functionArn: string,
+    background: BackgroundScheduler,
+    revisionId?: string,
+  ): void {
+    this.assertIdle(functionArn, revisionId);
     this.#status = "InProgress";
+    this.#revisionId = randomUUID();
 
     background.schedule(() => {
       this.#status = "Successful";

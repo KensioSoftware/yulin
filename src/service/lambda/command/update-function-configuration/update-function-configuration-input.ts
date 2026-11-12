@@ -14,6 +14,8 @@ import type { SimUpdateFunctionConfigurationCommand } from "./update-function-co
 export interface UpdateFunctionConfigurationInput {
   readonly name: string;
   readonly update: SimLambdaFunctionConfigurationUpdate;
+  /** The revision the function has to be at for the change to apply. */
+  readonly revisionId: string | undefined;
 }
 
 /**
@@ -35,6 +37,7 @@ export function requireUpdateFunctionConfigurationInput(
 
   return {
     name: input.FunctionName,
+    revisionId: input.RevisionId,
     update: {
       roleArn: input.Role,
       handlerName: input.Handler,

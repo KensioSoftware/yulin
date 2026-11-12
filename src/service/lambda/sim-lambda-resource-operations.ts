@@ -3,8 +3,8 @@ import { SimLambdaInspection } from "./sim-lambda-inspection.js";
 import type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
 
 /**
- * The tagging, configuration read and mapping update commands of the
- * simulated Lambda facade.
+ * The tagging, concurrency, configuration read and mapping update commands of
+ * the simulated Lambda facade.
  *
  * They sit here rather than on SimLambda itself because that file grows by one
  * delegating method per simulated operation and is at the length this codebase
@@ -41,6 +41,30 @@ export abstract class SimLambdaResourceOperations extends SimLambdaInspection {
     options?: SimLambdaRequestOptions,
   ): Promise<simLambdaCommands.SimListTagsCommandOutput> {
     return await this.commands.tags.list(command, options);
+  }
+
+  /** Handle a Put Function Concurrency Command from the SDK. */
+  async putFunctionConcurrency(
+    command: simLambdaCommands.SimPutFunctionConcurrencyCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimPutFunctionConcurrencyCommandOutput> {
+    return await this.commands.concurrency.put(command, options);
+  }
+
+  /** Handle a Get Function Concurrency Command from the SDK. */
+  async getFunctionConcurrency(
+    command: simLambdaCommands.SimGetFunctionConcurrencyCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimGetFunctionConcurrencyCommandOutput> {
+    return await this.commands.concurrency.get(command, options);
+  }
+
+  /** Handle a Delete Function Concurrency Command from the SDK. */
+  async deleteFunctionConcurrency(
+    command: simLambdaCommands.SimDeleteFunctionConcurrencyCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimDeleteFunctionConcurrencyCommandOutput> {
+    return await this.commands.concurrency.delete(command, options);
   }
 
   /** Handle an Update Event Source Mapping Command from the SDK. */

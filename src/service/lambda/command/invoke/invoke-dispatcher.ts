@@ -1,3 +1,4 @@
+import { SimLambdaTooManyRequestsException } from "../../error/sim-lambda.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -93,6 +94,12 @@ export class SimLambdaInvocationDispatcher {
         Payload: resultPayload(result),
       };
     } catch (error) {
+      // A throttled invocation never ran, so real Lambda refuses the request
+      // rather than reporting a function error.
+      if (error instanceof SimLambdaTooManyRequestsException) {
+        throw error;
+      }
+
       return {
         $metadata: {},
         StatusCode: 200,

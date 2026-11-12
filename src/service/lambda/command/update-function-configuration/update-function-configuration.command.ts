@@ -21,10 +21,10 @@ export interface SimUpdateFunctionConfigurationCommand {
  * value the function has, and `Environment` replaces the whole variable map
  * rather than merging into it, as on real AWS.
  *
- * Real Lambda also takes `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
- * `EphemeralStorage`, `SnapStart`, `LoggingConfig` and a `RevisionId`
- * precondition. None of those are simulated, so all of them are left out
- * rather than accepted and ignored.
+ * `RevisionId` changes only a function still at that revision. Real Lambda
+ * also takes `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
+ * `EphemeralStorage`, `SnapStart` and `LoggingConfig`. None of those are
+ * simulated, so all of them are left out rather than accepted and ignored.
  */
 export interface SimUpdateFunctionConfigurationCommandInput {
   readonly FunctionName?: string | undefined;
@@ -36,6 +36,7 @@ export interface SimUpdateFunctionConfigurationCommandInput {
   readonly MemorySize?: number | undefined;
   readonly Environment?: SimLambdaFunctionEnvironment | undefined;
   readonly DeadLetterConfig?: SimLambdaDeadLetterConfigInput | undefined;
+  readonly RevisionId?: string | undefined;
 }
 
 /**

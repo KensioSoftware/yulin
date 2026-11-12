@@ -22,6 +22,10 @@ export interface UpdateFunctionCodeInput {
   name: string;
   codeSource: SimLambdaCodeSource;
   publish: boolean;
+  /** The revision the function has to be at for the update to apply. */
+  revisionId: string | undefined;
+  /** Whether to check the request without changing anything. */
+  dryRun: boolean;
 }
 
 /**
@@ -50,5 +54,7 @@ export function requireUpdateFunctionCodeInput(
       updateFunctionCodeNaming,
     ),
     publish: input.Publish ?? false,
+    revisionId: input.RevisionId,
+    dryRun: input.DryRun ?? false,
   };
 }

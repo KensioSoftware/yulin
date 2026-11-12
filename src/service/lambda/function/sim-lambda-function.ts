@@ -21,6 +21,7 @@ import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaFunctionTags } from "./tags/sim-lambda-function-tags.js";
 import { SimLambdaFunctionUpdates } from "./update/sim-lambda-function-updates.js";
+import { SimLambdaFunctionConcurrency } from "./concurrency/sim-lambda-function-concurrency.js";
 import { SimLambdaInvocation } from "./invoke/sim-lambda-invocation.js";
 import { SimLambdaFunctionMetrics } from "../metric/sim-lambda-function-metrics.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
@@ -80,6 +81,8 @@ export class SimLambdaFunction {
   public readonly tags: SimLambdaFunctionTags;
   /** Where the function stands with the changes made to it. */
   public readonly updates = new SimLambdaFunctionUpdates();
+  /** The function's reserved concurrency, shared with its versions. */
+  public readonly concurrency: SimLambdaFunctionConcurrency;
   /** What this function publishes about its own work into `AWS/Lambda`. */
   public readonly metrics: SimLambdaFunctionMetrics;
 
@@ -137,6 +140,8 @@ export class SimLambdaFunction {
       });
     this.deadLetterTargetArn = deadLetterTargetArn;
     this.tags = properties.tags ?? new SimLambdaFunctionTags();
+    this.concurrency =
+      properties.concurrency ?? new SimLambdaFunctionConcurrency();
     this.runAsOwner = runAsOwner;
     this.outboundHttp = outboundHttp;
     this.metrics = new SimLambdaFunctionMetrics({ metrics, clock });
@@ -148,9 +153,7 @@ export class SimLambdaFunction {
     });
   }
 
-  /**
-   * The log group this function's output is recorded to.
-   */
+  /** The log group this function's output is recorded to. */
   get logGroupName(): string {
     return this.logging.logGroupName;
   }
@@ -160,10 +163,7 @@ export class SimLambdaFunction {
     return this.#state;
   }
 
-  /**
-   * Get the ARN for this sim Lambda function, qualified when it is a
-   * published version rather than the function itself.
-   */
+  /** The function's ARN, qualified when this is a published version. */
   get arn(): SimLambdaFunctionArn {
     return simLambdaFunctionArn(
       this.accountRegionScope,
@@ -190,6 +190,7 @@ export class SimLambdaFunction {
       environment: this.environment,
       deadLetterTargetArn: this.deadLetterTargetArn,
       tags: this.tags,
+      concurrency: this.concurrency,
       runAsOwner: this.runAsOwner,
       state: "Active",
       description: description ?? this.description,
@@ -220,17 +221,13 @@ export class SimLambdaFunction {
     this.#code = code;
   }
 
-  /**
-   * Move this sim Lambda function to the Active state.
-   */
+  /** Move this sim Lambda function to the Active state. */
   activate(): Promise<void> {
     this.#state = "Active";
     return Promise.resolve();
   }
 
-  /**
-   * Get the AWS-like function configuration for this sim Lambda function.
-   */
+  /** Get the AWS-like function configuration for this function. */
   configuration(): SimLambdaFunctionConfiguration {
     return simLambdaFunctionConfigurationOf(this);
   }
@@ -263,7 +260,7 @@ export class SimLambdaFunction {
     this.logging.recordFrom(this.#code);
     this.properties.environmentConflicts?.reportReads();
 
-    return await this.metrics.around(String(this.name), async () =>
+    return await this.concurrency.run(this.metrics, this.name, async () =>
       simAwsRunAsContext.run(
         this.runAsOwner,
         { kind: "arn", arn: this.roleArn },

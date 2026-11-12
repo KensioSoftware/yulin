@@ -52,6 +52,22 @@ export class SimLambdaFunctionMetrics {
   }
 
   /**
+   * Count an invocation that was throttled and so never ran, as real Lambda's
+   * `Throttles` counts one.
+   */
+  throttled(functionName: string): void {
+    this.#metrics?.publish([
+      {
+        namespace: simLambdaMetricNamespace,
+        metricName: "Throttles",
+        dimensions: simLambdaFunctionDimensions(functionName),
+        value: 1,
+        unit: "Count",
+      },
+    ]);
+  }
+
+  /**
    * Run one invocation and count how it went.
    *
    * `Invocations` counts every invocation, including one that failed, which is

@@ -19,13 +19,14 @@ export interface SimPublishVersionCommand {
  * published from, so the version keeps the function's own description when
  * none is given.
  *
- * Real Lambda takes a `CodeSha256` and a `RevisionId` here to publish only
- * code the caller has already seen. Neither is simulated, so both are left out
- * rather than accepted and ignored.
+ * `RevisionId` publishes only a function still at that revision. Real Lambda
+ * also takes a `CodeSha256`, which is not simulated, so it is left out rather
+ * than accepted and ignored.
  */
 export interface SimPublishVersionCommandInput {
   readonly FunctionName?: string | undefined;
   readonly Description?: string | undefined;
+  readonly RevisionId?: string | undefined;
 }
 
 /**

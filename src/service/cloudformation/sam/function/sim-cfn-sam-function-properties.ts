@@ -20,6 +20,7 @@ const propertyNames = new Set([
   "FunctionName",
   "Handler",
   "MemorySize",
+  "ReservedConcurrentExecutions",
   "Runtime",
   "Timeout",
 ]);

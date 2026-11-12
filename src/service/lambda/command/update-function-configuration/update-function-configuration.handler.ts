@@ -77,7 +77,8 @@ export class UpdateFunctionConfigurationCommandHandler implements CommandHandler
     command: SimUpdateFunctionConfigurationCommand,
     options?: UpdateFunctionConfigurationCommandHandlerOptions,
   ): Promise<SimUpdateFunctionConfigurationCommandOutput> {
-    const { name, update } = requireUpdateFunctionConfigurationInput(command);
+    const { name, update, revisionId } =
+      requireUpdateFunctionConfigurationInput(command);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
@@ -90,7 +91,7 @@ export class UpdateFunctionConfigurationCommandHandler implements CommandHandler
     );
 
     const simFunction = this.functions.require(functionName);
-    simFunction.updates.begin(simFunction.arn, this.background);
+    simFunction.updates.begin(simFunction.arn, this.background, revisionId);
     simFunction.updateConfiguration(update);
 
     if (update.environmentVariables !== undefined) {
