@@ -575,6 +575,10 @@ Each change reports `LastUpdateStatus: "InProgress"` until it has rolled out, an
 
 A change can name the `RevisionId` the function reported. `UpdateFunctionCode`, `UpdateFunctionConfiguration` and `PublishVersion` then apply only while the function is still at that revision, and refuse with `PreconditionFailedException` once another change has moved it on. `DryRun: true` on `UpdateFunctionCode` checks the request and the caller's permission and changes nothing.
 
+An alias and a resource-based policy each keep a revision of their own. `GetAlias` reports the alias's `RevisionId`, and `UpdateAlias` naming one applies only while the alias is still at it. `GetPolicy` reports the policy's, and `AddPermission` and `RemovePermission` naming one apply only while the policy is still at it. Both refuse with `PreconditionFailedException` otherwise.
+
+A function reports `CodeSha256` and `CodeSize` for the package its code came from. For a zip, whether given as `ZipFile` or loaded from S3, they are the base64 SHA-256 digest and the byte length of the archive, as on AWS. A function backed by an in-process handler reports a digest of the handler's source text and a size of 0. `PublishVersion` naming a `CodeSha256` publishes only while the code still has that digest, and refuses with `InvalidParameterValueException` once the code has been replaced.
+
 ## Reserved concurrency
 
 `PutFunctionConcurrencyCommand` reserves a number of simultaneous invocations for a function, `GetFunctionConcurrencyCommand` reads the reservation and `DeleteFunctionConcurrencyCommand` removes it. `GetFunction` reports it as `Concurrency`. The reservation covers the function and every version of it.
@@ -633,6 +637,8 @@ await simAws.backgroundTasksComplete();
 An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. A reservation of zero throttles every invocation, which is how a function is switched off. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
 
 `ReservedConcurrentExecutions` on an `AWS::Lambda::Function` or a SAM function makes the same reservation once the function exists. CDK writes it for `reservedConcurrentExecutions`.
+
+`GetAccountSettingsCommand` reports the Account's default limits in the Region and what its functions use of them. `UnreservedConcurrentExecutions` is what the reservations leave of the 1000. `AccountUsage` counts the functions, and adds up the `CodeSize` of `$LATEST` and of every published version.
 
 ## Listing the functions
 
@@ -4564,6 +4570,12 @@ Sim Lambda currently supports:
   refusing another change, a `PublishVersion` or a `TagResource` until then
 - `RevisionId` on a function's configuration, and as a precondition on `UpdateFunctionCode`,
   `UpdateFunctionConfiguration` and `PublishVersion`, and `DryRun` on `UpdateFunctionCode`
+- `RevisionId` on an alias and on a resource-based policy, and as a precondition on `UpdateAlias`,
+  `AddPermission` and `RemovePermission`
+- `CodeSha256` and `CodeSize` on a function's configuration, and `CodeSha256` as a precondition on
+  `PublishVersion`
+- `GetAccountSettingsCommand`, reporting the default limits, the unreserved concurrency, the
+  function count and the stored code size
 - `PutFunctionConcurrencyCommand`, `GetFunctionConcurrencyCommand` and
   `DeleteFunctionConcurrencyCommand`, throttling an invocation beyond the reservation, and
   `ReservedConcurrentExecutions` on a template function
@@ -4660,8 +4672,8 @@ Sim Lambda currently supports:
 Current documented limitations:
 
 - The function, invoke, permission, version, alias, Function URL config, event invoke config,
-  event source mapping, tagging and reserved concurrency commands are supported. The provisioned
-  concurrency commands and `GetAccountSettings` are absent so far.
+  event source mapping, tagging, reserved concurrency and account settings commands are supported.
+  The provisioned concurrency commands are absent so far.
 - Reserved concurrency is the only concurrency limit applied. A function with none reserved scales
   without limit, where real Lambda stops at the account's unreserved concurrency. Only a
   synchronous `Invoke` answers a throttle with `TooManyRequestsException`. Every other path treats
@@ -4702,7 +4714,7 @@ Current documented limitations:
   `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
   the grant that was made, and no value is supplied for them, so a statement carrying one never
   matches.
-- `RevisionId` and `EventSourceToken` on the permission commands are left out.
+- `EventSourceToken` on `AddPermission` is left out.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
@@ -4714,11 +4726,16 @@ Current documented limitations:
 - A function has at most one Function URL, and qualified (version or alias) Function URLs are left
   out.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
-  alone. The `CodeSha256` check `PublishVersion` makes is left out, along with
-  alias `RoutingConfig` weights, the `RevisionId` on `UpdateAlias`, and provisioned concurrency. `CodeSha256`, `RuntimePolicy`
-  and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig` and
-  `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
+  alone. Alias `RoutingConfig` weights and provisioned concurrency are left out. `CodeSha256`,
+  `RuntimePolicy` and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig`
+  and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
   `AutoPublishAlias` is left out.
+- `CodeSha256` matches AWS for a zip package alone. A function backed by an in-process handler or a
+  container image reports a digest of the handler's source text or the image URI, where AWS reports
+  one of the package or the image manifest. That is why a template's `CodeSha256` goes unchecked.
+  A digest computed for the real package would never match the one simulated Lambda holds.
+- `PublishVersion` publishes a new version every time it is called. Real Lambda answers with the
+  latest version when nothing has changed since it was published.
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
   CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
   API Gateway integration and authorizer URIs, and `AWS::Lambda::Permission`. The
@@ -4828,7 +4845,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves twenty-seven of these operations over HTTP, listed in the
+- `serveSimAws` serves twenty-eight of these operations over HTTP, listed in the
   [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](https://yulinsim.dev/sdk/) instead.

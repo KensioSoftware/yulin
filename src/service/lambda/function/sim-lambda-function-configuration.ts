@@ -57,6 +57,10 @@ export interface SimLambdaFunctionConfiguration {
   Version: string;
   Timeout: number;
   MemorySize: number;
+  /** The base64 SHA-256 digest of the function's deployment package. */
+  CodeSha256: string;
+  /** The size of the function's deployment package, in bytes. */
+  CodeSize: number;
   Handler?: string | undefined;
   Runtime?: string | undefined;
   Description?: string | undefined;

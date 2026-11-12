@@ -4,8 +4,8 @@ import type * as simLambdaCommands from "../command/sim-lambda-command.types.js"
 import type { SimLambda } from "../sim-lambda.js";
 
 /**
- * The routes for the tagging, concurrency, configuration read and mapping
- * update Commands.
+ * The routes for the tagging, concurrency, account settings, configuration read
+ * and mapping update Commands.
  *
  * They are built here rather than in the router's own constructor, which holds
  * every other Lambda Command and is at the length this codebase allows.
@@ -14,6 +14,14 @@ export function simLambdaResourceRoutes(
   simLambda: SimLambda,
 ): readonly (readonly [string, SimSdkCommandRoute])[] {
   return [
+    [
+      "GetAccountSettingsCommand",
+      async (command, context): Promise<unknown> =>
+        await simLambda.getAccountSettings(
+          command as simLambdaCommands.SimGetAccountSettingsCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
     [
       "GetFunctionConfigurationCommand",
       async (command, context): Promise<unknown> =>

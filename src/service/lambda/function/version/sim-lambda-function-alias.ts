@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+
+import { SimLambdaPreconditionFailedException } from "../../error/sim-lambda.error.js";
 import { SimLambdaFunctionPolicy } from "../policy/sim-lambda-function-policy.js";
 import type { SimLambdaFunctionArn } from "../sim-lambda-function-configuration.js";
 
@@ -10,6 +13,7 @@ export interface SimLambdaFunctionAliasConfiguration {
   Name: string;
   FunctionVersion: string;
   Description?: string | undefined;
+  RevisionId: string;
 }
 
 interface SimLambdaFunctionAliasProperties {
@@ -42,6 +46,7 @@ export class SimLambdaFunctionAlias {
 
   #functionVersion: string;
   #description: string | undefined;
+  #revisionId = randomUUID();
 
   constructor(properties: SimLambdaFunctionAliasProperties) {
     this.arn = properties.arn;
@@ -58,9 +63,23 @@ export class SimLambdaFunctionAlias {
   }
 
   /**
+   * Refuse a change naming a `RevisionId` this alias has moved on from, as
+   * real UpdateAlias refuses one.
+   */
+  assertRevision(revisionId: string | undefined): void {
+    if (revisionId !== undefined && revisionId !== this.#revisionId) {
+      throw new SimLambdaPreconditionFailedException(
+        "The Revision Id provided does not match the latest Revision Id. " +
+          "Call the GetFunction/GetAlias API to retrieve the latest Revision Id",
+      );
+    }
+  }
+
+  /**
    * Point this alias at another version, and describe it again.
    *
    * Omitted values are left as they are, as real UpdateAlias leaves them.
+   * Every update moves the alias on to a new revision.
    */
   update(properties: {
     readonly functionVersion?: string | undefined;
@@ -68,6 +87,7 @@ export class SimLambdaFunctionAlias {
   }): void {
     this.#functionVersion = properties.functionVersion ?? this.#functionVersion;
     this.#description = properties.description ?? this.#description;
+    this.#revisionId = randomUUID();
   }
 
   /**
@@ -79,6 +99,7 @@ export class SimLambdaFunctionAlias {
       Name: this.name,
       FunctionVersion: this.#functionVersion,
       Description: this.#description,
+      RevisionId: this.#revisionId,
     };
   }
 }

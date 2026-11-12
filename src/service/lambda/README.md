@@ -906,10 +906,10 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   and `MasterRegion` on `ListFunctions`
 - the previous code and settings answering invocations while a change is `InProgress`, a change
   ending `Failed`, and the refusal of a change to a function still `Pending`
-- `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
+- `EventSourceToken` on `AddPermission`, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes twenty-seven others
+- version and alias operations over the served HTTP API endpoint, which routes twenty-eight others
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

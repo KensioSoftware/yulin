@@ -91,6 +91,7 @@ export class UpdateAliasCommandHandler implements CommandHandler<
         input.FunctionVersion,
       ),
       description: input.Description,
+      revisionId: input.RevisionId,
     });
 
     return { $metadata: {}, ...alias.configuration() };

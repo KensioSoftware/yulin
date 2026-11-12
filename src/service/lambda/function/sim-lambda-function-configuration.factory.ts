@@ -23,6 +23,8 @@ export function simLambdaFunctionConfigurationOf(
     Version: simFunction.version,
     Timeout: simFunction.timeoutSeconds,
     MemorySize: simFunction.memorySizeMb,
+    CodeSha256: simFunction.codePackage.sha256,
+    CodeSize: simFunction.codePackage.size,
     Handler: simFunction.handlerName,
     Runtime: simFunction.runtimeName,
     Description: simFunction.description,

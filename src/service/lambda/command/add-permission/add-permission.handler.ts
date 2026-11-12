@@ -1,3 +1,4 @@
+import { simLambdaAssertPolicyRevision } from "../../function/policy/sim-lambda-policy-revision.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
@@ -101,6 +102,7 @@ export class AddPermissionCommandHandler implements CommandHandler<
       invokedViaFunctionUrl: input.InvokedViaFunctionUrl,
     });
 
+    simLambdaAssertPolicyRevision(resource.resourcePolicy, input.RevisionId);
     resource.resourcePolicy.add(permission);
 
     return {

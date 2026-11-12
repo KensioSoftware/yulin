@@ -1,3 +1,4 @@
+import { simLambdaAssertPolicyRevision } from "../../function/policy/sim-lambda-policy-revision.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
@@ -79,9 +80,12 @@ export class RemovePermissionCommandHandler implements CommandHandler<
       options?.caller,
     );
 
-    this.versions
-      .requireResource(this.functions.require(functionName), qualifier)
-      .resourcePolicy.remove(input.StatementId);
+    const { resourcePolicy } = this.versions.requireResource(
+      this.functions.require(functionName),
+      qualifier,
+    );
+    simLambdaAssertPolicyRevision(resourcePolicy, input.RevisionId);
+    resourcePolicy.remove(input.StatementId);
 
     return { $metadata: {} };
   }

@@ -15,15 +15,16 @@ export interface SimUpdateAliasCommand {
 /**
  * Minimal structural sim Lambda UpdateAlias input.
  *
- * An omitted member leaves that part of the alias as it is. The
- * `RoutingConfig` and `RevisionId` real Lambda takes here are left out, as
- * neither weighted routing nor revisions are simulated.
+ * An omitted member leaves that part of the alias as it is. A `RevisionId`
+ * updates only an alias still at that revision. The `RoutingConfig` real
+ * Lambda takes here is left out, as weighted routing is not simulated.
  */
 export interface SimUpdateAliasCommandInput {
   readonly FunctionName?: string | undefined;
   readonly Name?: string | undefined;
   readonly FunctionVersion?: string | undefined;
   readonly Description?: string | undefined;
+  readonly RevisionId?: string | undefined;
 }
 
 /**

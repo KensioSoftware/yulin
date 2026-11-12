@@ -12,6 +12,7 @@ import {
 import { simLambdaUnqualifiedFunctionOf } from "../../function/sim-lambda-function-reference.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
+import { simLambdaAssertPublishedCode } from "./publish-version-code-check.js";
 import { VersionAuthorizer } from "../version/version-authorizer.js";
 import type {
   SimPublishVersionCommand,
@@ -89,6 +90,7 @@ export class PublishVersionCommandHandler implements CommandHandler<
     // applied to, since the version would copy settings that are not settled.
     const simFunction = this.functions.require(functionName);
     simFunction.updates.assertIdle(simFunction.arn, command.input.RevisionId);
+    simLambdaAssertPublishedCode(simFunction, command.input.CodeSha256);
 
     const version = this.versions.publish(
       simFunction,

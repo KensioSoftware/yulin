@@ -2,6 +2,10 @@ import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment
 import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import {
+  simLambdaCodePackageNamed,
+  type SimLambdaCodePackage,
+} from "./sim-lambda-code-package.js";
 
 /**
  * The function settings a change to which reaches the code itself.
@@ -32,6 +36,9 @@ export interface SimLambdaExecutableCode {
    * global touched.
    */
   readonly runsInHostScope: boolean;
+
+  /** The deployment package this code came from. */
+  readonly codePackage: SimLambdaCodePackage;
 
   /**
    * Record what this code writes to its standard streams, so an invocation's
@@ -68,7 +75,19 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
    */
   readonly runsInHostScope = true;
 
-  constructor(private readonly handler: SimLambdaHandler) {}
+  /**
+   * The package a handler reference stands for. Its digest is taken over the
+   * handler's source text unless the code came from somewhere with an identity
+   * of its own, such as a container image URI.
+   */
+  readonly codePackage: SimLambdaCodePackage;
+
+  constructor(
+    private readonly handler: SimLambdaHandler,
+    identity = handler.toString(),
+  ) {
+    this.codePackage = simLambdaCodePackageNamed(identity);
+  }
 
   /**
    * Record nothing here.

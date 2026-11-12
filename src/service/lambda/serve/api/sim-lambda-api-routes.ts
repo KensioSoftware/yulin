@@ -7,7 +7,7 @@ import { simLambdaUrlApiRoutes } from "./sim-lambda-api-url-routes.js";
 
 /**
  * The Lambda operations reachable through the served AWS API endpoint, which
- * are twenty-seven of the ones simulated Lambda implements. The version and alias
+ * are twenty-eight of the ones simulated Lambda implements. The version and alias
  * operations are handled as Commands and have no route here yet.
  *
  * No two of these share a method and a path, so the order they are listed in
