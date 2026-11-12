@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -84,10 +85,15 @@ export class ListVersionsByFunctionCommandHandler implements CommandHandler<
     );
 
     const versions = this.versions.all(this.functions.require(functionName));
+    const page = simLambdaPage(versions, command.input, {
+      maximumMaxItems: 10_000,
+      pageLimit: 50,
+    });
 
     return {
       $metadata: {},
-      Versions: versions.map((version) => version.configuration()),
+      Versions: page.items.map((version) => version.configuration()),
+      NextMarker: page.nextMarker,
     };
   }
 }

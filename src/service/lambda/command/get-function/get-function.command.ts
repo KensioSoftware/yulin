@@ -26,4 +26,9 @@ export interface SimGetFunctionCommandInput {
 export interface SimGetFunctionCommandOutput {
   readonly $metadata: SimResponseMetadata;
   Configuration: SimLambdaFunctionConfiguration;
+  /**
+   * The function's tags, which belong to the function whatever version the
+   * request names. Left out for a function with none.
+   */
+  Tags?: Record<string, string> | undefined;
 }

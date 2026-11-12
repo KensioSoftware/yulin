@@ -100,9 +100,53 @@ export interface SimListEventSourceMappingsCommand {
 export interface SimListEventSourceMappingsCommandInput {
   readonly EventSourceArn?: string | undefined;
   readonly FunctionName?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 export interface SimListEventSourceMappingsCommandOutput {
   readonly EventSourceMappings: readonly SimLambdaEventSourceMappingConfiguration[];
+  readonly NextMarker?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim Lambda UpdateEventSourceMapping command.
+ */
+export interface SimUpdateEventSourceMappingCommand {
+  readonly input: SimUpdateEventSourceMappingCommandInput;
+}
+
+/**
+ * Minimal structural sim Lambda UpdateEventSourceMapping input.
+ *
+ * `BatchSize`, `Enabled` and `FilterCriteria` are what an update changes. The
+ * other members are declared so a request carrying one is refused rather than
+ * reported as done.
+ */
+export interface SimUpdateEventSourceMappingCommandInput {
+  readonly UUID?: string | undefined;
+  readonly FunctionName?: string | undefined;
+  readonly Enabled?: boolean | undefined;
+  readonly BatchSize?: number | undefined;
+  readonly FilterCriteria?: SimLambdaFilterCriteriaInput | undefined;
+  readonly MaximumBatchingWindowInSeconds?: number | undefined;
+  readonly DestinationConfig?: object | undefined;
+  readonly MaximumRecordAgeInSeconds?: number | undefined;
+  readonly BisectBatchOnFunctionError?: boolean | undefined;
+  readonly MaximumRetryAttempts?: number | undefined;
+  readonly ParallelizationFactor?: number | undefined;
+  readonly SourceAccessConfigurations?: readonly object[] | undefined;
+  readonly TumblingWindowInSeconds?: number | undefined;
+  readonly FunctionResponseTypes?: readonly string[] | undefined;
+  readonly ScalingConfig?: object | undefined;
+  readonly AmazonManagedKafkaEventSourceConfig?: object | undefined;
+  readonly SelfManagedKafkaEventSourceConfig?: object | undefined;
+  readonly DocumentDBEventSourceConfig?: object | undefined;
+  readonly KMSKeyArn?: string | undefined;
+  readonly MetricsConfig?: object | undefined;
+  readonly ProvisionedPollerConfig?: object | undefined;
+}
+
+export type SimUpdateEventSourceMappingCommandOutput =
+  SimEventSourceMappingCommandOutput;

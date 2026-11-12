@@ -17,6 +17,8 @@ export interface SimListFunctionUrlConfigsCommand {
  */
 export interface SimListFunctionUrlConfigsCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 /**
@@ -25,4 +27,5 @@ export interface SimListFunctionUrlConfigsCommandInput {
 export interface SimListFunctionUrlConfigsCommandOutput {
   readonly $metadata: SimResponseMetadata;
   FunctionUrlConfigs: SimLambdaFunctionUrlConfiguration[];
+  NextMarker?: string | undefined;
 }

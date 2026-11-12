@@ -22,7 +22,20 @@ export const simLambdaFunctionApiRoutes: readonly SimRestJsonRoute[] = [
     method: "GET",
     path: "/2015-03-31/functions",
     commandName: "ListFunctionsCommand",
-    input: (input) => ({ FunctionVersion: input.query("FunctionVersion") }),
+    input: (input) => ({
+      FunctionVersion: input.query("FunctionVersion"),
+      Marker: input.query("Marker"),
+      MaxItems: input.queryNumber("MaxItems"),
+    }),
+  },
+  {
+    method: "GET",
+    path: "/2015-03-31/functions/{FunctionName}/configuration",
+    commandName: "GetFunctionConfigurationCommand",
+    input: (input) => ({
+      FunctionName: input.label("FunctionName"),
+      Qualifier: input.query("Qualifier"),
+    }),
   },
   {
     method: "GET",

@@ -176,7 +176,7 @@ describe("Serving the simulated Lambda control plane", () => {
         {
           method: "POST",
           path: "/2015-03-31/functions/{FunctionName}/code",
-          commandName: "GetFunctionConfigurationCommand",
+          commandName: "PutFunctionConcurrencyCommand",
           input: (input) => ({ FunctionName: input.label("FunctionName") }),
         },
       ],
@@ -198,7 +198,7 @@ describe("Serving the simulated Lambda control plane", () => {
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
     assertStringIncludes(
       await response.text(),
-      "GetFunctionConfigurationCommand",
+      "PutFunctionConcurrencyCommand",
     );
   });
 });

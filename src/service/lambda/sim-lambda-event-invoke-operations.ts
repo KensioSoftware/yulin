@@ -1,5 +1,5 @@
 import type * as simLambdaCommands from "./command/sim-lambda-command.types.js";
-import { SimLambdaInspection } from "./sim-lambda-inspection.js";
+import { SimLambdaResourceOperations } from "./sim-lambda-resource-operations.js";
 import type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
 
 /**
@@ -9,7 +9,7 @@ import type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
  * delegating method per simulated operation and is at the length this codebase
  * allows. The five belong together, so they are the group that moved.
  */
-export abstract class SimLambdaEventInvokeOperations extends SimLambdaInspection {
+export abstract class SimLambdaEventInvokeOperations extends SimLambdaResourceOperations {
   /** Handle a Put Function Event Invoke Config Command from the SDK. */
   async putFunctionEventInvokeConfig(
     command: simLambdaCommands.SimPutFunctionEventInvokeConfigCommand,

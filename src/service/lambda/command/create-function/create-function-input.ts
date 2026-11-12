@@ -5,6 +5,7 @@ import {
 } from "../../function/code/lambda-code-source.js";
 import { requireLambdaEnvironmentVariables } from "../../function/environment/lambda-environment-variables.js";
 import { requireLambdaDeadLetterTarget } from "../../function/event-invoke/lambda-dead-letter-target.js";
+import { SimLambdaFunctionTags } from "../../function/tags/sim-lambda-function-tags.js";
 import type { SimCreateFunctionCommand } from "./create-function.command.js";
 
 /**
@@ -21,6 +22,11 @@ export interface CreateFunctionInput {
   memorySizeMb: number | undefined;
   environmentVariables: ReadonlyMap<string, string>;
   deadLetterTargetArn: string | undefined;
+  /**
+   * The tags the function is created with, checked against the limits real
+   * Lambda puts on them before the function exists.
+   */
+  tags: SimLambdaFunctionTags;
 }
 
 /**
@@ -48,5 +54,15 @@ export function requireCreateFunctionInput(
     memorySizeMb: input.MemorySize,
     environmentVariables: requireLambdaEnvironmentVariables(input.Environment),
     deadLetterTargetArn: requireLambdaDeadLetterTarget(input.DeadLetterConfig),
+    tags: tagsIn(input.Tags),
   };
+}
+
+function tagsIn(
+  requested: Readonly<Record<string, string>> | undefined,
+): SimLambdaFunctionTags {
+  const tags = new SimLambdaFunctionTags();
+  tags.tag(requested);
+
+  return tags;
 }

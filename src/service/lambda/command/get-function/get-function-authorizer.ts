@@ -4,21 +4,34 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
 interface GetFunctionAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
+  /**
+   * The IAM action the read is authorized as. GetFunction and
+   * GetFunctionConfiguration read the same function and differ only in this.
+   */
+  readonly action?: GetFunctionAuthorizerAction | undefined;
 }
+
+/**
+ * The IAM actions that read a function's configuration.
+ */
+export type GetFunctionAuthorizerAction =
+  | "lambda:GetFunction"
+  | "lambda:GetFunctionConfiguration";
 
 /**
  * Applies IAM authorization to a Lambda GetFunction request.
  *
  * AWS maps the GetFunction API operation to the lambda:GetFunction IAM
- * action. The resource is the function ARN being read.
+ * action, and GetFunctionConfiguration to lambda:GetFunctionConfiguration. The
+ * resource is the function ARN being read.
  */
 export class GetFunctionAuthorizer {
-  private static readonly action = "lambda:GetFunction";
-
+  private readonly action: GetFunctionAuthorizerAction;
   private readonly iam: SimIamInterServiceAuthZ;
 
   constructor(properties: GetFunctionAuthorizerProperties) {
     this.iam = properties.iam;
+    this.action = properties.action ?? "lambda:GetFunction";
   }
 
   /**
@@ -30,7 +43,7 @@ export class GetFunctionAuthorizer {
    */
   authorize(functionArn: string, caller?: SimAwsCaller): void {
     const decision = this.iam.authorize({
-      action: GetFunctionAuthorizer.action,
+      action: this.action,
       resource: functionArn,
       caller,
     });
@@ -39,7 +52,7 @@ export class GetFunctionAuthorizer {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
         reason: decision.denialReason,
-        action: GetFunctionAuthorizer.action,
+        action: this.action,
         resource: functionArn,
       });
     }

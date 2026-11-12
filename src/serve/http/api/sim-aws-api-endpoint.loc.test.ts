@@ -20,7 +20,7 @@ import {
 } from "@aws-sdk/client-sqs";
 import {
   LambdaClient,
-  GetFunctionConfigurationCommand,
+  GetFunctionConcurrencyCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
@@ -262,7 +262,7 @@ describe("Serving the general AWS API on one endpoint", () => {
     const error = await assertThrowsErrorAsync(
       async () =>
         await client.send(
-          new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
+          new GetFunctionConcurrencyCommand({ FunctionName: "orders" }),
         ),
     );
 

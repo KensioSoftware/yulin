@@ -2,7 +2,7 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
 import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda-dynamodb-stream-event-source-arn.js";
 import type { SimLambdaEventSourceStreamRecord } from "../stream/sim-lambda-event-source-streams.js";
-import type { SimLambdaFilterCriteria } from "../filter/sim-lambda-filter-criteria.js";
+import type { SimLambdaEventSourceFilters } from "./sim-lambda-event-source-delivery.js";
 import { simLambdaFilteredDelivery } from "../filter/sim-lambda-filtered-delivery.js";
 import { SimLambdaStreamCascadeGuard } from "../stream/sim-lambda-stream-cascade-guard.js";
 import { SimLambdaStreamHalt } from "../stream/sim-lambda-stream-halt.js";
@@ -41,10 +41,10 @@ export class SimLambdaDynamoDbStreamDelivery {
   private readonly batchResponse: SimLambdaStreamBatchResponse;
   private readonly cascade: SimLambdaStreamCascadeGuard;
   private readonly halt = new SimLambdaStreamHalt();
-  private readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  private readonly filters: SimLambdaEventSourceFilters;
 
   constructor(properties: SimLambdaDynamoDbStreamDeliveryProperties) {
-    this.filterCriteria = properties.mapping.filterCriteria;
+    this.filters = properties.mapping;
     this.eventBuilder = new SimLambdaDynamoDbStreamEventBuilder(
       properties.eventSourceArn,
     );
@@ -105,7 +105,7 @@ export class SimLambdaDynamoDbStreamDelivery {
     const times = simLambdaDynamoDbStreamRecordTimes(records);
 
     return await simLambdaFilteredDelivery({
-      criteria: this.filterCriteria,
+      criteria: this.filters.filterCriteria,
       records,
       // A pattern reads the record as the function would have received it, so
       // the event builder makes what it matches against.

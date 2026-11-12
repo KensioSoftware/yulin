@@ -609,6 +609,62 @@ await simAws.backgroundTasksComplete();
 
 The listing is authorized as a whole, against `lambda:ListFunctions` on `*`, the way AWS documents the permission. A caller without it is denied rather than given a filtered list.
 
+One answer carries at most 50 functions, as on real Lambda. `MaxItems` asks for fewer, and the `NextMarker` an answer carries fetches the next page. `ListVersionsByFunction`, `ListAliases`, `ListEventSourceMappings`, `ListFunctionUrlConfigs` and `ListFunctionEventInvokeConfigs` page the same way, each with the page limit AWS documents for it.
+
+`GetFunctionConfigurationCommand` reads one function's configuration (the `Configuration` member `GetFunction` answers with) under its own IAM action, `lambda:GetFunctionConfiguration`.
+
+## Tagging a function
+
+`CreateFunctionCommand` takes `Tags`, and `TagResourceCommand`, `UntagResourceCommand` and `ListTagsCommand` change and read them by function ARN. `GetFunction` reports them as `Tags`.
+
+```typescript sim-lambda-tags
+/**
+ * Tagging a simulated Lambda function and reading its tags back.
+ */
+
+import {
+  CreateFunctionCommand,
+  ListTagsCommand,
+  TagResourceCommand,
+  UntagResourceCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+const { FunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+    Tags: { team: "payments" },
+  }),
+);
+
+await lambda.tagResource(
+  new TagResourceCommand({ Resource: FunctionArn, Tags: { tier: "gold" } }),
+);
+await lambda.untagResource(
+  new UntagResourceCommand({ Resource: FunctionArn, TagKeys: ["team"] }),
+);
+
+const { Tags } = await lambda.listTags(
+  new ListTagsCommand({ Resource: FunctionArn }),
+);
+console.log(Tags); // { tier: "gold" }
+
+await simAws.backgroundTasksComplete();
+```
+
+Tags belong to the function. A published version reports the function's tags, including ones added after it was published, and a version or alias ARN is refused by the tagging commands. Real Lambda's limits apply (50 tags, keys of 1 to 128 characters, values of up to 256, and no `aws:` prefix).
+
+Each command is authorized against the IAM action of its own name. Creating a function with tags also needs `lambda:TagResource`, as AWS documents. `GetFunction` leaves `Tags` out for a caller without `lambda:ListTags`.
+
+An `AWS::Lambda::Function` in a template carries its `Tags` list onto the function it creates. That is the list CDK writes for `Tags.of(...).add(...)`.
+
 ## The runtime-provided AWS SDK
 
 Like the real Lambda Node.js runtime, the simulated runtime provides AWS SDK v3 packages without
@@ -2680,6 +2736,122 @@ An `AWS::Lambda::EventSourceMapping` carrying `FilterCriteria` deploys with it, 
 function's queue or stream event. A CDK `SqsEventSource` or `DynamoEventSource` given `filters`
 therefore filters here the way it does deployed.
 
+## Changing a mapping after it is made
+
+`UpdateEventSourceMappingCommand` changes a mapping's `BatchSize`, `Enabled` and `FilterCriteria`. The answer reports the mapping as `Updating`, `Enabling` or `Disabling`, and it settles in the background. A disabled mapping leaves records on its source, and enabling it again delivers what waited there.
+
+```typescript sim-lambda-update-event-source-mapping
+/**
+ * Pausing a simulated queue mapping, then resuming it with a smaller batch.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+  UpdateEventSourceMappingCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderConsumerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderConsumerRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const batchSizes: number[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaSqsEvent) => {
+        batchSizes.push(event.Records.length);
+      }),
+    },
+  }),
+);
+
+const { UUID } = await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "order-consumer",
+  }),
+);
+
+// A mapping refuses changes until it has finished being created.
+await simAws.backgroundTasksComplete();
+
+await simAws
+  .lambda()
+  .updateEventSourceMapping(
+    new UpdateEventSourceMappingCommand({ UUID, Enabled: false }),
+  );
+await simAws.backgroundTasksComplete();
+
+for (const body of ["order-1", "order-2"]) {
+  await simAws
+    .sqs()
+    .sendMessage(new SendMessageCommand({ QueueUrl, MessageBody: body }));
+}
+
+await simAws.lambda().updateEventSourceMapping(
+  new UpdateEventSourceMappingCommand({
+    UUID,
+    Enabled: true,
+    BatchSize: 1,
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+console.log(batchSizes); // [1, 1]
+```
+
+The new batch size and filters apply from the next batch. An empty `FilterCriteria` removes the filters. Each value is checked against the event source's own rules, as on creation.
+
+A mapping that is still being created, or still settling an earlier change, refuses an update with `ResourceInUseException`. Call `simAws.backgroundTasksComplete()` between creating a mapping and changing it.
+
 ## Function URLs
 
 A Function URL is an HTTP endpoint for one function. Creating one with
@@ -4323,8 +4495,11 @@ Sim Lambda currently supports:
   policy, Function URL, versions and aliases
 - `UpdateFunctionConfigurationCommand`, changing the `Role`, `Handler`, `Runtime`, `Description`,
   `Timeout`, `MemorySize` and `Environment` a function runs with
+- `GetFunctionConfigurationCommand`, reading a function's or a version's configuration alone
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
-  versions with `FunctionVersion: "ALL"`
+  versions with `FunctionVersion: "ALL"`, paged by `Marker` and `MaxItems` like the other listings
+- `Tags` on `CreateFunction` and on an `AWS::Lambda::Function`, and `TagResourceCommand`,
+  `UntagResourceCommand` and `ListTagsCommand` on a function ARN
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
 - Handler timers on the simulation's clock, and the function's `Timeout` as a deadline on the same
   clock, reported as real Lambda reports a timeout
@@ -4351,8 +4526,9 @@ Sim Lambda currently supports:
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
 - SQS, DynamoDB stream and Kinesis stream event source mappings, created with
-  `CreateEventSourceMappingCommand` and read with `GetEventSourceMappingCommand`,
-  `ListEventSourceMappingsCommand` and `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
+  `CreateEventSourceMappingCommand`, changed with `UpdateEventSourceMappingCommand` and read with
+  `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
+  `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
   DynamoDB stream and Kinesis events and honouring `BatchSize`
 - `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns, delivering
   the records that match and handling the rest without an invocation
@@ -4406,17 +4582,21 @@ Sim Lambda currently supports:
 
 Current documented limitations:
 
-- Only `CreateFunctionCommand`, `GetFunctionCommand`, `UpdateFunctionCodeCommand`,
-  `UpdateFunctionConfigurationCommand`, `ListFunctionsCommand`, `DeleteFunctionCommand`,
-  `InvokeCommand`, the permission commands (`AddPermissionCommand`, `RemovePermissionCommand`,
-  `GetPolicyCommand`), the version and alias commands, the Function URL config commands and the
-  event source mapping commands are supported. `GetFunctionConfiguration` and the concurrency and
-  tagging commands are absent so far.
+- The function, invoke, permission, version, alias, Function URL config, event invoke config,
+  event source mapping and tagging commands are supported. The concurrency commands
+  (`PutFunctionConcurrency`, `GetFunctionConcurrency` and the provisioned concurrency ones) are
+  absent so far.
+- Tags are kept on functions alone. Event source mappings and code signing configs take none, and
+  `Tags` on `CreateEventSourceMapping` is refused. Tags are not available as IAM condition keys
+  (`aws:ResourceTag/...`, `aws:RequestTag/...` and `aws:TagKeys`), so attribute-based access
+  control on a function is not simulated. SAM's `Tags` on `AWS::Serverless::Function` are left out,
+  and CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
 - `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
   along with `Architectures` and `SourceKMSKeyArn`. `UpdateFunctionConfiguration` takes only the
   settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
   `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`. `ListFunctions` leaves out
-  `Marker`/`MaxItems` paging and `MasterRegion`.
+  `MasterRegion`. A listing's `Marker` is an offset into what that request selected, and a marker
+  from a different selection is refused.
 - SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function` are left out. A
   SAM application declaring either deploys a function with the default retries, no destinations and
   no dead-letter target. The `AWS::Lambda::EventInvokeConfig` Resource and the `DeadLetterConfig`
@@ -4454,8 +4634,7 @@ Current documented limitations:
   out.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
   alone. The `CodeSha256` and `RevisionId` checks `PublishVersion` makes are left out, along with
-  alias `RoutingConfig` weights, provisioned concurrency, and the `Marker`/`MaxItems` paging on the
-  two listings. `CodeSha256`, `RuntimePolicy`
+  alias `RoutingConfig` weights and provisioned concurrency. `CodeSha256`, `RuntimePolicy`
   and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig` and
   `ProvisionedConcurrencyConfig` on `AWS::Lambda::Alias`, are accepted and ignored. SAM's
   `AutoPublishAlias` is left out.
@@ -4511,7 +4690,6 @@ Current documented limitations:
   exists.
 - A time read at module scope, like an environment variable read there, is read before any
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
-- `Event` invocation retries and failure destinations are left out, and handler errors are dropped.
 - The S3 object version a code location names is accepted but ignored, as sim S3 has no object
   versioning yet. That covers `Code.S3ObjectVersion` on `CreateFunction` and on a template
   function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as
@@ -4554,8 +4732,10 @@ Current documented limitations:
   policy ARNs, so the mapping is refused when it is created. A hand-written template and a SAM application
   usually attach that policy where CDK writes an inline one, so the two declaration paths differ.
   Write the grant inline to deploy either.
-- `UpdateEventSourceMapping` is absent, and a mapping's batch size or enabled state is fixed once it
-  is created. `Enabled: false` at creation is simulated.
+- `UpdateEventSourceMapping` changes `BatchSize`, `Enabled` and `FilterCriteria` alone. The
+  function, the response types, the destination and the stream retry limits a mapping was created
+  with are fixed, and an update naming one is refused. Delete the mapping and create it again to
+  change them.
 - One poll of one shard delivers one batch. Real Lambda runs several pollers at once and scales them
   with the event source, and what that concurrency does to ordering or to a downstream service is
   invisible here. A simulated DynamoDB stream has one shard and never splits, so a mapping on one has
@@ -4568,7 +4748,7 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves nineteen of these operations over HTTP, listed in the
+- `serveSimAws` serves twenty-four of these operations over HTTP, listed in the
   [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The version and alias operations have no
   route there yet, and reach the simulation through `SimAws` or
   [SDK interception](https://yulinsim.dev/sdk/) instead.

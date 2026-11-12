@@ -44,6 +44,24 @@ export class SimRestJsonInput {
   }
 
   /**
+   * A list member the query string stated, one parameter per item, which is
+   * how REST-JSON puts a list in a query string.
+   */
+  queryAll(name: string): string[] {
+    return this.parameters.getAll(name);
+  }
+
+  /**
+   * A number member the query string stated. A value that is not a number is
+   * passed on as one that fails validation, rather than dropped.
+   */
+  queryNumber(name: string): number | undefined {
+    const value = this.query(name);
+
+    return value === undefined ? undefined : Number(value);
+  }
+
+  /**
    * A member a header stated, matched however the client cased the name.
    */
   header(name: string): string | undefined {

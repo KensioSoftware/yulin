@@ -2,7 +2,7 @@ import type { SimLambdaFunction } from "../../../function/sim-lambda-function.js
 import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-mapping.js";
 import type { SimLambdaKinesisEventSourceArn } from "../../stream/kinesis/sim-lambda-kinesis-event-source-arn.js";
 import type { SimLambdaKinesisStreamRecord } from "../../stream/kinesis/sim-lambda-kinesis-streams.js";
-import type { SimLambdaFilterCriteria } from "../../filter/sim-lambda-filter-criteria.js";
+import type { SimLambdaEventSourceFilters } from "../sim-lambda-event-source-delivery.js";
 import { simLambdaFilteredDelivery } from "../../filter/sim-lambda-filtered-delivery.js";
 import { SimLambdaStreamCascadeGuard } from "../../stream/sim-lambda-stream-cascade-guard.js";
 import { SimLambdaStreamHalt } from "../../stream/sim-lambda-stream-halt.js";
@@ -38,12 +38,12 @@ export class SimLambdaKinesisStreamDelivery {
   private readonly batchResponse: SimLambdaStreamBatchResponse;
   private readonly cascade: SimLambdaStreamCascadeGuard;
   private readonly halt = new SimLambdaStreamHalt();
-  private readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  private readonly filters: SimLambdaEventSourceFilters;
 
   constructor(properties: SimLambdaKinesisStreamDeliveryProperties) {
     const { eventSourceArn } = properties;
 
-    this.filterCriteria = properties.mapping.filterCriteria;
+    this.filters = properties.mapping;
 
     this.eventBuilder = new SimLambdaKinesisStreamEventBuilder({
       eventSourceArn,
@@ -107,7 +107,7 @@ export class SimLambdaKinesisStreamDelivery {
     const times = simLambdaKinesisStreamRecordTimes(records);
 
     return await simLambdaFilteredDelivery({
-      criteria: this.filterCriteria,
+      criteria: this.filters.filterCriteria,
       records,
       documentOf: (record) => this.eventBuilder.filterDocumentOf(record),
       // A batch the filters emptied is finished with even though the function

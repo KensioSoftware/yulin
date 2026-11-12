@@ -49,6 +49,7 @@ export interface SimCreateFunctionCommandInput {
   readonly MemorySize?: number | undefined;
   readonly Environment?: SimLambdaFunctionEnvironment | undefined;
   readonly DeadLetterConfig?: SimLambdaDeadLetterConfigInput | undefined;
+  readonly Tags?: Record<string, string> | undefined;
 }
 
 /**

@@ -4,8 +4,8 @@ import type { SimRestJsonRoute } from "../../../../serve/http/api/rest-json/sim-
 /**
  * The event source mapping operations this endpoint serves.
  *
- * Creating and listing answer at the collection, and reading and deleting at
- * one mapping's own UUID.
+ * Creating and listing answer at the collection, and reading, updating and
+ * deleting at one mapping's own UUID.
  */
 export const simLambdaEventSourceApiRoutes: readonly SimRestJsonRoute[] = [
   {
@@ -22,7 +22,16 @@ export const simLambdaEventSourceApiRoutes: readonly SimRestJsonRoute[] = [
     input: (input) => ({
       EventSourceArn: input.query("EventSourceArn"),
       FunctionName: input.query("FunctionName"),
+      Marker: input.query("Marker"),
+      MaxItems: input.queryNumber("MaxItems"),
     }),
+  },
+  {
+    method: "PUT",
+    path: "/2015-03-31/event-source-mappings/{UUID}",
+    commandName: "UpdateEventSourceMappingCommand",
+    status: 202,
+    input: (input) => ({ ...input.json(), UUID: input.label("UUID") }),
   },
   {
     method: "GET",

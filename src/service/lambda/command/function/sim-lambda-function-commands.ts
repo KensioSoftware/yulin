@@ -32,6 +32,11 @@ import type {
   SimGetFunctionCommand,
   SimGetFunctionCommandOutput,
 } from "../get-function/get-function.command.js";
+import { GetFunctionConfigurationCommandHandler } from "../get-function-configuration/get-function-configuration.handler.js";
+import type {
+  SimGetFunctionConfigurationCommand,
+  SimGetFunctionConfigurationCommandOutput,
+} from "../get-function-configuration/get-function-configuration.command.js";
 import { InvokeCommandHandler } from "../invoke/invoke.handler.js";
 import type {
   SimInvokeCommand,
@@ -116,6 +121,18 @@ export class SimLambdaFunctionCommands {
       command,
       options,
     );
+  }
+
+  /**
+   * Read a function's configuration alone.
+   */
+  async getConfiguration(
+    command: SimGetFunctionConfigurationCommand,
+    options?: SimLambdaFunctionCommandOptions,
+  ): Promise<SimGetFunctionConfigurationCommandOutput> {
+    return await new GetFunctionConfigurationCommandHandler(
+      this.properties,
+    ).handle(command, options);
   }
 
   /**

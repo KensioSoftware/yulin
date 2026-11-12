@@ -155,7 +155,7 @@ describe("Resolving a Lambda operation from a served request", () => {
     // Then none of them resolves to the operation beside it
     assertUndefined(command("POST", "/2015-03-31/functions/orders/versions"));
     assertUndefined(
-      command("GET", "/2015-03-31/functions/orders/configuration"),
+      command("GET", "/2015-03-31/functions/orders/code-signing-config"),
     );
     assertUndefined(
       command("GET", "/2015-03-31/functions/orders/aliases/live"),
@@ -199,10 +199,31 @@ describe("Resolving a Lambda operation from a served request", () => {
     // Given a listing whose only member travels in the query string
     assertObjectEquals(input("GET", "/2015-03-31/functions"), {
       FunctionVersion: undefined,
+      Marker: undefined,
+      MaxItems: undefined,
     });
     assertObjectEquals(
       input("GET", "/2015-03-31/functions?FunctionVersion=ALL"),
-      { FunctionVersion: "ALL" },
+      { FunctionVersion: "ALL", Marker: undefined, MaxItems: undefined },
+    );
+  });
+
+  it("reads a listing's page out of the query string", () => {
+    assertObjectEquals(
+      input("GET", "/2015-03-31/functions?Marker=50&MaxItems=10"),
+      { FunctionVersion: undefined, Marker: "50", MaxItems: 10 },
+    );
+  });
+
+  it("reads a tag removal's keys from the repeated query parameter", () => {
+    const arn = "arn:aws:lambda:us-east-1:111111111111:function:orders";
+
+    assertObjectEquals(
+      input(
+        "DELETE",
+        `/2017-03-31/tags/${encodeURIComponent(arn)}?tagKeys=team&tagKeys=tier`,
+      ),
+      { Resource: arn, TagKeys: ["team", "tier"] },
     );
   });
 
@@ -365,6 +386,8 @@ describe("Resolving a Lambda operation from a served request", () => {
     assertObjectEquals(read, {
       EventSourceArn: undefined,
       FunctionName: "orders",
+      Marker: undefined,
+      MaxItems: undefined,
     });
   });
 });

@@ -32,6 +32,7 @@ import {
   simLambdaFunctionArn,
 } from "../../function/sim-lambda-function-configuration.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
+import { CreateFunctionTagAuthorizer } from "./create-function-tag-authorizer.js";
 import {
   type CreateFunctionInput,
   requireCreateFunctionInput,
@@ -74,6 +75,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly functions: SimLambdaFunctionMap;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly authorizer: CreateFunctionAuthorizer;
+  private readonly tagAuthorizer: CreateFunctionTagAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly codeResolver: SimLambdaCodeResolver;
   private readonly environmentConflicts: SimLambdaEnvironmentConflicts;
@@ -102,6 +104,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     this.functions = functions;
     this.runAsOwner = runAsOwner;
     this.authorizer = new CreateFunctionAuthorizer({ iam });
+    this.tagAuthorizer = new CreateFunctionTagAuthorizer({ iam });
     this.background = background;
     this.codeResolver = new SimLambdaCodeResolver({
       codeStore,
@@ -136,6 +139,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       input.name,
     );
     this.authorizer.authorize(functionArn, input.roleArn, options?.caller);
+    this.tagAuthorizer.authorize(functionArn, input.tags, options?.caller);
 
     this.requireAvailableFunctionName(input.name, functionArn);
 

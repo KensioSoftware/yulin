@@ -8,6 +8,10 @@ import type {
   SimLambdaFilterCriteria,
   SimLambdaFilterCriteriaInput,
 } from "./filter/sim-lambda-filter-criteria.js";
+import {
+  type SimLambdaEventSourceMappingUpdate,
+  simLambdaEventSourceMappingNext,
+} from "./sim-lambda-event-source-mapping-update.js";
 import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
 import type {
   SimLambdaStreamRetryLimits,
@@ -35,13 +39,17 @@ export type SimLambdaFunctionResponseType = "ReportBatchItemFailures";
  * The lifecycle states an event source mapping reports.
  *
  * A mapping is Creating until the simulation has caught up with it, then either
- * Enabled or Disabled, as on real Lambda. The states in between, such as
- * Updating and Deleting, belong to operations this simulation does not have.
+ * Enabled or Disabled, as on real Lambda. An update passes through Updating,
+ * Enabling or Disabling on its way to one of those two. Deleting is left out,
+ * because a deleted mapping is gone by the time anything could ask about it.
  */
 export type SimLambdaEventSourceMappingState =
   | "Creating"
   | "Enabled"
-  | "Disabled";
+  | "Disabled"
+  | "Updating"
+  | "Enabling"
+  | "Disabling";
 
 interface SimLambdaEventSourceMappingProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -113,7 +121,12 @@ export class SimLambdaEventSourceMapping {
   public readonly qualifier: string | undefined;
 
   public readonly functionArn: SimLambdaFunctionArn;
-  public readonly batchSize: number;
+
+  /**
+   * How many records one delivery carries at most. Read on every poll, so an
+   * update applies from the next batch on.
+   */
+  public batchSize: number;
   /**
    * Where this mapping started reading, for a source that has a choice.
    *
@@ -126,9 +139,10 @@ export class SimLambdaEventSourceMapping {
    * The filters a record has to match before it is delivered, if this mapping
    * was created with any.
    *
-   * A mapping with none delivers every record its source hands it.
+   * A mapping with none delivers every record its source hands it. Read on
+   * every delivery, so an update applies from the next batch on.
    */
-  public readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  public filterCriteria: SimLambdaFilterCriteria | undefined;
 
   /**
    * When this mapping stops delivering a batch its function keeps failing, for
@@ -143,8 +157,8 @@ export class SimLambdaEventSourceMapping {
     | SimLambdaStreamDestinationConfiguration
     | undefined;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly enabled: boolean;
-  private readonly lastModified: Date;
+  private enabled: boolean;
+  private lastModified: Date;
   #state: SimLambdaEventSourceMappingState = "Creating";
 
   constructor(properties: SimLambdaEventSourceMappingProperties) {
@@ -210,6 +224,21 @@ export class SimLambdaEventSourceMapping {
     this.#state = this.enabled ? "Enabled" : "Disabled";
 
     return Promise.resolve();
+  }
+
+  /**
+   * Apply an UpdateEventSourceMapping request. The mapping stops polling until
+   * `activate` settles it, as real Lambda passes through a state of its own
+   * while it rolls a change out.
+   */
+  update(update: SimLambdaEventSourceMappingUpdate): void {
+    const next = simLambdaEventSourceMappingNext(this, this.enabled, update);
+
+    this.batchSize = next.batchSize;
+    this.filterCriteria = next.filterCriteria;
+    this.lastModified = update.updatedAt;
+    this.#state = next.state;
+    this.enabled = next.enabled;
   }
 
   /**

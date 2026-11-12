@@ -59,6 +59,17 @@ export class SimLambdaEventSourcePollers {
   }
 
   /**
+   * Finish an update to a mapping in the background, as real Lambda finishes
+   * one, and poll straight away if the mapping is enabled once it settles.
+   */
+  settle(mapping: SimLambdaEventSourceMapping): void {
+    this.properties.background.schedule(async () => {
+      await mapping.activate();
+      this.pollers.get(mapping.uuid)?.pollNow();
+    });
+  }
+
+  /**
    * Stop polling for a deleted mapping.
    */
   stop(mapping: SimLambdaEventSourceMapping): void {

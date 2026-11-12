@@ -3,11 +3,11 @@ import {
   DeleteFunctionCommand,
   GetFunctionCommand,
   InvokeCommand,
+  PutFunctionConcurrencyCommand,
   LambdaClient,
   ListFunctionsCommand,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
-  GetFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertArrayLength,
@@ -158,11 +158,14 @@ describe("simulated Lambda SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new GetFunctionConfigurationCommand({ FunctionName: "orders" }),
+        new PutFunctionConcurrencyCommand({
+          FunctionName: "orders",
+          ReservedConcurrentExecutions: 1,
+        }),
       );
     });
 
-    assertStringIncludes(error.message, "GetFunctionConfigurationCommand");
+    assertStringIncludes(error.message, "PutFunctionConcurrencyCommand");
     assertStringIncludes(error.message, "InvokeCommand");
   });
 });
