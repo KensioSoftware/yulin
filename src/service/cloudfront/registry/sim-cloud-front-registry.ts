@@ -122,8 +122,10 @@ export class SimCloudFrontRegistry {
   deregisterAlternateDomainNames(
     distributionId: SimCloudFrontDistributionId,
   ): void {
-    for (const [alternateDomainName, registeredDistributionId] of this
-      .alternateDomainDistributionIds) {
+    for (const [
+      alternateDomainName,
+      registeredDistributionId,
+    ] of this.alternateDomainDistributionIds) {
       if (registeredDistributionId === distributionId) {
         this.alternateDomainDistributionIds.delete(alternateDomainName);
       }
