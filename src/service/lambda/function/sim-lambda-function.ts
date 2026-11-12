@@ -68,7 +68,8 @@ export class SimLambdaFunction {
   public environment: SimLambdaEnvironment;
 
   /** Where this function's abandoned asynchronous events go, if anywhere. */
-  public deadLetterTargetArn: string | undefined; /**
+  public deadLetterTargetArn: string | undefined;
+  /**
    * This function's resource-based policy, which says who may act on it. It
    * survives as long as the function does, and it is the only thing that can
    * allow a principal from another Account.
