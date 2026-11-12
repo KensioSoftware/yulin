@@ -9,6 +9,7 @@ import {
   makeLambdaCodeZip,
 } from "./make-lambda-code-zip.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import { simLambdaCodePackageOf } from "./sim-lambda-code-package.js";
 import { SimLambdaVmZipCode } from "./sim-lambda-vm-zip-code.js";
 
 /**
@@ -60,7 +61,8 @@ export const simLambdaVmZipFunctionFactory = new MappedFactory<
     memorySizeMb: 128,
   }),
   (input) => {
-    const archive = SimZipArchive.fromBytes(makeLambdaCodeZip(input.code));
+    const zipBytes = makeLambdaCodeZip(input.code);
+    const archive = SimZipArchive.fromBytes(zipBytes);
     const environment = simLambdaEnvironmentFactory.make({
       functionName: input.name,
       regionName: input.accountRegionScope.regionName,
@@ -73,6 +75,7 @@ export const simLambdaVmZipFunctionFactory = new MappedFactory<
       accountRegionScope: input.accountRegionScope,
       code: new SimLambdaVmZipCode({
         archive,
+        codePackage: simLambdaCodePackageOf(zipBytes),
         handlerName: input.handlerName,
         environment,
         sdkModuleProvider: input.sdkModuleProvider,

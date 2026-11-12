@@ -106,6 +106,7 @@ export class SimLambdaCodeResolver {
       case "container-image": {
         return new SimLambdaHandlerReferenceCode(
           this.containerImageHandler(source.imageUri),
+          source.imageUri,
         );
       }
     }

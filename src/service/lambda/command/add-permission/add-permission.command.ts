@@ -21,6 +21,8 @@ export interface SimAddPermissionCommandInput {
   readonly SourceAccount?: string | undefined;
   readonly PrincipalOrgID?: string | undefined;
   readonly InvokedViaFunctionUrl?: boolean | undefined;
+  /** Change the policy only while it is still at this revision. */
+  readonly RevisionId?: string | undefined;
 }
 
 /**

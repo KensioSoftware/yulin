@@ -9,6 +9,7 @@ import type {
   SimLambdaCodeConfiguration,
   SimLambdaExecutableCode,
 } from "./sim-lambda-executable-code.js";
+import type { SimLambdaCodePackage } from "./sim-lambda-code-package.js";
 import { parseLambdaHandlerName } from "./sim-lambda-handler-name.js";
 import {
   makeSimLambdaVmContext,
@@ -33,6 +34,7 @@ interface SimLambdaVmZipCodeProperties extends SimLambdaVmContextProperties {
   readonly archive: SimZipArchive;
   readonly handlerName: string;
   readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  readonly codePackage: SimLambdaCodePackage;
 }
 
 /**
@@ -57,6 +59,11 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   };
 
   constructor(private readonly properties: SimLambdaVmZipCodeProperties) {}
+
+  /** The archive this code was unzipped from. */
+  get codePackage(): SimLambdaCodePackage {
+    return this.properties.codePackage;
+  }
 
   /**
    * Record what this code writes to its standard streams.

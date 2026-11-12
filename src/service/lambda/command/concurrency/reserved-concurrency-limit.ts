@@ -53,3 +53,21 @@ export function simLambdaReservedConcurrencyIn(
 
   return requested;
 }
+
+/**
+ * The Region's concurrency limit, and what the functions' reservations leave
+ * of it for the functions that reserve none.
+ */
+export function simLambdaUnreservedConcurrency(
+  functions: Iterable<SimLambdaFunction>,
+): { readonly limit: number; readonly unreserved: number } {
+  const reserved = [...functions].reduce(
+    (sum, simFunction) => sum + (simFunction.concurrency.reserved ?? 0),
+    0,
+  );
+
+  return {
+    limit: regionalConcurrencyLimit,
+    unreserved: regionalConcurrencyLimit - reserved,
+  };
+}

@@ -1,6 +1,6 @@
 import {
   CreateFunctionCommand,
-  GetAccountSettingsCommand,
+  GetProvisionedConcurrencyConfigCommand,
   DeleteFunctionCommand,
   GetFunctionCommand,
   InvokeCommand,
@@ -160,10 +160,18 @@ describe("simulated Lambda SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new GetAccountSettingsCommand({}));
+      await client.send(
+        new GetProvisionedConcurrencyConfigCommand({
+          FunctionName: "orders",
+          Qualifier: "live",
+        }),
+      );
     });
 
-    assertStringIncludes(error.message, "GetAccountSettingsCommand");
+    assertStringIncludes(
+      error.message,
+      "GetProvisionedConcurrencyConfigCommand",
+    );
     assertStringIncludes(error.message, "InvokeCommand");
   });
 });

@@ -21,6 +21,8 @@ interface SimLambdaUpdateAliasProperties {
   readonly name: string;
   readonly functionVersion?: string | undefined;
   readonly description?: string | undefined;
+  /** Update the alias only while it is still at this revision. */
+  readonly revisionId?: string | undefined;
 }
 
 /**
@@ -67,6 +69,7 @@ export class SimLambdaFunctionAliasStore {
   update(properties: SimLambdaUpdateAliasProperties): SimLambdaFunctionAlias {
     const { simFunction, name, functionVersion, description } = properties;
     const alias = this.require(simFunction, name);
+    alias.assertRevision(properties.revisionId);
 
     if (functionVersion !== undefined) {
       this.versions.requireVersion(simFunction, functionVersion);

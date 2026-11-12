@@ -5,7 +5,9 @@ import type { SimRestJsonRoute } from "../../../../serve/http/api/rest-json/sim-
  *
  * A statement is added and read at the function's `/policy`, and removed at
  * that path with the statement id appended, so the removal is the one of the
- * three that reads a second label out of the path.
+ * three that reads a second label out of the path. A version or alias is
+ * named in the `Qualifier` query parameter on all three, and the removal takes
+ * its `RevisionId` there too, having no body to carry one.
  */
 export const simLambdaPermissionApiRoutes: readonly SimRestJsonRoute[] = [
   {
@@ -16,13 +18,17 @@ export const simLambdaPermissionApiRoutes: readonly SimRestJsonRoute[] = [
     input: (input) => ({
       ...input.json(),
       FunctionName: input.label("FunctionName"),
+      Qualifier: input.query("Qualifier"),
     }),
   },
   {
     method: "GET",
     path: "/2015-03-31/functions/{FunctionName}/policy",
     commandName: "GetPolicyCommand",
-    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+    input: (input) => ({
+      FunctionName: input.label("FunctionName"),
+      Qualifier: input.query("Qualifier"),
+    }),
   },
   {
     method: "DELETE",
@@ -32,6 +38,8 @@ export const simLambdaPermissionApiRoutes: readonly SimRestJsonRoute[] = [
     input: (input) => ({
       FunctionName: input.label("FunctionName"),
       StatementId: input.label("StatementId"),
+      Qualifier: input.query("Qualifier"),
+      RevisionId: input.query("RevisionId"),
     }),
   },
 ];

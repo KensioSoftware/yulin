@@ -41,6 +41,10 @@ export type {
   SimPutFunctionConcurrencyCommandOutput,
 } from "./concurrency/concurrency.command.js";
 export type {
+  SimGetAccountSettingsCommand,
+  SimGetAccountSettingsCommandOutput,
+} from "./account-settings/get-account-settings.command.js";
+export type {
   SimListTagsCommand,
   SimListTagsCommandOutput,
   SimTagResourceCommand,

@@ -176,7 +176,7 @@ describe("Serving the simulated Lambda control plane", () => {
         {
           method: "POST",
           path: "/2015-03-31/functions/{FunctionName}/code",
-          commandName: "GetAccountSettingsCommand",
+          commandName: "GetProvisionedConcurrencyConfigCommand",
           input: (input) => ({ FunctionName: input.label("FunctionName") }),
         },
       ],
@@ -196,6 +196,9 @@ describe("Serving the simulated Lambda control plane", () => {
     // Then the endpoint says so rather than answering with a server error
     assertResponseStatus(response, 501, await describeResponse(response));
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
-    assertStringIncludes(await response.text(), "GetAccountSettingsCommand");
+    assertStringIncludes(
+      await response.text(),
+      "GetProvisionedConcurrencyConfigCommand",
+    );
   });
 });

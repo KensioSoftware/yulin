@@ -3,6 +3,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import type { SimLambdaCodeResolveContext } from "./sim-lambda-code-resolver.js";
+import { simLambdaCodePackageOf } from "./sim-lambda-code-package.js";
 import { SimLambdaVmZipCode } from "./sim-lambda-vm-zip-code.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
@@ -48,6 +49,7 @@ export class SimLambdaVmZipCodeFactory {
 
     return new SimLambdaVmZipCode({
       archive: this.unzip(zipBytes),
+      codePackage: simLambdaCodePackageOf(zipBytes),
       handlerName: context.handlerName,
       environment: context.environment,
       sdkModuleProvider: this.vmSdkModuleProvider,

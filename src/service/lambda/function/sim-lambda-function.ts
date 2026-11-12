@@ -16,6 +16,7 @@ import {
   type SimLambdaExecutableCode,
   SimLambdaHandlerReferenceCode,
 } from "./code/sim-lambda-executable-code.js";
+import type { SimLambdaCodePackage } from "./code/sim-lambda-code-package.js";
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
@@ -199,10 +200,7 @@ export class SimLambdaFunction {
   }
 
   /**
-   * Apply a settings change, as UpdateFunctionConfiguration makes one.
-   *
-   * The function object survives, so its resource-based policy stands and the
-   * version, alias and Function URL stores go on finding it under its name. A
+   * Apply a settings change, as UpdateFunctionConfiguration makes one. A
    * version published beforehand keeps the settings it was published with.
    */
   updateConfiguration(update: SimLambdaFunctionConfigurationUpdate): void {
@@ -210,15 +208,17 @@ export class SimLambdaFunction {
   }
 
   /**
-   * Replace the code this function runs, keeping everything else about it.
-   *
-   * The function object survives the change. Its resource-based policy lives
-   * on the object, and the version, alias and Function URL stores hold it
-   * under its name. A version published beforehand keeps its own reference to
-   * the code it was published with.
+   * Replace the code this function runs, keeping everything else about it,
+   * as UpdateFunctionCode does. A version published beforehand keeps its own
+   * reference to the code it was published with.
    */
   updateCode(code: SimLambdaExecutableCode): void {
     this.#code = code;
+  }
+
+  /** The deployment package this function's code came from. */
+  get codePackage(): SimLambdaCodePackage {
+    return this.#code.codePackage;
   }
 
   /** Move this sim Lambda function to the Active state. */

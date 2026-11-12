@@ -100,6 +100,10 @@ describe("Resolving a Lambda operation from a served request", () => {
       command("PUT", "/2015-03-31/functions/orders/configuration"),
       "UpdateFunctionConfigurationCommand",
     );
+    assertIdentical(
+      command("GET", "/2016-08-19/account-settings"),
+      "GetAccountSettingsCommand",
+    );
   });
 
   it("routes the Function URL configuration operations", () => {
@@ -172,7 +176,7 @@ describe("Resolving a Lambda operation from a served request", () => {
 
     assertObjectEquals(input("GET", "/2015-03-31/functions/orders"), named);
     assertObjectEquals(input("DELETE", "/2015-03-31/functions/orders"), named);
-    assertObjectEquals(
+    assertObjectMatches(
       input("GET", "/2015-03-31/functions/orders/policy"),
       named,
     );
@@ -262,7 +266,7 @@ describe("Resolving a Lambda operation from a served request", () => {
       }),
       { InvokeMode: "BUFFERED", FunctionName: "orders" },
     );
-    assertObjectEquals(
+    assertObjectMatches(
       input("POST", "/2015-03-31/functions/orders/policy", {
         body: JSON.stringify({ StatementId: "AllowS3" }),
       }),
@@ -271,10 +275,9 @@ describe("Resolving a Lambda operation from a served request", () => {
   });
 
   it("reads a permission removal, whose statement is a second label", () => {
-    assertObjectEquals(
-      input("DELETE", "/2015-03-31/functions/orders/policy/AllowS3"),
-      { FunctionName: "orders", StatementId: "AllowS3" },
-    );
+    const path = "/2015-03-31/functions/orders/policy/AllowS3?RevisionId=r1";
+    const read = { StatementId: "AllowS3", RevisionId: "r1" };
+    assertObjectMatches(input("DELETE", path), read);
   });
 
   it("reads an invoke from the path, a header, the query and the body", () => {

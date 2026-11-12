@@ -4,6 +4,11 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
 interface ListFunctionsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
+  /**
+   * The action authorized, for another operation documented against "*".
+   * GetAccountSettings is the other one. ListFunctions is the default.
+   */
+  readonly action?: string;
 }
 
 /**
@@ -17,13 +22,14 @@ interface ListFunctionsAuthorizerProperties {
  * receives AccessDenied rather than a filtered listing.
  */
 export class ListFunctionsAuthorizer {
-  private static readonly action = "lambda:ListFunctions";
   private static readonly resource = "*";
 
   private readonly iam: SimIamInterServiceAuthZ;
+  private readonly action: string;
 
   constructor(properties: ListFunctionsAuthorizerProperties) {
     this.iam = properties.iam;
+    this.action = properties.action ?? "lambda:ListFunctions";
   }
 
   /**
@@ -35,7 +41,7 @@ export class ListFunctionsAuthorizer {
    */
   authorize(caller?: SimAwsCaller): void {
     const decision = this.iam.authorize({
-      action: ListFunctionsAuthorizer.action,
+      action: this.action,
       resource: ListFunctionsAuthorizer.resource,
       caller,
     });
@@ -44,7 +50,7 @@ export class ListFunctionsAuthorizer {
       throw new SimIamAccessDenied({
         principal: decision.caller.principal,
         reason: decision.denialReason,
-        action: ListFunctionsAuthorizer.action,
+        action: this.action,
         resource: ListFunctionsAuthorizer.resource,
       });
     }

@@ -3,14 +3,22 @@ import { SimLambdaInspection } from "./sim-lambda-inspection.js";
 import type { SimLambdaRequestOptions } from "./sim-lambda-request-options.js";
 
 /**
- * The tagging, concurrency, configuration read and mapping update commands of
- * the simulated Lambda facade.
+ * The tagging, concurrency, account settings, configuration read and mapping
+ * update commands of the simulated Lambda facade.
  *
  * They sit here rather than on SimLambda itself because that file grows by one
  * delegating method per simulated operation and is at the length this codebase
  * allows.
  */
 export abstract class SimLambdaResourceOperations extends SimLambdaInspection {
+  /** Handle a Get Account Settings Command from the SDK. */
+  async getAccountSettings(
+    command: simLambdaCommands.SimGetAccountSettingsCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimGetAccountSettingsCommandOutput> {
+    return await this.commands.accountSettings.get(command, options);
+  }
+
   /** Handle a Get Function Configuration Command from the SDK. */
   async getFunctionConfiguration(
     command: simLambdaCommands.SimGetFunctionConfigurationCommand,

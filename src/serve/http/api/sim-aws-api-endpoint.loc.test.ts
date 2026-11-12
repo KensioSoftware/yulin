@@ -20,7 +20,7 @@ import {
 } from "@aws-sdk/client-sqs";
 import {
   LambdaClient,
-  GetAccountSettingsCommand,
+  GetProvisionedConcurrencyConfigCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
@@ -260,7 +260,13 @@ describe("Serving the general AWS API on one endpoint", () => {
 
     // When it asks for one this simulation has not implemented
     const error = await assertThrowsErrorAsync(
-      async () => await client.send(new GetAccountSettingsCommand({})),
+      async () =>
+        await client.send(
+          new GetProvisionedConcurrencyConfigCommand({
+            FunctionName: "orders",
+            Qualifier: "live",
+          }),
+        ),
     );
 
     // Then it is refused as unimplemented, which an SDK does not retry, and

@@ -44,6 +44,12 @@ export const simLambdaFunctionApiRoutes: readonly SimRestJsonRoute[] = [
     input: (input) => ({ FunctionName: input.label("FunctionName") }),
   },
   {
+    method: "GET",
+    path: "/2016-08-19/account-settings",
+    commandName: "GetAccountSettingsCommand",
+    input: () => ({}),
+  },
+  {
     method: "PUT",
     path: "/2017-10-31/functions/{FunctionName}/concurrency",
     commandName: "PutFunctionConcurrencyCommand",
