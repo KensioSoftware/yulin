@@ -18,6 +18,7 @@ export function simLambdaFunctionConfigurationOf(
     FunctionArn: simFunction.arn,
     Role: simFunction.roleArn,
     State: simFunction.state,
+    LastUpdateStatus: simFunction.updates.status,
     Version: simFunction.version,
     Timeout: simFunction.timeoutSeconds,
     MemorySize: simFunction.memorySizeMb,

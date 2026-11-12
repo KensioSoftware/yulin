@@ -90,6 +90,7 @@ export class UpdateFunctionConfigurationCommandHandler implements CommandHandler
     );
 
     const simFunction = this.functions.require(functionName);
+    simFunction.updates.begin(simFunction.arn, this.background);
     simFunction.updateConfiguration(update);
 
     if (update.environmentVariables !== undefined) {

@@ -571,6 +571,8 @@ The function keeps its name, ARN, code, [resource-based policy](#resource-based-
 
 A changed `Environment`, `MemorySize` or `Handler` reaches the code itself. The next invocation of a [zip code function](#zip-packaged-code-and-the-vm-runtime) cold starts under the new settings. Whatever its module had in memory goes, the way it goes on real Lambda when the configuration changes. A `Handler` change picks a different export out of the archive already deployed, with no need to upload it again.
 
+Each change reports `LastUpdateStatus: "InProgress"` until it has rolled out, and `"Successful"` after. A change rolls out with the simulation's other background work, so `simAws.backgroundTasksComplete()` finishes it, and the SDK's `waitUntilFunctionUpdatedV2` waiter sees it finish. Real Lambda refuses `UpdateFunctionCode`, `UpdateFunctionConfiguration`, `PublishVersion` and `TagResource` with `ResourceConflictException` while a change is in progress, and so does simulated Lambda. A test making two changes in a row settles the simulation between them, as deploy code waits between them on AWS.
+
 ## Listing the functions
 
 `ListFunctionsCommand` reports every function in the Account and Region, each described as `GetFunction` describes it. `FunctionVersion: "ALL"` adds each function's published versions to the listing.
@@ -4135,6 +4137,8 @@ its `FunctionName` and `Qualifier` name. CDK emits one for `onFailure`, `onSucce
 and `maxEventAge` on a function. `DeadLetterConfig` on `AWS::Lambda::Function` is what CDK's
 `deadLetterQueue` emits, and it sets the same dead-letter target `CreateFunction` takes.
 
+A SAM `AWS::Serverless::Function` states the same two with `EventInvokeConfig` and `DeadLetterQueue`. They expand to an `AWS::Lambda::EventInvokeConfig` on `$LATEST` and a `DeadLetterConfig`, as SAM expands them. The execution role SAM generates is given the permission to send to each target. A destination naming only a `Type` of `SQS` or `SNS` gets a queue or topic created for it, named after the function (`<LogicalId>EventInvokeConfigOnFailureQueue`, for example).
+
 ```typescript sim-lambda-cloudformation-event-invoke-config
 /**
  * Deploying a Lambda failure destination and a dead-letter queue from a
@@ -4495,6 +4499,8 @@ Sim Lambda currently supports:
   policy, Function URL, versions and aliases
 - `UpdateFunctionConfigurationCommand`, changing the `Role`, `Handler`, `Runtime`, `Description`,
   `Timeout`, `MemorySize` and `Environment` a function runs with
+- `LastUpdateStatus`, reporting a code or settings change `InProgress` until it has rolled out, and
+  refusing another change, a `PublishVersion` or a `TagResource` until then
 - `GetFunctionConfigurationCommand`, reading a function's or a version's configuration alone
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`, paged by `Marker` and `MaxItems` like the other listings
@@ -4577,6 +4583,11 @@ Sim Lambda currently supports:
 - A CDK function given `onFailure`, `onSuccess`, `retryAttempts`, `maxEventAge` or
   `deadLetterQueue`, which deploys the `AWS::Lambda::EventInvokeConfig` and the `DeadLetterConfig`
   those synthesise
+- `Tags`, `DeadLetterQueue` and `EventInvokeConfig` on a SAM `AWS::Serverless::Function`, expanded as
+  SAM expands them, with the generated execution role allowed to deliver to each target and a queue
+  or topic created for a destination that names only a `Type`
+- An `AWS::Lambda::EventSourceMapping` whose `FunctionName` is a version or alias ARN, delivering to
+  that version or alias, as CDK's `alias.addEventSource(...)` synthesises one
 
 ## Limitations
 
@@ -4589,19 +4600,17 @@ Current documented limitations:
 - Tags are kept on functions alone. Event source mappings and code signing configs take none, and
   `Tags` on `CreateEventSourceMapping` is refused. Tags are not available as IAM condition keys
   (`aws:ResourceTag/...`, `aws:RequestTag/...` and `aws:TagKeys`), so attribute-based access
-  control on a function is not simulated. SAM's `Tags` on `AWS::Serverless::Function` are left out,
-  and CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
+  control on a function is not simulated. CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
 - `UpdateFunctionCode` leaves out the `RevisionId` and `DryRun` preconditions real Lambda takes,
   along with `Architectures` and `SourceKMSKeyArn`. `UpdateFunctionConfiguration` takes only the
   settings simulated Lambda models, leaving out `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`,
   `EphemeralStorage`, `SnapStart`, `LoggingConfig` and `RevisionId`. `ListFunctions` leaves out
   `MasterRegion`. A listing's `Marker` is an offset into what that request selected, and a marker
   from a different selection is refused.
-- SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function` are left out. A
-  SAM application declaring either deploys a function with the default retries, no destinations and
-  no dead-letter target. The `AWS::Lambda::EventInvokeConfig` Resource and the `DeadLetterConfig`
-  property a CloudFormation or CDK template writes are both deployed. See
-  [retries and destinations in templates](#retries-and-destinations-in-templates).
+- SAM's `EventInvokeConfig` on `AWS::Serverless::Function` configures `$LATEST`, since
+  `AutoPublishAlias` is left out. A `Destination` written as an `Fn::If` that can resolve to
+  `AWS::NoValue` is passed on as it stands, and no queue or topic is created for the branch naming
+  none.
 - Throttling does not drive a retry. A retry follows a handler that threw or ran out of time, and
   the `MaximumEventAgeInSeconds` a config carries is measured from when the invocation was
   accepted.
@@ -4609,8 +4618,10 @@ Current documented limitations:
   S3 destinations and `OnSuccess` are refused. Destination delivery is attempted once. A delivery
   failure rejects the background task after the discarded records have advanced the checkpoint.
   Destination delivery retries and `DestinationDeliveryFailures` metrics are not simulated.
-- A settings change takes effect at once. Real Lambda reports `LastUpdateStatus: "InProgress"` while
-  it rolls the change out, and neither that member nor the wait it implies is simulated.
+- An invocation made while a change is `InProgress` runs the changed code and settings. Real Lambda
+  runs the previous ones until the change has rolled out. A change never ends `Failed`. Real Lambda
+  also refuses a change to a function still `Pending` after its creation, and simulated Lambda
+  accepts one.
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
@@ -4641,8 +4652,7 @@ Current documented limitations:
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
   CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
   API Gateway integration and authorizer URIs, and `AWS::Lambda::Permission`. The
-  `AWS::Lambda::Url` and `AWS::Lambda::EventSourceMapping` template readers still refuse or drop a
-  qualifier.
+  `AWS::Lambda::Url` template reader still drops one.
 - The vm runtime supports CommonJS function code only. An ES module deployment package is refused
   at cold start, whether the handler file ends in `.mjs` or a `.js` file opens on `import`.
   Evaluating one would need `vm.SourceTextModule`, which Node.js gates behind

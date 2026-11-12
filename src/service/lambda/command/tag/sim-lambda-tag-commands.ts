@@ -55,6 +55,7 @@ export class SimLambdaTagCommands {
       options,
     );
 
+    simFunction.updates.assertIdle(simFunction.arn);
     simFunction.tags.tag(command.input.Tags);
 
     return { $metadata: {} };

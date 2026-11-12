@@ -20,6 +20,7 @@ import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaFunctionTags } from "./tags/sim-lambda-function-tags.js";
+import { SimLambdaFunctionUpdates } from "./update/sim-lambda-function-updates.js";
 import { SimLambdaInvocation } from "./invoke/sim-lambda-invocation.js";
 import { SimLambdaFunctionMetrics } from "../metric/sim-lambda-function-metrics.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
@@ -77,6 +78,8 @@ export class SimLambdaFunction {
   public readonly resourcePolicy = new SimLambdaFunctionPolicy();
   /** The function's tags, shared with every version published from it. */
   public readonly tags: SimLambdaFunctionTags;
+  /** Where the function stands with the changes made to it. */
+  public readonly updates = new SimLambdaFunctionUpdates();
   /** What this function publishes about its own work into `AWS/Lambda`. */
   public readonly metrics: SimLambdaFunctionMetrics;
 
@@ -152,9 +155,7 @@ export class SimLambdaFunction {
     return this.logging.logGroupName;
   }
 
-  /**
-   * Get the current state of this sim Lambda function.
-   */
+  /** Get the current state of this sim Lambda function. */
   get state(): SimLambdaFunctionState {
     return this.#state;
   }

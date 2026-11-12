@@ -904,7 +904,8 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   settings simulated Lambda does not model on `UpdateFunctionConfiguration` (`Layers`, `VpcConfig`,
   `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig`, `RevisionId`),
   and `MasterRegion` on `ListFunctions`
-- `LastUpdateStatus`, so a settings change takes effect at once, with no roll-out to wait on
+- the previous code and settings answering invocations while a change is `InProgress`, a change
+  ending `Failed`, and the refusal of a change to a function still `Pending`
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
@@ -914,4 +915,3 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   variables" above), and the same limitation for a time read there or a request made there
 - outbound HTTP from any client other than `fetch`, `node:http` and `node:https`, and following a
   redirect the simulation answered with
-- SAM's `EventInvokeConfig` and `DeadLetterQueue` on `AWS::Serverless::Function`

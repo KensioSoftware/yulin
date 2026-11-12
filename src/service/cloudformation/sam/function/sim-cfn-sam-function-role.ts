@@ -3,6 +3,8 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../template/value/sim-cfn-template-value.js";
 import { samConditionAttribute } from "./sim-cfn-sam-function-properties.js";
+import { samFunctionDeadLetterPolicies } from "./sim-cfn-sam-function-dead-letter.js";
+import { samFunctionEventInvokeConfigPolicies } from "./sim-cfn-sam-function-event-invoke-config.js";
 import {
   basicExecutionPolicyArn,
   lambdaAssumeRolePolicyDocument,
@@ -19,8 +21,9 @@ interface SamFunctionRoleProperties {
  * The AWS::IAM::Role Resource a SAM function is expanded with, for a function
  * that named no Role of its own.
  *
- * Every SAM function gets the basic execution policy, as SAM gives one, and
- * whatever its `Policies` said on top. The Role is conditioned the way the
+ * Every SAM function gets the basic execution policy, as SAM gives one,
+ * whatever its `Policies` said on top, and the permission to deliver to its
+ * dead-letter queue and its `EventInvokeConfig` destinations. The Role is conditioned the way the
  * function is. A function the template conditioned out leaves no Role behind
  * for the Stack to create.
  */
@@ -42,7 +45,11 @@ export function samFunctionRoleResource(
         basicExecutionPolicyArn,
         ...policies.managedPolicyArns,
       ],
-      ...inlinePolicies(policies.inlinePolicies),
+      ...inlinePolicies([
+        ...policies.inlinePolicies,
+        ...samFunctionDeadLetterPolicies(logicalId, functionProperties),
+        ...samFunctionEventInvokeConfigPolicies(logicalId, functionProperties),
+      ]),
     },
   };
 }
