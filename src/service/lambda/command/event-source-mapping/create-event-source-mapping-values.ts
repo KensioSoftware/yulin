@@ -27,6 +27,23 @@ export function functionResponseTypesIn(
 }
 
 /**
+ * The `Enabled` a request carries, refusing a value that is not a boolean.
+ *
+ * A request arriving as JSON can carry `"false"`, which would otherwise read
+ * as true.
+ */
+export function enabledIn(value: unknown): boolean | undefined {
+  if (value !== undefined && typeof value !== "boolean") {
+    throw new SimLambdaValidationException(
+      `1 validation error detected: Value '${JSON.stringify(value)}' at 'enabled' ` +
+        "failed to satisfy constraint: Member must be a boolean",
+    );
+  }
+
+  return value;
+}
+
+/**
  * A field a request has to carry, reported the way real Lambda reports a
  * missing one.
  */

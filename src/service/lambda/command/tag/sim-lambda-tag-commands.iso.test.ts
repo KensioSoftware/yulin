@@ -148,6 +148,21 @@ describe("Lambda tagging commands", () => {
     assertInstanceOf(error, SimLambdaInvalidParameterValueException);
   });
 
+  it("refuses a tag value that is not a string", async () => {
+    // Given a request whose value arrived as a JSON number.
+    const simLambda = new SimLambda();
+    const arn = await createOrders(simLambda);
+    const tags = { tier: 1 } as unknown as Record<string, string>;
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simLambda.tagResource(
+        new TagResourceCommand({ Resource: arn, Tags: tags }),
+      ),
+    );
+
+    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
+  });
+
   it("refuses a request that would leave more than 50 tags", async () => {
     // Given a function carrying 50 tags.
     const simLambda = new SimLambda();

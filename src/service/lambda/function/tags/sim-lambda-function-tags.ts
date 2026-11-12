@@ -96,7 +96,13 @@ function assertWritableKey(key: string): void {
   }
 }
 
-function assertValue(key: string, value: string): void {
+function assertValue(key: string, value: unknown): void {
+  if (typeof value !== "string") {
+    throw new SimLambdaInvalidParameterValueException(
+      `The value of tag "${key}" must be a string`,
+    );
+  }
+
   if (value.length > maximumValueLength) {
     throw new SimLambdaInvalidParameterValueException(
       `The value of tag "${key}" must be at most ` +

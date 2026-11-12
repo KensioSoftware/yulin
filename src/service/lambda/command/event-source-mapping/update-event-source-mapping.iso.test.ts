@@ -23,6 +23,7 @@ import {
   SimLambdaInvalidParameterValueException,
   SimLambdaResourceInUseException,
   SimLambdaResourceNotFoundException,
+  SimLambdaValidationException,
 } from "../../error/sim-lambda.error.js";
 
 async function send(
@@ -210,6 +211,23 @@ describe("Lambda UpdateEventSourceMappingCommand", () => {
 
     assertInstanceOf(error, SimLambdaInvalidParameterValueException);
     await simAws.backgroundTasksComplete();
+  });
+
+  it("refuses an Enabled that is not a boolean", async () => {
+    // Given a settled mapping, and an Enabled that arrived as a JSON string.
+    const { simAws, uuid } = await simAwsWithSqsEventSource();
+    await simAws.backgroundTasksComplete();
+    const enabled = "false" as unknown as boolean;
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .lambda()
+        .updateEventSourceMapping(
+          new UpdateEventSourceMappingCommand({ UUID: uuid, Enabled: enabled }),
+        ),
+    );
+
+    assertInstanceOf(error, SimLambdaValidationException);
   });
 
   it("throws for a mapping that does not exist", async () => {

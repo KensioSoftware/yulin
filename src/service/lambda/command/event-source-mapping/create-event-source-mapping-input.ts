@@ -14,6 +14,7 @@ import type { SimLambdaEventSourceStart } from "../../event-source/sim-lambda-ev
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { simLambdaFunctionReferenceOf } from "../../function/sim-lambda-function-reference.js";
 import {
+  enabledIn,
   functionResponseTypesIn,
   requiredString,
 } from "./create-event-source-mapping-values.js";
@@ -120,7 +121,7 @@ export class SimLambdaEventSourceMappingInput {
         startingPosition: input.StartingPosition,
         startingPositionTimestamp: input.StartingPositionTimestamp,
       }),
-      enabled: input.Enabled ?? true,
+      enabled: enabledIn(input.Enabled) ?? true,
       functionResponseTypes: functionResponseTypesIn(input),
       filterCriteria: SimLambdaFilterCriteria.of(
         input.FilterCriteria,

@@ -60,6 +60,17 @@ describe("Lambda CloudFormation Function tags", () => {
     });
   });
 
+  it("keeps a tag that omits its Value, with an empty value", async () => {
+    const simAws = new SimAws();
+    await deployTagged(simAws, [{ Key: "team" }]);
+
+    const read = await simAws
+      .lambda()
+      .getFunction(new GetFunctionCommand({ FunctionName: "orders" }));
+
+    assertObjectEquals(read.Tags, { team: "" });
+  });
+
   it("drops an entry that is not a Key and Value pair rather than failing the stack", async () => {
     const simAws = new SimAws();
     await deployTagged(simAws, [

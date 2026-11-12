@@ -7,6 +7,7 @@ import {
   refuseUnsimulatedInput,
   refuseUnsupportedEventSourceInput,
 } from "./create-event-source-mapping-refusals.js";
+import { enabledIn } from "./create-event-source-mapping-values.js";
 import type { SimUpdateEventSourceMappingCommandInput } from "./event-source-mapping.command.js";
 
 /**
@@ -54,7 +55,7 @@ export function simLambdaEventSourceMappingUpdateOf(
       input.BatchSize === undefined
         ? undefined
         : eventSourceArn.batchRules.sizeIn(input.BatchSize),
-    enabled: input.Enabled,
+    enabled: enabledIn(input.Enabled),
     // An empty FilterCriteria is how real Lambda is told to drop the filters,
     // which the criteria reader answers with no criteria at all.
     filterCriteria:
