@@ -117,8 +117,8 @@ export class SimCloudFrontFunction {
   async handleViewerRequest(request: Request): Promise<Request | Response> {
     const cffEvent = this.eventAdapter.toViewerRequestEvent(request);
 
-    const handlerFunction = this
-      .handlerFunction as CloudFrontFunction.ViewerRequestHandler;
+    const handlerFunction =
+      this.handlerFunction as CloudFrontFunction.ViewerRequestHandler;
     const cffResult = await this.running(
       async () => await handlerFunction(cffEvent),
     );
@@ -135,8 +135,8 @@ export class SimCloudFrontFunction {
   ): Promise<Response> {
     const cffEvent = this.eventAdapter.toViewerResponseEvent(request, response);
 
-    const handlerFunction = this
-      .handlerFunction as CloudFrontFunction.ViewerResponseHandler;
+    const handlerFunction =
+      this.handlerFunction as CloudFrontFunction.ViewerResponseHandler;
     const cffResult = await this.running(
       async () => await handlerFunction(cffEvent),
     );
