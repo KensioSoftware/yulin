@@ -17,6 +17,9 @@ import {
 } from "./sim-cfn-sam-function-properties.js";
 import { samFunctionRoleResource } from "./sim-cfn-sam-function-role.js";
 import { samFunctionUrlResources } from "./sim-cfn-sam-function-url.js";
+import { samFunctionDeadLetterConfig } from "./sim-cfn-sam-function-dead-letter.js";
+import { samFunctionEventInvokeConfigResources } from "./sim-cfn-sam-function-event-invoke-config.js";
+import { samFunctionTags } from "./sim-cfn-sam-function-tags.js";
 
 interface SamFunctionExpansionProperties {
   readonly logicalId: string;
@@ -43,8 +46,9 @@ interface SamFunctionExpansionProperties {
  * names. The execution Role is a second Resource named after it, unless the
  * function named a Role of its own to run as.
  *
- * The `Events` of the function reach the world in front of it, and a
- * `FunctionUrlConfig` is the AWS::Lambda::Url it answers on. Both expand into
+ * The `Events` of the function reach the world in front of it, a
+ * `FunctionUrlConfig` is the AWS::Lambda::Url it answers on, and an
+ * `EventInvokeConfig` is the AWS::Lambda::EventInvokeConfig on `$LATEST`. Both expand into
  * Resources beside the function, named after it, so what an event made is
  * something a template can `Ref` and something a Stack tears down.
  *
@@ -70,6 +74,8 @@ export function samFunctionResources(
     ...samCarriedAttributes(resource),
     Properties: {
       ...samCarriedProperties(functionProperties),
+      ...samFunctionDeadLetterConfig(functionProperties),
+      ...samFunctionTags(functionProperties),
       Role: declaredRole ?? { "Fn::GetAtt": [roleLogicalId, "Arn"] },
     },
   };
@@ -84,6 +90,11 @@ export function samFunctionResources(
       }),
     }),
     ...samFunctionUrlResources({ logicalId, functionProperties, condition }),
+    ...samFunctionEventInvokeConfigResources({
+      logicalId,
+      functionProperties,
+      condition,
+    }),
     ...samFunctionEventResources({
       logicalId,
       functionProperties,

@@ -115,6 +115,7 @@ export class UpdateFunctionCodeCommandHandler implements CommandHandler<
         "in. Set one with UpdateFunctionConfiguration first.",
     });
 
+    simFunction.updates.begin(simFunction.arn, this.background);
     simFunction.updateCode(code);
 
     return {

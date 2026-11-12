@@ -72,7 +72,8 @@ describe("Lambda UpdateFunctionConfigurationCommand and published versions", () 
 
   it("publishes the settings the function has when the version is taken", async () => {
     // Given a function whose settings changed after it was created.
-    const simLambda = new SimLambda();
+    const simAws = new SimAws();
+    const simLambda = simAws.lambda();
     await createOrdersFunction(simLambda);
     await simLambda.updateFunctionConfiguration(
       new UpdateFunctionConfigurationCommand({
@@ -82,6 +83,10 @@ describe("Lambda UpdateFunctionConfigurationCommand and published versions", () 
         Environment: { Variables: { STAGE: "test" } },
       }),
     );
+
+    // And that change has finished rolling out, which real Lambda waits for
+    // before it publishes.
+    await simAws.backgroundTasksComplete();
 
     // When a version is published afterwards.
     const published = await simLambda.publishVersion(

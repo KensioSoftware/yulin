@@ -135,6 +135,9 @@ describe("simulated Lambda SDK Command routing", () => {
     assertNonNullable(invoked.Payload);
     assertIdentical(Buffer.from(invoked.Payload).toString(), '"second"');
 
+    // The code update finishes rolling out before the next change, as real
+    // Lambda requires.
+    await simSdk.simAws.backgroundTasksComplete();
     await client.send(
       new UpdateFunctionConfigurationCommand({
         FunctionName: "intercepted",

@@ -6,7 +6,6 @@ import type { SimCreateEventSourceMappingCommandInput } from "../../command/even
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { recordUnsimulatedEventSourceMappingProperties } from "./sim-cfn-lambda-event-source-mapping-property-rules.js";
-import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
 
 /**
  * What a CloudFormation Unix time seconds value is multiplied by to reach the
@@ -61,12 +60,12 @@ export class SimCfnLambdaEventSourceMappingProperties {
       DestinationConfig: simLambdaStreamDestinationConfig(
         this.properties["DestinationConfig"],
       ),
-      FunctionName: simCfnLambdaTargetFunctionName(
-        this.parser.requiredString(
-          this.resource,
-          this.properties["FunctionName"],
-          "FunctionName",
-        ),
+      // Passed on whole, qualifier included: a mapping CDK points at an alias
+      // or a version names it by its qualified ARN, and delivers to that.
+      FunctionName: this.parser.requiredString(
+        this.resource,
+        this.properties["FunctionName"],
+        "FunctionName",
       ),
       BatchSize: this.parser.optionalNumber(
         this.resource,
