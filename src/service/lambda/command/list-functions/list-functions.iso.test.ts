@@ -7,17 +7,23 @@ import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
   assertArrayEmpty,
   assertArrayEquals,
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
   assertStringEndsWith,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import {
+  SimLambdaInvalidParameterValueException,
+  SimLambdaValidationException,
+} from "../../error/sim-lambda.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
@@ -167,5 +173,73 @@ describe("Lambda ListFunctionsCommand", () => {
     assertIdentical(error.action, "lambda:ListFunctions");
 
     await simAws.backgroundTasksComplete();
+  });
+
+  it("pages the listing by MaxItems, with NextMarker reaching the rest", async () => {
+    // Given three functions.
+    const simLambda = new SimLambda();
+    await createFunction(simLambda, "orders");
+    await createFunction(simLambda, "invoices");
+    await createFunction(simLambda, "shipments");
+
+    // When they are listed two at a time.
+    const first = await simLambda.listFunctions(
+      new ListFunctionsCommand({ MaxItems: 2 }),
+    );
+    const second = await simLambda.listFunctions(
+      new ListFunctionsCommand({ MaxItems: 2, Marker: first.NextMarker }),
+    );
+
+    // Then the second page carries the rest, and says there is no more.
+    assertArrayEquals(
+      first.Functions.map((simFunction) => simFunction.FunctionName),
+      ["orders", "invoices"],
+    );
+    assertArrayEquals(
+      second.Functions.map((simFunction) => simFunction.FunctionName),
+      ["shipments"],
+    );
+    assertUndefined(second.NextMarker);
+  });
+
+  it("answers with at most 50 functions however many are asked for", async () => {
+    // Given 51 functions.
+    const simLambda = new SimLambda();
+    for (let index = 0; index < 51; index++) {
+      // oxlint-disable-next-line no-await-in-loop -- created in order
+      await createFunction(simLambda, `function-${String(index)}`);
+    }
+
+    // When a thousand are asked for.
+    const listed = await simLambda.listFunctions(
+      new ListFunctionsCommand({ MaxItems: 1000 }),
+    );
+
+    // Then real Lambda's page limit applies.
+    assertArrayLength(listed.Functions, 50);
+    assertNonNullable(listed.NextMarker);
+  });
+
+  it("refuses a MaxItems below one", async () => {
+    const simLambda = new SimLambda();
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simLambda.listFunctions(new ListFunctionsCommand({ MaxItems: 0 })),
+    );
+
+    assertInstanceOf(error, SimLambdaValidationException);
+  });
+
+  it("refuses a Marker the listing did not issue", async () => {
+    const simLambda = new SimLambda();
+    await createFunction(simLambda, "orders");
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simLambda.listFunctions(
+        new ListFunctionsCommand({ Marker: "elsewhere" }),
+      ),
+    );
+
+    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
   });
 });

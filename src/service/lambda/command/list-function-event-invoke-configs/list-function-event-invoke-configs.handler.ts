@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import { simLambdaEventInvokeConfiguration } from "../../function/event-invoke/sim-lambda-event-invoke-settings.js";
 import {
@@ -50,11 +51,18 @@ export class ListFunctionEventInvokeConfigsCommandHandler implements CommandHand
       options,
     );
 
+    const page = simLambdaPage(
+      this.eventInvokeConfigs.allForFunction(resolved.functionName),
+      command.input,
+      { maximumMaxItems: 50, pageLimit: 50 },
+    );
+
     return {
       $metadata: {},
-      FunctionEventInvokeConfigs: this.eventInvokeConfigs
-        .allForFunction(resolved.functionName)
-        .map(simLambdaEventInvokeConfiguration),
+      FunctionEventInvokeConfigs: page.items.map(
+        simLambdaEventInvokeConfiguration,
+      ),
+      NextMarker: page.nextMarker,
     };
   }
 }

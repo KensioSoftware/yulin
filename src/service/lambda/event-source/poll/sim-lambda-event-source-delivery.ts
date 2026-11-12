@@ -41,10 +41,20 @@ export interface SimLambdaEventSourceEventBuilder {
   filterDocumentOf(message: SimSqsPollMessage): Record<string, unknown>;
 }
 
+/**
+ * Where a delivery reads the filters a batch goes through.
+ *
+ * That is the mapping itself rather than a copy of its filters, so filters
+ * changed by UpdateEventSourceMapping apply from the next batch on.
+ */
+export interface SimLambdaEventSourceFilters {
+  readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+}
+
 interface SimLambdaEventSourceDeliveryProperties {
   readonly eventBuilder: SimLambdaEventSourceEventBuilder;
   readonly batchResponse: SimLambdaEventSourceBatchResponse;
-  readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  readonly filters: SimLambdaEventSourceFilters;
 }
 
 /**
@@ -60,12 +70,12 @@ interface SimLambdaEventSourceDeliveryProperties {
 export class SimLambdaEventSourceDelivery {
   private readonly eventBuilder: SimLambdaEventSourceEventBuilder;
   private readonly batchResponse: SimLambdaEventSourceBatchResponse;
-  private readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  private readonly filters: SimLambdaEventSourceFilters;
 
   constructor(properties: SimLambdaEventSourceDeliveryProperties) {
     this.eventBuilder = properties.eventBuilder;
     this.batchResponse = properties.batchResponse;
-    this.filterCriteria = properties.filterCriteria;
+    this.filters = properties.filters;
   }
 
   /**
@@ -76,7 +86,7 @@ export class SimLambdaEventSourceDelivery {
     messages: readonly SimSqsPollMessage[],
   ): Promise<SimLambdaEventSourceBatchOutcome> {
     return await simLambdaFilteredDelivery({
-      criteria: this.filterCriteria,
+      criteria: this.filters.filterCriteria,
       records: messages,
       documentOf: (message) => this.eventBuilder.filterDocumentOf(message),
       // A message the filters excluded is deleted from the queue without the

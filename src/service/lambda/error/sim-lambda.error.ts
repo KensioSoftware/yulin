@@ -80,3 +80,17 @@ export class SimLambdaInvalidParameterValueException extends SimLambdaError {
     super(message, { httpStatusCode: 400 }, options);
   }
 }
+
+/**
+ * Simulated Lambda ResourceInUseException error.
+ *
+ * Real Lambda refuses a change to an event source mapping while an earlier
+ * change is still being rolled out.
+ */
+export class SimLambdaResourceInUseException extends SimLambdaError {
+  public override readonly name = "ResourceInUseException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

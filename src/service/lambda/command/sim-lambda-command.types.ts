@@ -24,7 +24,22 @@ export type {
   SimListEventSourceMappingsCommand,
   SimListEventSourceMappingsCommandInput,
   SimListEventSourceMappingsCommandOutput,
+  SimUpdateEventSourceMappingCommand,
+  SimUpdateEventSourceMappingCommandInput,
+  SimUpdateEventSourceMappingCommandOutput,
 } from "./event-source-mapping/event-source-mapping.command.js";
+export type {
+  SimGetFunctionConfigurationCommand,
+  SimGetFunctionConfigurationCommandOutput,
+} from "./get-function-configuration/get-function-configuration.command.js";
+export type {
+  SimListTagsCommand,
+  SimListTagsCommandOutput,
+  SimTagResourceCommand,
+  SimTagResourceCommandOutput,
+  SimUntagResourceCommand,
+  SimUntagResourceCommandOutput,
+} from "./tag/tag.command.js";
 export type {
   SimCreateAliasCommand,
   SimCreateAliasCommandOutput,

@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -83,11 +84,18 @@ export class ListFunctionUrlConfigsCommandHandler implements CommandHandler<
     );
     this.functions.require(functionName);
 
+    const page = simLambdaPage(
+      this.functionUrls.allForFunction(functionName),
+      command.input,
+      { maximumMaxItems: 50, pageLimit: 50 },
+    );
+
     return {
       $metadata: {},
-      FunctionUrlConfigs: this.functionUrls
-        .allForFunction(functionName)
-        .map((functionUrl) => functionUrl.configuration()),
+      FunctionUrlConfigs: page.items.map((functionUrl) =>
+        functionUrl.configuration(),
+      ),
+      NextMarker: page.nextMarker,
     };
   }
 }

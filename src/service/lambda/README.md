@@ -58,7 +58,10 @@ Current command areas include:
 - `add-permission/`, `remove-permission/`, `get-policy/`
 - `publish-version/`, `list-versions-by-function/`
 - `create-alias/`, `update-alias/`, `get-alias/`, `list-aliases/`, `delete-alias/`
-- `event-source-mapping/`
+- `event-source-mapping/`, including `UpdateEventSourceMapping`
+- `get-function-configuration/`, reusing the `GetFunction` read under its own IAM action
+- `tag/`, for `TagResource`, `UntagResource` and `ListTags` on a function ARN
+- `sim-lambda-page.ts`, the `Marker`/`MaxItems` paging every listing shares
 
 Commands sharing a set of collaborators are grouped behind one class per area — `command/function/`,
 `command/function-url/`, `command/permission/`, `command/version/`, `command/alias/`,
@@ -896,16 +899,16 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
 - running a container image: nothing reads one, so a function naming `Code.ImageUri` runs the real
   in-process handler an executable binding or a simulated ECR repository stands in with, and is
   skipped or refused where neither does
-- `GetFunctionConfiguration`, and the concurrency and tagging commands
+- the concurrency commands, tags on anything but a function, and tags as IAM condition keys
 - `RevisionId`, `DryRun`, `Architectures` and `SourceKMSKeyArn` on `UpdateFunctionCode`, the
   settings simulated Lambda does not model on `UpdateFunctionConfiguration` (`Layers`, `VpcConfig`,
   `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart`, `LoggingConfig`, `RevisionId`),
-  and `Marker`/`MaxItems` paging and `MasterRegion` on `ListFunctions`
+  and `MasterRegion` on `ListFunctions`
 - `LastUpdateStatus`, so a settings change takes effect at once, with no roll-out to wait on
 - `RevisionId` and `EventSourceToken` on the permission commands, qualified Function URLs, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes the other nineteen
+- version and alias operations over the served HTTP API endpoint, which routes twenty-four others
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

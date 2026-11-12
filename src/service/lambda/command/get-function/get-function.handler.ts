@@ -18,7 +18,12 @@ import type {
   SimLambdaFunctionName,
 } from "../../function/sim-lambda-function.js";
 import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
-import { GetFunctionAuthorizer } from "./get-function-authorizer.js";
+import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
+import { simLambdaGetFunctionTags } from "./get-function-tags.js";
+import {
+  GetFunctionAuthorizer,
+  type GetFunctionAuthorizerAction,
+} from "./get-function-authorizer.js";
 import type {
   SimGetFunctionCommand,
   SimGetFunctionCommandOutput,
@@ -30,6 +35,23 @@ interface GetFunctionCommandHandlerProperties {
   versions: SimLambdaFunctionVersionStore;
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
+  /**
+   * The IAM action the read is authorized as, which is what tells GetFunction
+   * apart from GetFunctionConfiguration.
+   */
+  action?: GetFunctionAuthorizerAction | undefined;
+}
+
+/**
+ * The function a read names, and the version of it the qualifier picks.
+ *
+ * They differ for a qualified read: the version carries the configuration, and
+ * the function carries what belongs to it whatever the version, such as its
+ * tags.
+ */
+interface GetFunctionResolved {
+  readonly simFunction: SimLambdaFunction;
+  readonly version: SimLambdaFunction;
 }
 
 interface GetFunctionCommandHandlerOptions {
@@ -49,6 +71,7 @@ export class GetFunctionCommandHandler implements CommandHandler<
   private readonly functions: SimLambdaFunctionMap;
   private readonly versions: SimLambdaFunctionVersionStore;
   private readonly authorizer: GetFunctionAuthorizer;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: GetFunctionCommandHandlerProperties) {
@@ -58,11 +81,13 @@ export class GetFunctionCommandHandler implements CommandHandler<
       versions,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      action,
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
     this.versions = versions;
-    this.authorizer = new GetFunctionAuthorizer({ iam });
+    this.authorizer = new GetFunctionAuthorizer({ iam, action });
+    this.iam = iam;
     this.background = background;
   }
 
@@ -74,9 +99,27 @@ export class GetFunctionCommandHandler implements CommandHandler<
     command: SimGetFunctionCommand,
     options?: GetFunctionCommandHandlerOptions,
   ): Promise<SimGetFunctionCommandOutput> {
+    const { simFunction, version } = await this.resolve(command, options);
+
+    return {
+      $metadata: {},
+      Configuration: version.configuration(),
+      ...simLambdaGetFunctionTags(this.iam, simFunction, options?.caller),
+    };
+  }
+
+  /**
+   * Authorize a read of a function, and find the function and the version of
+   * it the request names.
+   */
+  async resolve(
+    command: SimGetFunctionCommand,
+    options?: GetFunctionCommandHandlerOptions,
+    commandName = "GetFunctionCommand",
+  ): Promise<GetFunctionResolved> {
     assertDefined(
       command.input.FunctionName,
-      "GetFunctionCommand.input.FunctionName required",
+      `${commandName}.input.FunctionName required`,
     );
 
     // Allow for potential non-deterministic sequencing of async events.
@@ -102,10 +145,8 @@ export class GetFunctionCommandHandler implements CommandHandler<
     }
 
     return {
-      $metadata: {},
-      Configuration: this.versions
-        .require(simFunction, qualifier)
-        .configuration(),
+      simFunction,
+      version: this.versions.require(simFunction, qualifier),
     };
   }
 }

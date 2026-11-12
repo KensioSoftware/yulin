@@ -15,13 +15,14 @@ export interface SimListAliasesCommand {
 /**
  * Minimal structural sim Lambda ListAliases input.
  *
- * Every alias is reported in one answer, so the `Marker` and `MaxItems` real
- * Lambda pages with are left out. A `FunctionVersion` narrows the answer to
- * the aliases pointing at one version.
+ * A `FunctionVersion` narrows the answer to the aliases pointing at one
+ * version, and `MaxItems` and `Marker` page it.
  */
 export interface SimListAliasesCommandInput {
   readonly FunctionName?: string | undefined;
   readonly FunctionVersion?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 /**
@@ -30,4 +31,5 @@ export interface SimListAliasesCommandInput {
 export interface SimListAliasesCommandOutput {
   readonly $metadata: SimResponseMetadata;
   Aliases: SimLambdaFunctionAliasConfiguration[];
+  NextMarker?: string | undefined;
 }

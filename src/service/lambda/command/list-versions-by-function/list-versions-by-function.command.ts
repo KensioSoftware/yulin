@@ -15,11 +15,13 @@ export interface SimListVersionsByFunctionCommand {
 /**
  * Minimal structural sim Lambda ListVersionsByFunction input.
  *
- * Every version is reported in one answer, so the `Marker` and `MaxItems`
- * real Lambda pages with are left out.
+ * One answer carries at most 50 versions, as on real Lambda, and
+ * `NextMarker` reaches the rest.
  */
 export interface SimListVersionsByFunctionCommandInput {
   readonly FunctionName?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 /**
@@ -28,4 +30,5 @@ export interface SimListVersionsByFunctionCommandInput {
 export interface SimListVersionsByFunctionCommandOutput {
   readonly $metadata: SimResponseMetadata;
   Versions: SimLambdaFunctionConfiguration[];
+  NextMarker?: string | undefined;
 }

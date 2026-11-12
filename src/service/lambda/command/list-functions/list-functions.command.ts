@@ -15,17 +15,19 @@ export interface SimListFunctionsCommand {
 /**
  * Minimal structural sim Lambda ListFunctions input.
  *
- * `FunctionVersion` is the only member simulated Lambda reads. `"ALL"` adds
- * each function's published versions to the listing, and anything else lists
- * the functions themselves.
+ * `FunctionVersion: "ALL"` adds each function's published versions to the
+ * listing, and anything else lists the functions themselves. One answer
+ * carries at most 50 of them, as on real Lambda, and `NextMarker` reaches the
+ * rest.
  *
- * Real Lambda pages the listing with `Marker` and `MaxItems`, and reaches
- * another Region's functions with `MasterRegion`. Neither is simulated, so
- * all three are left out rather than accepted and ignored, matching the other
- * simulated Lambda listings.
+ * `MasterRegion` reaches another Region's Lambda@Edge replicas, which this
+ * simulation does not have, so it is left out rather than accepted and
+ * ignored.
  */
 export interface SimListFunctionsCommandInput {
   readonly FunctionVersion?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 /**
@@ -34,4 +36,5 @@ export interface SimListFunctionsCommandInput {
 export interface SimListFunctionsCommandOutput {
   readonly $metadata: SimResponseMetadata;
   readonly Functions: readonly SimLambdaFunctionConfiguration[];
+  readonly NextMarker?: string | undefined;
 }

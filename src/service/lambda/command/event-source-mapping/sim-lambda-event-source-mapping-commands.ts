@@ -11,7 +11,9 @@ import { SimLambdaEventSourceMappingStore } from "../../event-source/sim-lambda-
 import type { SimLambdaEventSourcePollers } from "../../event-source/sim-lambda-event-source-pollers.js";
 import { simLambdaFunctionNameOf } from "../../function/sim-lambda-function-name.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import { CreateEventSourceMappingCommandHandler } from "./create-event-source-mapping.handler.js";
+import { UpdateEventSourceMappingCommandHandler } from "./update-event-source-mapping.handler.js";
 import {
   anyFunctionName,
   SimLambdaEventSourceMappingAccess,
@@ -25,6 +27,8 @@ import type {
   SimGetEventSourceMappingCommandOutput,
   SimListEventSourceMappingsCommand,
   SimListEventSourceMappingsCommandOutput,
+  SimUpdateEventSourceMappingCommand,
+  SimUpdateEventSourceMappingCommandOutput,
 } from "./event-source-mapping.command.js";
 
 interface SimLambdaEventSourceMappingCommandsProperties {
@@ -122,10 +126,30 @@ export class SimLambdaEventSourceMappingCommands {
       functionName,
     });
 
+    // Real Lambda answers with at most 100 mappings, whatever MaxItems says.
+    const page = simLambdaPage(matching, command.input, {
+      maximumMaxItems: 10_000,
+      pageLimit: 100,
+    });
+
     return {
       $metadata: {},
-      EventSourceMappings: matching.map((mapping) => mapping.configuration()),
+      EventSourceMappings: page.items.map((mapping) => mapping.configuration()),
+      NextMarker: page.nextMarker,
     };
+  }
+
+  /**
+   * Change a mapping's batch size, enabled state or filters.
+   */
+  async update(
+    command: SimUpdateEventSourceMappingCommand,
+    options?: SimLambdaEventSourceMappingCommandOptions,
+  ): Promise<SimUpdateEventSourceMappingCommandOutput> {
+    return await new UpdateEventSourceMappingCommandHandler({
+      ...this.properties,
+      access: this.access,
+    }).handle(command, options);
   }
 
   /**

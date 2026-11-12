@@ -19,6 +19,7 @@ import {
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
+import { SimLambdaFunctionTags } from "./tags/sim-lambda-function-tags.js";
 import { SimLambdaInvocation } from "./invoke/sim-lambda-invocation.js";
 import { SimLambdaFunctionMetrics } from "../metric/sim-lambda-function-metrics.js";
 import { runSimLambdaInHostScope } from "./invoke/sim-lambda-host-scope.js";
@@ -55,10 +56,8 @@ export class SimLambdaFunction {
 
   /**
    * The settings UpdateFunctionConfiguration changes, which is everything
-   * about the function that is neither its identity nor its code.
-   *
-   * They are read all over the simulation and written in one place, which is
-   * updateConfiguration below.
+   * about the function that is neither its identity nor its code. They are
+   * read all over the simulation and written only by updateConfiguration.
    */
   public roleArn: string;
   public handlerName: string | undefined;
@@ -69,17 +68,14 @@ export class SimLambdaFunction {
   public environment: SimLambdaEnvironment;
 
   /** Where this function's abandoned asynchronous events go, if anywhere. */
-  public deadLetterTargetArn: string | undefined;
-  /**
-   * This function's resource-based policy, which says who may act on it.
-   *
-   * It lives on the function because that is what it belongs to: it survives
-   * as long as the function does, and it is the only thing that can allow a
-   * principal from another Account, whose own policies this Account never
-   * sees.
+  public deadLetterTargetArn: string | undefined; /**
+   * This function's resource-based policy, which says who may act on it. It
+   * survives as long as the function does, and it is the only thing that can
+   * allow a principal from another Account.
    */
   public readonly resourcePolicy = new SimLambdaFunctionPolicy();
-
+  /** The function's tags, shared with every version published from it. */
+  public readonly tags: SimLambdaFunctionTags;
   /** What this function publishes about its own work into `AWS/Lambda`. */
   public readonly metrics: SimLambdaFunctionMetrics;
 
@@ -136,6 +132,7 @@ export class SimLambdaFunction {
         memorySizeMb,
       });
     this.deadLetterTargetArn = deadLetterTargetArn;
+    this.tags = properties.tags ?? new SimLambdaFunctionTags();
     this.runAsOwner = runAsOwner;
     this.outboundHttp = outboundHttp;
     this.metrics = new SimLambdaFunctionMetrics({ metrics, clock });
@@ -190,6 +187,7 @@ export class SimLambdaFunction {
       code: this.#code,
       environment: this.environment,
       deadLetterTargetArn: this.deadLetterTargetArn,
+      tags: this.tags,
       runAsOwner: this.runAsOwner,
       state: "Active",
       description: description ?? this.description,

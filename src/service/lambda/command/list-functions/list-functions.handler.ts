@@ -12,6 +12,7 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionMap } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionConfiguration } from "../../function/sim-lambda-function-configuration.js";
 import type { SimLambdaFunctionVersionStore } from "../../function/version/sim-lambda-function-version-store.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import { ListFunctionsAuthorizer } from "./list-functions-authorizer.js";
 import type {
   SimListFunctionsCommand,
@@ -84,11 +85,17 @@ export class ListFunctionsCommandHandler implements CommandHandler<
       )
       .toArray();
 
+    const page = simLambdaPage(listed, command.input, {
+      maximumMaxItems: 10_000,
+      pageLimit: 50,
+    });
+
     return {
       $metadata: {},
-      Functions: listed.map((simFunction): SimLambdaFunctionConfiguration =>
+      Functions: page.items.map((simFunction): SimLambdaFunctionConfiguration =>
         simFunction.configuration(),
       ),
+      NextMarker: page.nextMarker,
     };
   }
 }

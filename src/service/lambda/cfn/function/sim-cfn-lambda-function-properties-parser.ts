@@ -12,6 +12,7 @@ import { SimCfnLambdaDeadLetterParser } from "./sim-cfn-lambda-dead-letter-parse
 import { SimCfnLambdaEnvironmentParser } from "./sim-cfn-lambda-environment-parser.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
+import { simCfnLambdaTags } from "./sim-cfn-lambda-tags-parser.js";
 import { simCfnLambdaGeneratedFunctionName } from "./sim-cfn-lambda-generated-function-name.js";
 
 export interface SimCfnLambdaFunctionProperties {
@@ -27,6 +28,7 @@ export interface SimCfnLambdaFunctionProperties {
   readonly memorySizeMb: number | undefined;
   readonly environment: SimLambdaFunctionEnvironment | undefined;
   readonly deadLetterConfig: SimLambdaDeadLetterConfigInput | undefined;
+  readonly tags: Record<string, string> | undefined;
 }
 
 /**
@@ -49,6 +51,7 @@ export function simCfnLambdaCreateFunctionInput(
     MemorySize: functionProperties.memorySizeMb,
     Environment: functionProperties.environment,
     DeadLetterConfig: functionProperties.deadLetterConfig,
+    Tags: functionProperties.tags,
   };
 }
 
@@ -117,6 +120,7 @@ export class SimCfnLambdaFunctionPropertiesParser {
         resource,
         properties["DeadLetterConfig"],
       ),
+      tags: simCfnLambdaTags(properties["Tags"]),
     };
   }
 

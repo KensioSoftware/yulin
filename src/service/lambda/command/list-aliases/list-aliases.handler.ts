@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simLambdaPage } from "../sim-lambda-page.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -87,9 +88,15 @@ export class ListAliasesCommandHandler implements CommandHandler<
       input.FunctionVersion,
     );
 
+    const page = simLambdaPage(aliases, input, {
+      maximumMaxItems: 10_000,
+      pageLimit: 10_000,
+    });
+
     return {
       $metadata: {},
-      Aliases: aliases.map((alias) => alias.configuration()),
+      Aliases: page.items.map((alias) => alias.configuration()),
+      NextMarker: page.nextMarker,
     };
   }
 }

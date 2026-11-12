@@ -14,6 +14,7 @@ import { SimLambdaEventSourceMappingCommands } from "./command/event-source-mapp
 import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-function-commands.js";
 import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
 import { SimLambdaPermissionCommands } from "./command/permission/sim-lambda-permission-commands.js";
+import { SimLambdaTagCommands } from "./command/tag/sim-lambda-tag-commands.js";
 import { SimLambdaVersionCommands } from "./command/version/sim-lambda-version-commands.js";
 import { SimLambdaEventSourcePollers } from "./event-source/sim-lambda-event-source-pollers.js";
 import { SimLambdaNoEventSourceQueues } from "./event-source/queue/sim-lambda-no-event-source-queues.js";
@@ -124,6 +125,7 @@ export class SimLambdaCommands {
   public readonly aliases: SimLambdaAliasCommands;
   public readonly eventSourceMappings: SimLambdaEventSourceMappingCommands;
   public readonly eventInvokeConfigs: SimLambdaEventInvokeConfigCommands;
+  public readonly tags: SimLambdaTagCommands;
 
   constructor(properties: SimLambdaCommandsProperties) {
     const {
@@ -176,6 +178,12 @@ export class SimLambdaCommands {
     this.permissions = new SimLambdaPermissionCommands({
       functions: this.functionLookup,
       versions: this.versionStore,
+      iam,
+      background,
+    });
+    this.tags = new SimLambdaTagCommands({
+      accountRegionScope,
+      functions: this.functionLookup,
       iam,
       background,
     });
