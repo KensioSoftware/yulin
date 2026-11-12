@@ -245,4 +245,66 @@ describe("Lambda reserved concurrency", () => {
 
     assertIdentical(reserved.ReservedConcurrentExecutions, 3);
   });
+
+  it("removes a template function whose reservation is refused", async () => {
+    // Given a template function asking for more than the account can reserve.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: {
+          Resources: {
+            OrdersFunction: {
+              Type: "AWS::Lambda::Function",
+              Properties: {
+                FunctionName: "orders",
+                Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+                Handler: "index.handler",
+                Runtime: "nodejs22.x",
+                Code: { ZipFile: "exports.handler = async () => null;" },
+                ReservedConcurrentExecutions: 950,
+              },
+            },
+          },
+        },
+      });
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the function it made is rolled back rather than left behind.
+    assertUndefined(simAws.lambda().getSimFunctionByName("orders"));
+  });
+
+  it("reports a throttle the handler met invoking another function as its own error", async () => {
+    // Given an outer function whose handler invokes a switched-off function
+    // and lets the throttle escape.
+    const simAws = await simAwsWithFunction(["inner"]);
+    await reserve(simAws, 0, "inner");
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "outer",
+        Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(
+            async () =>
+              await simAws
+                .lambda()
+                .invoke(new InvokeCommand({ FunctionName: "inner" })),
+          ),
+        },
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // When the outer function is invoked.
+    const invoked = await simAws
+      .lambda()
+      .invoke(new InvokeCommand({ FunctionName: "outer" }));
+
+    // Then it ran and failed, which is a function error and not a throttle.
+    assertIdentical(invoked.StatusCode, 200);
+    assertIdentical(invoked.FunctionError, "Unhandled");
+  });
 });

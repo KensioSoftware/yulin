@@ -38,13 +38,30 @@ export async function simCfnLambdaReserveConcurrency(
 /**
  * Finish creating a template function once CreateFunction has made it, by
  * reserving the concurrency it states, and answer with the function.
+ *
+ * A reservation that is refused fails the Resource, and CloudFormation rolls
+ * the function it made back. Leaving it in place would leave a function no
+ * Resource owns, which a retried deployment would collide with by name.
  */
 export async function simCfnLambdaCreatedFunction(
   lambda: SimLambda,
   functionProperties: SimCfnLambdaFunctionProperties,
   options?: SimCfnResourceCallerOptions,
 ): Promise<SimLambdaFunction> {
-  await simCfnLambdaReserveConcurrency(lambda, functionProperties, options);
+  try {
+    await simCfnLambdaReserveConcurrency(lambda, functionProperties, options);
+  } catch (error) {
+    // Settled rather than awaited outright, so a rollback that fails too
+    // leaves the refusal as the error the deployment reports.
+    await Promise.allSettled([
+      lambda.deleteFunction(
+        { input: { FunctionName: functionProperties.functionName } },
+        options,
+      ),
+    ]);
+
+    throw error;
+  }
 
   const simFunction = lambda.getSimFunctionByName(
     functionProperties.functionName,
