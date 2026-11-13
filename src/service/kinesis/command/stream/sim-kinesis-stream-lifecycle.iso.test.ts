@@ -56,7 +56,7 @@ describe("Simulated Kinesis stream lifecycle", () => {
     await simKinesisStreamFactory.make({ shardCount: 3 }, simAws);
 
     // When it is summarised.
-    const summary = await simAws
+    const { StreamDescriptionSummary } = await simAws
       .kinesis()
       .describeStreamSummary(
         new DescribeStreamSummaryCommand({ StreamName: "orders" }),
@@ -64,7 +64,6 @@ describe("Simulated Kinesis stream lifecycle", () => {
 
     // Then the open shard count stands in for the shards themselves, and the
     // retention is the default Kinesis gives a new stream.
-    const { StreamDescriptionSummary } = summary;
     assertIdentical(StreamDescriptionSummary.OpenShardCount, 3);
     assertIdentical(StreamDescriptionSummary.RetentionPeriodHours, 24);
     assertIdentical(StreamDescriptionSummary.ConsumerCount, 0);
