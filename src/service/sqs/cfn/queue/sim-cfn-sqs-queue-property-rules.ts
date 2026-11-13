@@ -66,7 +66,7 @@ export class SimCfnSqsQueuePropertyRules {
    * Record everything about this Resource the queue is created without.
    */
   apply(): void {
-    this.applyToFifoQueue();
+    this.isFifo();
     this.skipped.assertConstraints();
 
     for (const name of Object.keys(this.properties)) {
@@ -75,34 +75,21 @@ export class SimCfnSqsQueuePropertyRules {
   }
 
   /**
-   * Refuse a FIFO queue.
+   * Whether the Resource asks for a FIFO queue.
    *
-   * This is one of the few properties still worth refusing over. A FIFO queue
-   * is named `<name>.fifo`, and simulated SQS refuses that name to an SDK
-   * caller as well, so there is no queue to create the Resource without the
-   * property as: the only queue that could exist would answer to a different
-   * name from the one the template gave it, and everything referring to it
-   * would be referring to nothing.
-   *
-   * A value that is neither true nor false is refused as well, rather than
-   * read as false: CloudFormation refuses it too, and the queue it asked for
-   * is not knowable.
+   * A value that is neither true nor false is refused rather than read as
+   * false: CloudFormation refuses it too, and the queue it asked for is not
+   * knowable.
    */
-  private applyToFifoQueue(): void {
+  isFifo(): boolean {
     const fifo = this.properties["FifoQueue"];
 
     if (fifo === undefined || standardQueueValues.has(fifo)) {
-      return;
+      return false;
     }
 
     if (fifoQueueValues.has(fifo)) {
-      throw sqsQueuePropertyError(
-        this.logicalId,
-        "FifoQueue names a FIFO queue, which simulated SQS does not " +
-          "simulate. Only standard queues are simulated, and a FIFO queue " +
-          "is named <name>.fifo, which simulated SQS refuses, so there is no " +
-          "queue to create under the name the template gave it",
-      );
+      return true;
     }
 
     throw sqsQueuePropertyError(

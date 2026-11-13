@@ -39,24 +39,42 @@ export class SimSqsDeadLetterTargets {
   }
 
   /**
-   * Refuse a request whose redrive policy names a queue that is not there.
+   * Refuse a request whose redrive policy names a queue that is not there, or
+   * one of the other type.
    *
-   * A request setting no redrive policy names no dead-letter queue, so there is
-   * nothing to check.
+   * Real SQS requires a FIFO queue's dead-letter queue to be a FIFO queue, and
+   * a standard queue's to be a standard queue. A request setting no redrive
+   * policy names no dead-letter queue, so there is nothing to check.
    */
-  assertRequestedTarget(requested: SimSqsQueueAttributeInput): void {
+  assertRequestedTarget(
+    requested: SimSqsQueueAttributeInput,
+    sourceIsFifo: boolean,
+  ): void {
     const policy = simSqsRedrivePolicyIn(requested);
 
-    if (policy === undefined || this.find(policy) !== undefined) {
+    if (policy === undefined) {
       return;
     }
 
-    throw new SimSqsInvalidParameterValue(
-      `Value ${policy.value} for parameter RedrivePolicy is invalid. Reason: ` +
-        `Dead letter target ${policy.deadLetterTargetArn} does not exist. A ` +
-        `dead-letter queue has to be an existing queue in the same Account ` +
-        `and Region as the queue redriving to it.`,
-    );
+    const target = this.find(policy);
+
+    if (target === undefined) {
+      throw new SimSqsInvalidParameterValue(
+        `Value ${policy.value} for parameter RedrivePolicy is invalid. ` +
+          `Reason: Dead letter target ${policy.deadLetterTargetArn} does not ` +
+          `exist. A dead-letter queue has to be an existing queue in the same ` +
+          `Account and Region as the queue redriving to it.`,
+      );
+    }
+
+    if (target.name.isFifo !== sourceIsFifo) {
+      throw new SimSqsInvalidParameterValue(
+        `Value ${policy.value} for parameter RedrivePolicy is invalid. ` +
+          `Reason: The dead-letter queue of a FIFO queue must also be a FIFO ` +
+          `queue, and the dead-letter queue of a standard queue must also be ` +
+          `a standard queue.`,
+      );
+    }
   }
 
   /**
@@ -82,7 +100,13 @@ export class SimSqsDeadLetterTargets {
 
     for (const message of messages.exhausted(instant, policy.maxReceiveCount)) {
       messages.remove(message);
-      target.add(message.onDeadLetterQueue(instant, sourceQueueArn));
+      target.add(
+        message.onDeadLetterQueue({
+          instant,
+          sourceQueueArn,
+          toFifoQueue: target.name.isFifo,
+        }),
+      );
     }
   }
 

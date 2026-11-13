@@ -13,10 +13,14 @@ import { validateSimCfnSqsKmsDataKeyReusePeriod } from "./sim-cfn-sqs-queue-encr
  * ranges and defaults in one place, the ones simulated SQS already validates.
  *
  * Five of them are amounts. `RedrivePolicy` is a JSON document, and
- * CloudFormation carries it as an object where SQS carries it as a string.
+ * CloudFormation carries it as an object where SQS carries it as a string. The
+ * FIFO ones are a boolean and two words.
  */
 export const attributePropertyNames: ReadonlySet<string> = new Set([
+  "ContentBasedDeduplication",
+  "DeduplicationScope",
   "DelaySeconds",
+  "FifoThroughputLimit",
   "MaximumMessageSize",
   "MessageRetentionPeriod",
   "ReceiveMessageWaitTimeSeconds",
@@ -40,9 +44,6 @@ export const unsimulatedPropertyReasons: SimCfnSkippedPropertyRules = new Map<
   string,
   SimCfnSkippedPropertyRule | string
 >([
-  ["ContentBasedDeduplication", "only standard queues are simulated"],
-  ["DeduplicationScope", "only standard queues are simulated"],
-  ["FifoThroughputLimit", "only standard queues are simulated"],
   [
     "KmsDataKeyReusePeriodSeconds",
     {
@@ -70,8 +71,7 @@ export const fifoQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
 ]);
 
 /**
- * The FifoQueue values that ask for a standard queue, which is the only kind
- * this simulation creates.
+ * The FifoQueue values that ask for a standard queue.
  */
 export const standardQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
   false,

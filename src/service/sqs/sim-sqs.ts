@@ -39,7 +39,8 @@ interface SimSqsProperties {
  * name is unique within one of those scopes, and both the queue URL and the ARN
  * name the region.
  *
- * Only standard queues are simulated. FIFO queues are not.
+ * Both standard and FIFO queues are simulated. A queue whose name ends
+ * `.fifo` is a FIFO queue, created with the `FifoQueue` attribute.
  */
 export class SimSqs {
   private readonly queues = new SimSqsQueueStore();

@@ -29,10 +29,12 @@ interface SimSqsDeleteMessageCommandsProperties {
  */
 export class SimSqsDeleteMessageCommands {
   private readonly access: SimSqsQueueAccess;
+  private readonly clock: BackgroundScheduler;
   private readonly handles: SimSqsMessageHandles;
 
   constructor(properties: SimSqsDeleteMessageCommandsProperties) {
     this.access = properties.access;
+    this.clock = properties.clock;
     this.handles = new SimSqsMessageHandles({ clock: properties.clock });
   }
 
@@ -93,14 +95,17 @@ export class SimSqsDeleteMessageCommands {
    * A handle from an earlier receive is accepted and deletes nothing, which is
    * what real SQS does with one: the receive it belongs to has been superseded,
    * so the message another consumer now holds is left where it is. That is the
-   * failure a consumer slower than the visibility timeout actually hits.
+   * failure a consumer slower than the visibility timeout actually hits. A
+   * FIFO queue refuses that handle instead.
    */
   private delete(queue: SimSqsQueue, requested: string | undefined): void {
     const receiptHandle = SimSqsMessageHandles.required(requested);
     const message = this.handles.message(queue, receiptHandle);
 
+    this.handles.assertUnexpired(queue, message, receiptHandle);
+
     if (message.holdsReceiptHandle(receiptHandle)) {
-      queue.removeMessage(message);
+      queue.removeMessage(message, this.clock.now());
     }
   }
 }

@@ -10,6 +10,7 @@ import type {
   SimSqsQueueAttributeInput,
   SimSqsQueueAttributes,
 } from "./sim-sqs-queue-attributes.js";
+import { SimSqsQueueIntake } from "./sim-sqs-queue-intake.js";
 import { simSqsReportedQueueAttributes } from "./sim-sqs-queue-report.js";
 
 interface SimSqsQueueProperties {
@@ -22,7 +23,7 @@ interface SimSqsQueueProperties {
 }
 
 /**
- * One simulated standard queue.
+ * One simulated queue, standard or FIFO.
  *
  * The queue owns its messages rather than a service-wide message table owning
  * them, because everything a message does depends on the queue's attributes: how
@@ -36,7 +37,10 @@ export class SimSqsQueue {
   public readonly arn: SimSqsQueueArn;
   public readonly createdAt: Date;
 
-  private readonly messages = new SimSqsMessageStore();
+  /** How this queue takes in what is sent to it. */
+  public readonly intake: SimSqsQueueIntake;
+
+  private readonly messages: SimSqsMessageStore;
   private readonly deadLetterTargets: SimSqsDeadLetterTargets;
   private readonly activity: SimSqsQueueActivity;
   private settings: SimSqsQueueAttributes;
@@ -49,6 +53,16 @@ export class SimSqsQueue {
       accountRegionScope: properties.accountRegionScope,
     });
     this.createdAt = properties.createdAt;
+    this.messages = new SimSqsMessageStore(properties.name.isFifo);
+    this.intake = new SimSqsQueueIntake({
+      fifo: properties.name.isFifo,
+      add: (stored): void => {
+        this.add(stored);
+      },
+      announce: (instant): void => {
+        this.activity.messageAvailableAt(this.arn.value, instant);
+      },
+    });
     this.lastModifiedAt = properties.createdAt;
     this.settings = properties.attributes;
     this.deadLetterTargets = properties.deadLetterTargets;
@@ -101,14 +115,14 @@ export class SimSqsQueue {
   ): void {
     const updated = this.settings.with(requested);
 
-    this.deadLetterTargets.assertRequestedTarget(requested);
+    this.deadLetterTargets.assertRequestedTarget(requested, this.name.isFifo);
 
     this.settings = updated;
     this.lastModifiedAt = modifiedAt;
   }
 
   /**
-   * Take a newly sent message.
+   * Take a message, whether sent or moved here from another queue.
    *
    * Anything watching the queue is told, which is how a Lambda event source
    * mapping learns there is something to poll for. A message moved here from
@@ -122,6 +136,9 @@ export class SimSqsQueue {
 
   /**
    * The messages that can be received at an instant, oldest first.
+   *
+   * A FIFO queue hands out none from a message group with a message in flight,
+   * and as many from one group as it can before moving on to the next.
    */
   receivable(instant: Date, limit: number): readonly SimSqsMessage[] {
     this.applyLifecycle(instant);
@@ -141,15 +158,6 @@ export class SimSqsQueue {
     this.applyLifecycle(instant);
 
     return this.messages.nextAvailability(instant);
-  }
-
-  /**
-   * How many messages this queue could hand out at an instant.
-   */
-  receivableCount(instant: Date): number {
-    this.applyLifecycle(instant);
-
-    return this.messages.countsAt(instant).visible;
   }
 
   /**
@@ -209,10 +217,21 @@ export class SimSqsQueue {
   }
 
   /**
-   * Forget a deleted message.
+   * Whether a message is still on this queue.
    */
-  removeMessage(message: SimSqsMessage): void {
+  holdsMessage(message: SimSqsMessage): boolean {
+    return this.messages.holds(message);
+  }
+
+  /**
+   * Forget a deleted message.
+   *
+   * Deleting a FIFO message unblocks its message group, so watchers are told
+   * the next message in the group can be received now.
+   */
+  removeMessage(message: SimSqsMessage, instant: Date): void {
     this.messages.remove(message);
+    this.intake.released(instant);
   }
 
   /**

@@ -1,3 +1,8 @@
+import type { SimSqsFifoQueueAttributes } from "./sim-sqs-fifo-queue-attributes.js";
+import {
+  type SimSqsQueueType,
+  SimSqsStandardQueueType,
+} from "./sim-sqs-queue-type.js";
 import { SimSqsQueueAttributeNumbers } from "./sim-sqs-queue-attribute-numbers.js";
 import { SimSqsQueueJsonAttributes } from "./sim-sqs-queue-json-attributes.js";
 import type { SimSqsQueuePolicy } from "./sim-sqs-queue-policy.js";
@@ -14,31 +19,45 @@ export type SimSqsQueueAttributeInput = Readonly<
 /**
  * The attribute values held by one simulated queue.
  *
- * They come in two kinds. Most are amounts, held as numbers because that is
+ * They come in three kinds. Most are amounts, held as numbers because that is
  * what the queue's behaviour is expressed in. The redrive policy and the queue
  * policy are JSON documents, and a queue has neither until one is set, so they
- * are held apart from the rest rather than squeezed into the same map.
+ * are held apart from the rest rather than squeezed into the same map. The
+ * FIFO attributes belong to the queue's type, which is fixed when the queue is
+ * created.
  */
 export class SimSqsQueueAttributes {
   private readonly numbers: SimSqsQueueAttributeNumbers;
   private readonly documents: SimSqsQueueJsonAttributes;
+  private readonly type: SimSqsQueueType;
 
   private constructor(
     numbers: SimSqsQueueAttributeNumbers,
     documents: SimSqsQueueJsonAttributes,
+    type: SimSqsQueueType,
   ) {
     this.numbers = numbers;
     this.documents = documents;
+    this.type = type;
   }
 
   /**
-   * The attribute values a queue created with no attributes has.
+   * The attribute values a queue of one type created with no attributes has,
+   * a standard queue unless told otherwise.
    */
-  static defaults(): SimSqsQueueAttributes {
+  static defaults(
+    type: SimSqsQueueType = new SimSqsStandardQueueType(),
+  ): SimSqsQueueAttributes {
     return new this(
       SimSqsQueueAttributeNumbers.defaults(),
       SimSqsQueueJsonAttributes.defaults(),
+      type,
     );
+  }
+
+  /** The FIFO attributes, or nothing for a standard queue. */
+  get fifo(): SimSqsFifoQueueAttributes | undefined {
+    return this.type.fifo;
   }
 
   /** The delay a new message with no delay of its own waits out. */
@@ -78,6 +97,7 @@ export class SimSqsQueueAttributes {
     return new SimSqsQueueAttributes(
       this.numbers.with(requested),
       this.documents.with(requested),
+      this.type.with(requested),
     );
   }
 
@@ -89,7 +109,9 @@ export class SimSqsQueueAttributes {
    * request carrying none matches any existing queue.
    */
   matches(requested: SimSqsQueueAttributeInput): boolean {
-    return this.documents.matches(requested) && this.numbers.matches(requested);
+    return [this.type, this.documents, this.numbers].every((part) =>
+      part.matches(requested),
+    );
   }
 
   /**
@@ -104,6 +126,7 @@ export class SimSqsQueueAttributes {
     const reported = new Map(this.numbers.reported());
 
     this.documents.reportInto(reported);
+    this.type.reportInto(reported);
 
     return reported;
   }

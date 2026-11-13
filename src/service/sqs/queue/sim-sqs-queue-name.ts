@@ -1,15 +1,14 @@
 import {
   SimSqsInvalidParameterValue,
-  SimSqsUnsupportedOperation,
   SimSqsValidationException,
 } from "../error/sim-sqs.error.js";
 
 /**
  * Real SQS allows alphanumeric characters, hyphens and underscores, up to 80
- * characters. A FIFO queue name additionally ends in `.fifo`, which is the only
- * way a period gets into a name.
+ * characters. A FIFO queue name ends in `.fifo` within those 80, which is the
+ * only way a period gets into a name.
  */
-const queueNamePattern = /^[\w-]{1,80}$/;
+const queueNamePattern = /^(?:[\w-]{1,80}|[\w-]{1,75}\.fifo)$/u;
 
 const fifoSuffix = ".fifo";
 
@@ -41,23 +40,54 @@ export class SimSqsQueueName {
 
   /**
    * Read a queue name from request input, refusing one real SQS would refuse.
+   *
+   * Whether a `.fifo` name matches the queue type asked for is the create
+   * request's question, since only it knows whether `FifoQueue` was set.
    */
   static of(value: string): SimSqsQueueName {
-    if (value.endsWith(fifoSuffix)) {
-      throw new SimSqsUnsupportedOperation(
-        `Queue name '${value}' names a FIFO queue, which simulated SQS does ` +
-          `not support. Only standard queues are simulated.`,
-      );
-    }
-
     if (!queueNamePattern.test(value)) {
       throw new SimSqsInvalidParameterValue(
         `Value '${value}' for parameter QueueName is invalid. Reason: Can ` +
           `only include alphanumeric characters, hyphens, or underscores. 1 ` +
-          `to 80 in length.`,
+          `to 80 in length. A FIFO queue name ends with the .fifo suffix.`,
       );
     }
 
     return new this(value);
+  }
+
+  /**
+   * Whether this is the name of a FIFO queue, which always ends `.fifo`.
+   */
+  get isFifo(): boolean {
+    return this.value.endsWith(fifoSuffix);
+  }
+
+  /**
+   * Refuse a name that does not match the queue type a create request asked
+   * for.
+   *
+   * Real SQS ties the two together in both directions: a FIFO queue has to be
+   * named `<name>.fifo`, and a standard queue cannot be, since a period is
+   * otherwise not allowed in a name.
+   */
+  assertMatchesType(fifo: boolean): void {
+    if (fifo && !this.isFifo) {
+      throw new SimSqsInvalidParameterValue(
+        `Value '${this.value}' for parameter QueueName is invalid. Reason: ` +
+          `The name of a FIFO queue can only include alphanumeric ` +
+          `characters, hyphens, or underscores, must end with .fifo suffix ` +
+          `and be 1 to 80 in length.`,
+      );
+    }
+
+    if (!fifo && this.isFifo) {
+      throw new SimSqsInvalidParameterValue(
+        `Value '${this.value}' for parameter QueueName is invalid. Reason: ` +
+          `Can only include alphanumeric characters, hyphens, or ` +
+          `underscores. 1 to 80 in length. A name ending .fifo needs the ` +
+          `FifoQueue attribute set to true.`,
+      );
+    }
   }
 }

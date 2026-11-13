@@ -60,7 +60,8 @@ export class SimSqsQueueActivity {
    */
   receivableCount(queueArn: string): number {
     return (
-      this.queues.findByArn(queueArn)?.receivableCount(this.clock.now()) ?? 0
+      this.queues.findByArn(queueArn)?.receivable(this.clock.now(), Infinity)
+        .length ?? 0
     );
   }
 

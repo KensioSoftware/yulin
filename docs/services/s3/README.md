@@ -2129,9 +2129,8 @@ error from `backgroundTasksComplete()` naming the Bucket.
   name, as it is for an SDK caller.
 - `Managed: false` on a `Custom::S3BucketNotifications` resource is refused outright, and an
   EventBridge destination in one is refused by name as it is for an SDK caller.
-- A FIFO queue destination is refused by name, as real S3 refuses one. Simulated SQS has no FIFO
-  queues either, and simulated SNS has no FIFO topics, so a FIFO topic destination is refused the
-  same way.
+- A FIFO queue destination is refused by name, as real S3 refuses one. A FIFO topic destination is
+  refused the same way, and simulated SNS has no FIFO topics.
 - The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is ignored.
   Queue encryption is left out.
 - `mountBucketFilesystem(...)` replaces the storage with the directory, and a file written there by

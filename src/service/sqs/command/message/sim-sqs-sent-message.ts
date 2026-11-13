@@ -6,29 +6,19 @@ import type { SimSqsMessageWrite } from "../../message/sim-sqs-message-writer.js
 import type { SimSqsSentMessage } from "./send.command.js";
 
 /**
- * Read the message a send request describes, refusing the fields this simulation
- * does not model.
+ * Read the message a send request describes.
  *
- * The FIFO fields are refused because there are no FIFO queues here to give them
- * meaning, and a message accepted with a `MessageGroupId` that ordered nothing
- * would be a message a test believed was ordered.
+ * Whether the queue takes a message group, a deduplication id or a delay is
+ * the queue's to decide, so the writer checks those against the queue.
  */
 export function sentMessageWrite(sent: SimSqsSentMessage): SimSqsMessageWrite {
-  if (
-    sent.MessageDeduplicationId !== undefined ||
-    sent.MessageGroupId !== undefined
-  ) {
-    throw new SimSqsUnsupportedOperation(
-      "MessageDeduplicationId and MessageGroupId apply to FIFO queues, which " +
-        "simulated SQS does not support",
-    );
-  }
-
   return {
     body: sent.MessageBody,
     attributes: SimSqsMessageAttributes.of(sent.MessageAttributes),
     delaySeconds: sent.DelaySeconds,
     traceHeader: sentTraceHeader(sent) ?? simAwsLineage.traceHeader(),
+    messageGroupId: sent.MessageGroupId,
+    deduplicationId: sent.MessageDeduplicationId,
   };
 }
 

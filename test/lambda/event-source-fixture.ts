@@ -40,19 +40,21 @@ export interface SimSqsSourceQueue {
 }
 
 /**
- * Make a queue named `orders` for an event source mapping to poll.
+ * Make a queue, named `orders` unless told otherwise, for an event source
+ * mapping to poll.
  */
 export async function makeSourceQueue(
   simAws: SimAws,
   attributes?: Record<string, string>,
+  queueName = "orders",
 ): Promise<SimSqsSourceQueue> {
   const created = await simAws.sqs().createQueue(
     new CreateQueueCommand({
-      QueueName: "orders",
+      QueueName: queueName,
       ...(attributes !== undefined && { Attributes: attributes }),
     }),
   );
-  const queueArn = simAws.sqs().findQueue("orders")?.arn.value;
+  const queueArn = simAws.sqs().findQueue(queueName)?.arn.value;
 
   assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
   assertNonNullable(queueArn, "The queue has an ARN");
@@ -163,6 +165,7 @@ export interface SimSqsEventSourceFixture extends SimSqsSourceQueue {
 
 interface SqsEventSourceOptions {
   readonly simAws?: SimAws;
+  readonly queueName?: string;
   readonly queueAttributes?: Record<string, string>;
   readonly roleActions?: readonly string[];
   readonly handlerResult?: (event: SimLambdaSqsEvent) => unknown;
@@ -180,7 +183,11 @@ export async function simAwsWithSqsEventSource(
   options: SqsEventSourceOptions = {},
 ): Promise<SimSqsEventSourceFixture> {
   const simAws = options.simAws ?? new SimAws();
-  const queue = await makeSourceQueue(simAws, options.queueAttributes);
+  const queue = await makeSourceQueue(
+    simAws,
+    options.queueAttributes,
+    options.queueName,
+  );
   const roleArn = await makePollingRole(
     simAws,
     queue.queueArn,

@@ -30,8 +30,8 @@ const behaviourRefusals: readonly SimEventBridgeTargetRefusal[] = [
   ],
   [
     (target): unknown => target.SqsParameters,
-    "SqsParameters names a FIFO queue's message group, and FIFO queues are " +
-      "not simulated",
+    "SqsParameters names a FIFO queue's message group, and EventBridge " +
+      "delivery to a FIFO queue is not simulated",
   ],
 ];
 

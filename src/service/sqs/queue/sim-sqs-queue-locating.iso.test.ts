@@ -44,17 +44,31 @@ describe("Naming a simulated queue by ARN and by URL", () => {
     assertStringIncludes(error.message, "https://sqs.<region>.amazonaws.com");
   });
 
-  it("refuses a URL naming a FIFO queue, which is not simulated", () => {
-    // Given the URL of a FIFO queue, which simulated SQS refuses to create.
+  it("reads a FIFO queue's URL and ARN", () => {
+    // Given the URL of a FIFO queue, whose name ends in .fifo.
+    const fifoUrl =
+      "https://sqs.eu-west-2.amazonaws.com/111111111111/orders.fifo";
+
+    // When it is read as an ARN, and back.
+    const fifoArn = sqsQueueArnOf(fifoUrl);
+
+    // Then the suffix survives both ways.
+    assertIdentical(fifoArn, "arn:aws:sqs:eu-west-2:111111111111:orders.fifo");
+    assertIdentical(sqsQueueUrlOf(fifoArn), fifoUrl);
+  });
+
+  it("refuses a URL naming a queue no SQS could hold", () => {
+    // Given the URL of a queue whose name has a dot other than a .fifo
+    // suffix.
     // When it is read as an ARN.
     const error = assertThrowsError(() => {
       sqsQueueArnOf(
-        "https://sqs.eu-west-2.amazonaws.com/111111111111/orders.fifo",
+        "https://sqs.eu-west-2.amazonaws.com/111111111111/orders.v2",
       );
     });
 
     // Then it is refused here, rather than at the first poll made with an ARN
     // nothing can read back.
-    assertStringIncludes(error.message, "FIFO queue is not simulated");
+    assertStringIncludes(error.message, "does not name a queue");
   });
 });

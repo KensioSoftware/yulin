@@ -5,6 +5,7 @@ import {
   type SimSqsQueueAttributeSpec,
 } from "./sim-sqs-queue-attribute-specs.js";
 import type { SimSqsQueueAttributeInput } from "./sim-sqs-queue-attributes.js";
+import { simSqsFifoQueueAttributeNames } from "./sim-sqs-fifo-queue-attributes.js";
 
 const integerPattern = /^-?\d+$/;
 
@@ -40,14 +41,17 @@ function attributeNumber(
  * An SDK attribute map is a partial record, so an explicitly undefined value is
  * the absence of an attribute rather than a request to set one. The JSON
  * attributes are left out because they are documents with no numeric range to
- * be checked against.
+ * be checked against, and the FIFO attributes because they are the queue
+ * type's to check.
  */
 function numberEntries(
   requested: SimSqsQueueAttributeInput,
 ): readonly [string, string][] {
   return Object.entries(requested).filter(
     (entry): entry is [string, string] =>
-      entry[1] !== undefined && !simSqsJsonQueueAttributeNames.has(entry[0]),
+      entry[1] !== undefined &&
+      !simSqsJsonQueueAttributeNames.has(entry[0]) &&
+      !simSqsFifoQueueAttributeNames.has(entry[0]),
   );
 }
 

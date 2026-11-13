@@ -14,6 +14,12 @@ interface SimLambdaEventSourceBatchRulesProperties {
    * source that needs one to fill a larger batch.
    */
   readonly largestWithoutWindow?: number | undefined;
+
+  /**
+   * Why the source takes no batching window at all, for a source that takes
+   * none.
+   */
+  readonly windowRefusal?: string | undefined;
 }
 
 /**
@@ -36,6 +42,7 @@ export class SimLambdaEventSourceBatchRules {
   public readonly maximumSize: number;
 
   private readonly largestWithoutWindow: number | undefined;
+  private readonly windowRefusal: string | undefined;
   private readonly sourceDescription: string;
   private readonly unitName: string;
 
@@ -43,6 +50,7 @@ export class SimLambdaEventSourceBatchRules {
     this.defaultSize = properties.defaultSize;
     this.maximumSize = properties.maximumSize;
     this.largestWithoutWindow = properties.largestWithoutWindow;
+    this.windowRefusal = properties.windowRefusal;
     this.sourceDescription = properties.sourceDescription;
     this.unitName = properties.unitName;
   }
@@ -75,7 +83,7 @@ export class SimLambdaEventSourceBatchRules {
    *
    * Real Lambda takes a whole number of seconds up to 300. A queue mapping
    * delivering more than ten messages at a time needs a window of at least a
-   * second, and is refused without one.
+   * second, and is refused without one. A FIFO queue mapping takes no window.
    */
   windowIn(requested: number | undefined, batchSize: number): number {
     const windowSeconds = requested ?? 0;
@@ -90,6 +98,10 @@ export class SimLambdaEventSourceBatchRules {
           "'maximumBatchingWindowInSeconds' failed to satisfy constraint: " +
           "Member must have value less than or equal to 300",
       );
+    }
+
+    if (this.windowRefusal !== undefined && windowSeconds > 0) {
+      throw new SimLambdaInvalidParameterValueException(this.windowRefusal);
     }
 
     const largest = this.largestWithoutWindow;

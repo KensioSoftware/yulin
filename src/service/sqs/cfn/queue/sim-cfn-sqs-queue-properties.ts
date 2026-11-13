@@ -7,6 +7,7 @@ import type {
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSqsQueueAttributeInput } from "../../queue/sim-sqs-queue-attributes.js";
 import { simSqsJsonQueueAttributeNames } from "../../queue/sim-sqs-queue-attribute-specs.js";
+import { simSqsFifoQueueAttributeNames } from "../../queue/sim-sqs-fifo-queue-attributes.js";
 import { SimCfnSqsQueueName } from "./sim-cfn-sqs-queue-name.js";
 import {
   SimCfnSqsQueuePropertyRules,
@@ -45,7 +46,7 @@ export class SimCfnSqsQueueProperties {
    * The queue name.
    *
    * An unnamed queue is named after the stack and the logical ID, as real
-   * CloudFormation names one.
+   * CloudFormation names one, with the `.fifo` a FIFO queue's name ends in.
    */
   name(): string {
     const name = this.properties["QueueName"];
@@ -54,6 +55,7 @@ export class SimCfnSqsQueueProperties {
       return new SimCfnSqsQueueName({
         stackName: this.resource.stackName,
         logicalId: this.resource.logicalId,
+        fifo: this.rules.isFifo(),
       }).value;
     }
 
@@ -71,25 +73,60 @@ export class SimCfnSqsQueueProperties {
   attributes(): SimSqsQueueAttributeInput {
     this.rules.apply();
 
-    return Object.fromEntries(
-      Object.entries(this.properties)
+    const entries: [string, string][] = [
+      ...this.queueTypeAttributes(),
+      ...Object.entries(this.properties)
         .filter(([name]) => this.rules.isAttributeProperty(name))
-        .map(([name, value]) => [name, this.attributeValue(value, name)]),
-    );
+        .map(([name, value]): [string, string] => [
+          name,
+          this.attributeValue(value, name),
+        ]),
+    ];
+
+    return Object.fromEntries(entries);
+  }
+
+  /**
+   * The `FifoQueue` attribute, which CreateQueue takes only as true. A
+   * standard queue is created by leaving it out, so `FifoQueue: false` in a
+   * template leaves it out too.
+   */
+  private queueTypeAttributes(): [string, string][] {
+    if (this.rules.isFifo()) {
+      return [["FifoQueue", "true"]];
+    }
+
+    return [];
   }
 
   /**
    * Read one property as the string the attribute of that name carries.
    *
-   * Five of these properties are amounts and `RedrivePolicy` is a JSON
-   * document, so the two are read differently.
+   * Most of these properties are amounts, `RedrivePolicy` is a JSON document,
+   * and the FIFO ones are a boolean and two words, so each is read its own way.
    */
   private attributeValue(value: SimCfnTemplateValue, name: string): string {
     if (simSqsJsonQueueAttributeNames.has(name)) {
       return this.documentValue(value, name);
     }
 
+    if (simSqsFifoQueueAttributeNames.has(name)) {
+      return this.wordValue(value, name);
+    }
+
     return this.numberValue(value, name);
+  }
+
+  /**
+   * Read a FIFO property as the string an SQS attribute carries. A boolean
+   * becomes `true` or `false`, and what the word has to be is left to SQS.
+   */
+  private wordValue(value: SimCfnTemplateValue, name: string): string {
+    if (typeof value === "boolean" || typeof value === "string") {
+      return String(value);
+    }
+
+    throw this.propertyError(`${name} must be a boolean or a string`);
   }
 
   /**

@@ -25,7 +25,9 @@ export class SimSchedulerDeadLetterConfig {
   ): SimSchedulerDeadLetterConfig {
     const { Arn: arn } = config;
 
-    if (arn !== undefined && parseSqsQueueArn(arn) === undefined) {
+    // A FIFO queue's name ends `.fifo`, and Scheduler takes a standard queue
+    // only.
+    if (arn !== undefined && !isStandardQueueArn(arn)) {
       throw new SimSchedulerValidationException(
         `Target DeadLetterConfig Arn ${arn} is not a standard SQS queue ARN. ` +
           `One is arn:aws:sqs:<region>:<account-id>:<queue-name>.`,
@@ -34,4 +36,8 @@ export class SimSchedulerDeadLetterConfig {
 
     return new this(config);
   }
+}
+
+function isStandardQueueArn(arn: string): boolean {
+  return parseSqsQueueArn(arn)?.name.endsWith(".fifo") === false;
 }

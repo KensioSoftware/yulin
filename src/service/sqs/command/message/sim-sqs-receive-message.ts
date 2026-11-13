@@ -5,7 +5,12 @@ import type {
   SimReceiveMessageCommand,
   SimReceiveMessageCommandOutput,
 } from "./receive.command.js";
+import {
+  SimSqsReceiveAttempts,
+  type SimSqsTakenMessage,
+} from "./sim-sqs-receive-attempts.js";
 import { SimSqsReceiveRequest } from "./sim-sqs-receive-request.js";
+import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 
 interface SimSqsReceiveMessageProperties {
   readonly access: SimSqsQueueAccess;
@@ -25,6 +30,7 @@ interface SimSqsReceiveMessageProperties {
 export class SimSqsReceiveMessage {
   private readonly access: SimSqsQueueAccess;
   private readonly clock: BackgroundScheduler;
+  private readonly attempts = new SimSqsReceiveAttempts();
 
   constructor(properties: SimSqsReceiveMessageProperties) {
     this.access = properties.access;
@@ -45,11 +51,34 @@ export class SimSqsReceiveMessage {
     );
     const request = SimSqsReceiveRequest.of(command.input, queue);
     const receivedAt = this.clock.now();
-    const received = queue.receivable(receivedAt, request.messageCount);
+    const taken = this.take(queue, request, receivedAt);
 
-    return {
-      $metadata: {},
-      Messages: request.taken(queue, received, receivedAt),
-    };
+    this.attempts.remember(queue, request.attemptId, taken, receivedAt);
+
+    return { $metadata: {}, Messages: request.reported(taken) };
+  }
+
+  /**
+   * Take what an earlier receive under the same attempt id took, when it can be
+   * repeated, and otherwise whatever the queue can hand out now.
+   */
+  private take(
+    queue: SimSqsQueue,
+    request: SimSqsReceiveRequest,
+    receivedAt: Date,
+  ): readonly SimSqsTakenMessage[] {
+    const repeated = this.attempts.repeatable(
+      queue,
+      request.attemptId,
+      receivedAt,
+    );
+
+    if (repeated !== undefined) {
+      return request.retaken(queue, repeated, receivedAt);
+    }
+
+    const found = queue.receivable(receivedAt, request.messageCount);
+
+    return request.taken(queue, found, receivedAt);
   }
 }

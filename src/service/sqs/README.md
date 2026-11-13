@@ -1,6 +1,6 @@
 # Simulated SQS implementation
 
-This directory contains the simulated SQS service implementation. Standard queues only.
+This directory contains the simulated SQS service implementation, for standard and FIFO queues.
 
 The guiding decision here is that visibility is a timestamp rather than a timer. A received message
 records the instant it is hidden until, and it becomes receivable again when the simulation's clock
@@ -46,6 +46,14 @@ splits reading an attribute from setting one: an attribute real SQS has and this
 is left out of a response, as real SQS leaves out an attribute a queue has no value for, but setting
 one is refused rather than ignored.
 
+The FIFO attributes belong to the queue's type, which `SimSqsQueueName` decides. A name ends `.fifo`
+exactly when the queue is FIFO, and `CreateQueue` takes `FifoQueue` out of the request
+(`simSqsRequestedQueueType`) before applying the rest. `SimSqsStandardQueueType` and
+`SimSqsFifoQueueAttributes` both implement `SimSqsQueueType`. The standard one refuses every FIFO
+attribute and reports none. The FIFO one holds `ContentBasedDeduplication`, `DeduplicationScope` and
+`FifoThroughputLimit`. Callers read `fifo` off the attributes, and it is undefined for a
+standard queue.
+
 `SimSqsRedrivePolicy` and `SimSqsQueuePolicy` are held apart from the numeric attributes, because they
 are JSON documents and because a queue has neither until one is set. Both keep the string they were
 parsed from, so `GetQueueAttributes` reports back what was set rather than a re-serialised version of
@@ -61,6 +69,35 @@ to keep.
 `SimSqsDeletedQueueNames` holds a deleted queue's name for 60 seconds, as real SQS holds it. The hold
 is measured on the simulation's clock, so advancing simulated time frees the name. That is the
 failure a redeployed stack actually hits.
+
+## FIFO model
+
+Three pieces make a queue FIFO.
+
+`simSqsCheckedOrdering` checks a send against the queue's type. A standard queue keeps a
+`MessageGroupId` (real SQS uses it for fair queueing) and refuses a deduplication id. A FIFO queue
+requires the group, refuses a per-message delay, and works out the deduplication id, from the
+sender or as the SHA-256 of the body. It also returns the deduplication key. That is the id alone, or
+the group and the id together when `DeduplicationScope` is `messageGroup`.
+
+`SimSqsQueueIntake` takes the sent message in. On a FIFO queue it looks the key up in a
+`SimSqsDeduplicationWindow` and answers a duplicate with the send it duplicates. Otherwise it gives
+the message the next number from `SimSqsSequenceNumbers` and adds it. The window holds a key for
+five minutes of simulated time whatever happens to the message. `SimSqsMessageWriter` returns the
+message it built alongside what the queue accepted. The response takes its digests from the first
+and its `MessageId` and `SequenceNumber` from the second, since a duplicate carries the original
+message's id and its own body.
+
+`simSqsFifoReceivable` decides what a FIFO queue can hand out. The store holds messages oldest
+first, so an in-flight or delayed message is always met before the messages of its group waiting
+behind it. That message blocks its group for the rest of the walk. The visible messages left are
+grouped by message group and handed out a group at a time. Deleting a FIFO message announces
+availability at once, since it can unblock the next message of its group.
+
+`SimSqsReceiveAttempts` holds what each FIFO receive under a `ReceiveRequestAttemptId` took, per
+queue, for five minutes. A retry repeats the receive while every message is still on the queue,
+under the same receipt handle and hidden until the same instant. It lives with the receive command,
+its only caller.
 
 ## Polling model
 
@@ -204,14 +241,14 @@ hangs off the property in `unsimulatedPropertyReasons` through the shared
 message either way, and a period outside that range fails the stack at `CreateQueue` on real AWS.
 See the CloudFormation service README for what the seam is for.
 
-`FifoQueue: true` fails the resource instead. A FIFO queue is named
-`<name>.fifo`, a name simulated SQS refuses, leaving no queue to create under the name the template
-gave it. The failures are worded as an invalid resource rather than an unsupported one, because sim
-CloudFormation skips a resource whose error reads as unsupported, and skipping is the wrong answer
-for a queue that cannot be created as asked.
+`FifoQueue: true` becomes the `FifoQueue` attribute, and the FIFO properties pass through as
+attributes of the same names. `FifoQueue: false` is left out of the request, since real SQS takes
+the attribute as `true` only. Any other value fails the resource. The failure is worded as
+an invalid resource. Sim CloudFormation skips a resource whose error reads as unsupported, and
+skipping is the wrong answer for a queue that cannot be created as asked.
 
 `SimCfnSqsQueueName` generates the name for a queue the template does not name, from the stack name
-and the logical ID. It applies the 80 characters a queue name allows through the shared
+and the logical ID, ending it `.fifo` for a FIFO queue. It applies the 80 characters a queue name allows through the shared
 `SimCfnGeneratedResourceName`, which ends the name in a tail derived from the other two parts, in
 place of the random characters real CloudFormation ends one with.
 
@@ -264,7 +301,8 @@ here, it does not make another Account's queues reachable through this one.
   is running that could send a message during the wait, so waiting could only ever time out.
 - `DeleteQueue` and `PurgeQueue` happen at once, where real SQS may take up to a minute over either.
   The 60 second hold on a deleted queue's name is simulated.
-- A queue name ending in `.fifo` is refused, as are the FIFO-only request fields.
+- FIFO throughput is unlimited, and `FifoThroughputLimit` is held and validated only. `ReceiveRequestAttemptId`
+  is refused on a standard queue.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
 - Tags, `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored when a
   request sets them, and recorded against the Resource when a CloudFormation template declares them.

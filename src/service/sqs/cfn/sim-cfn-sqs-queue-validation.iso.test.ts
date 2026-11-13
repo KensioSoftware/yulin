@@ -66,8 +66,8 @@ async function createQueueResource(
 }
 
 describe("SQS CloudFormation Queue validation", () => {
-  it("fails a FIFO queue rather than creating a standard one", async () => {
-    // Given a template asking for a FIFO queue, which is not simulated.
+  it("fails a FIFO queue whose name does not end .fifo", async () => {
+    // Given a template asking for a FIFO queue under a standard queue's name.
     const simAws = new SimAws();
 
     // When the template is deployed, then the deployment fails.
@@ -78,25 +78,20 @@ describe("SQS CloudFormation Queue validation", () => {
           Resources: {
             OrdersQueue: {
               Type: "AWS::SQS::Queue",
-              Properties: { QueueName: "orders.fifo", FifoQueue: true },
+              Properties: { QueueName: "orders", FifoQueue: true },
             },
           },
         },
       });
     });
 
-    // And the failure names FIFO, rather than the property being recorded and
-    // the queue created: a FIFO queue is named <name>.fifo, which simulated
-    // SQS refuses, so there is no queue to create under that name.
-    assertStringIncludes(
-      error.message,
-      "FifoQueue names a FIFO queue, which simulated SQS does not simulate",
-    );
+    // And the failure is SQS's own refusal of the name, as it is on AWS.
+    assertStringIncludes(error.message, "must end with .fifo suffix");
 
     const stack = simAws.cloudFormation().getStackByName("orders-stack");
     assertNonNullable(stack);
     assertIdentical(stack.getResource("OrdersQueue")?.status, "CREATE_FAILED");
-    assertUndefined(simAws.sqs().findQueue("orders.fifo"));
+    assertUndefined(simAws.sqs().findQueue("orders"));
   });
 
   it("creates a standard queue for FifoQueue false", async () => {

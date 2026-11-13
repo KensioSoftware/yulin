@@ -198,7 +198,7 @@ describe("SQS ReceiveMessage attributes and validation", () => {
     assertInstanceOf(error, SimSqsInvalidParameterValue);
   });
 
-  it("refuses a FIFO receive attempt id", async () => {
+  it("refuses a FIFO receive attempt id on a standard queue", async () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();
 
@@ -212,7 +212,7 @@ describe("SQS ReceiveMessage attributes and validation", () => {
       );
     });
 
-    // Then it is refused, since FIFO queues are not simulated.
+    // Then it is refused, since it applies only to a FIFO queue.
     assertInstanceOf(error, SimSqsUnsupportedOperation);
   });
 });

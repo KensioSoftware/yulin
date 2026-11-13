@@ -1,7 +1,10 @@
+import type { SimSqsMessageOrdering } from "./sim-sqs-message.js";
+
 /**
  * What a message knows about itself that SQS reports as system attributes.
  */
 export interface SimSqsMessageSystemFacts {
+  readonly ordering: SimSqsMessageOrdering;
   readonly sentAt: Date;
   readonly receiveCount: number;
   readonly firstReceived: Date;
@@ -19,6 +22,9 @@ export function simSqsMessageSystemValues(
   const optional: [string, string | undefined][] = [
     ["DeadLetterQueueSourceArn", facts.deadLetterSourceArn],
     ["AWSTraceHeader", facts.traceHeader],
+    ["MessageGroupId", facts.ordering.messageGroupId],
+    ["MessageDeduplicationId", facts.ordering.deduplicationId],
+    ["SequenceNumber", facts.ordering.sequenceNumber],
   ];
 
   return new Map<string, string>([

@@ -40,6 +40,7 @@ export interface SimSendMessageCommandInput extends SimSqsSentMessage {
 
 export interface SimSendMessageCommandOutput {
   readonly MessageId?: string | undefined;
+  readonly SequenceNumber?: string | undefined;
   readonly MD5OfMessageBody?: string | undefined;
   readonly MD5OfMessageAttributes?: string | undefined;
   readonly $metadata: SimResponseMetadata;
@@ -69,6 +70,7 @@ export interface SimSendMessageBatchCommandInput {
 export interface SimSqsSendMessageBatchResultEntry {
   readonly Id: string;
   readonly MessageId: string;
+  readonly SequenceNumber?: string | undefined;
   readonly MD5OfMessageBody: string;
   readonly MD5OfMessageAttributes?: string | undefined;
 }
