@@ -100,6 +100,21 @@ describe("Lambda Invoke with a qualifier", () => {
     assertStringEndsWith(payload.invokedFunctionArn, ":function:orders:live");
   });
 
+  it("tells the handler the ARN an explicit $LATEST named", async () => {
+    const lambda = await givenPublishedFunction();
+
+    // When the function is invoked naming $LATEST.
+    const invoked = await lambda.invoke(
+      new InvokeCommand({ FunctionName: "orders", Qualifier: "$LATEST" }),
+    );
+
+    // Then the handler is told the ARN that names it, $LATEST and all.
+    assertStringEndsWith(
+      invokedPayload(invoked.Payload).invokedFunctionArn,
+      ":function:orders:$LATEST",
+    );
+  });
+
   it("reads the qualifier off a qualified function ARN", async () => {
     const lambda = await givenPublishedFunction();
     const { Configuration } = await lambda.getFunction(

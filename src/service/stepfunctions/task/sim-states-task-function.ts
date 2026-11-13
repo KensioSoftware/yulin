@@ -1,6 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimLambdaFunctionTarget } from "../../lambda/function/version/sim-lambda-function-target.js";
 import type { SimLambdaFunctionReference } from "../../lambda/function/sim-lambda-function-reference.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimStatesTaskFailure } from "../error/sim-step-functions.error.js";
@@ -68,9 +67,22 @@ export class SimStatesTaskFunction {
 
     this.authorize(request, found.resource.arn);
 
-    const result = await this.run(request, found);
+    const { simFunction, resource, invokedFunctionArn = resource.arn } = found;
+    let result: unknown;
 
-    return request.target.answer(result, found.simFunction.version);
+    // Invoked directly rather than through an `Invoke` command, because a
+    // handler failure has to reach the task rather than being answered as an
+    // error payload the state would take for a result.
+    try {
+      result = await simFunction.invoke(request.payload, invokedFunctionArn);
+    } catch (error) {
+      throw request.target.handlerFailure(error, request.stateName);
+    }
+
+    return request.target.answer(
+      readTaskResult(result, request.stateName),
+      simFunction.version,
+    );
   }
 
   /**
@@ -98,28 +110,6 @@ export class SimStatesTaskFunction {
           "state machine's execution role.",
       );
     }
-  }
-
-  /**
-   * Run the handler, and read a task failure off it raising.
-   *
-   * Invoked directly rather than through an `Invoke` command, because a
-   * handler failure has to reach the task rather than being answered as an
-   * error payload the state would take for a result.
-   */
-  private async run(
-    request: SimStatesTaskFunctionRequest,
-    { simFunction, resource }: SimLambdaFunctionTarget,
-  ): Promise<JSONValue> {
-    let result: unknown;
-
-    try {
-      result = await simFunction.invoke(request.payload, resource.arn);
-    } catch (error) {
-      throw request.target.handlerFailure(error, request.stateName);
-    }
-
-    return readTaskResult(result, request.stateName);
   }
 }
 

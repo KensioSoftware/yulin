@@ -13,6 +13,13 @@ import type { SimLambdaFunction } from "../sim-lambda-function.js";
 export interface SimLambdaFunctionTarget {
   readonly resource: SimLambdaPolicyResource;
   readonly simFunction: SimLambdaFunction;
+
+  /**
+   * The ARN the handler is told it was invoked by, where that differs from the
+   * resource's. A target named with an explicit `$LATEST` is the function
+   * itself, and its handler is told the ARN ending in `:$LATEST`.
+   */
+  readonly invokedFunctionArn?: string | undefined;
 }
 
 /**
@@ -24,5 +31,7 @@ export async function simLambdaInvokeTarget(
   target: SimLambdaFunctionTarget,
   event: unknown,
 ): Promise<unknown> {
-  return await target.simFunction.invoke(event, target.resource.arn);
+  const { simFunction, resource, invokedFunctionArn = resource.arn } = target;
+
+  return await simFunction.invoke(event, invokedFunctionArn);
 }

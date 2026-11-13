@@ -51,15 +51,17 @@ export class SimLambdaTagCommands {
     command: SimTagResourceCommand,
     options?: SimLambdaTagCommandOptions,
   ): Promise<SimTagResourceCommandOutput> {
+    // Copied once, so the tags authorized are the tags written.
+    const tags = { ...command.input.Tags };
     const simFunction = await this.taggedFunction(
       "lambda:TagResource",
       command.input.Resource,
       options,
-      simLambdaRequestTagConditions(command.input.Tags),
+      simLambdaRequestTagConditions(tags),
     );
 
     simFunction.updates.assertIdle(simFunction.arn);
-    simFunction.tags.tag(command.input.Tags);
+    simFunction.tags.tag(tags);
 
     return { $metadata: {} };
   }

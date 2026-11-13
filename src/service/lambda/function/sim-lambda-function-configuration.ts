@@ -44,6 +44,21 @@ export function simLambdaFunctionArn(
 }
 
 /**
+ * The ARN a handler is told it was invoked by, which is the ARN of the
+ * resource the caller named, ending in `:$LATEST` where the caller named that
+ * explicitly. `simLambdaFunctionArn` leaves `$LATEST` off, as a resource ARN
+ * does.
+ */
+export function simLambdaInvokedFunctionArn(
+  resourceArn: string,
+  qualifier: string | undefined,
+): string {
+  return qualifier === SIM_LAMBDA_LATEST_VERSION
+    ? `${resourceArn}:${qualifier}`
+    : resourceArn;
+}
+
+/**
  * Minimal structural Lambda function configuration, as returned by
  * CreateFunction and GetFunction.
  */
