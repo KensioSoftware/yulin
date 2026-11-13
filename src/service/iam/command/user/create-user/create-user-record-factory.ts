@@ -3,6 +3,11 @@ import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { makeSimIamUserId } from "../../../user/sim-iam-user-id.js";
 import type { SimCreateUserCommandOutput } from "./create-user.command.js";
+import {
+  makeSimIamIdentityTags,
+  simIamTagsMember,
+  type SimIamTagsInput,
+} from "../../../tag/sim-iam-identity-tags.js";
 
 interface MakeUserProperties {
   readonly accountId: SimAwsAccountId;
@@ -10,6 +15,7 @@ interface MakeUserProperties {
   readonly path: string;
   readonly userName: SimIamUsername;
   readonly creationDate: Date;
+  readonly tags?: SimIamTagsInput;
 }
 
 /**
@@ -33,6 +39,7 @@ export class CreateUserRecordFactory {
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
       loginProfile: undefined,
+      tags: makeSimIamIdentityTags(properties.tags, "User"),
     };
   }
 
@@ -47,6 +54,7 @@ export class CreateUserRecordFactory {
         UserId: user.userId,
         Arn: user.arn,
         CreateDate: user.creationDate,
+        ...simIamTagsMember(user.tags),
       },
     };
   }

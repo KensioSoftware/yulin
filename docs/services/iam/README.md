@@ -386,7 +386,8 @@ because a pattern needs as many components as the ARN it is matched against. `Ar
 Condition context values are supplied by the service handling the simulated request, such as S3
 object tags. Sim IAM automatically derives the global values it can work out itself. `aws:PrincipalArn` comes
 from the resolved caller, `aws:RequestedRegion` from the Region the request was made in, and
-`aws:CurrentTime` and `aws:EpochTime` from the simulation's clock. A caller
+`aws:CurrentTime` and `aws:EpochTime` from the simulation's clock. The caller also brings the keys
+that describe it, which [Tags and principal keys](#tags-and-principal-keys) lists. A caller
 whose Account is in the simulated organization also carries `aws:PrincipalOrgID` (see
 [Organizations](https://yulinsim.dev/services/organizations/)). A value a service supplies under any
 of those names is overwritten by the derived one. Context-key names are matched
@@ -665,6 +666,108 @@ attached. An [AWS-managed policy](#aws-managed-policies) grants a User what it g
 `CreateLoginProfileCommand` gives a User a console password. The response describes the profile
 without the password, which is how real IAM behaves. See
 [CloudFormation Users](#users) for reading the password back out of the simulator.
+
+## Tags and principal keys
+
+Roles and Users carry tags. `CreateRoleCommand` and `CreateUserCommand` take them as `Tags`, and
+`TagRoleCommand`, `UntagRoleCommand` and `ListRoleTagsCommand` change and read a Role's tags
+afterwards (with `TagUserCommand`, `UntagUserCommand` and `ListUserTagsCommand` for a User).
+`GetRoleCommand` describes a Role's tags and leaves `Tags` out for an untagged Role, as IAM does. An
+`AWS::IAM::Role` or `AWS::IAM::User` declaring `Tags` is created with them, so the tags CDK's
+`Tags.of(...)` puts on a stack reach its Roles.
+
+IAM's rules for a Role's or a User's tags apply. Keys compare without regard to case and keep the case
+they were written in, so tagging a Role carrying `Department=finance` with `department=hr` replaces
+the tag. A key under the reserved `aws:` prefix, or a request naming the same key twice, is refused
+as `InvalidInput`. More than 50 tags is `LimitExceeded`. Untagging a key the entity does not carry
+does nothing.
+
+A Role's or a User's tags reach policies in three ways:
+
+- A request the Role or User makes carries its tags as `aws:PrincipalTag/` and the tag key. A
+  session of a Role carries the Role's tags
+- A request acting on a Role or a User, such as `GetRole` or `PutRolePolicy`, carries its tags as
+  both `iam:ResourceTag/` and `aws:ResourceTag/` and the tag key
+- A request setting tags carries them as `aws:RequestTag/` and the tag key, with the keys together
+  as `aws:TagKeys`. `UntagRole` and `UntagUser` carry the keys they remove as `aws:TagKeys`
+
+Creating a Role with tags needs `iam:TagRole` as well as `iam:CreateRole`, and creating a User with
+tags needs `iam:TagUser`, which is how IAM authorizes the request.
+
+```typescript sim-iam-principal-tags
+/**
+ * Granting access by the tags of the Role making the request.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "ReportsReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+    Tags: [{ Key: "team", Value: "reports" }],
+  }),
+);
+
+await simIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ReportsReader",
+    PolicyName: "ReadOwnTeamsObjects",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:GetObject",
+        Resource: "*",
+        Condition: {
+          StringEquals: {
+            "s3:ExistingObjectTag/team": "reports",
+            "aws:PrincipalTag/team": "reports",
+          },
+        },
+      },
+    }),
+  }),
+);
+
+const decision = simIam.authorize({
+  action: "s3:GetObject",
+  resource: "arn:aws:s3:::reports-bucket/summary.csv",
+  caller: {
+    kind: "arn",
+    arn: "arn:aws:iam::123456789012:role/ReportsReader",
+  },
+  conditionContext: { "s3:ExistingObjectTag/team": "reports" },
+});
+
+console.log(decision.isAllowed); // true
+```
+
+Every request also carries the keys AWS uses to describe its caller:
+
+| Caller       | `aws:PrincipalType` | `aws:userid`                | `aws:username` |
+| ------------ | ------------------- | --------------------------- | -------------- |
+| Account root | `Account`           | the Account ID              | absent         |
+| IAM User     | `User`              | the User's ID               | the User name  |
+| Role session | `AssumedRole`       | the Role's ID, `:`, session | absent         |
+| Anonymous    | `Anonymous`         | `anonymous`                 | absent         |
+
+A caller with an ARN carries its Account as `aws:PrincipalAccount`. `aws:PrincipalIsAWSService` is
+`true` for a service principal, which names itself in `aws:PrincipalServiceName`, and `false` for
+everyone else. A caller named by a Role's own ARN stands for a session of that Role. It is described
+as an `AssumedRole` carrying the Role's tags, without an `aws:userid`, because it has no session
+name.
 
 ## STS AssumeRole sessions
 
@@ -1581,6 +1684,9 @@ is recorded on the Role it names.
 [Creating a Role under a permissions boundary](#creating-a-role-under-a-permissions-boundary) covers
 the guard it exists for.
 
+A Role's `Tags` are put on the Role it creates, and so are a User's on the User. See
+[Tags and principal keys](#tags-and-principal-keys).
+
 ### Users
 
 An `AWS::IAM::User` creates a User in the Stack's Account. `UserName` names it and falls back to the
@@ -1872,6 +1978,11 @@ Sim IAM currently supports:
 - `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand`, `AttachUserPolicyCommand` and
   `ListAttachedUserPoliciesCommand`
 - `CreateLoginProfileCommand`, for a User's console password
+- `TagRoleCommand`, `UntagRoleCommand`, `ListRoleTagsCommand`, `TagUserCommand`, `UntagUserCommand`
+  and `ListUserTagsCommand`, along with `Tags` on `CreateRoleCommand` and `CreateUserCommand`
+- `aws:PrincipalTag/`, `iam:ResourceTag/`, `aws:RequestTag/` and `aws:TagKeys`, and the principal
+  keys `aws:PrincipalAccount`, `aws:PrincipalType`, `aws:userid`, `aws:username`,
+  `aws:PrincipalIsAWSService` and `aws:PrincipalServiceName`
 - `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and every documented condition operator with explicit-deny

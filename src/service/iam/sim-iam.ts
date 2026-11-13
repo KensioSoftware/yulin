@@ -16,6 +16,7 @@ import type {
   SimArnPrincipal,
   SimAwsPrincipal,
 } from "../aws/caller/sim-aws-caller.js";
+import { SimIamTagOperations } from "./sim-iam-tag-operations.js";
 import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
@@ -40,6 +41,7 @@ import {
  * service facade per Account.
  */
 export class SimIam
+  extends SimIamTagOperations
   implements SimIamInterServiceAuthZ, SimIamAccountIdentityPolicies
 {
   /**
@@ -69,13 +71,14 @@ export class SimIam
    */
   public readonly users: Map<SimIamUsername, SimIamUser>;
 
+  protected readonly commands: SimIamCommandHandlers;
   private readonly cfnFactory: SimCfnServiceResourceFactory;
-  private readonly commands: SimIamCommandHandlers;
   private readonly accountAuthZ: SimIamAccountAuthZ;
   private readonly sdkRouter = new SimIamSdkCommandRouter(this);
   private readonly deployRoles = new SimIamDeployRoleMaker(this);
 
   constructor(properties: SimIamProperties = {}) {
+    super();
     const parts = new SimIamAccountParts(properties);
 
     this.accountId = parts.accountId;

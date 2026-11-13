@@ -145,3 +145,17 @@ export class SimIamLimitExceeded extends SimIamError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated IAM InvalidInput error.
+ *
+ * IAM answers a request carrying a value outside what a parameter accepts with
+ * this, such as a tag key that starts with the reserved `aws:` prefix.
+ */
+export class SimIamInvalidInput extends SimIamError {
+  public override readonly name = "InvalidInput";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

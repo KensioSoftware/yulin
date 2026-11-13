@@ -1,3 +1,4 @@
+import type { SimIamConditionValue } from "../policy/sim-iam-policy.js";
 import type { SimArn } from "../../aws/arn.js";
 import type { SimIamRole } from "./sim-iam-role.js";
 
@@ -40,4 +41,21 @@ export function simIamAttachedPermissionsBoundary(
     PermissionsBoundaryType: "PermissionsBoundaryPolicy",
     PermissionsBoundaryArn: permissionsBoundaryArn,
   };
+}
+
+/**
+ * What a Role-creating request says about the boundary it declares.
+ *
+ * An account that requires a permissions boundary allows `iam:CreateRole`
+ * only under `StringEquals` on `iam:PermissionsBoundary`, and the CDK
+ * permissions-boundary guard is written that way. A request declaring no
+ * boundary leaves the key out, which is what refuses it: a positive operator
+ * over an absent key matches nothing.
+ */
+export function simIamPermissionsBoundaryCondition(
+  permissionsBoundary: string | undefined,
+): Readonly<Record<string, SimIamConditionValue>> | undefined {
+  return permissionsBoundary === undefined
+    ? undefined
+    : { "iam:PermissionsBoundary": permissionsBoundary };
 }

@@ -1,5 +1,9 @@
 import type { SimQueryOperations } from "../../../serve/http/api/query/sim-query-operation.js";
 import { iamQueryEntity } from "./sim-iam-query-entity.js";
+import {
+  iamQueryTags,
+  iamQueryTagsInput,
+} from "./sim-iam-query-tag-operations.js";
 
 /**
  * The members IAM describes one User with.
@@ -37,8 +41,10 @@ export function simIamQueryUserOperations(): SimQueryOperations {
         input: (fields): Record<string, unknown> => ({
           UserName: fields.text("UserName"),
           Path: fields.text("Path"),
+          Tags: iamQueryTagsInput(fields),
         }),
-        result: (output): string => iamQueryEntity(output, "User", userMembers),
+        result: (output): string =>
+          iamQueryEntity(output, "User", userMembers, iamQueryTags),
       },
     ],
     [

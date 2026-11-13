@@ -11,6 +11,10 @@ import {
   iamQueryListingInput,
   iamQueryListingResult,
 } from "./sim-iam-query-listing.js";
+import {
+  iamQueryTags,
+  iamQueryTagsInput,
+} from "./sim-iam-query-tag-operations.js";
 
 /**
  * The members IAM describes one Role with.
@@ -33,8 +37,10 @@ const roleMembers = [
  * IAM does, so only the create and the get pass this.
  */
 function roleBoundary(role: SimQueryOutput): string {
-  return queryStructure(role, "PermissionsBoundary", (boundary) =>
-    queryMembers(boundary, simIamAttachedBoundaryMembers),
+  return (
+    queryStructure(role, "PermissionsBoundary", (boundary) =>
+      queryMembers(boundary, simIamAttachedBoundaryMembers),
+    ) + iamQueryTags(role)
   );
 }
 
@@ -56,6 +62,7 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           AssumeRolePolicyDocument: fields.text("AssumeRolePolicyDocument"),
           Description: fields.text("Description"),
           PermissionsBoundary: fields.text("PermissionsBoundary"),
+          Tags: iamQueryTagsInput(fields),
         }),
         result: (output): string =>
           iamQueryEntity(output, "Role", roleMembers, roleBoundary),

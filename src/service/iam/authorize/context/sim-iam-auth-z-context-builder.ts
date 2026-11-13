@@ -32,6 +32,7 @@ import type {
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 import { SimIamAuthZScpSourceBuilder } from "./sim-iam-auth-z-scp-source-builder.js";
 import { SimIamDerivedConditions } from "./sim-iam-derived-conditions.js";
+import { SimIamPrincipalConditions } from "./sim-iam-principal-conditions.js";
 import type { SimIamServiceControlPolicyResolver } from "../scp/sim-iam-scp-resolver.js";
 
 interface SimIamAuthZContextBuilderProperties {
@@ -105,10 +106,17 @@ export class SimIamAuthZContextBuilder {
   private readonly callerAccountResolver: SimIamCallerAccountResolver;
   private readonly allowRequirement = new SimIamAuthZAllowRequirement();
   private readonly derivedConditions: SimIamDerivedConditions;
+  private readonly principalConditions: SimIamPrincipalConditions;
   private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
     this.derivedConditions = new SimIamDerivedConditions(properties.clock);
+    this.principalConditions = new SimIamPrincipalConditions({
+      accountId: properties.accountId,
+      roles: properties.roles,
+      users: properties.users,
+      iamResolver: properties.iamResolver,
+    });
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder({
       accountRootPrincipal: makeSimAwsAccountRootPrincipal(
         properties.accountId,
@@ -202,6 +210,7 @@ export class SimIamAuthZContextBuilder {
       ...input.conditionContext,
       ...input.callerConditions?.conditionValuesFor(caller),
       ...this.derivedConditions.of({ caller, region: input.region }),
+      ...this.principalConditions.of(caller),
       ...this.scpSourceBuilder.principalOrgConditions(caller),
     };
   }

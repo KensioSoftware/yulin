@@ -109,6 +109,28 @@ export class SimQueryFields {
   }
 
   /**
+   * The items of a list of strings, such as `TagKeys.member.1`, in subscript
+   * order. A list nobody stated is nothing, as it is for `list`.
+   */
+  texts(name: string): readonly string[] | undefined {
+    const start = `${this.prefix}${name}.member.`;
+    const items = this.fields
+      .entries()
+      .map(
+        ([field, value]) => [field.slice(start.length), value, field] as const,
+      )
+      .filter(
+        ([subscript, , field]) =>
+          field.startsWith(start) && /^\d+$/u.test(subscript),
+      )
+      .toArray()
+      .toSorted(([one], [other]) => Number(one) - Number(other))
+      .map(([, value]) => value);
+
+    return items.length === 0 ? undefined : items;
+  }
+
+  /**
    * The entries of a map, each as the fields under its own subscript.
    */
   entries(name: string): readonly SimQueryFields[] {
