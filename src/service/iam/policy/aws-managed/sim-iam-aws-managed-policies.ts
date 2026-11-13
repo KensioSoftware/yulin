@@ -1,6 +1,6 @@
 import snapshot from "./sim-iam-aws-managed-policies.json" with { type: "json" };
 import type { SimArn } from "../../../aws/arn.js";
-import { jsonStringify } from "../../../../util/type-guard/json.js";
+import type { JSONString } from "../../../../util/type-guard/json.js";
 import type {
   SimIamManagedPolicy,
   SimIamPolicyDocument,
@@ -27,7 +27,7 @@ const policies = new Map<string, SimIamManagedPolicy>();
  * The account and resource prefix every AWS-managed policy ARN has, in any
  * partition.
  */
-const awsManagedArn = /^arn:[\w-]+:iam::aws:policy\/(.+)$/;
+const awsManagedArn = /^arn:([\w-]+):iam::aws:policy\/(.+)$/;
 
 /**
  * Whether an ARN names a policy AWS manages rather than an Account's own.
@@ -46,9 +46,9 @@ export function isSimIamAwsManagedPolicyArn(arn: string): boolean {
 export function simIamAwsManagedPolicy(
   arn: SimArn,
 ): SimIamManagedPolicy | undefined {
-  const pathAndName = awsManagedArn.exec(arn)?.[1];
+  const [, partition, pathAndName] = awsManagedArn.exec(arn) ?? [];
 
-  if (pathAndName === undefined) {
+  if (partition === undefined || pathAndName === undefined) {
     return undefined;
   }
 
@@ -64,7 +64,7 @@ export function simIamAwsManagedPolicy(
     return undefined;
   }
 
-  const policy = awsManagedPolicy(arn, pathAndName, record);
+  const policy = awsManagedPolicy(arn, partition, pathAndName, record);
   policies.set(arn, policy);
 
   return policy;
@@ -86,8 +86,16 @@ export function simIamAwsManagedPolicies(): readonly SimIamManagedPolicy[] {
     .toArray();
 }
 
+/**
+ * A catalogued policy as an Account in the ARN's partition sees it.
+ *
+ * AWS publishes each partition's copy of a policy with that partition's ARNs.
+ * The catalogue holds the `aws` copy, so an ARN in a statement is moved into
+ * the partition the policy was attached from.
+ */
 function awsManagedPolicy(
   arn: SimArn,
+  partition: string,
   pathAndName: string,
   record: SimIamAwsManagedPolicyRecord,
 ): SimIamManagedPolicy {
@@ -105,6 +113,9 @@ function awsManagedPolicy(
     description: record.description,
     creationDate: new Date(record.createDate),
     updateDate: new Date(record.updateDate),
-    policyDocument: jsonStringify(record.document as SimIamPolicyDocument),
+    policyDocument: JSON.stringify(record.document).replaceAll(
+      '"arn:aws:',
+      () => `"arn:${partition}:`,
+    ) as JSONString<SimIamPolicyDocument>,
   };
 }

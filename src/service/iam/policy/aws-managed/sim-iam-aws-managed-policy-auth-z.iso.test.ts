@@ -245,6 +245,34 @@ describe("IAM AWS-managed policy authorization", () => {
     assertTrue(decision.isAllowed);
   });
 
+  it("grants a policy attached in another partition on that partition's resources", async () => {
+    // Given a Role with AWSLambdaExecute attached from the China partition.
+    const simIam = new SimAws().account(makeSimAwsAccountId()).iam();
+    const roleName = faker.string.alpha(12);
+    const roleCreation = await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: roleName,
+        AssumeRolePolicyDocument: JSON.stringify(lambdaTrustPolicy),
+      }),
+    );
+    await simIam.attachRolePolicy(
+      new AttachRolePolicyCommand({
+        RoleName: roleName,
+        PolicyArn: "arn:aws-cn:iam::aws:policy/AWSLambdaExecute",
+      }),
+    );
+
+    // When the Role reads an Object from a Bucket in that partition.
+    const decision = simIam.authorize({
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
+      action: "s3:GetObject",
+      resource: "arn:aws-cn:s3:::reports/daily.json",
+    });
+
+    // Then the policy's S3 statement allows it.
+    assertTrue(decision.isAllowed);
+  });
+
   it("attaches an AWS-managed ARN outside the catalogue without granting anything", async () => {
     // Given a Role.
     const simIam = new SimAws().account(makeSimAwsAccountId()).iam();

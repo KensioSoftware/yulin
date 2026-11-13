@@ -199,6 +199,9 @@ export class SimIamUserCommandHandlers {
    * The User ARN a command operates on, for authorization.
    */
   private userArn(username = "*"): string {
-    return `arn:aws:iam::${this.accountId}:user/${username}`;
+    return (
+      this.users.get(username as SimIamUsername)?.arn ??
+      `arn:aws:iam::${this.accountId}:user/${username}`
+    );
   }
 }

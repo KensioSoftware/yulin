@@ -1,7 +1,9 @@
 import {
   AttachRolePolicyCommand,
   CreateRoleCommand,
+  CreateUserCommand,
   ListAttachedRolePoliciesCommand,
+  PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
 import {
   assertFalse,
@@ -12,6 +14,7 @@ import {
 import { faker } from "@faker-js/faker";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 
 const trustPolicy = JSON.stringify({
@@ -110,6 +113,49 @@ describe("IAM ListAttachedRolePoliciesCommand", () => {
           "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
       },
     ]);
+  });
+
+  it("authorizes the caller against the Role's path", async () => {
+    // Given a Role under the /team/ path, and a User allowed to list the
+    // attachments of Roles under that path only.
+    const accountId = makeSimAwsAccountId();
+    const simIam = new SimAws().account(accountId).iam();
+    const roleName = faker.string.alpha(12);
+    await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: roleName,
+        Path: "/team/",
+        AssumeRolePolicyDocument: trustPolicy,
+      }),
+    );
+    const operator = await simIam.createUser(
+      new CreateUserCommand({ UserName: faker.string.alpha(12) }),
+    );
+    await simIam.putUserPolicy(
+      new PutUserPolicyCommand({
+        UserName: operator.User.UserName,
+        PolicyName: "ListTeamRoles",
+        PolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "iam:ListAttachedRolePolicies",
+              Resource: `arn:aws:iam::${accountId}:role/team/*`,
+            },
+          ],
+        }),
+      }),
+    );
+
+    // When the User lists the Role's attachments.
+    const output = await simIam.listAttachedRolePolicies(
+      new ListAttachedRolePoliciesCommand({ RoleName: roleName }),
+      { caller: { kind: "arn", arn: operator.User.Arn } },
+    );
+
+    // Then the request is allowed.
+    assertArrayEquals(output.AttachedPolicies, []);
   });
 
   it("refuses a Role that does not exist", async () => {

@@ -252,9 +252,15 @@ export class SimIamRoleCommandHandlers {
 
   /**
    * The Role ARN a command operates on, for authorization.
+   *
+   * An existing Role is authorized as its stored ARN, which carries its path.
+   * A Role that does not exist yet is named by the path-less ARN.
    */
   private roleArn(roleName = "*"): string {
-    return `arn:aws:iam::${this.accountId}:role/${roleName}`;
+    return (
+      this.roles.get(roleName as SimIamRoleName)?.arn ??
+      `arn:aws:iam::${this.accountId}:role/${roleName}`
+    );
   }
 }
 
