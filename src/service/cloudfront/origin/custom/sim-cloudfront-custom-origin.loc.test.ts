@@ -15,6 +15,7 @@ import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../../lambda/function/code/lambda-zip-file-input.js";
 import { simCfManagedOriginRequestPolicyIds } from "../../origin-request-policy/sim-cf-managed-origin-request-policies.js";
+import { grantPublicFunctionUrl } from "../../../../../test/lambda/public-url-fixture.js";
 
 describe("Serving a sim CloudFront custom Origin on localhost", () => {
   it("presents the AWS-facing viewer Origin to a custom Origin", async () => {
@@ -51,6 +52,7 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
     assertNonNullable(functionUrl);
 
     // And a Distribution fronting it as a custom Origin.

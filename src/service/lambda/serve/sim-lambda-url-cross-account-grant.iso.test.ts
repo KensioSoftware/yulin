@@ -19,6 +19,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { simAwsCallerHeaderName } from "../../iam/request/sim-aws-caller-header.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { grantFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 const ownerAccountId = "111111111111";
 const callerAccountId = "222222222222";
@@ -58,7 +59,10 @@ describe("What a cross-account grant on a Function URL covers", () => {
         UserName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -67,15 +71,12 @@ describe("What a cross-account grant on a Function URL covers", () => {
     );
 
     // And the function granting that User the URL
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccountUser",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: `arn:aws:iam::${callerAccountId}:user/Caller`,
-        FunctionUrlAuthType: "AWS_IAM",
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccountUser",
+      Principal: `arn:aws:iam::${callerAccountId}:user/Caller`,
+      FunctionUrlAuthType: "AWS_IAM",
+    });
 
     // When they sign a request to the URL
     const signed = await signAwsRequest({
@@ -130,7 +131,10 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -175,15 +179,12 @@ describe("What a cross-account grant on a Function URL covers", () => {
     );
 
     // And a grant conditioned on the URL being public, not IAM-authenticated
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccount",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-        FunctionUrlAuthType: "NONE",
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccount",
+      Principal: callerRoleArn,
+      FunctionUrlAuthType: "NONE",
+    });
 
     // And the other Account's Role allowed to invoke Function URLs by its own
     // Account
@@ -204,7 +205,10 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -239,15 +243,12 @@ describe("What a cross-account grant on a Function URL covers", () => {
     );
 
     // And a grant conditioned on the auth type the URL actually has
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccount",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-        FunctionUrlAuthType: "AWS_IAM",
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccount",
+      Principal: callerRoleArn,
+      FunctionUrlAuthType: "AWS_IAM",
+    });
 
     // And the other Account's Role allowed to invoke Function URLs by its own
     // Account
@@ -268,7 +269,10 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );

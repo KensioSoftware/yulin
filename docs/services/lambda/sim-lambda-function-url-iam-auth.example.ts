@@ -61,7 +61,7 @@ await simAws.iam().putRolePolicy(
       Version: "2012-10-17",
       Statement: {
         Effect: "Allow",
-        Action: "lambda:InvokeFunctionUrl",
+        Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
         Resource: created.FunctionArn,
       },
     }),

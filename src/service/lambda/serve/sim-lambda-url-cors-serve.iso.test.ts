@@ -17,6 +17,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
 import type { SimLambdaFunctionUrlCorsParts } from "../function/url/sim-lambda-function-url-cors.factory.js";
 import { simLambdaFunctionUrlCorsFactory } from "../function/url/sim-lambda-function-url-cors.factory.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 describe("Serving a sim Lambda Function URL configured for CORS", () => {
   interface ServedFunctionUrl {
@@ -58,6 +59,9 @@ describe("Serving a sim Lambda Function URL configured for CORS", () => {
       }),
     );
     assertNonNullable(FunctionUrl);
+    // Granted whatever the auth type, since the grant names `NONE` and opens
+    // nothing on an `AWS_IAM` URL.
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     return {
       simAws,

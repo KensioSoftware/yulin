@@ -68,7 +68,7 @@ async function serveBodyEcho(simAws: SimAws): Promise<string> {
       PolicyName: "InvokeUrl",
       PolicyDocument: simIamPolicyDocumentFactory.make({
         Statement: {
-          Action: "lambda:InvokeFunctionUrl",
+          Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
           Resource: created.FunctionArn,
         },
       }),

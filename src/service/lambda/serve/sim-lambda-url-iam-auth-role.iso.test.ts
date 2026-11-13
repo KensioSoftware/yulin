@@ -68,7 +68,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Action: "lambda:InvokeFunctionUrl",
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
             Resource: reporter.FunctionArn,
           },
         }),
@@ -121,7 +121,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Action: "lambda:InvokeFunctionUrl",
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
             Resource: reporter.FunctionArn,
           },
         }),

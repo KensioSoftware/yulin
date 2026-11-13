@@ -114,7 +114,10 @@ app.synth();
         RoleName: "Anything",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
