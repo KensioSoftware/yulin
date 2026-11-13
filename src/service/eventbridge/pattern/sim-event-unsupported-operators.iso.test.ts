@@ -30,9 +30,7 @@ describe("EventBridge event pattern unsupported operators", () => {
     // Given patterns using each unsimulated operator in turn.
     const unsimulated = [
       { "source-ip": [{ cidr: "10.0.0.0/24" }] },
-      { source: [{ "equals-ignore-case": "orders.service" }] },
       { source: [{ wildcard: "orders.*" }] },
-      { $or: [{ source: ["orders.service"] }, { region: ["us-east-1"] }] },
     ];
 
     // Then each is refused with its own name in the message, rather than
@@ -66,15 +64,21 @@ describe("EventBridge event pattern unsupported operators", () => {
     assertStringIncludes(error.message, "anything-but with prefix");
   });
 
-  it("refuses a prefix written to ignore case", async () => {
-    // Given a prefix with a nested equals-ignore-case.
-    const error = await refusedPattern({
-      detail: { service: [{ prefix: { "equals-ignore-case": "eventb" } }] },
+  it("refuses an $or offering fewer than two pattern objects", async () => {
+    // Given an $or with one alternative, and one offering a list of values.
+    const single = await refusedPattern({
+      $or: [{ source: ["orders.service"] }],
+    });
+    const values = await refusedPattern({
+      $or: [{ source: ["orders.service"] }, ["us-east-1"]],
     });
 
-    // Then it is refused rather than compared case-sensitively, which would
-    // answer a different question from the one the pattern asked.
-    assertStringIncludes(error.message, "prefix with equals-ignore-case");
+    // Then both are refused as malformed.
+    assertStringIncludes(single.message, "at least two pattern objects");
+    assertStringIncludes(
+      values.message,
+      "each alternative is a pattern object",
+    );
   });
 
   it("refuses an anything-but written as an object it does not know", async () => {

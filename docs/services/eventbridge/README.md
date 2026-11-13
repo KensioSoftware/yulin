@@ -266,15 +266,16 @@ making the list an "or".
 
 Supported conditions:
 
-| Condition                      | Written as                                             |
-| ------------------------------ | ------------------------------------------------------ |
-| Exact value, or any of several | `"source": ["orders.service", "billing.service"]`      |
-| Nested field                   | `"detail": { "customer": { "tier": ["gold"] } }`       |
-| Begins with                    | `"time": [{ "prefix": "2026-07-26" }]`                 |
-| Ends with                      | `"FileName": [{ "suffix": ".png" }]`                   |
-| Anything but                   | `"state": [{ "anything-but": ["stopped", "failed"] }]` |
-| Numeric, and ranges            | `"total": [{ "numeric": [">", 0, "<=", 5000] }]`       |
-| Field is or is not there       | `"refundId": [{ "exists": false }]`                    |
+| Condition                      | Written as                                               |
+| ------------------------------ | -------------------------------------------------------- |
+| Exact value, or any of several | `"source": ["orders.service", "billing.service"]`        |
+| Nested field                   | `"detail": { "customer": { "tier": ["gold"] } }`         |
+| Begins with                    | `"time": [{ "prefix": "2026-07-26" }]`                   |
+| Ends with                      | `"FileName": [{ "suffix": ".png" }]`                     |
+| Equals, ignoring case          | `"source": [{ "equals-ignore-case": "Orders.Service" }]` |
+| Anything but                   | `"state": [{ "anything-but": ["stopped", "failed"] }]`   |
+| Numeric, and ranges            | `"total": [{ "numeric": [">", 0, "<=", 5000] }]`         |
+| Field is or is not there       | `"refundId": [{ "exists": false }]`                      |
 
 Values are compared by type. The string `"5"` in a pattern does not match the number `5` in an
 event. `null` and the empty string are values like any other. Where the event carries a list for a
@@ -282,9 +283,14 @@ field, the pattern matches when the two lists overlap, and a pattern naming one 
 event whose `resources` names several. `exists` is about the field and not its members, and a field
 carrying an empty list still exists.
 
+`prefix` and `suffix` compare regardless of case when written with a nested `equals-ignore-case`,
+as in `[{ "prefix": { "equals-ignore-case": "us-" } }]`.
+
+`$or` sits where a field name would and lists two or more patterns for the same object. The object
+matches when any one of them does, alongside every other key beside the `$or`.
+
 `PutRule` rejects unsupported operators instead of storing a pattern that can never match. These
-include `cidr`, `equals-ignore-case`, `wildcard`, `$or`, nested `anything-but`, and the
-case-insensitive forms of `prefix` and `suffix`.
+are `cidr`, `wildcard` and the nested forms of `anything-but`.
 
 ## Testing a pattern without a rule
 
@@ -1302,8 +1308,8 @@ no permission for.
 - Numbers are compared after JSON parsing, so `300`, `300.0` and `3.0e2` are one value here. Real
   EventBridge compares the JSON token when matching an exact value, and so may tell those forms
   apart. Use `numeric` to compare numbers. That is what it is for.
-- The `cidr`, `equals-ignore-case`, `wildcard` and `$or` pattern operators are refused at `PutRule`,
-  as are the nested forms of `anything-but` and the case-insensitive forms of `prefix` and `suffix`.
+- The `cidr` and `wildcard` pattern operators are refused at `PutRule`, as are the nested forms of
+  `anything-but`.
 - A rule needs an `EventPattern`, a `ScheduleExpression` or both. Real EventBridge takes a rule with
   neither, which matches nothing and fires never. Here that rule is refused.
 - A scheduled rule only fires while a test advances the simulation's clock. Nothing runs on the

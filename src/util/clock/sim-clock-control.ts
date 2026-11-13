@@ -1,4 +1,4 @@
-import { setTimeout } from "node:timers";
+import { hostSetTimeout as setTimeout } from "../timer/host-timers.js";
 import type {
   BackgroundCompleter,
   BackgroundDueTaskSource,

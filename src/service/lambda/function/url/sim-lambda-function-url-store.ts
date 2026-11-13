@@ -1,79 +1,57 @@
+import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimLambdaFunction } from "../sim-lambda-function.js";
+import { simLambdaFunctionArn } from "../sim-lambda-function-configuration.js";
 import {
-  SimLambdaResourceConflictException,
-  SimLambdaResourceNotFoundException,
-} from "../../error/sim-lambda.error.js";
-import type {
-  SimLambdaFunction,
-  SimLambdaFunctionName,
-} from "../sim-lambda-function.js";
-import {
+  type MakeSimLambdaFunctionUrlProperties,
   SimLambdaFunctionUrlFactory,
   type SimLambdaFunctionUrlFactoryProperties,
 } from "./sim-lambda-function-url-factory.js";
-import type { SimLambdaFunctionUrlCors } from "./sim-lambda-function-url-cors.js";
 import type {
   SimLambdaFunctionUrl,
-  SimLambdaFunctionUrlAuthType,
   SimLambdaFunctionUrlId,
-  SimLambdaFunctionUrlInvokeMode,
   SimLambdaFunctionUrlMap,
 } from "./sim-lambda-function-url.js";
-interface CreateSimLambdaFunctionUrlProperties {
-  readonly simFunction: SimLambdaFunction;
-  readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
-  readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
-  readonly cors?: SimLambdaFunctionUrlCors | undefined;
-}
 
 /**
  * Function URL state for one Account/Region scope of simulated Lambda.
  *
- * Each function has at most one Function URL, so URLs are held by function
- * name.
+ * A function has at most one Function URL of its own, and at most one for
+ * each of its aliases, so URLs are held by function name and alias.
  */
 export class SimLambdaFunctionUrlStore {
   private readonly functionUrls: SimLambdaFunctionUrlMap = new Map();
   private readonly factory: SimLambdaFunctionUrlFactory;
+  private readonly scope: SimAwsAccountRegionScope;
 
   // The store's construction inputs are exactly the factory's: it holds URL
   // state and forwards the wiring straight through.
   constructor(properties: SimLambdaFunctionUrlFactoryProperties) {
     this.factory = new SimLambdaFunctionUrlFactory(properties);
+    this.scope = properties.accountRegionScope;
   }
 
   /**
-   * Get a function's Function URL, if it has one.
+   * Get the Function URL of a function, or of one of its aliases, if there is
+   * one.
    */
-  get(functionName: string): SimLambdaFunctionUrl | undefined {
-    return this.functionUrls.get(functionName as SimLambdaFunctionName);
+  get(
+    functionName: string,
+    qualifier?: string,
+  ): SimLambdaFunctionUrl | undefined {
+    return this.functionUrls.get(
+      simLambdaFunctionArn(this.scope, functionName, qualifier),
+    );
   }
 
   /**
-   * Get a function's Function URL, or fail as AWS does when it has none.
-   */
-  require(simFunction: SimLambdaFunction): SimLambdaFunctionUrl {
-    const functionUrl = this.get(simFunction.name);
-
-    if (functionUrl === undefined) {
-      throw new SimLambdaResourceNotFoundException(
-        `Function URL config not found for function: ${simFunction.arn}`,
-      );
-    }
-
-    return functionUrl;
-  }
-
-  /**
-   * Get every Function URL a function has, which is either none or one.
+   * Get every Function URL a function has, its own and its aliases'.
    */
   allForFunction(functionName: string): readonly SimLambdaFunctionUrl[] {
-    const functionUrl = this.get(functionName);
-
-    if (functionUrl === undefined) {
-      return [];
-    }
-
-    return [functionUrl];
+    return this.functionUrls
+      .values()
+      .filter((functionUrl) => functionUrl.functionName === functionName)
+      .toArray();
   }
 
   /**
@@ -86,44 +64,39 @@ export class SimLambdaFunctionUrlStore {
   }
 
   /**
-   * Create a Function URL for a function that does not have one.
+   * Create a Function URL for a function or alias that does not have one.
    */
-  create(
-    properties: CreateSimLambdaFunctionUrlProperties,
-  ): SimLambdaFunctionUrl {
-    const { simFunction } = properties;
-
-    if (this.get(simFunction.name) !== undefined) {
+  create(properties: MakeSimLambdaFunctionUrlProperties): SimLambdaFunctionUrl {
+    const { simFunction, qualifier } = properties;
+    if (this.get(simFunction.name, qualifier) !== undefined) {
       throw new SimLambdaResourceConflictException(
         `FunctionUrlConfig exists for this Lambda function: ${simFunction.arn}`,
       );
     }
 
     const functionUrl = this.factory.make(properties);
-    this.functionUrls.set(simFunction.name, functionUrl);
+    this.functionUrls.set(functionUrl.functionArn, functionUrl);
 
     return functionUrl;
   }
 
   /**
-   * Delete a function's Function URL when it has one.
+   * Delete every Function URL a function has, its aliases' included.
    *
-   * Deleting a function takes its URL with it, and a function without one is
+   * Deleting a function takes its URLs with it, and a function without one is
    * not an error there the way a DeleteFunctionUrlConfig request is.
    */
-  deleteIfPresent(simFunction: SimLambdaFunction): void {
-    if (this.get(simFunction.name) !== undefined) {
-      this.delete(simFunction);
+  deleteAllForFunction(simFunction: SimLambdaFunction): void {
+    for (const functionUrl of this.allForFunction(simFunction.name)) {
+      this.delete(functionUrl);
     }
   }
 
   /**
-   * Delete a function's Function URL, so its hostname stops resolving.
+   * Delete a Function URL, so its hostname stops resolving.
    */
-  delete(simFunction: SimLambdaFunction): void {
-    const functionUrl = this.require(simFunction);
-
-    this.functionUrls.delete(functionUrl.functionName);
+  delete(functionUrl: SimLambdaFunctionUrl): void {
+    this.functionUrls.delete(functionUrl.functionArn);
     this.factory.forget(functionUrl);
   }
 }

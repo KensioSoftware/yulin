@@ -5,17 +5,24 @@ import {
 } from "@aws-sdk/client-iam";
 import {
   AddPermissionCommand,
+  CreateAliasCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
+  DeleteAliasCommand,
   DeleteFunctionCommand,
   DeleteFunctionUrlConfigCommand,
+  GetAliasCommand,
   GetFunctionCommand,
   GetFunctionUrlConfigCommand,
   GetPolicyCommand,
   InvokeCommand,
   LambdaClient,
+  ListAliasesCommand,
   ListEventSourceMappingsCommand,
   ListFunctionUrlConfigsCommand,
+  ListVersionsByFunctionCommand,
+  PublishVersionCommand,
+  UpdateAliasCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertArrayEmpty,
@@ -258,6 +265,52 @@ describe("Serving the simulated Lambda control plane on an endpoint URL", () => 
       new ListFunctionUrlConfigsCommand({ FunctionName: "public" }),
     );
     assertArrayEmpty(gone.FunctionUrlConfigs ?? []);
+  });
+
+  it("serves the version and alias operations", async () => {
+    // Given a function with two published versions
+    await createEchoFunction("versioned");
+    await client.send(new PublishVersionCommand({ FunctionName: "versioned" }));
+    await client.send(new PublishVersionCommand({ FunctionName: "versioned" }));
+
+    // When an alias is created on the first and moved to the second
+    await client.send(
+      new CreateAliasCommand({
+        FunctionName: "versioned",
+        Name: "live",
+        FunctionVersion: "1",
+      }),
+    );
+    await client.send(
+      new UpdateAliasCommand({
+        FunctionName: "versioned",
+        Name: "live",
+        FunctionVersion: "2",
+      }),
+    );
+
+    // Then every read sees it, and invoking the alias runs the version
+    const versions = await client.send(
+      new ListVersionsByFunctionCommand({ FunctionName: "versioned" }),
+    );
+    assertArrayLength(versions.Versions ?? [], 3);
+    const alias = await client.send(
+      new GetAliasCommand({ FunctionName: "versioned", Name: "live" }),
+    );
+    assertIdentical(alias.FunctionVersion, "2");
+    const invoked = await client.send(
+      new InvokeCommand({ FunctionName: "versioned", Qualifier: "live" }),
+    );
+    assertIdentical(invoked.ExecutedVersion, "2");
+
+    // And deleting the alias leaves the listing empty
+    await client.send(
+      new DeleteAliasCommand({ FunctionName: "versioned", Name: "live" }),
+    );
+    const aliases = await client.send(
+      new ListAliasesCommand({ FunctionName: "versioned" }),
+    );
+    assertArrayEmpty(aliases.Aliases ?? []);
   });
 
   it("lists the event source mappings of a function", async () => {

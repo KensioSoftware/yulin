@@ -1,4 +1,7 @@
-import { clearTimeout, setTimeout } from "node:timers";
+import {
+  hostClearTimeout as clearTimeout,
+  hostSetTimeout as setTimeout,
+} from "../../../../../util/timer/host-timers.js";
 import type {
   BackgroundScheduler,
   BackgroundTask,

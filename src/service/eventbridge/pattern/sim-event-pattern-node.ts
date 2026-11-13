@@ -1,16 +1,13 @@
 import { isRecord } from "../../../util/type-guard/record.js";
 import type { JSONValue } from "../../../util/type-guard/json.js";
 import { SimEventPatternField } from "./sim-event-pattern-field.js";
-import {
-  eventPatternRefusal,
-  unsimulatedOperatorRefusal,
-} from "./sim-event-pattern-refusals.js";
+import { eventPatternRefusal } from "./sim-event-pattern-refusals.js";
 
 /**
  * The key real EventBridge matches several fields with, one of which is enough.
  *
- * It appears where a field name would, rather than inside a condition list, so
- * it is refused here rather than by the operator table.
+ * It appears where a field name would, rather than inside a condition list,
+ * and holds a list of patterns for the same object, any one of which is enough.
  */
 const orKey = "$or";
 
@@ -29,9 +26,14 @@ type SimEventPatternEntry = SimEventPatternField | SimEventPatternNode;
  */
 export class SimEventPatternNode {
   private readonly entries: ReadonlyMap<string, SimEventPatternEntry>;
+  private readonly alternatives: readonly SimEventPatternNode[];
 
-  private constructor(entries: ReadonlyMap<string, SimEventPatternEntry>) {
+  private constructor(
+    entries: ReadonlyMap<string, SimEventPatternEntry>,
+    alternatives: readonly SimEventPatternNode[],
+  ) {
     this.entries = entries;
+    this.alternatives = alternatives;
   }
 
   /**
@@ -49,10 +51,48 @@ export class SimEventPatternNode {
     const entries = new Map<string, SimEventPatternEntry>();
 
     for (const [key, value] of writtenEntries) {
-      entries.set(key, this.entryFor(key, value));
+      if (key !== orKey) {
+        entries.set(key, this.entryFor(key, value));
+      }
     }
 
-    return new this(entries);
+    const alternatives = new Map(writtenEntries).get(orKey);
+
+    return new this(entries, this.alternativesIn(alternatives));
+  }
+
+  /**
+   * Read the patterns an `$or` offers, any one of which is enough.
+   */
+  private static alternativesIn(
+    written: JSONValue | undefined,
+  ): readonly SimEventPatternNode[] {
+    if (written === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(written) || written.length < 2) {
+      throw eventPatternRefusal(
+        `${orKey} takes a list of at least two pattern objects, and this one ` +
+          `takes ${JSON.stringify(written)}`,
+      );
+    }
+
+    return written.map((alternative) => this.alternativeIn(alternative));
+  }
+
+  /**
+   * Read one pattern an `$or` offers, which has to be a pattern object.
+   */
+  private static alternativeIn(written: JSONValue): SimEventPatternNode {
+    if (!isRecord(written)) {
+      throw eventPatternRefusal(
+        `${orKey} offers ${JSON.stringify(written)}, and each alternative is ` +
+          `a pattern object`,
+      );
+    }
+
+    return this.of(written);
   }
 
   /**
@@ -77,10 +117,6 @@ export class SimEventPatternNode {
     key: string,
     written: JSONValue,
   ): SimEventPatternEntry {
-    if (key === orKey) {
-      throw unsimulatedOperatorRefusal(orKey);
-    }
-
     if (Array.isArray(written)) {
       return SimEventPatternField.of(written, key);
     }
@@ -111,8 +147,14 @@ export class SimEventPatternNode {
     // pattern supplied.
     const carried = new Map(Object.entries(value));
 
-    return this.entries
+    const everyKeyHolds = this.entries
       .entries()
       .every(([key, entry]) => SimEventPatternNode.holds(entry, carried, key));
+
+    return (
+      everyKeyHolds &&
+      (this.alternatives.length === 0 ||
+        this.alternatives.some((alternative) => alternative.matches(value)))
+    );
   }
 }

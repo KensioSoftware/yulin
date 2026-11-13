@@ -1,3 +1,7 @@
+import {
+  simLambdaFunctionUrlOwner,
+  simLambdaFunctionUrlReference,
+} from "../function-url/function-url-reference.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import {
   type BackgroundScheduler,
@@ -75,14 +79,19 @@ export class CreateFunctionUrlConfigCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const functionName = command.input.FunctionName;
+    const reference = simLambdaFunctionUrlReference(
+      command.input.FunctionName,
+      command.input.Qualifier,
+    );
     this.authorizer.authorize(
-      this.functions.functionArn(functionName),
+      this.functions.functionArn(reference.functionName, reference.qualifier),
       options?.caller,
     );
+    const simFunction = simLambdaFunctionUrlOwner(this.functions, reference);
 
     const functionUrl = this.functionUrls.create({
-      simFunction: this.functions.require(functionName),
+      simFunction,
+      qualifier: reference.qualifier,
       authType: this.inputParser.requireAuthType(command.input.AuthType),
       invokeMode: this.inputParser.parseOptionalInvokeMode(
         command.input.InvokeMode,

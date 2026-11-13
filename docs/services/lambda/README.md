@@ -2682,8 +2682,8 @@ and a queue deletes it, the way real Lambda handles a record it filtered out. A 
 empty invokes nothing at all.
 
 AWS documents Lambda's filter rules as EventBridge event patterns, and simulated EventBridge's
-matcher is what evaluates them here. Exact values, `prefix`, `suffix`, `anything-but`, `numeric` and
-`exists` all work. A mapping naming an operator the matcher has no behaviour for is refused when it
+matcher is what evaluates them here. Exact values, `prefix`, `suffix`, `equals-ignore-case`,
+`anything-but`, `numeric`, `exists` and `$or` all work. A mapping naming an operator the matcher has no behaviour for is refused when it
 is created. A mapping carrying several filters delivers a record any one of them matches.
 
 What a pattern reads depends on the source:
@@ -3116,8 +3116,14 @@ the route key, the stage and the path parameters are the endpoint's rather than 
 `GetFunctionUrlConfigCommand` reads the configuration back, `UpdateFunctionUrlConfigCommand`
 changes the `AuthType`, `InvokeMode` or `Cors` while keeping the same endpoint, and
 `DeleteFunctionUrlConfigCommand` removes it, after which the hostname stops resolving and returns
-`404`. `ListFunctionUrlConfigsCommand` lists what a function has, which is one configuration or
-none, since a function has at most one Function URL.
+`404`.
+
+A Function URL can also be put on an alias. Every one of the URL commands takes a `Qualifier` naming
+the alias, and the URL it makes has a hostname of its own, reports the alias ARN as its
+`FunctionArn` and runs the version the alias points at. A request to it is authorized against the
+alias's own resource-based policy. Real Lambda refuses a version number or `$LATEST` as the
+`Qualifier`, and so does simulated Lambda. A function has at most one URL of its own and one for each
+alias. `ListFunctionUrlConfigsCommand` lists them all, and deleting an alias takes its URL with it.
 
 A `Cors` block on an update replaces the whole block the URL was created with. An update that leaves
 `Cors` out keeps the block already in place.
@@ -3626,6 +3632,11 @@ frozen clock holds it asleep for as long as the test wants. The timers belong to
 simulations running at once each keep their own, and code outside an invocation keeps the host
 timers it already had.
 
+The same holds for timers a handler imports. `setTimeout`, `clearTimeout`, `setInterval` and
+`clearInterval` from `node:timers`, `setTimeout` and `scheduler.wait` from `node:timers/promises`,
+and `util.promisify(setTimeout)` all wait on the simulation's clock, in an in-process handler and in
+zip code alike. An abort signal passed to a promise timer cancels it as it does on Node.js.
+
 A sleeping handler is released by the clock. A test asks for the invocation and moves time before
 waiting on the answer.
 
@@ -4022,6 +4033,8 @@ never registered.
 `AWS::Lambda::Url` creates a Function URL for a deployed function, and CDK's
 `Function.addFunctionUrl(...)` emits one. `TargetFunctionArn` accepts either an `Fn::GetAtt` ARN or a
 `Ref` to the function, and `Fn::GetAtt` on the URL exposes `FunctionUrl` and `FunctionArn`.
+`Qualifier`, or a `TargetFunctionArn` naming an alias, puts the URL on that alias. CDK writes that
+for `Alias.addFunctionUrl(...)`.
 
 ```typescript sim-lambda-cloudformation-function-url
 /**
@@ -4605,6 +4618,9 @@ Sim Lambda currently supports:
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
   resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
   control
+- Function URLs on an alias, through a `Qualifier` on the URL commands or on `AWS::Lambda::Url`
+- `node:timers` and `node:timers/promises` timers a handler imports, waiting on the simulation's
+  clock
 - `lambdaFunctionUrlEventFactory`, making a Function URL invocation event for a test that calls a
   handler directly
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
@@ -4614,8 +4630,9 @@ Sim Lambda currently supports:
   `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
   `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
   DynamoDB stream and Kinesis events and honouring `BatchSize`
-- `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns, delivering
-  the records that match and handling the rest without an invocation
+- `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns including
+  `equals-ignore-case` and `$or`, delivering the records that match and handling the rest without
+  an invocation
 - `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, and `"AT_TIMESTAMP"` on a
   Kinesis one, with a failing batch blocking its shard until it is through or discarded
 - `MaximumRetryAttempts` and `MaximumRecordAgeInSeconds` on a stream mapping, ending the retries at
@@ -4641,7 +4658,8 @@ Sim Lambda currently supports:
   and the JWKS a token verifier fetches from the regional Cognito endpoint
 - Execution roles, evaluated against simulated IAM
 - Published versions and aliases, with `PublishVersion`, `ListVersionsByFunction`, `CreateAlias`,
-  `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias`, and a `Qualifier` on `Invoke`,
+  `UpdateAlias`, `GetAlias`, `ListAliases` and `DeleteAlias` (served over HTTP too), and a
+  `Qualifier` on `Invoke`,
   `GetFunction` and the permission commands, each qualified resource holding its own policy
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:UpdateFunctionCode`, `lambda:InvokeFunction`, the Function URL
@@ -4723,8 +4741,9 @@ Current documented limitations:
   well-formed Origin is stored and matches no request.
 - `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
   buffered.
-- A function has at most one Function URL, and qualified (version or alias) Function URLs are left
-  out.
+- An invocation through an alias, whether by `Invoke` or through the alias's Function URL, reports
+  the version's ARN as `invokedFunctionArn` in the handler's context. Real Lambda reports the alias
+  ARN.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
   alone. Alias `RoutingConfig` weights and provisioned concurrency are left out. `CodeSha256`,
   `RuntimePolicy` and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig`
@@ -4738,8 +4757,7 @@ Current documented limitations:
   latest version when nothing has changed since it was published.
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
   CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
-  API Gateway integration and authorizer URIs, and `AWS::Lambda::Permission`. The
-  `AWS::Lambda::Url` template reader still drops one.
+  API Gateway integration and authorizer URIs, `AWS::Lambda::Permission` and `AWS::Lambda::Url`.
 - The vm runtime supports CommonJS function code only. An ES module deployment package is refused
   at cold start, whether the handler file ends in `.mjs` or a `.js` file opens on `import`.
   Evaluating one would need `vm.SourceTextModule`, which Node.js gates behind
@@ -4779,9 +4797,9 @@ Current documented limitations:
 - A handler is interrupted at its deadline only where it yields. The deadline waits on the
   simulation's clock like any other work, and dispatching it needs the event loop, so a handler
   looping over the CPU without awaiting anything runs to the end of its loop.
-- The global `setTimeout`, `clearTimeout`, `setInterval` and `clearInterval` are the timers on the
-  simulation's clock. `node:timers`, `node:timers/promises` and `util.promisify(setTimeout)` are
-  imported directly rather than read from the globals, and they wait in real time.
+- The async iterator `setInterval` from `node:timers/promises` waits in real time, as does a timer
+  function a CommonJS handler copied out of `node:timers` at module scope before its first
+  invocation. The `ref` option on a promise timer has no effect inside an invocation.
 - Module-scope initialization time and execution environment recycling are left out. A cold start
   costs nothing against the deadline, and a function keeps one warm environment for as long as it
   exists.
@@ -4813,10 +4831,9 @@ Current documented limitations:
   invoked it, are refused with `SimLambdaStreamCascadeError`. Real Lambda runs that loop for as long
   as it is paid for. A handler that writes back and then settles is delivered its own writes and
   finishes.
-- `FilterCriteria` is evaluated by simulated EventBridge's pattern matcher, which leaves out the
-  `equals-ignore-case` and `$or` operators real Lambda takes. A pattern naming one is refused when
-  the mapping is created. The limits AWS puts on the number and length of patterns go unenforced,
-  and `KMSKeyArn` is refused, so criteria are held in plaintext.
+- `FilterCriteria` is evaluated by simulated EventBridge's pattern matcher. The limits AWS puts on
+  the number and length of patterns go unenforced, and `KMSKeyArn` is refused, so criteria are held
+  in plaintext.
 - A shard iterator never expires, where a real one is good for 15 minutes.
 - `MaximumBatchingWindowInSeconds` is only simulated as 0. A partial batch is delivered as soon as
   anything is on the event source, leaving a batching window nothing to wait for. A non-zero value
@@ -4845,7 +4862,6 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves twenty-eight of these operations over HTTP, listed in the
-  [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The version and alias operations have no
-  route there yet, and reach the simulation through `SimAws` or
-  [SDK interception](https://yulinsim.dev/sdk/) instead.
+- `serveSimAws` serves thirty-five of these operations over HTTP, listed in the
+  [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The provisioned concurrency
+  operations have no route there, as they have no simulation behind them.

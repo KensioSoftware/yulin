@@ -15,7 +15,7 @@ import {
   simLambdaUrlRequiresInvokeFunction,
 } from "./sim-lambda-url-invoke-actions.js";
 import type { SimAwsRequestSource } from "../../../iam/request/sim-aws-request-source.js";
-import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
+import type { SimLambdaPolicyResource } from "../../function/policy/sim-lambda-policy-resource.js";
 import type { SimLambdaFunctionUrl } from "../../function/url/sim-lambda-function-url.js";
 
 interface SimLambdaUrlAuthorizerProperties {
@@ -23,7 +23,11 @@ interface SimLambdaUrlAuthorizerProperties {
 }
 
 interface SimLambdaUrlAuthorizationInput {
-  readonly simFunction: SimLambdaFunction;
+  /**
+   * What the URL is on, the function or one of its aliases, whose ARN and
+   * resource policy decide the request.
+   */
+  readonly resource: SimLambdaPolicyResource;
   readonly functionUrl: SimLambdaFunctionUrl;
   readonly caller: SimAwsCaller;
   /**
@@ -105,9 +109,9 @@ export class SimLambdaUrlAuthorizer {
 
     return this.iam.authorize({
       action,
-      resource: input.simFunction.arn,
+      resource: input.resource.arn,
       caller: input.caller,
-      resourcePolicies: simLambdaResourcePolicies(input.simFunction),
+      resourcePolicies: simLambdaResourcePolicies(input.resource),
       conditionContext: {
         [simLambdaFunctionUrlAuthTypeConditionKey]: input.functionUrl.authType,
         ...(source?.arn !== undefined && {

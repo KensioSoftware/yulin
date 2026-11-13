@@ -1,7 +1,7 @@
 import {
-  clearInterval as hostClearInterval,
-  clearTimeout as hostClearTimeout,
-} from "node:timers";
+  hostClearInterval,
+  hostClearTimeout,
+} from "../../../../../util/timer/host-timers.js";
 import { SimLambdaTimerHandle } from "./sim-lambda-timer-handle.js";
 
 /** Whatever a caller passes to `clearTimeout` or `clearInterval`. */

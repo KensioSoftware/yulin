@@ -41,6 +41,13 @@ class SimLambdaProcessTimers {
   }
 
   /**
+   * Whether the code running now is inside an invocation.
+   */
+  running(): boolean {
+    return this.storage.getStore() !== undefined;
+  }
+
+  /**
    * The timers the code running now should use.
    */
   current(): SimLambdaTimers {

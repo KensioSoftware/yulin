@@ -4,11 +4,11 @@ import { simLambdaFunctionApiRoutes } from "./sim-lambda-api-function-routes.js"
 import { simLambdaPermissionApiRoutes } from "./sim-lambda-api-permission-routes.js";
 import { simLambdaTagApiRoutes } from "./sim-lambda-api-tag-routes.js";
 import { simLambdaUrlApiRoutes } from "./sim-lambda-api-url-routes.js";
+import { simLambdaVersionApiRoutes } from "./sim-lambda-api-version-routes.js";
 
 /**
  * The Lambda operations reachable through the served AWS API endpoint, which
- * are twenty-eight of the ones simulated Lambda implements. The version and alias
- * operations are handled as Commands and have no route here yet.
+ * are thirty-five of the ones simulated Lambda implements.
  *
  * No two of these share a method and a path, so the order they are listed in
  * decides nothing. A path that is not one of these is refused rather than
@@ -20,4 +20,5 @@ export const simLambdaApiRoutes: readonly SimRestJsonRoute[] = [
   ...simLambdaPermissionApiRoutes,
   ...simLambdaEventSourceApiRoutes,
   ...simLambdaTagApiRoutes,
+  ...simLambdaVersionApiRoutes,
 ];

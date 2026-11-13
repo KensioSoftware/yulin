@@ -1,3 +1,4 @@
+import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
@@ -32,6 +33,7 @@ import type {
 interface SimLambdaAliasCommandsProperties {
   readonly functions: SimLambdaFunctionLookup;
   readonly aliases: SimLambdaFunctionAliasStore;
+  readonly functionUrls: SimLambdaFunctionUrlStore;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
 }

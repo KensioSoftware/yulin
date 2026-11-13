@@ -157,12 +157,11 @@ describe("Resolving a Lambda operation from a served request", () => {
     // Given the paths of Lambda operations this simulation has not
     // implemented, each sharing its method with one it has
     // Then none of them resolves to the operation beside it
-    assertUndefined(command("POST", "/2015-03-31/functions/orders/versions"));
     assertUndefined(
-      command("GET", "/2015-03-31/functions/orders/code-signing-config"),
+      command("PUT", "/2019-09-30/functions/orders/provisioned-concurrency"),
     );
     assertUndefined(
-      command("GET", "/2015-03-31/functions/orders/aliases/live"),
+      command("GET", "/2015-03-31/functions/orders/code-signing-config"),
     );
     assertUndefined(
       command("GET", "/2019-09-25/functions/orders/event-invoke-config"),
@@ -180,8 +179,11 @@ describe("Resolving a Lambda operation from a served request", () => {
       input("GET", "/2015-03-31/functions/orders/policy"),
       named,
     );
-    assertObjectEquals(input("GET", "/2021-10-31/functions/orders/url"), named);
-    assertObjectEquals(
+    assertObjectMatches(
+      input("GET", "/2021-10-31/functions/orders/url"),
+      named,
+    );
+    assertObjectMatches(
       input("DELETE", "/2021-10-31/functions/orders/url"),
       named,
     );
@@ -254,13 +256,13 @@ describe("Resolving a Lambda operation from a served request", () => {
       }),
       { Timeout: 5, FunctionName: "orders" },
     );
-    assertObjectEquals(
+    assertObjectMatches(
       input("POST", "/2021-10-31/functions/orders/url", {
         body: JSON.stringify({ AuthType: "NONE" }),
       }),
       { AuthType: "NONE", FunctionName: "orders" },
     );
-    assertObjectEquals(
+    assertObjectMatches(
       input("PUT", "/2021-10-31/functions/orders/url", {
         body: JSON.stringify({ InvokeMode: "BUFFERED" }),
       }),

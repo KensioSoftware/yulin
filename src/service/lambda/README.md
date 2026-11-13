@@ -635,8 +635,10 @@ declared here and satisfied structurally by `SimDynamoDb`, so neither service im
 ## Function URLs
 
 `function/url/` owns Function URLs: `SimLambdaFunctionUrl` is the stored resource and
-`SimLambdaFunctionUrlStore` holds one per function for an Account/Region scope. Creating one
-allocates a URL id and builds the AWS-shaped endpoint from it:
+`SimLambdaFunctionUrlStore` holds one per function and one per alias for an Account/Region scope,
+keyed by the function name with the alias appended. `SimLambdaUrlRouter` resolves an alias URL
+through `findTarget`, so the alias's policy authorizes the request and its version runs. Creating
+one allocates a URL id and builds the AWS-shaped endpoint from it:
 
 ```text
 https://<url-id>.lambda-url.<region>.on.aws/
@@ -906,10 +908,9 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   and `MasterRegion` on `ListFunctions`
 - the previous code and settings answering invocations while a change is `InProgress`, a change
   ending `Failed`, and the refusal of a change to a function still `Pending`
-- `EventSourceToken` on `AddPermission`, qualified Function URLs, alias
+- `EventSourceToken` on `AddPermission`, alias
   `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
-- version and alias operations over the served HTTP API endpoint, which routes twenty-eight others
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there or a request made there

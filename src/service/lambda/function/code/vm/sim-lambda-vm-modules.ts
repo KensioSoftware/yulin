@@ -1,3 +1,7 @@
+import {
+  installSimLambdaTimerModules,
+  simLambdaIsTimerModule,
+} from "../../invoke/timer/sim-lambda-timer-modules.js";
 import { isBuiltin } from "node:module";
 import path from "node:path";
 import vm from "node:vm";
@@ -49,6 +53,12 @@ export class SimLambdaVmModules {
     // dependencies still asks the runtime for, so the provider is offered
     // those too. Anything it declines is the host built-in itself.
     if (isBuiltin(specifier)) {
+      // The timer modules are the host's own, patched to run on the clock of
+      // the invocation running now, as the sandbox's timer globals do.
+      if (simLambdaIsTimerModule(specifier)) {
+        installSimLambdaTimerModules();
+      }
+
       return (
         this.properties.sdkModuleProvider.provideModule(specifier) ??
         requireHostModule(specifier)

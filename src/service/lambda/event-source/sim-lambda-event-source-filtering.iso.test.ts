@@ -51,6 +51,46 @@ function streamedOrderIds(
 }
 
 describe("sim Lambda event source mapping filter criteria", () => {
+  it("delivers a queue message an $or alternative matches in any case", async () => {
+    // Given a queue mapping whose filter offers two alternatives, one of them
+    // matched regardless of case.
+    const { queueUrl, events, simAws } = await simAwsWithSqsEventSource({
+      filterPatterns: [
+        JSON.stringify({
+          body: {
+            $or: [
+              { status: [{ "equals-ignore-case": "shipped" }] },
+              { priority: ["high"] },
+            ],
+          },
+        }),
+      ],
+    });
+
+    // When three orders are sent, the last matching neither alternative.
+    for (const body of [
+      { orderId: "order-1", status: "SHIPPED" },
+      { orderId: "order-2", status: "placed", priority: "high" },
+      { orderId: "order-3", status: "placed", priority: "low" },
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- sent in order
+      await simAws.sqs().sendMessage(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: JSON.stringify(body),
+        }),
+      );
+    }
+    await simAws.backgroundTasksComplete();
+
+    // Then the two matching orders reached the function.
+    const orderIds = events
+      .flatMap((event) => event.Records)
+      .map((record) => (JSON.parse(record.body) as { orderId: string }).orderId)
+      .toSorted((left, right) => left.localeCompare(right));
+    assertArrayEquals(orderIds, ["order-1", "order-2"]);
+  });
+
   it("delivers a queue message its filter matches and deletes one it does not", async () => {
     // Given a queue mapping filtering on a field of the message body.
     const { queueUrl, events, simAws } = await simAwsWithSqsEventSource({

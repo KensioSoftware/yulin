@@ -1,7 +1,7 @@
 import {
-  setInterval as hostSetInterval,
-  setTimeout as hostSetTimeout,
-} from "node:timers";
+  hostSetInterval,
+  hostSetTimeout,
+} from "../../../../../util/timer/host-timers.js";
 import type {
   SimLambdaTimerCallback,
   SimLambdaTimers,

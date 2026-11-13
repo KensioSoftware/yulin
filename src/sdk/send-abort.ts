@@ -1,4 +1,4 @@
-import { setTimeout } from "node:timers";
+import { hostSetTimeout as setTimeout } from "../util/timer/host-timers.js";
 import { SimSdkAbortError } from "./error/sim-sdk.error.js";
 
 /**

@@ -41,6 +41,8 @@ export function makeSimLambdaFunctionUrlId(): SimLambdaFunctionUrlId {
 interface SimLambdaFunctionUrlProperties {
   readonly urlId: SimLambdaFunctionUrlId;
   readonly functionName: SimLambdaFunctionName;
+  /** The alias this URL invokes, or nothing for the function's `$LATEST`. */
+  readonly qualifier?: string | undefined;
   readonly functionArn: string;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
@@ -75,13 +77,16 @@ export interface SimLambdaFunctionUrlConfiguration {
 /**
  * Simulated Lambda Function URL resource.
  *
- * A Function URL is the HTTP endpoint for one function. The id is the routing
+ * A Function URL is the HTTP endpoint for one function, or for one alias of
+ * it. The id is the routing
  * key: it is the leading label of the endpoint hostname, so the localhost
  * serving layer can find the function from nothing but the request Host.
  */
 export class SimLambdaFunctionUrl {
   public readonly urlId: SimLambdaFunctionUrlId;
   public readonly functionName: SimLambdaFunctionName;
+  /** The alias this URL invokes, or nothing for the function's `$LATEST`. */
+  public readonly qualifier: string | undefined;
   public readonly functionArn: string;
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly creationTime: string;
@@ -108,6 +113,7 @@ export class SimLambdaFunctionUrl {
 
     this.urlId = urlId;
     this.functionName = functionName;
+    this.qualifier = properties.qualifier;
     this.functionArn = functionArn;
     this.accountRegionScope = accountRegionScope;
     this.#authType = authType;
@@ -193,7 +199,8 @@ export class SimLambdaFunctionUrl {
   }
 }
 
-export type SimLambdaFunctionUrlMap = Map<
-  SimLambdaFunctionName,
-  SimLambdaFunctionUrl
->;
+/**
+ * Function URLs keyed by the ARN they are on, which is the function's, or one
+ * of its aliases'.
+ */
+export type SimLambdaFunctionUrlMap = Map<string, SimLambdaFunctionUrl>;
