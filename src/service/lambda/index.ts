@@ -7,6 +7,12 @@ export {
 export { SimSdkLambdaVmModuleProvider } from "./function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 export { makeLambdaZipFileInput } from "./function/code/lambda-zip-file-input.js";
 export {
+  lambdaHandlerModule,
+  SimLambdaHandlerModule,
+  type SimLambdaHandlerSource,
+  type SimLambdaModuleLoader,
+} from "./function/code/sim-lambda-handler-module.js";
+export {
   makeLambdaCodeZip,
   type LambdaCodeZipFiles,
 } from "./function/code/make-lambda-code-zip.js";

@@ -3782,8 +3782,9 @@ export const handler = async () => {
 };
 ```
 
-Moving the read inside the handler fixes it. Zip code in the vm runtime is unaffected, because it is
-imported at cold start, during an invocation.
+Moving the read inside the handler fixes it, and so does
+[importing the handler module at cold start](#import-the-handler-module-at-cold-start). Zip code in
+the vm runtime is unaffected, because it is imported at cold start, during an invocation.
 
 This rarely comes up, because test suites commonly export the same variables they configure their
 functions with, and then a module-scope read gets the right value anyway. Sim Lambda warns on the
@@ -3798,6 +3799,50 @@ to it (a handler module imported ahead of Yulin, or a setup file that loads firs
 of the whole environment such as `{ ...process.env }`. Neither produces a warning. A handler that
 reads its variables inside the handler function produces none either.
 
+### Import the handler module at cold start
+
+Where moving the reads is impractical, give the function the handler module in place of the
+handler. `lambdaHandlerModule` takes a function that imports the module, and the name of the export
+to run (`handler` unless given).
+
+```typescript
+import {
+  lambdaHandlerModule,
+  makeLambdaZipFileInput,
+} from "@kensio/yulin/lambda";
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        lambdaHandlerModule(() => import("../src/orders.js")),
+      ),
+    },
+    Environment: { Variables: { TABLE_NAME: "orders" } },
+  }),
+);
+```
+
+The function imports the module during its first invocation, with its own environment variables and
+the simulation's clock in place. Module-scope code then reads what it reads on real Lambda, where it
+runs as the function initializes. The import costs nothing against the invocation's deadline, and
+the module stays loaded for later invocations. An import that throws fails the invocation with
+`Runtime.ImportModuleError`, and the next invocation calls the loader again. Node.js keeps the error
+from an ES module whose top-level code threw, so importing that module again fails the same way. Real
+Lambda starts a fresh environment, where the module runs again. A module lacking the export fails
+with `Runtime.HandlerNotFound`.
+
+A handler module works wherever a handler does. It can go to `makeLambdaZipFileInput`, be the
+`handler` of a [CloudFormation binding](#executable-bindings), or be registered as a container image
+in simulated ECR.
+
+Node.js evaluates a module once per process (Vitest, once per test file). A module the test file has
+already imported, or one another function imported first, ran its module scope at that earlier
+import, with whatever environment and time were in place then. Import the module through the loader
+alone.
+
 ## The time inside a handler
 
 A function runs on its simulation's clock, and so does the function code. `Date.now()` and
@@ -3809,7 +3854,8 @@ handler with a constant budget, where it would otherwise drain in real time.
 Zip code gets this from its own vm sandbox. A real in-process handler gets it from a substituted
 global `Date` that reports the invocation's clock while an invocation is running and the host clock
 otherwise. A time read at module scope is therefore read too early, exactly as it is for environment
-variables. See [simulated time](https://yulinsim.dev/time/) for the whole picture, including where real
+variables, unless the function
+[imports its handler module at cold start](#import-the-handler-module-at-cold-start). See [simulated time](https://yulinsim.dev/time/) for the whole picture, including where real
 AWS puts the time on the event.
 
 ## Timers and the invocation deadline
@@ -4629,7 +4675,8 @@ A binding can target the function by `logicalId` (which also matches a CDK const
 `aws:cdk:path` metadata), by `functionName`, by `arn`, by full `cdkPath`, or by `imageRepository`
 for a function packaged as a container image. A bound function may omit template `Code` and
 `Handler` entirely, and unbound functions in the same template keep their template code on the vm
-path. A binding that resolves to no template resource fails the deploy with the unmatched target
+path. A binding's `handler` can also be a handler module made with `lambdaHandlerModule`, which the
+function [imports at cold start](#import-the-handler-module-at-cold-start). A binding that resolves to no template resource fails the deploy with the unmatched target
 named for diagnosis. Where two bindings could both back the same function, the one listed first is
 the one that backs it.
 
@@ -5000,7 +5047,8 @@ Current documented limitations:
 - Lambda Layers are left out.
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value
-  instead. See [Environment variables](#environment-variables).
+  instead. A handler module the function imports at cold start reads the function's own values. See
+  [Import the handler module at cold start](#import-the-handler-module-at-cold-start).
 - Outbound HTTP is routed for `fetch`, `node:http`, `node:https` and `node:http2` alone. A handler using another
   client, or a request made from a handler module while it is being imported, reaches the network.
   A routed response comes back as the simulation answered it, with redirects left for the caller to
@@ -5023,7 +5071,8 @@ Current documented limitations:
   costs nothing against the deadline, and a function keeps one warm environment for as long as it
   exists.
 - A time read at module scope, like an environment variable read there, is read before any
-  invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
+  invocation and sees the host clock. A handler module the function imports at cold start reads
+  simulated time. See [The time inside a handler](#the-time-inside-a-handler).
 - The S3 object version a code location names is accepted but ignored, as sim S3 has no object
   versioning yet. That covers `Code.S3ObjectVersion` on `CreateFunction` and on a template
   function, and `S3ObjectVersion` on `UpdateFunctionCode`. A versioned location loads the object as

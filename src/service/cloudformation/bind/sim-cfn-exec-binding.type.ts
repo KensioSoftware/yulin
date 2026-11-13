@@ -1,6 +1,6 @@
 import type { ExactlyOne } from "../../../util/exactly-one.type.js";
 import type { CloudFrontFunction } from "../../cloudfront/index.js";
-import type { SimLambdaHandler } from "../../lambda/function/sim-lambda-handler.type.js";
+import type { SimLambdaHandlerSource } from "../../lambda/function/code/sim-lambda-handler-module.js";
 
 /**
  * A real in-process handler function that can back an executable
@@ -10,7 +10,7 @@ import type { SimLambdaHandler } from "../../lambda/function/sim-lambda-handler.
  */
 export type SimCfnExecutableResource =
   | CloudFrontFunction.Handler
-  | SimLambdaHandler
+  | SimLambdaHandlerSource
   // oxlint-disable-next-line typescript/no-unsafe-function-type
   | Function;
 
@@ -63,4 +63,4 @@ export type SimCfnCfBinding =
   SimCfnExecutableResourceBinding<CloudFrontFunction.Handler>;
 
 export type SimCfnLambdaBinding =
-  SimCfnExecutableResourceBinding<SimLambdaHandler>;
+  SimCfnExecutableResourceBinding<SimLambdaHandlerSource>;

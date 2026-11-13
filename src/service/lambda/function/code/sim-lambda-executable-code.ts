@@ -6,6 +6,11 @@ import {
   simLambdaCodePackageNamed,
   type SimLambdaCodePackage,
 } from "./sim-lambda-code-package.js";
+import {
+  simLambdaHandlerIdentity,
+  simLambdaHandlerOf,
+  type SimLambdaHandlerSource,
+} from "./sim-lambda-handler-module.js";
 
 /**
  * The function settings a change to which reaches the code itself.
@@ -62,7 +67,13 @@ export interface SimLambdaExecutableCode {
     configuration: SimLambdaCodeConfiguration,
   ): SimLambdaExecutableCode;
 
-  handlerFunction(): SimLambdaHandler;
+  /**
+   * The handler function, cold-starting the code if it has not started.
+   *
+   * Code imported at cold start may answer with a promise, since importing a
+   * module takes a turn of the event loop.
+   */
+  handlerFunction(): SimLambdaHandler | Promise<SimLambdaHandler>;
 }
 
 /**
@@ -83,8 +94,8 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
   readonly codePackage: SimLambdaCodePackage;
 
   constructor(
-    private readonly handler: SimLambdaHandler,
-    identity = handler.toString(),
+    private readonly handler: SimLambdaHandlerSource,
+    identity = simLambdaHandlerIdentity(handler),
   ) {
     this.codePackage = simLambdaCodePackageNamed(identity);
   }
@@ -115,9 +126,10 @@ export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
   }
 
   /**
-   * Get the referenced handler function.
+   * Get the referenced handler function, importing its module the first time
+   * when it was given as a module.
    */
-  handlerFunction(): SimLambdaHandler {
-    return this.handler;
+  async handlerFunction(): Promise<SimLambdaHandler> {
+    return await simLambdaHandlerOf(this.handler);
   }
 }

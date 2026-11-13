@@ -266,7 +266,7 @@ export class SimLambdaFunction {
       await simLambdaPlatformLogged(
         this.logging,
         invocation.platformLog,
-        async () => invocation.run(this.#code.handlerFunction(), event),
+        async () => invocation.run(await this.#code.handlerFunction(), event),
       );
 
     return await this.concurrency.run(this.metrics, this, async () =>

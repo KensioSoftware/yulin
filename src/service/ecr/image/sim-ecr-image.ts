@@ -1,16 +1,17 @@
+import type { SimLambdaHandlerModule } from "../../lambda/function/code/sim-lambda-handler-module.js";
 import type { SimLambdaHandler } from "../../lambda/function/sim-lambda-handler.type.js";
 
 /**
- * What a simulated container image actually is: a real in-process handler.
+ * What a simulated container image actually is: a real in-process handler, or
+ * the module exporting one.
  *
  * Yulin never reads image content, so there is nothing else an image could be
  * here. A handler function is the only thing this simulator can run, which is
  * why this is the sim Lambda handler type rather than a shape of its own.
  */
-export type SimEcrImageHandler<
-  TEvent = never,
-  TResult = unknown,
-> = SimLambdaHandler<TEvent, TResult>;
+export type SimEcrImageHandler<TEvent = never, TResult = unknown> =
+  | SimLambdaHandler<TEvent, TResult>
+  | SimLambdaHandlerModule;
 
 interface SimEcrImageProperties {
   readonly imageTag: string;

@@ -5,7 +5,7 @@ import type { SimLambdaFunctionCode } from "../../command/create-function/create
 import type { SimLambdaContainerImages } from "../../function/code/image/sim-lambda-container-images.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
-import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";
+import type { SimLambdaHandlerSource } from "../../function/code/sim-lambda-handler-module.js";
 import type { SimCfnLambdaFunctionProperties } from "./sim-cfn-lambda-function-properties-parser.js";
 
 interface SimCfnLambdaCodeInputProperties {
@@ -55,7 +55,7 @@ export function simCfnLambdaCodeInput(
 ): SimCfnLambdaCodeInput {
   const { resource, functionProperties, bindings } = properties;
 
-  const bindingFinder = new SimCfnExecBindingFinder<SimLambdaHandler>({
+  const bindingFinder = new SimCfnExecBindingFinder<SimLambdaHandlerSource>({
     resource,
     bindings,
   });
@@ -107,6 +107,6 @@ function registeredImageCode(
 /**
  * The code input for a function a real in-process handler backs.
  */
-function handlerCode(handler: SimLambdaHandler): SimCfnLambdaCodeInput {
+function handlerCode(handler: SimLambdaHandlerSource): SimCfnLambdaCodeInput {
   return { code: { ZipFile: makeLambdaZipFileInput(handler) }, bound: true };
 }

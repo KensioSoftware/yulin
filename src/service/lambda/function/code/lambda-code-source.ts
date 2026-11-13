@@ -1,6 +1,6 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
-import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import type { SimLambdaHandlerSource } from "./sim-lambda-handler-module.js";
 import { LambdaZipFileStowaway } from "./lambda-zip-file-input.js";
 
 /**
@@ -20,7 +20,7 @@ export interface SimLambdaCodeInput {
  */
 export interface SimLambdaHandlerReferenceSource {
   readonly kind: "handler-reference";
-  readonly handlerFunction: SimLambdaHandler;
+  readonly handlerFunction: SimLambdaHandlerSource;
 }
 
 /**
