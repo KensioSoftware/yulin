@@ -38,8 +38,9 @@ export class SimLambdaHandlerModule {
   /**
    * The handler the module exports, importing the module the first time.
    *
-   * A failed import is tried again on the next invocation, as a real cold
-   * start that failed is.
+   * A failed import calls the loader again on the next invocation, as a real
+   * cold start that failed starts again. Node.js keeps the error from an ES
+   * module whose top-level code threw, so that import fails the same way.
    */
   async handler(): Promise<SimLambdaHandler> {
     this.#handler ??= this.imported();

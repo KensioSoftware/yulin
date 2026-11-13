@@ -3821,8 +3821,10 @@ The function imports the module during its first invocation, with its own enviro
 the simulation's clock in place. Module-scope code then reads what it reads on real Lambda, where it
 runs as the function initializes. The import costs nothing against the invocation's deadline, and
 the module stays loaded for later invocations. An import that throws fails the invocation with
-`Runtime.ImportModuleError`, and the next invocation tries the import again. A module lacking the
-export fails with `Runtime.HandlerNotFound`.
+`Runtime.ImportModuleError`, and the next invocation calls the loader again. Node.js keeps the error
+from an ES module whose top-level code threw, so importing that module again fails the same way. Real
+Lambda starts a fresh environment, where the module runs again. A module lacking the export fails
+with `Runtime.HandlerNotFound`.
 
 A handler module works wherever a handler does. It can go to `makeLambdaZipFileInput`, be the
 `handler` of a [CloudFormation binding](#executable-bindings), or be registered as a container image
