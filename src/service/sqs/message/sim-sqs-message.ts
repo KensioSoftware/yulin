@@ -41,7 +41,7 @@ interface SimSqsMessageProperties {
 export interface SimSqsDeadLetterMoveOf {
   readonly instant: Date;
   readonly sourceQueueArn: string;
-  readonly restartsRetention: boolean;
+  readonly toFifoQueue: boolean;
 }
 
 /**
@@ -170,7 +170,9 @@ export class SimSqsMessage {
    * attributes, the sent timestamp and its place in its message group. Real
    * SQS leaves the enqueue timestamp alone when it moves a message to a
    * standard queue, so retention still runs from when the message was first
-   * sent, and restarts it on a move to a FIFO queue.
+   * sent. A move to a FIFO queue restarts retention, and replaces the
+   * deduplication id with the message id, as real SQS does, so two messages
+   * that shared an id on the source queue are both kept.
    *
    * What does not carry over is the receive count, because a receive count
    * counts receives from one queue and this message has not been received from
@@ -178,16 +180,15 @@ export class SimSqsMessage {
    * dead-letter queue's delay does not apply to it.
    */
   onDeadLetterQueue(move: SimSqsDeadLetterMoveOf): SimSqsMessage {
-    const { instant, sourceQueueArn, restartsRetention } = move;
+    const { instant, sourceQueueArn, toFifoQueue } = move;
 
     return new SimSqsMessage({
       messageId: this.messageId,
       body: this.body,
       attributes: this.attributes,
       sentAt: this.sentAt,
-      enqueuedAt: this.enqueuedAfterMove(instant, restartsRetention),
+      ...this.afterMove(instant, toFifoQueue),
       visibleFrom: instant,
-      ordering: this.ordering,
       deadLetterSourceArn: sourceQueueArn,
       traceHeader: this.traceHeader,
     });
@@ -226,11 +227,21 @@ export class SimSqsMessage {
     });
   }
 
-  private enqueuedAfterMove(instant: Date, restartsRetention: boolean): Date {
-    if (restartsRetention) {
-      return instant;
+  /**
+   * When retention runs from, and the ordering, for this message on a
+   * dead-letter queue.
+   */
+  private afterMove(
+    instant: Date,
+    toFifoQueue: boolean,
+  ): { enqueuedAt: Date; ordering: SimSqsMessageOrdering } {
+    if (!toFifoQueue) {
+      return { enqueuedAt: this.enqueuedAt, ordering: this.ordering };
     }
 
-    return this.enqueuedAt;
+    return {
+      enqueuedAt: instant,
+      ordering: { ...this.ordering, deduplicationId: this.messageId },
+    };
   }
 }

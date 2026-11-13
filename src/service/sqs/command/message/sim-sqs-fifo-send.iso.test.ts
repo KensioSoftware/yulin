@@ -155,6 +155,33 @@ describe("SQS SendMessage to a FIFO queue", () => {
     assertNotEqual(again.MessageId, first.MessageId);
   });
 
+  it("still deduplicates a fresh id once older ones have expired", async () => {
+    // Given a FIFO queue whose earlier deduplication id has expired.
+    const { simAws, queueUrl } = await simAwsWithFifoQueue();
+    const sendWithId = async (id: string): Promise<string | undefined> => {
+      const sent = await simAws.sqs().sendMessage(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: id,
+          MessageGroupId: "customer-1",
+          MessageDeduplicationId: id,
+        }),
+      );
+
+      return sent.MessageId;
+    };
+
+    await sendWithId("order-1");
+    await simAws.clock().advanceBy({ minutes: 6 });
+
+    // When a new id is sent twice.
+    const first = await sendWithId("order-2");
+    const again = await sendWithId("order-2");
+
+    // Then the second send is still a duplicate of the first.
+    assertIdentical(again, first);
+  });
+
   it("deduplicates by the SHA-256 of the body when asked to", async () => {
     // Given a FIFO queue with content-based deduplication.
     const { simAws, queueUrl } = await simAwsWithFifoQueue({

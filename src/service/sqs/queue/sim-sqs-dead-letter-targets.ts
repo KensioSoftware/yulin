@@ -104,9 +104,7 @@ export class SimSqsDeadLetterTargets {
         message.onDeadLetterQueue({
           instant,
           sourceQueueArn,
-          // Real SQS restarts retention for a message moved to a FIFO
-          // dead-letter queue, and keeps it running for a standard one.
-          restartsRetention: target.name.isFifo,
+          toFifoQueue: target.name.isFifo,
         }),
       );
     }

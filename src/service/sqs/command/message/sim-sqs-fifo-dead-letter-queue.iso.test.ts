@@ -73,7 +73,10 @@ describe("SQS FIFO dead-letter queues", () => {
     const moved = await simAws.sqs().receiveMessage(
       new ReceiveMessageCommand({
         QueueUrl: deadLetterQueueUrl,
-        MessageSystemAttributeNames: ["MessageGroupId"],
+        MessageSystemAttributeNames: [
+          "MessageGroupId",
+          "MessageDeduplicationId",
+        ],
       }),
     );
 
@@ -81,7 +84,15 @@ describe("SQS FIFO dead-letter queues", () => {
 
     assertNonNullable(movedMessage);
     assertIdentical(movedMessage.Body, "a-1");
-    assertIdentical(movedMessage.Attributes?.["MessageGroupId"], "a");
+    const movedAttributes = movedMessage.Attributes;
+
+    assertNonNullable(movedAttributes);
+    assertIdentical(movedAttributes["MessageGroupId"], "a");
+    // And its deduplication id is now its message id, as real SQS replaces it.
+    assertIdentical(
+      movedAttributes["MessageDeduplicationId"],
+      movedMessage.MessageId,
+    );
 
     const next = await simAws
       .sqs()

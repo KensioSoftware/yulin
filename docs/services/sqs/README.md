@@ -788,8 +788,9 @@ The request fails with `InvalidParameterValue`, and the message stays on the que
 accepts the same request and leaves the message where it is.
 
 A FIFO queue's dead-letter queue has to be a FIFO queue, and a standard queue's has to be a standard
-queue. A moved message keeps its group, its deduplication id and its sequence number. Its retention
-period starts again on the dead-letter queue, as real SQS restarts it for a FIFO queue.
+queue. A moved message keeps its group and its sequence number, and its deduplication id becomes its
+message id, as real SQS replaces it. Its retention period starts again on the dead-letter queue, as
+real SQS restarts it for a FIFO queue.
 
 `FifoThroughputLimit` takes `perQueue` or `perMessageGroupId`, and `perMessageGroupId` needs
 `DeduplicationScope` set to `messageGroup`. The setting is held and validated, and this simulation

@@ -161,6 +161,36 @@ describe("SQS ReceiveMessage from a FIFO queue", () => {
     assertArrayEquals(await receiveBodies(simAws, queueUrl), ["a-1"]);
   });
 
+  it("holds a group back while a later message of it is in flight", async () => {
+    // Given two messages of one group received together.
+    const { simAws, queueUrl } = await simAwsWithFifoQueue();
+
+    await send(simAws, queueUrl, "a", "a-1");
+    await send(simAws, queueUrl, "a", "a-2");
+
+    const both = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MaxNumberOfMessages: 2,
+      }),
+    );
+    const firstHandle = both.Messages?.[0]?.ReceiptHandle;
+
+    assertNonNullable(firstHandle);
+
+    // When the consumer gives the first back while still holding the second.
+    await simAws.sqs().changeMessageVisibility(
+      new ChangeMessageVisibilityCommand({
+        QueueUrl: queueUrl,
+        ReceiptHandle: firstHandle,
+        VisibilityTimeout: 0,
+      }),
+    );
+
+    // Then the group stays blocked, and the first is not handed out again.
+    assertArrayEquals(await receiveBodies(simAws, queueUrl), []);
+  });
+
   it("reports the FIFO system attributes", async () => {
     // Given a message on a FIFO queue.
     const { simAws, queueUrl } = await simAwsWithFifoQueue();

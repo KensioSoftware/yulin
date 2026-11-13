@@ -47,9 +47,19 @@ export class SimSqsDeduplicationWindow {
   }
 
   /**
-   * Remember a send accepted under an id, for the next five minutes.
+   * Remember a send accepted under an id, for the next five minutes, and
+   * forget the ids whose five minutes are up.
+   *
+   * Forgetting here keeps the window to five minutes of sends, where an id
+   * never sent again would otherwise be held for as long as the queue exists.
    */
   remember(key: string, send: SimSqsAcceptedSend, instant: Date): void {
+    for (const [held, { expiresAt }] of this.remembered) {
+      if (expiresAt <= instant.getTime()) {
+        this.remembered.delete(held);
+      }
+    }
+
     this.remembered.set(key, {
       send,
       expiresAt: instant.getTime() + deduplicationIntervalMilliseconds,
