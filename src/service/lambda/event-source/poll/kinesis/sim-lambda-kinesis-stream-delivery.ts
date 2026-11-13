@@ -127,7 +127,10 @@ export class SimLambdaKinesisStreamDelivery {
     try {
       return batchResponse.handled(
         times,
-        await simFunction.invoke(this.eventBuilder.of(delivered)),
+        await simFunction.invoke(
+          this.eventBuilder.of(delivered),
+          this.filters.functionArn,
+        ),
       );
     } catch {
       // As on real Lambda, the handler error goes to the function's logs. What

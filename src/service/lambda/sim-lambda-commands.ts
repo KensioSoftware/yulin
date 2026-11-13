@@ -8,6 +8,7 @@ import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-s
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { SimLambdaTagConditionIam } from "./function/tags/sim-lambda-tag-conditions.js";
 import { SimLambdaAliasCommands } from "./command/alias/sim-lambda-alias-commands.js";
 import { SimLambdaEventInvokeConfigCommands } from "./command/event-invoke-config/sim-lambda-event-invoke-config-commands.js";
 import { SimLambdaEventSourceMappingCommands } from "./command/event-source-mapping/sim-lambda-event-source-mapping-commands.js";
@@ -156,8 +157,6 @@ export class SimLambdaCommands {
       destinations = new SimLambdaNoDestinationTargets(),
     } = properties;
 
-    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
-
     this.containerImages = containerImages;
     this.eventInvokeConfigStore = new SimLambdaEventInvokeConfigStore({
       clock: background,
@@ -168,6 +167,10 @@ export class SimLambdaCommands {
       functions: properties.functions,
       versions: this.versionStore,
     });
+    const iam = new SimLambdaTagConditionIam(
+      simIamInRegion(properties.iam, accountRegionScope.regionName),
+      this.functionLookup,
+    );
     this.functionUrlStore = new SimLambdaFunctionUrlStore({
       accountRegionScope,
       urlRegistry,

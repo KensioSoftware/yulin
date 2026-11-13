@@ -72,7 +72,10 @@ export class SimRestApiIntegrationInvocation {
           cognito: input.authorization.cognito,
         },
       );
-      const result = await target.simFunction.invoke(event);
+      const result = await target.simFunction.invoke(
+        event,
+        target.resource.arn,
+      );
 
       return this.responseBuilder.isStructuredResult(result)
         ? this.responseBuilder.build(result)

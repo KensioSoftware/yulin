@@ -5,6 +5,8 @@ import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-int
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
+import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
+import { simLambdaRequestTagConditions } from "../../function/tags/sim-lambda-request-tag-conditions.js";
 import { simLambdaTaggedFunction } from "./sim-lambda-tagged-function.js";
 import { requiredString } from "../event-source-mapping/create-event-source-mapping-values.js";
 import type {
@@ -53,6 +55,7 @@ export class SimLambdaTagCommands {
       "lambda:TagResource",
       command.input.Resource,
       options,
+      simLambdaRequestTagConditions(command.input.Tags),
     );
 
     simFunction.updates.assertIdle(simFunction.arn);
@@ -72,6 +75,7 @@ export class SimLambdaTagCommands {
       "lambda:UntagResource",
       command.input.Resource,
       options,
+      simLambdaRequestTagConditions({}, command.input.TagKeys),
     );
 
     simFunction.tags.untag(command.input.TagKeys);
@@ -103,6 +107,7 @@ export class SimLambdaTagCommands {
     action: string,
     resource: string | undefined,
     options?: SimLambdaTagCommandOptions,
+    conditionContext?: Readonly<Record<string, SimIamConditionValue>>,
   ): Promise<SimLambdaFunction> {
     const arn = requiredString(resource, "resource");
 
@@ -114,6 +119,7 @@ export class SimLambdaTagCommands {
     new FunctionUrlAuthorizer({ iam: this.properties.iam, action }).authorize(
       arn,
       options?.caller,
+      conditionContext,
     );
 
     return simLambdaTaggedFunction(

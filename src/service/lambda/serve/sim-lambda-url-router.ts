@@ -82,6 +82,10 @@ export class SimLambdaUrlRouter {
       return undefined;
     }
 
-    return { functionUrl, ...functionTarget, iam: simScopeIamAuthZ(scope) };
+    return {
+      functionUrl,
+      ...functionTarget,
+      iam: lambda.withTagConditions(simScopeIamAuthZ(scope)),
+    };
   }
 }

@@ -33,6 +33,7 @@ import {
 } from "../../function/sim-lambda-function-configuration.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
 import { CreateFunctionTagAuthorizer } from "./create-function-tag-authorizer.js";
+import { simLambdaRequestTagConditions } from "../../function/tags/sim-lambda-request-tag-conditions.js";
 import {
   type CreateFunctionInput,
   requireCreateFunctionInput,
@@ -138,7 +139,12 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       this.accountRegionScope,
       input.name,
     );
-    this.authorizer.authorize(functionArn, input.roleArn, options?.caller);
+    this.authorizer.authorize(
+      functionArn,
+      input.roleArn,
+      options?.caller,
+      simLambdaRequestTagConditions(input.tags.record()),
+    );
     this.tagAuthorizer.authorize(functionArn, input.tags, options?.caller);
 
     this.requireAvailableFunctionName(input.name, functionArn);

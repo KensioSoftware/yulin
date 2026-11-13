@@ -32,12 +32,14 @@ export class SimLambdaAsyncInvocations {
     simFunction: SimLambdaFunction,
     event: unknown,
     qualifier: string | undefined,
+    invokedFunctionArn: string,
   ): void {
     const { background, destinations, eventInvokeConfigs } = this.properties;
 
     new SimLambdaAsyncInvocation({
       simFunction,
       event,
+      invokedFunctionArn,
       settings: simLambdaAsyncInvocationSettings({
         simFunction,
         qualifier,

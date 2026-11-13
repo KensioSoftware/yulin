@@ -6,6 +6,7 @@ import {
   PublishVersionCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertStringEndsWith,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -91,9 +92,12 @@ describe("Lambda Invoke with a qualifier", () => {
       new InvokeCommand({ FunctionName: "orders", Qualifier: "live" }),
     );
 
-    // Then the version behind the alias ran, reported by its number.
+    // Then the version behind the alias ran, reported by its number, and the
+    // handler was told the alias ARN it was invoked by.
     assertIdentical(invoked.ExecutedVersion, "1");
-    assertIdentical(invokedPayload(invoked.Payload).functionVersion, "1");
+    const payload = invokedPayload(invoked.Payload);
+    assertIdentical(payload.functionVersion, "1");
+    assertStringEndsWith(payload.invokedFunctionArn, ":function:orders:live");
   });
 
   it("reads the qualifier off a qualified function ARN", async () => {

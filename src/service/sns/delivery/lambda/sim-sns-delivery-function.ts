@@ -84,6 +84,9 @@ export class SimSnsDeliveryFunction {
     // asynchronous invocation real SNS makes, and because a handler failure
     // has to reach the delivery outcome rather than being swallowed as an
     // asynchronous invocation error.
-    await target.simFunction.invoke(simSnsLambdaEventDocument(request));
+    await target.simFunction.invoke(
+      simSnsLambdaEventDocument(request),
+      target.resource.arn,
+    );
   }
 }

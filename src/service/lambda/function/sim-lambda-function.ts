@@ -234,22 +234,23 @@ export class SimLambdaFunction {
   }
 
   /**
-   * Invoke this sim Lambda function's handler with an invocation event.
+   * Invoke this sim Lambda function's handler with an invocation event, as
+   * the ARN the caller named (an alias ARN for a call through an alias).
    *
-   * The handler runs with this function's execution Role as the ambient
-   * simulated caller for the run-as owner, which is the owning SimAws
-   * instance when the function was created through one, and with this
-   * function's own environment variables. Cold-start module imports also run
-   * as the execution Role and with the same environment, as on real Lambda.
-   *
-   * Resolves with the handler result, or rejects with the handler or
-   * Runtime.* cold-start error.
+   * The handler runs as this function's execution Role, the ambient caller
+   * for the run-as owner, with this function's own environment variables.
+   * Cold-start module imports run the same way, as on real Lambda. Resolves
+   * with the handler result, or rejects with the handler or Runtime.*
+   * cold-start error.
    */
-  async invoke(event: unknown): Promise<unknown> {
+  async invoke(
+    event: unknown,
+    invokedFunctionArn: string = this.arn,
+  ): Promise<unknown> {
     const invocation = new SimLambdaInvocation({
       functionName: this.name,
       functionVersion: this.version,
-      invokedFunctionArn: this.arn,
+      invokedFunctionArn,
       timeoutSeconds: this.timeoutSeconds,
       memorySizeMb: this.memorySizeMb,
       clock: this.clock,

@@ -120,7 +120,9 @@ export class SimLambdaServiceController implements SimAwsServiceController {
         { caller: authenticatedCaller },
       );
 
-      return this.responseBuilder.build(await route.simFunction.invoke(event));
+      return this.responseBuilder.build(
+        await route.simFunction.invoke(event, route.resource.arn),
+      );
     } catch {
       // Real Function URLs report an unhandled function error as a bad
       // gateway, with the error itself only visible in the function's logs.

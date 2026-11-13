@@ -130,6 +130,7 @@ export class InvokeCommandHandler implements CommandHandler<
       this.versions.require(simFunction, qualifier),
       command,
       qualifier,
+      functionArn,
     );
   }
 }

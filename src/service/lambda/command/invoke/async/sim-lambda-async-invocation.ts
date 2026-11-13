@@ -15,6 +15,9 @@ import { simLambdaHandlerAttempt } from "./sim-lambda-handler-attempt.js";
 
 interface SimLambdaAsyncInvocationProperties {
   readonly simFunction: SimLambdaFunction;
+
+  /** The ARN the invocation was asked for by, which the handler is told. */
+  readonly invokedFunctionArn: string;
   readonly event: unknown;
   readonly settings: SimLambdaAsyncInvocationSettings;
   readonly background: BackgroundScheduler;
@@ -49,10 +52,9 @@ export class SimLambdaAsyncInvocation {
   }
 
   private async attempt(): Promise<void> {
-    const { simFunction, event } = this.properties;
     this.attemptCount += 1;
 
-    const attempt = await simLambdaHandlerAttempt(simFunction, event);
+    const attempt = await simLambdaHandlerAttempt(this.properties);
 
     if (!attempt.succeeded) {
       await this.failed(attempt.error);

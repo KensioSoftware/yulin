@@ -14,3 +14,15 @@ export interface SimLambdaFunctionTarget {
   readonly resource: SimLambdaPolicyResource;
   readonly simFunction: SimLambdaFunction;
 }
+
+/**
+ * Run the version a target names, telling its handler the ARN of the
+ * resource the target named, which is the alias ARN for a delivery through an
+ * alias.
+ */
+export async function simLambdaInvokeTarget(
+  target: SimLambdaFunctionTarget,
+  event: unknown,
+): Promise<unknown> {
+  return await target.simFunction.invoke(event, target.resource.arn);
+}

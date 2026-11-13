@@ -42,13 +42,16 @@ export interface SimLambdaEventSourceEventBuilder {
 }
 
 /**
- * Where a delivery reads the filters a batch goes through.
+ * Where a delivery reads the filters a batch goes through, and the function
+ * ARN the batch is invoked by, which a handler reads as its
+ * `invokedFunctionArn`.
  *
- * That is the mapping itself rather than a copy of its filters, so filters
+ * That is the mapping itself rather than a copy, so filters and a function
  * changed by UpdateEventSourceMapping apply from the next batch on.
  */
 export interface SimLambdaEventSourceFilters {
   readonly filterCriteria: SimLambdaFilterCriteria | undefined;
+  readonly functionArn: string;
 }
 
 interface SimLambdaEventSourceDeliveryProperties {
@@ -109,7 +112,10 @@ export class SimLambdaEventSourceDelivery {
     try {
       return batchResponse.handled(
         delivered,
-        await simFunction.invoke(this.eventBuilder.of(delivered)),
+        await simFunction.invoke(
+          this.eventBuilder.of(delivered),
+          this.filters.functionArn,
+        ),
       );
     } catch {
       // As on real Lambda, the handler error goes to the function's logs and

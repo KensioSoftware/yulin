@@ -410,8 +410,9 @@ The duration is simulated time, so a handler that sleeps a minute on a clock the
 reports a minute. Billed duration rounds it up to the next millisecond. Only a cold start reports
 `Init Duration`, and it is always zero, since a cold start here costs no time. `Max Memory Used` is
 a nominal 64 MB (or the memory size, if that is less), because the handler shares a process with
-the rest of the test run and its own use cannot be measured. The request id is the
-`context.awsRequestId` the handler was given.
+the rest of the test run and its own use cannot be measured. An invocation that ran out of time
+ends its `REPORT` line with `Status: timeout`. The request id is the `context.awsRequestId` the
+handler was given.
 
 ## Function code from S3
 
@@ -745,6 +746,13 @@ await simAws.backgroundTasksComplete();
 Tags belong to the function. A published version reports the function's tags, including ones added after it was published, and a version or alias ARN is refused by the tagging commands. Real Lambda's limits apply (50 tags, keys of 1 to 128 characters, values of up to 256, and no `aws:` prefix).
 
 Each command is authorized against the IAM action of its own name. Creating a function with tags also needs `lambda:TagResource`, as AWS documents. `GetFunction` leaves `Tags` out for a caller without `lambda:ListTags`.
+
+A policy can decide on tags. Every Lambda command, and every Function URL call, gives the function's
+tags as `aws:ResourceTag/<key>`, so a caller allowed `lambda:InvokeFunction` only where
+`aws:ResourceTag/team` is `orders` can invoke that team's functions and no others. A version or
+alias reads the function's tags. `CreateFunction` and `TagResource` give the tags they carry as
+`aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and `UntagResource` gives the keys it names
+as `aws:TagKeys`.
 
 An `AWS::Lambda::Function` in a template carries its `Tags` list onto the function it creates. That is the list CDK writes for `Tags.of(...).add(...)`.
 
@@ -1392,7 +1400,9 @@ that name to another version.
 The same qualifier can travel on the `FunctionName` instead, appended to the name (`orders:live`)
 or to a function ARN. `ExecutedVersion` on the invocation output is the version number that ran,
 and an invocation through an alias reports the version behind it. Inside the handler, `context`
-carries that number as `functionVersion` and the qualified ARN as `invokedFunctionArn`.
+carries that number as `functionVersion`, and the ARN the invocation named as `invokedFunctionArn`.
+That is the alias ARN for a call through an alias, by `Invoke`, a Function URL, an event source
+mapping or another simulated service, and the unqualified ARN for a call naming no qualifier.
 
 ```typescript sim-lambda-versions-and-aliases
 /**
@@ -2699,6 +2709,11 @@ AWS documents Lambda's filter rules as EventBridge event patterns, and simulated
 matcher is what evaluates them here. Exact values, `prefix`, `suffix`, `equals-ignore-case`,
 `anything-but`, `numeric`, `exists` and `$or` all work. A mapping naming an operator the matcher has no behaviour for is refused when it
 is created. A mapping carrying several filters delivers a record any one of them matches.
+
+A mapping takes up to ten filters, and each pattern up to 4096 characters. AWS's default quota is
+five filters, and an Account can have it raised to ten. The simulation has no quota to read, so it
+takes ten, and refuses an eleventh with `InvalidParameterValueException`. A pattern over the length
+is refused with `ValidationException`.
 
 What a pattern reads depends on the source:
 
@@ -4698,6 +4713,7 @@ Sim Lambda currently supports:
   versions with `FunctionVersion: "ALL"`, paged by `Marker` and `MaxItems` like the other listings
 - `Tags` on `CreateFunction` and on an `AWS::Lambda::Function`, and `TagResourceCommand`,
   `UntagResourceCommand` and `ListTagsCommand` on a function ARN
+- `aws:ResourceTag/<key>`, `aws:RequestTag/<key>` and `aws:TagKeys` for policies on functions
 - `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
 - Handler timers on the simulation's clock, and the function's `Timeout` as a deadline on the same
   clock, reported as real Lambda reports a timeout
@@ -4804,9 +4820,10 @@ Current documented limitations:
   a throttle as a failed invocation, so an asynchronous one counts it against
   `MaximumRetryAttempts`, where real Lambda keeps retrying a throttled event for up to six hours.
 - Tags are kept on functions alone. Event source mappings and code signing configs take none, and
-  `Tags` on `CreateEventSourceMapping` is refused. Tags are not available as IAM condition keys
-  (`aws:ResourceTag/...`, `aws:RequestTag/...` and `aws:TagKeys`), so attribute-based access
-  control on a function is not simulated. CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
+  `Tags` on `CreateEventSourceMapping` is refused. Another simulated service invoking a function
+  (S3, SNS, EventBridge, API Gateway, ELBv2, Step Functions and the rest) is authorized without
+  `aws:ResourceTag/...`, so a resource policy conditioned on the function's tags does not match it.
+  CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
 - `UpdateFunctionCode` leaves out `Architectures` and `SourceKMSKeyArn`.
   `UpdateFunctionConfiguration` takes only the settings simulated Lambda models, leaving out
   `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart` and
@@ -4846,9 +4863,6 @@ Current documented limitations:
   well-formed Origin is stored and matches no request.
 - `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
   buffered.
-- An invocation through an alias, whether by `Invoke` or through the alias's Function URL, reports
-  the version's ARN as `invokedFunctionArn` in the handler's context. Real Lambda reports the alias
-  ARN.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
   alone. Alias `RoutingConfig` weights and provisioned concurrency are left out. `CodeSha256`,
   `RuntimePolicy` and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig`
@@ -4875,8 +4889,7 @@ Current documented limitations:
   decorate what they print, and either one reaches the log group only where the host console passes
   it on to `process.stdout`. See [What a handler prints](#what-a-handler-prints).
 - Execution environments are never recycled, so a function keeps one log stream for as long as it
-  exists. The `REPORT` line's `Max Memory Used` is a nominal figure, and a timed-out invocation's
-  `REPORT` line carries no `Status: timeout`.
+  exists. The `REPORT` line's `Max Memory Used` is a nominal figure.
 - Container image functions are never run. Yulin never reads a container image, and stays
   Docker-free.
   A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
@@ -4936,9 +4949,9 @@ Current documented limitations:
   invoked it, are refused with `SimLambdaStreamCascadeError`. Real Lambda runs that loop for as long
   as it is paid for. A handler that writes back and then settles is delivered its own writes and
   finishes.
-- `FilterCriteria` is evaluated by simulated EventBridge's pattern matcher. The limits AWS puts on
-  the number and length of patterns go unenforced, and `KMSKeyArn` is refused, so criteria are held
-  in plaintext.
+- `FilterCriteria` is evaluated by simulated EventBridge's pattern matcher. A mapping takes ten
+  filters whatever the Account's quota, where AWS takes five unless the quota was raised.
+  `KMSKeyArn` is refused, so criteria are held in plaintext.
 - A shard iterator never expires, where a real one is good for 15 minutes.
 - `MaximumBatchingWindowInSeconds` is only simulated as 0. A partial batch is delivered as soon as
   anything is on the event source, leaving a batching window nothing to wait for. A non-zero value

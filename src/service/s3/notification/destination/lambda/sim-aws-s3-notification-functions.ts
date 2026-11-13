@@ -88,7 +88,7 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
       throw new Error(missingFunctionRefusal(arn, request.destinationArn));
     }
 
-    await target.simFunction.invoke(event);
+    await target.simFunction.invoke(event, target.resource.arn);
   }
 
   private findTarget(
