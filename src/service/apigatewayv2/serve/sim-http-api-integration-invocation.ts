@@ -67,7 +67,7 @@ export class SimHttpApiIntegrationInvocation {
       );
 
       const response = this.responseBuilder.build(
-        await target.simFunction.invoke(event),
+        await target.simFunction.invoke(event, target.resource.arn),
       );
 
       // Lambda answered the invocation, whatever the handler then returned.

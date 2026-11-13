@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
 
 interface FunctionUrlAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -29,13 +30,19 @@ export class FunctionUrlAuthorizer {
    *
    * The caller is passed through unchanged so sim IAM can distinguish an
    * omitted caller, which defaults to Account root, from an explicit
-   * anonymous caller.
+   * anonymous caller. A request carrying tags passes what it carries as
+   * condition values.
    */
-  authorize(functionArn: string, caller?: SimAwsCaller): void {
+  authorize(
+    functionArn: string,
+    caller?: SimAwsCaller,
+    conditionContext?: Readonly<Record<string, SimIamConditionValue>>,
+  ): void {
     const decision = this.iam.authorize({
       action: this.action,
       resource: functionArn,
       caller,
+      conditionContext,
     });
 
     if (decision.isDenied) {

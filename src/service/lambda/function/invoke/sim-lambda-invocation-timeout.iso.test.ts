@@ -70,8 +70,8 @@ async function failedWith(
   return { functionError: output.FunctionError, ...document };
 }
 
-/** Everything the function wrote to its log group. */
-async function loggedLines(simAws: SimAws): Promise<readonly string[]> {
+/** Everything written to the function's log group, platform lines included. */
+async function allLoggedLines(simAws: SimAws): Promise<readonly string[]> {
   const { events } = await simAws.logs().filterLogEvents(
     new FilterLogEventsCommand({
       logGroupName: `/aws/lambda/${functionName}`,
@@ -80,7 +80,12 @@ async function loggedLines(simAws: SimAws): Promise<readonly string[]> {
 
   assertNonNullable(events, "the log group answered with its events");
 
-  return handlerLines(events.map((event) => event.message));
+  return events.map((event) => event.message);
+}
+
+/** Everything the function itself wrote to its log group. */
+async function loggedLines(simAws: SimAws): Promise<readonly string[]> {
+  return handlerLines(await allLoggedLines(simAws));
 }
 
 /** The `Sum` of one AWS/Lambda metric this function published. */
@@ -178,6 +183,13 @@ describe("a sim Lambda invocation that runs out of time", () => {
     assertNonNullable(line, "the invocation logged something");
     assertStringIncludes(line, "ERROR Invoke Error");
     assertStringIncludes(line, "Sandbox.Timedout");
+
+    // And the REPORT line says how it ended, as real Lambda's does.
+    const allLines = await allLoggedLines(simAws);
+    const report = allLines.at(-1);
+    assertNonNullable(report, "the invocation wrote a REPORT line");
+    assertStringIncludes(report, "Duration: 3000.00 ms");
+    assertStringIncludes(report, "Status: timeout");
   });
 
   it("counts a timeout as an error the function published", async () => {

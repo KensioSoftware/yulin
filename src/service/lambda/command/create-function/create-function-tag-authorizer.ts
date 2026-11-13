@@ -2,6 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimLambdaFunctionTags } from "../../function/tags/sim-lambda-function-tags.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
+import { simLambdaRequestTagConditions } from "../../function/tags/sim-lambda-request-tag-conditions.js";
 
 interface CreateFunctionTagAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -33,7 +34,11 @@ export class CreateFunctionTagAuthorizer {
     caller?: SimAwsCaller,
   ): void {
     if (!tags.isEmpty) {
-      this.tagResource.authorize(functionArn, caller);
+      this.tagResource.authorize(
+        functionArn,
+        caller,
+        simLambdaRequestTagConditions(tags.record()),
+      );
     }
   }
 }

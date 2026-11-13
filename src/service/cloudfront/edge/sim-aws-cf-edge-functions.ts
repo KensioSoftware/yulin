@@ -47,7 +47,9 @@ export class SimAwsCfEdgeFunctions implements SimCfEdgeFunctions {
    * the request pipeline as a failure rather than as an invocation result.
    */
   async invoke(functionArn: string, event: object): Promise<unknown> {
-    return await this.target(functionArn).simFunction.invoke(event);
+    const target = this.target(functionArn);
+
+    return await target.simFunction.invoke(event, target.resource.arn);
   }
 
   /**

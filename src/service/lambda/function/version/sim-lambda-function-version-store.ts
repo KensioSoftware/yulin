@@ -10,6 +10,7 @@ import {
   simLambdaQualifiedFunctionArn,
   SimLambdaFunctionVersions,
 } from "./sim-lambda-function-versions.js";
+import { simLambdaInvokedFunctionArn } from "../sim-lambda-function-configuration.js";
 
 /**
  * Published version state for one Account/Region scope of simulated Lambda.
@@ -77,7 +78,14 @@ export class SimLambdaFunctionVersionStore {
     }
 
     return qualifier === undefined || qualifier === SIM_LAMBDA_LATEST_VERSION
-      ? { resource: simFunction, simFunction }
+      ? {
+          resource: simFunction,
+          simFunction,
+          invokedFunctionArn: simLambdaInvokedFunctionArn(
+            simFunction.arn,
+            qualifier,
+          ),
+        }
       : this.of(simFunction).target(qualifier);
   }
 

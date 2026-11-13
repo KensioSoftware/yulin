@@ -82,6 +82,9 @@ export class SimEventBridgeDeliveryFunction {
     // asynchronous invocation real EventBridge makes, and because a handler
     // failure has to reach the delivery outcome rather than being swallowed
     // as an asynchronous invocation error.
-    await target.simFunction.invoke(simEventBridgeDeliveryDocument(request));
+    await target.simFunction.invoke(
+      simEventBridgeDeliveryDocument(request),
+      target.resource.arn,
+    );
   }
 }

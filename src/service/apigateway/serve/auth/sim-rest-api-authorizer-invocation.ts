@@ -72,6 +72,7 @@ export class SimRestApiAuthorizerInvocation {
     try {
       const result = await target.simFunction.invoke(
         await this.event(input, authorizer, identityValues, methodArn),
+        target.resource.arn,
       );
 
       return new SimRestApiAuthorizerResponse(methodArn).read(result);

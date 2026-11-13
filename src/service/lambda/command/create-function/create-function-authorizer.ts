@@ -3,6 +3,7 @@ import { SimIamPassRoleAuthorizer } from "../../../iam/authorize/pass-role/sim-i
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simLambdaServicePrincipal } from "../../sim-lambda-service-principal.js";
+import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
 
 interface CreateFunctionAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -41,11 +42,17 @@ export class CreateFunctionAuthorizer {
    * omitted caller, which defaults to Account root, from an explicit anonymous
    * caller.
    */
-  authorize(functionArn: string, roleArn: string, caller?: SimAwsCaller): void {
+  authorize(
+    functionArn: string,
+    roleArn: string,
+    caller?: SimAwsCaller,
+    conditionContext?: Readonly<Record<string, SimIamConditionValue>>,
+  ): void {
     const decision = this.iam.authorize({
       action: CreateFunctionAuthorizer.action,
       resource: functionArn,
       caller,
+      conditionContext,
     });
 
     if (decision.isDenied) {

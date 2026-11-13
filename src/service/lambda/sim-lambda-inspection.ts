@@ -12,6 +12,8 @@ import type {
 import type { SimLambdaFunctionAlias } from "./function/version/sim-lambda-function-alias.js";
 import type { SimLambdaFunctionTarget } from "./function/version/sim-lambda-function-target.js";
 import type { SimLambdaCommands } from "./sim-lambda-commands.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimLambdaTagConditionIam } from "./function/tags/sim-lambda-tag-conditions.js";
 
 /**
  * What a test or another simulated service can ask a simulated Lambda about
@@ -104,5 +106,14 @@ export abstract class SimLambdaInspection {
     urlId: SimLambdaFunctionUrlId,
   ): SimLambdaFunctionUrl | undefined {
     return this.commands.functionUrlStore.byUrlId(urlId);
+  }
+
+  /**
+   * IAM authorization for a request made against one of these functions from
+   * outside the Lambda commands, such as a Function URL call. A policy reads
+   * the function's tags as `aws:ResourceTag/<key>`, as it does for a command.
+   */
+  withTagConditions(iam: SimIamInterServiceAuthZ): SimIamInterServiceAuthZ {
+    return new SimLambdaTagConditionIam(iam, this.commands.functionLookup);
   }
 }

@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { simLambdaReportStatus } from "../invoke/sim-lambda-timed-out.error.js";
 import type { SimLambdaFunctionLogging } from "./sim-lambda-function-logging.js";
 import type { SimLambdaOutputSink } from "./sim-lambda-output-sink.js";
 
@@ -24,6 +25,9 @@ export interface SimLambdaPlatformLogReport {
 
   /** Whether this invocation cold started its execution environment. */
   readonly coldStart: boolean;
+
+  /** How the invocation ended, where that was not normally. */
+  readonly status?: string | undefined;
 }
 
 /**
@@ -66,6 +70,7 @@ export function simLambdaEndLines(
     `Memory Size: ${String(memorySizeMb)} MB`,
     `Max Memory Used: ${String(memoryUsedMb)} MB`,
     ...(report.coldStart ? ["Init Duration: 0.00 ms"] : []),
+    ...(report.status === undefined ? [] : [`Status: ${report.status}`]),
   ];
 
   return `END RequestId: ${requestId}\nREPORT ${fields.join("\t")}\t\n`;
@@ -104,13 +109,19 @@ export async function simLambdaPlatformLogged<T>(
 
   sink?.write(simLambdaStartLine(invocation));
 
+  let status: string | undefined;
+
   try {
     return await logging.around(run);
+  } catch (error) {
+    status = simLambdaReportStatus(error);
+    throw error;
   } finally {
     sink?.write(
       simLambdaEndLines(invocation, {
         durationMs: clock.now().getTime() - startedAt,
         coldStart,
+        status,
       }),
     );
   }

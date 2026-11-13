@@ -278,6 +278,44 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "wildcard");
   });
 
+  it("refuses more filters than a mapping takes", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping asks for eleven filters, one past the most any Account's
+    // quota allows.
+    const error = await refusedMapping(ready, {
+      FilterCriteria: {
+        Filters: Array.from({ length: 11 }, (_, index) => ({
+          Pattern: JSON.stringify({ body: [`order-${String(index)}`] }),
+        })),
+      },
+    });
+
+    // Then it is refused, as real Lambda refuses it at creation.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(error.message, "at most 10");
+  });
+
+  it("refuses a filter pattern longer than 4096 characters", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping's one pattern runs past the length Lambda takes.
+    const error = await refusedMapping(ready, {
+      FilterCriteria: {
+        Filters: [{ Pattern: JSON.stringify({ body: ["x".repeat(4100)] }) }],
+      },
+    });
+
+    // Then it is refused by the request's own validation.
+    assertIdentical(error.name, "ValidationException");
+    assertStringIncludes(
+      error.message,
+      "filterCriteria.filters.1.member.pattern",
+    );
+  });
+
   it("refuses a mapping on a standalone simulated Lambda with no queues", async () => {
     // Given a simulated Lambda constructed outside SimAws.
     const lambda = new SimLambda({

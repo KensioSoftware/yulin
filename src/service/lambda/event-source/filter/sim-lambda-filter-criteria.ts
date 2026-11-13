@@ -1,6 +1,7 @@
 import { SimEventPattern } from "../../../eventbridge/pattern/sim-event-pattern.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
+import { simLambdaAssertFilterLimits } from "./sim-lambda-filter-limits.js";
 
 /**
  * The `FilterCriteria` a CreateEventSourceMapping request carries, as the
@@ -99,6 +100,8 @@ export class SimLambdaFilterCriteria {
     if (filters.length === 0) {
       return undefined;
     }
+
+    simLambdaAssertFilterLimits(filters);
 
     return new this(
       filters.map((filter) => patternOf(filter.Pattern, eventSourceKind)),

@@ -19,7 +19,10 @@ import type {
   SimLambdaFunctionMap,
   SimLambdaFunctionName,
 } from "../../function/sim-lambda-function.js";
-import { simLambdaFunctionArn } from "../../function/sim-lambda-function-configuration.js";
+import {
+  simLambdaFunctionArn,
+  simLambdaInvokedFunctionArn,
+} from "../../function/sim-lambda-function-configuration.js";
 import { InvokeAuthorizer } from "./invoke-authorizer.js";
 import { SimLambdaInvocationDispatcher } from "./invoke-dispatcher.js";
 import type {
@@ -130,6 +133,7 @@ export class InvokeCommandHandler implements CommandHandler<
       this.versions.require(simFunction, qualifier),
       command,
       qualifier,
+      simLambdaInvokedFunctionArn(functionArn, qualifier),
     );
   }
 }

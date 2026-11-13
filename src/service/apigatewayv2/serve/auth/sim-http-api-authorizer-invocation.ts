@@ -80,7 +80,7 @@ export class SimHttpApiAuthorizerInvocation {
       });
 
       return new SimHttpApiAuthorizerResponse({ authorizer, routeArn }).read(
-        await target.simFunction.invoke(event),
+        await target.simFunction.invoke(event, target.resource.arn),
       );
     } catch {
       // An authorizer that failed tells the caller nothing, the way an

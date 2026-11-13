@@ -32,3 +32,13 @@ export function simLambdaTimedOutError(
 
   return error;
 }
+
+/**
+ * The `Status` a `REPORT` line gives an invocation that ended in this error,
+ * which real Lambda writes as `timeout`. Any other ending writes none.
+ */
+export function simLambdaReportStatus(error: unknown): string | undefined {
+  return error instanceof Error && error.name === timedOutErrorType
+    ? "timeout"
+    : undefined;
+}

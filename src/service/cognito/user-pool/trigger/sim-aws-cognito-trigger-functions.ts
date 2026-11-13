@@ -98,7 +98,7 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
       );
     }
 
-    return await target.simFunction.invoke(event);
+    return await target.simFunction.invoke(event, target.resource.arn);
   }
 
   private policyRefusal(

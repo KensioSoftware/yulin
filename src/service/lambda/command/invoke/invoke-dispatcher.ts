@@ -9,11 +9,8 @@ import {
 import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import { SimLambdaAsyncInvocations } from "./async/sim-lambda-async-invocations.js";
-import {
-  functionErrorPayload,
-  parseInvokeEvent,
-  resultPayload,
-} from "./invoke-payload.js";
+import { parseInvokeEvent } from "./invoke-payload.js";
+import { simLambdaRequestResponse } from "./invoke-request-response.js";
 import type {
   SimInvokeCommand,
   SimInvokeCommandOutput,
@@ -54,65 +51,31 @@ export class SimLambdaInvocationDispatcher {
   async dispatch(
     simFunction: SimLambdaFunction,
     command: SimInvokeCommand,
-    qualifier?: string,
+    qualifier: string | undefined,
+    invokedFunctionArn: string,
   ): Promise<SimInvokeCommandOutput> {
     const invocationType = command.input.InvocationType ?? "RequestResponse";
 
     switch (invocationType) {
       case "RequestResponse": {
-        return await this.requestResponse(simFunction, command);
+        return await simLambdaRequestResponse(
+          simFunction,
+          command,
+          invokedFunctionArn,
+        );
       }
       case "Event": {
         this.asyncInvocations.start(
           simFunction,
           parseInvokeEvent(command.input.Payload),
           qualifier,
+          invokedFunctionArn,
         );
         return { $metadata: {}, StatusCode: 202 };
       }
       case "DryRun": {
         return { $metadata: {}, StatusCode: 204 };
       }
-    }
-  }
-
-  private async requestResponse(
-    simFunction: SimLambdaFunction,
-    command: SimInvokeCommand,
-  ): Promise<SimInvokeCommandOutput> {
-    // Read before the attempt, so a payload that is not JSON reaches the
-    // caller as a request error rather than as a handler failure.
-    const event = parseInvokeEvent(command.input.Payload);
-
-    const refusalsBefore = simFunction.concurrency.refusals;
-    const invocation = simFunction.invoke(event);
-    // Read straight after starting: the reservation turns an invocation away
-    // before anything awaits, so a refusal counted here is this invocation's.
-    const refused = simFunction.concurrency.refusals > refusalsBefore;
-
-    try {
-      const result = await invocation;
-      return {
-        $metadata: {},
-        StatusCode: 200,
-        ExecutedVersion: simFunction.version,
-        Payload: resultPayload(result),
-      };
-    } catch (error) {
-      // A throttled invocation never ran, so real Lambda refuses the request
-      // rather than reporting a function error. A throttle the handler met
-      // while invoking another function is that handler's own error.
-      if (refused) {
-        throw error;
-      }
-
-      return {
-        $metadata: {},
-        StatusCode: 200,
-        ExecutedVersion: simFunction.version,
-        FunctionError: "Unhandled",
-        Payload: functionErrorPayload(error),
-      };
     }
   }
 }
