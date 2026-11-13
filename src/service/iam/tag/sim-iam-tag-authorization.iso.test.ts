@@ -1,5 +1,6 @@
 import {
   CreateRoleCommand,
+  CreateUserCommand,
   GetRoleCommand,
   TagRoleCommand,
   UntagRoleCommand,
@@ -95,6 +96,44 @@ describe("sim IAM tag-based authorization", () => {
     });
 
     // Then only the tagged Role needs iam:TagRole, as on AWS
+    assertIdentical(error.name, "AccessDenied");
+  });
+
+  it("authorizes creating a tagged User at the path it is created under", async () => {
+    // Given a caller allowed to create and tag Users under /engineering/ only
+    const simAws = new SimAws();
+    const caller = await callerWith(simAws, {
+      Effect: "Allow",
+      Action: ["iam:CreateUser", "iam:TagUser"],
+      Resource: `arn:aws:iam::${simAws.defaultAccountId}:user/engineering/*`,
+    });
+    const tags = [{ Key: "team", Value: "reports" }];
+
+    // When it creates a tagged User there, and another at the root path
+    const created = await simAws.iam().createUser(
+      new CreateUserCommand({
+        UserName: "builder",
+        Path: "/engineering/",
+        Tags: tags,
+      }),
+      { caller },
+    );
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .iam()
+        .createUser(
+          new CreateUserCommand({ UserName: "visitor", Tags: tags }),
+          {
+            caller,
+          },
+        );
+    });
+
+    // Then only the User under the allowed path is created
+    assertIdentical(
+      created.User.Arn,
+      `arn:aws:iam::${simAws.defaultAccountId}:user/engineering/builder`,
+    );
     assertIdentical(error.name, "AccessDenied");
   });
 

@@ -39,7 +39,8 @@ interface SimIamIdentityAuthorizerProperties {
  *
  * An existing Role or User is authorized as its stored ARN, which carries its
  * path, and with its tags as `iam:ResourceTag/` and `aws:ResourceTag/`. One
- * that does not exist yet is named by the path-less ARN and has no tags.
+ * that does not exist yet is named by the ARN it would have, at the path a
+ * create request gives or at `/`, and has no tags.
  */
 export class SimIamIdentityAuthorizer {
   constructor(
@@ -61,6 +62,7 @@ export class SimIamIdentityAuthorizer {
     name: string | undefined,
     options: SimIamRequestOptions | undefined,
     conditions: SimIamConditions = {},
+    path = "/",
   ): void {
     const { accountId, authorizer, entity, find } = this.properties;
     const target = name ?? "*";
@@ -69,32 +71,31 @@ export class SimIamIdentityAuthorizer {
     authorizer.authorize(
       action,
       existing?.arn ??
-        `arn:aws:iam::${accountId}:${entity.toLowerCase()}/${target}`,
+        `arn:aws:iam::${accountId}:${entity.toLowerCase()}${path}${target}`,
       options?.caller,
       { ...conditions, ...simIamResourceTagConditions(existing?.tags) },
     );
   }
 
   /**
-   * Authorize creating an entity, which needs the tagging action as well when
-   * the request carries tags.
+   * Authorize creating an entity at a normalised path, which needs the
+   * tagging action as well when the request carries tags.
    */
   authorizeCreate(
     name: string | undefined,
+    path: string,
     tags: SimIamTagsInput,
     options: SimIamRequestOptions | undefined,
     conditions: SimIamConditions = {},
   ): void {
     const { entity } = this.properties;
     const requestTags = simIamRequestTagConditions(tags);
+    const create = { ...conditions, ...requestTags };
 
-    this.authorize(`iam:Create${entity}`, name, options, {
-      ...conditions,
-      ...requestTags,
-    });
+    this.authorize(`iam:Create${entity}`, name, options, create, path);
 
     if ((tags?.length ?? 0) > 0) {
-      this.authorize(`iam:Tag${entity}`, name, options, requestTags);
+      this.authorize(`iam:Tag${entity}`, name, options, requestTags, path);
     }
   }
 }

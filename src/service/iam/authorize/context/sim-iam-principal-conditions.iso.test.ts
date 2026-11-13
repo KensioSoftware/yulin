@@ -132,16 +132,34 @@ describe("sim IAM principal condition keys", () => {
     };
 
     // When the root reads under conditions on its type and id
-    // Then both name the Account, and the root has no user name
-    assertTrue(
-      allowed(simAws, caller, {
-        StringEquals: {
-          "aws:PrincipalType": "Account",
-          "aws:userid": simAws.defaultAccountId,
-        },
-        Null: { "aws:username": "true" },
-      }),
-    );
+    const decision = simAws.iam().authorize({
+      action: "s3:GetObject",
+      resource: reportObject,
+      caller,
+      resourcePolicies: [
+        simIamAuthZResourcePolicySourceFactory.make({
+          document: {
+            Statement: {
+              Effect: "Allow",
+              Principal: "*",
+              Action: "s3:GetObject",
+              Resource: reportObject,
+              Condition: {
+                StringEquals: {
+                  "aws:PrincipalType": "Account",
+                  "aws:userid": simAws.defaultAccountId,
+                },
+                Null: { "aws:username": "true" },
+              },
+            },
+          },
+        }),
+      ],
+    });
+
+    // Then the resource statement matches, which the root's own Allow cannot
+    // stand in for: both name the Account, and the root has no user name
+    assertArrayLength(decision.resourceAllowStatements, 1);
   });
 
   it("describes a service principal as an AWS service", () => {
@@ -167,21 +185,59 @@ describe("sim IAM principal condition keys", () => {
     // Given a simulation
     const simAws = new SimAws();
 
-    // When an anonymous caller reads under conditions on its type and id
-    // Then both say anonymous
+    // When an anonymous caller reads under conditions on its type, id and Account
+    // Then all three say anonymous, and the request carries no service flag
     assertTrue(
       allowed(
         simAws,
         { kind: "anonymous" },
         {
           StringEquals: {
+            "aws:PrincipalAccount": "anonymous",
             "aws:PrincipalType": "Anonymous",
             "aws:userid": "anonymous",
           },
-          Bool: { "aws:PrincipalIsAWSService": "false" },
+          Null: { "aws:PrincipalIsAWSService": "true" },
         },
       ),
     );
+  });
+
+  it("ignores principal keys a service supplies", () => {
+    // Given a read allowed only where the request has no User name or team tag
+    const simAws = new SimAws();
+
+    // When an anonymous request arrives carrying both keys itself
+    const decision = simAws.iam().authorize({
+      action: "s3:GetObject",
+      resource: reportObject,
+      caller: { kind: "anonymous" },
+      conditionContext: {
+        "AWS:UserName": "report-reader",
+        "aws:PrincipalTag/team": "reports",
+      },
+      resourcePolicies: [
+        simIamAuthZResourcePolicySourceFactory.make({
+          document: {
+            Statement: {
+              Effect: "Allow",
+              Principal: "*",
+              Action: "s3:GetObject",
+              Resource: reportObject,
+              Condition: {
+                Null: {
+                  "aws:username": "true",
+                  "aws:PrincipalTag/team": "true",
+                },
+              },
+            },
+          },
+        }),
+      ],
+    });
+
+    // Then IAM drops both, as an anonymous caller carries neither
+    assertTrue(decision.isAllowed);
   });
 
   it("reads the tags of a caller from another Account in the simulation", async () => {

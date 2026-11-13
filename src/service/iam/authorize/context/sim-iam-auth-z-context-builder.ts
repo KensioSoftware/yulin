@@ -33,6 +33,7 @@ import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 import { SimIamAuthZScpSourceBuilder } from "./sim-iam-auth-z-scp-source-builder.js";
 import { SimIamDerivedConditions } from "./sim-iam-derived-conditions.js";
 import { SimIamPrincipalConditions } from "./sim-iam-principal-conditions.js";
+import { simIamWithoutPrincipalKeys } from "./sim-iam-principal-keys.js";
 import type { SimIamServiceControlPolicyResolver } from "../scp/sim-iam-scp-resolver.js";
 
 interface SimIamAuthZContextBuilderProperties {
@@ -200,15 +201,18 @@ export class SimIamAuthZContextBuilder {
    *
    * A service supplies values it knows from the request, and values it can
    * only work out once the caller is resolved. IAM's own values are applied
-   * last, so nothing a service supplies can overwrite them.
+   * last, so nothing a service supplies can overwrite them. The keys that
+   * describe the caller are dropped from what a service supplies.
    */
   private conditionContext(
     input: SimIamAuthorizationInput,
     caller: SimAwsResolvedCaller,
   ): Readonly<Record<string, SimIamConditionValue>> {
     return {
-      ...input.conditionContext,
-      ...input.callerConditions?.conditionValuesFor(caller),
+      ...simIamWithoutPrincipalKeys(input.conditionContext),
+      ...simIamWithoutPrincipalKeys(
+        input.callerConditions?.conditionValuesFor(caller),
+      ),
       ...this.derivedConditions.of({ caller, region: input.region }),
       ...this.principalConditions.of(caller),
       ...this.scpSourceBuilder.principalOrgConditions(caller),

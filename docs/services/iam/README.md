@@ -763,9 +763,11 @@ Every request also carries the keys AWS uses to describe its caller:
 | Role session | `AssumedRole`       | the Role's ID, `:`, session | absent         |
 | Anonymous    | `Anonymous`         | `anonymous`                 | absent         |
 
-A caller with an ARN carries its Account as `aws:PrincipalAccount`. `aws:PrincipalIsAWSService` is
-`true` for a service principal, which names itself in `aws:PrincipalServiceName`, and `false` for
-everyone else. A caller named by a Role's own ARN stands for a session of that Role. It is described
+A caller with an ARN carries its Account as `aws:PrincipalAccount`, and an anonymous caller carries
+`anonymous` there. `aws:PrincipalIsAWSService` is `true` for a service principal, which names itself
+in `aws:PrincipalServiceName`, and `false` for any other signed request. An anonymous request carries
+no `aws:PrincipalIsAWSService`. IAM supplies every one of these keys itself, and drops any a service
+passes in its `conditionContext`. A caller named by a Role's own ARN stands for a session of that Role. It is described
 as an `AssumedRole` carrying the Role's tags, without an `aws:userid`, because it has no session
 name.
 

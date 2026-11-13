@@ -39,7 +39,10 @@ export class SimIamTagCommandHandlers {
     tags: SimIamTagsInput,
     options?: SimIamRequestOptions,
   ): Promise<SimIamTaggingCommandOutput> {
-    const tagged = await this.authorized(
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
+
+    const tagged = this.authorized(
       `iam:Tag${this.entity}`,
       name,
       options,
@@ -59,7 +62,10 @@ export class SimIamTagCommandHandlers {
     keys: readonly string[] | undefined,
     options?: SimIamRequestOptions,
   ): Promise<SimIamTaggingCommandOutput> {
-    const tagged = await this.authorized(
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
+
+    const tagged = this.authorized(
       `iam:Untag${this.entity}`,
       name,
       options,
@@ -78,11 +84,10 @@ export class SimIamTagCommandHandlers {
     name: string | undefined,
     options?: SimIamRequestOptions,
   ): Promise<SimIamListTagsCommandOutput> {
-    const tagged = await this.authorized(
-      `iam:List${this.entity}Tags`,
-      name,
-      options,
-    );
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
+
+    const tagged = this.authorized(`iam:List${this.entity}Tags`, name, options);
 
     return { Tags: tagged.tags.all, IsTruncated: false };
   }
@@ -93,17 +98,18 @@ export class SimIamTagCommandHandlers {
    * IAM authorizes before it looks the entity up, so a caller denied the
    * action learns nothing about whether the entity exists. A request naming
    * no entity finds none.
+   *
+   * The caller awaits sequencing first. Authorizing, finding the entity and
+   * changing it then run without a pause between them, and the entity and
+   * the request input changed are the ones authorized.
    */
-  private async authorized(
+  private authorized(
     action: string,
     name: string | undefined,
     options: SimIamRequestOptions | undefined,
     conditions = {},
-  ): Promise<SimIamAuthorizedIdentity> {
+  ): SimIamAuthorizedIdentity {
     this.identity.authorize(action, name, options, conditions);
-
-    // Allow for potential non-deterministic sequencing of async events.
-    await this.background.sequence();
 
     const tagged = this.identity.find(name ?? "");
 

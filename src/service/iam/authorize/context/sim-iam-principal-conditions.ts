@@ -29,9 +29,10 @@ interface SimIamPrincipalConditionsProperties extends SimIamPrincipalDirectory {
  *
  * A User or a Role session also carries the tags of the User or the Role as
  * `aws:PrincipalTag/`, and every caller with an ARN carries its Account as
- * `aws:PrincipalAccount`. `aws:PrincipalIsAWSService` says whether a service
- * principal made the request, and a service principal names itself in
- * `aws:PrincipalServiceName`.
+ * `aws:PrincipalAccount`. An anonymous caller's Account is `anonymous`.
+ * `aws:PrincipalIsAWSService` says whether a service principal made a signed
+ * request, and is absent from an anonymous one. A service principal names
+ * itself in `aws:PrincipalServiceName`.
  *
  * A caller named by a Role's own ARN stands for a session of that Role. It is
  * described as an `AssumedRole` carrying the Role's tags, with no
@@ -57,7 +58,7 @@ export class SimIamPrincipalConditions {
 
     if (principal.kind === "anonymous") {
       return {
-        "aws:PrincipalIsAWSService": "false",
+        "aws:PrincipalAccount": "anonymous",
         "aws:PrincipalType": "Anonymous",
         "aws:userid": "anonymous",
       };

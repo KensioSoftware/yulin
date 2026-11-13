@@ -1,5 +1,6 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import { normaliseUserPath } from "../../user/sim-iam-user-path.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamCredentialRegistry } from "../../credential/sim-iam-credential-registry.js";
@@ -93,6 +94,7 @@ export class SimIamUserCommandHandlers {
   ): Promise<SimCreateUserCommandOutput> {
     this.identity.authorizeCreate(
       command.input.UserName,
+      normaliseUserPath(command.input.Path),
       command.input.Tags,
       options,
     );

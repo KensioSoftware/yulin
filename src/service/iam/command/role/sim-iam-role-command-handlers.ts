@@ -1,5 +1,6 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import { normaliseRolePath } from "../../role/sim-iam-role-path.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
@@ -98,6 +99,7 @@ export class SimIamRoleCommandHandlers {
   ): Promise<SimCreateRoleCommandOutput> {
     this.identity.authorizeCreate(
       command.input.RoleName,
+      normaliseRolePath(command.input.Path),
       command.input.Tags,
       options,
       simIamPermissionsBoundaryCondition(command.input.PermissionsBoundary),
