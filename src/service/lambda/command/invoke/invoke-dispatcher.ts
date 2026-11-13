@@ -13,6 +13,7 @@ import {
   parseInvokeEvent,
   simLambdaAsyncPayloadLimit,
 } from "./invoke-payload.js";
+import { simLambdaInvokeRequestContext } from "../../function/invoke/sim-lambda-invoke-request-context.js";
 import { simLambdaRequestResponse } from "./invoke-request-response.js";
 import type {
   SimInvokeCommand,
@@ -68,12 +69,18 @@ export class SimLambdaInvocationDispatcher {
         );
       }
       case "Event": {
-        this.asyncInvocations.start(
-          simFunction,
-          parseInvokeEvent(command.input.Payload, simLambdaAsyncPayloadLimit),
-          qualifier,
-          invokedFunctionArn,
+        const event = parseInvokeEvent(
+          command.input.Payload,
+          simLambdaAsyncPayloadLimit,
         );
+        simLambdaInvokeRequestContext.exit(() => {
+          this.asyncInvocations.start(
+            simFunction,
+            event,
+            qualifier,
+            invokedFunctionArn,
+          );
+        });
         return { $metadata: {}, StatusCode: 202 };
       }
       case "DryRun": {

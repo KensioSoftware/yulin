@@ -1160,7 +1160,7 @@ An `Invoke` request is held to the limits real Lambda applies. A `RequestRespons
 to 6 MB (6,291,456 bytes), and an `Event` payload up to 1 MB. A larger one is refused with
 `RequestTooLargeException` before the handler runs. A handler answering a synchronous invocation
 with more than 6 MB gets a function error in place of its response, with `errorType`
-`Function.ResponseSizeTooLarge`, as on AWS.
+`Function.ResponseSizeTooLarge`, as on AWS. A handler error that large is answered the same way.
 
 ### The log tail and the client context
 
@@ -1439,8 +1439,9 @@ a function in one chain of requests is stopped before it starts, and the functio
 `RecursiveInvocationsDropped` metric counts it.
 
 A chain is followed through the hops AWS follows. Those are SQS, SNS, S3 and EventBridge, and one
-function invoking another directly, synchronously or not. A DynamoDB or Kinesis stream starts a new
-chain, as it does on AWS. A message a function sends to a queue carries its chain in the
+function invoking another directly, synchronously or not. A record an asynchronous invocation sends
+to a destination or dead-letter target carries the chain on, so a loop through a destination is
+stopped too. A DynamoDB or Kinesis stream starts a new chain, as it does on AWS. A message a function sends to a queue carries its chain in the
 `AWSTraceHeader` system attribute, which the next invocation's `Records` show too.
 
 What the stop does depends on how the function was invoked. A synchronous `Invoke` is refused with

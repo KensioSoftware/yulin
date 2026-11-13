@@ -2,10 +2,9 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import { simLambdaInvokeRequestContext } from "../../function/invoke/sim-lambda-invoke-request-context.js";
 import {
   functionErrorPayload,
-  isOversizedResponse,
-  oversizedResponsePayload,
   parseInvokeEvent,
   resultPayload,
+  sizedResponse,
 } from "./invoke-payload.js";
 import {
   simLambdaInvokeRequestOf,
@@ -55,9 +54,7 @@ export async function simLambdaRequestResponse(
     return {
       ...answered,
       ...simLambdaLogResult(request),
-      ...(isOversizedResponse(payload)
-        ? { FunctionError: "Unhandled", Payload: oversizedResponsePayload() }
-        : { Payload: payload }),
+      ...sizedResponse(payload, undefined),
     };
   } catch (error) {
     // A throttled invocation never ran, so real Lambda refuses the request
@@ -70,8 +67,7 @@ export async function simLambdaRequestResponse(
     return {
       ...answered,
       ...simLambdaLogResult(request),
-      FunctionError: "Unhandled",
-      Payload: functionErrorPayload(error),
+      ...sizedResponse(functionErrorPayload(error), "Unhandled"),
     };
   }
 }

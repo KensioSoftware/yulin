@@ -47,6 +47,8 @@ export class SimSqsPolledQueue {
       (instant) => {
         schedule.at(instant);
       },
+      // A delayed message becoming receivable may fill the batch first.
+      this.nextAvailability(),
     );
   }
 

@@ -97,26 +97,33 @@ export function resultPayload(result: unknown): Uint8Array {
 }
 
 /**
- * Whether a response payload is more than a synchronous invocation carries,
- * which real Lambda answers as a function error of its own.
+ * A synchronous invocation's response, a handler result or a handler error,
+ * held to the size real Lambda allows.
+ *
+ * A response larger than 6 MB is answered with the function error real
+ * Lambda answers it with, whichever it was.
  */
-export function isOversizedResponse(payload: Uint8Array): boolean {
-  return payload.byteLength > responseLimit;
-}
+export function sizedResponse(
+  payload: Uint8Array,
+  functionError: "Unhandled" | undefined,
+): { Payload: Uint8Array; FunctionError?: string } {
+  if (payload.byteLength <= responseLimit) {
+    return functionError === undefined
+      ? { Payload: payload }
+      : { Payload: payload, FunctionError: functionError };
+  }
 
-/**
- * The function error real Lambda answers with for a handler whose response is
- * too large.
- */
-export function oversizedResponsePayload(): Uint8Array {
-  return Buffer.from(
-    JSON.stringify({
-      errorMessage:
-        "Response payload size exceeded maximum allowed payload size " +
-        `(${String(responseLimit)} bytes).`,
-      errorType: "Function.ResponseSizeTooLarge",
-    }),
-  );
+  return {
+    FunctionError: "Unhandled",
+    Payload: Buffer.from(
+      JSON.stringify({
+        errorMessage:
+          "Response payload size exceeded maximum allowed payload size " +
+          `(${String(responseLimit)} bytes).`,
+        errorType: "Function.ResponseSizeTooLarge",
+      }),
+    ),
+  };
 }
 
 /**

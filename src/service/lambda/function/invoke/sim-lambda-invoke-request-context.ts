@@ -52,6 +52,14 @@ export const simLambdaInvokeRequestContext = {
   },
 
   /**
+   * Start work outside any request, as an asynchronous invocation starts, so
+   * it never answers the request that happened to start it.
+   */
+  exit<T>(work: () => T): T {
+    return storage.exit(work);
+  },
+
+  /**
    * The request the current invocation of a function is running for, if one
    * asked for anything.
    */

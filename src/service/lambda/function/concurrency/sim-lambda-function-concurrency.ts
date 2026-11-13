@@ -4,6 +4,18 @@ import { SimLambdaRecursiveInvocationException } from "../../error/sim-lambda-in
 import type { SimLambdaFunctionMetrics } from "../../metric/sim-lambda-function-metrics.js";
 
 /**
+ * What a function's invocation is counted against: its name, in its Account
+ * and Region.
+ */
+interface SimLambdaConcurrencyFunction {
+  readonly name: string;
+  readonly accountRegionScope: {
+    readonly accountId: string;
+    readonly regionName: string;
+  };
+}
+
+/**
  * The reserved concurrency of one simulated Lambda function, and the
  * invocations of it running now.
  *
@@ -73,23 +85,26 @@ export class SimLambdaFunctionConcurrency {
    */
   async run<T>(
     metrics: SimLambdaFunctionMetrics,
-    functionName: string,
+    simFunction: SimLambdaConcurrencyFunction,
     run: () => Promise<T>,
   ): Promise<T> {
+    const { name, accountRegionScope: scope } = simFunction;
     const refuse =
       this.recursiveLoop === "Allow"
         ? undefined
         : (): never => {
             this.#refusals += 1;
-            metrics.recursionDropped(functionName);
+            metrics.recursionDropped(name);
             throw new SimLambdaRecursiveInvocationException(
-              `Function ${functionName} was invoked recursively more than ` +
-                "16 times in one chain of requests, and was stopped.",
+              `Function ${name} was invoked recursively more than 16 times ` +
+                "in one chain of requests, and was stopped.",
             );
           };
 
-    return await simAwsLineage.invoking(functionName, refuse, async () =>
-      this.withinReservation(metrics, functionName, run),
+    return await simAwsLineage.invoking(
+      `${scope.accountId}:${scope.regionName}:${name}`,
+      refuse,
+      async () => this.withinReservation(metrics, name, run),
     );
   }
 

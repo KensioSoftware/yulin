@@ -21,7 +21,8 @@ type SimLambdaStreamingHandler = (
  * The handler is given a response stream where another handler gets its
  * context, and the context third. The response is over once the handler has
  * finished and the stream has ended. A handler that finishes without ending
- * the stream has it ended for it, as the real runtime does. A request
+ * the stream has it ended for it, as the real runtime does. A handler that
+ * destroys its stream with an error fails the invocation with it. A request
  * following the stream is handed it before the handler runs.
  */
 export async function simLambdaStreamingRun(
@@ -30,6 +31,11 @@ export async function simLambdaStreamingRun(
   contextBuilder: SimLambdaInvokeContextBuilder,
 ): Promise<SimLambdaStreamedResponse> {
   const stream = new SimLambdaResponseStream();
+  // A handler destroying its stream with an error is read from `finished`
+  // below. Without a listener the error would be thrown from the event.
+  stream.on("error", () => {
+    // Reported through `finished`.
+  });
   const context = contextBuilder.build(() => {
     // A streaming handler answers through its stream, never this callback.
   });

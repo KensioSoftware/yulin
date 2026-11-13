@@ -11,7 +11,8 @@ export class BatchingWindow {
 
   /**
    * Whether a poll that found some records holds them for the window,
-   * arranging to look again when it closes.
+   * arranging to look again when it closes, or sooner where more records are
+   * known to arrive before then.
    */
   holds(
     now: Date,
@@ -21,6 +22,7 @@ export class BatchingWindow {
       readonly batchingWindowSeconds?: number | undefined;
     },
     pollAt: (instant: Date) => void,
+    sooner?: Date,
   ): boolean {
     const until = this.holdUntil(
       now,
@@ -30,7 +32,7 @@ export class BatchingWindow {
     );
 
     if (until !== undefined) {
-      pollAt(until);
+      pollAt(sooner !== undefined && sooner < until ? sooner : until);
     }
 
     return until !== undefined;

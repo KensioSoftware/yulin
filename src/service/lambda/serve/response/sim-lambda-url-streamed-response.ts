@@ -2,6 +2,7 @@ import {
   simLambdaHttpIntegrationContentType,
   type SimLambdaResponseStream,
 } from "../../function/stream/sim-lambda-response-stream.js";
+import { simLambdaUrlFollowedBody } from "./sim-lambda-url-followed-body.js";
 import type { SimLambdaHttpResponsePrelude } from "../../function/stream/sim-lambda-awslambda-global.js";
 
 /**
@@ -50,11 +51,21 @@ export async function simLambdaUrlStreamedResponse(
     );
   }
 
-  return new Response(followed(stream, body, invocation), {
-    status: prelude.statusCode ?? 200,
-    headers,
-  });
+  const status = prelude.statusCode ?? 200;
+
+  return new Response(
+    bodylessStatuses.has(status)
+      ? null
+      : simLambdaUrlFollowedBody(stream, body, invocation),
+    { status, headers },
+  );
 }
+
+/**
+ * The statuses a response carries no body with, which the Fetch API refuses
+ * a body for.
+ */
+const bodylessStatuses: ReadonlySet<number> = new Set([204, 205, 304]);
 
 const noPrelude: SimLambdaHttpResponsePrelude = {};
 
@@ -74,49 +85,4 @@ function splitPrelude(
     ) as SimLambdaHttpResponsePrelude,
     body: written.subarray(end + preludeEnd.length),
   };
-}
-
-/**
- * The body, starting with what was written before the response was answered
- * and going on with each chunk the handler writes after.
- */
-function followed(
-  stream: SimLambdaResponseStream,
-  body: Buffer,
-  invocation: Promise<unknown>,
-): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    start(controller): void {
-      if (body.length > 0) {
-        controller.enqueue(new Uint8Array(body));
-      }
-
-      if (stream.writableFinished) {
-        controller.close();
-        return;
-      }
-
-      stream.on("chunk", (chunk: Buffer) => {
-        controller.enqueue(new Uint8Array(chunk));
-      });
-      stream.once("finish", () => {
-        controller.close();
-      });
-      void failOnError(invocation, controller);
-    },
-  });
-}
-
-/**
- * End the body with the invocation's error, should it fail.
- */
-async function failOnError(
-  invocation: Promise<unknown>,
-  controller: ReadableStreamDefaultController<Uint8Array>,
-): Promise<void> {
-  try {
-    await invocation;
-  } catch (error) {
-    controller.error(error);
-  }
 }

@@ -10,7 +10,7 @@ import {
 } from "./sim-lambda-async-outcome.js";
 import { simLambdaHandlerAttempt } from "./sim-lambda-handler-attempt.js";
 import { SimLambdaAsyncAttempts } from "./sim-lambda-async-attempts.js";
-import { simAwsLineage } from "../../../../aws/lineage/sim-aws-lineage.js";
+import { SimLambdaAsyncChain } from "./sim-lambda-async-chain.js";
 
 interface SimLambdaAsyncInvocationProperties {
   readonly simFunction: SimLambdaFunction;
@@ -33,20 +33,16 @@ interface SimLambdaAsyncInvocationProperties {
  */
 export class SimLambdaAsyncInvocation {
   private readonly properties: SimLambdaAsyncInvocationProperties;
-  private readonly outcomes: SimLambdaAsyncOutcomeDelivery;
+  private readonly outcomes: SimLambdaAsyncChain;
   private readonly attempts: SimLambdaAsyncAttempts;
   private readonly startedAt: Date;
-
-  /**
-   * The chain of requests the invocation was made in, which every attempt
-   * carries on.
-   */
-  private readonly lineage = simAwsLineage.current();
 
   constructor(properties: SimLambdaAsyncInvocationProperties) {
     this.properties = properties;
     this.startedAt = properties.background.now();
-    this.outcomes = new SimLambdaAsyncOutcomeDelivery(properties);
+    this.outcomes = new SimLambdaAsyncChain(
+      new SimLambdaAsyncOutcomeDelivery(properties),
+    );
     this.attempts = new SimLambdaAsyncAttempts(properties);
   }
 
@@ -58,7 +54,7 @@ export class SimLambdaAsyncInvocation {
   }
 
   private async attempt(): Promise<void> {
-    const attempt = await simAwsLineage.passing(this.lineage, async () =>
+    const attempt = await this.outcomes.attempt(async () =>
       simLambdaHandlerAttempt(this.properties),
     );
 

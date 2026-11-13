@@ -50,8 +50,11 @@ export class SimLambdaResponseStream extends Writable {
     callback: (error?: Error | null) => void,
   ): void {
     this.#writeFirst();
+    // A copy, since the writer may reuse its buffer once the write completes.
     this.#record(
-      Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string, encoding),
+      Buffer.isBuffer(chunk)
+        ? Buffer.from(chunk)
+        : Buffer.from(chunk as string, encoding),
     );
     callback();
   }

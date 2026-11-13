@@ -1,11 +1,17 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
+
+import {
+  simAwsLineageFromTraceHeaders,
+  simAwsTraceHeaderOf,
+} from "./sim-aws-trace-header.js";
 
 /**
  * How many times each function has been invoked in one chain of requests,
  * keyed by a short hash of the function.
  */
-export type SimAwsLineage = ReadonlyMap<string, number>;
+export type { SimAwsLineage } from "./sim-aws-trace-header.js";
+import type { SimAwsLineage } from "./sim-aws-trace-header.js";
 
 interface SimAwsLineageStore {
   /** The chain the running invocation is part of. */
@@ -13,6 +19,9 @@ interface SimAwsLineageStore {
 
   /** The chain the next invocation starts from, where a hop said so. */
   readonly incoming?: SimAwsLineage | undefined;
+
+  /** The chain as the last invocation started from this store left it. */
+  produced?: SimAwsLineage | undefined;
 }
 
 const storage = new AsyncLocalStorage<SimAwsLineageStore>();
@@ -56,6 +65,10 @@ export const simAwsLineage = {
 
     const current = new Map(base).set(key, count);
 
+    if (store !== undefined) {
+      store.produced = current;
+    }
+
     return await storage.run({ current }, invocation);
   },
 
@@ -67,6 +80,32 @@ export const simAwsLineage = {
     delivery: () => Promise<T>,
   ): Promise<T> {
     return await storage.run({ incoming: lineage ?? noLineage }, delivery);
+  },
+
+  /**
+   * Run a delivery as part of a chain, answering with what it produced and
+   * the chain as the invocation it made left it. A delivery that invoked
+   * nothing leaves the chain where it was.
+   */
+  async following<T>(
+    lineage: SimAwsLineage | undefined,
+    delivery: () => Promise<T>,
+  ): Promise<{ result: T; lineage: SimAwsLineage | undefined }> {
+    const store: SimAwsLineageStore = { incoming: lineage ?? noLineage };
+    const result = await storage.run(store, delivery);
+
+    return { result, lineage: store.produced ?? lineage };
+  },
+
+  /**
+   * Run work as part of a chain, as the service writing on an invocation's
+   * behalf after it has finished, such as a destination delivery.
+   */
+  async within<T>(
+    lineage: SimAwsLineage | undefined,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    return await storage.run({ current: lineage }, work);
   },
 
   /**
@@ -85,49 +124,16 @@ export const simAwsLineage = {
   traceHeader(): string | undefined {
     const lineage = storage.getStore()?.current;
 
-    if (lineage === undefined) {
-      return undefined;
-    }
-
-    const root = `1-${randomBytes(4).toString("hex")}-${randomBytes(12).toString("hex")}`;
-    const entries = lineage
-      .entries()
-      .map(([key, count]) => `${key}:${String(count)}`)
-      .toArray();
-
-    return `Root=${root};Sampled=0;Lineage=${entries.join("|")}`;
+    return lineage === undefined ? undefined : simAwsTraceHeaderOf(lineage);
   },
 
   /**
    * The chains a set of trace headers carry, merged by taking each function's
    * highest count.
    */
-  fromTraceHeaders(headers: readonly (string | undefined)[]): SimAwsLineage {
-    const merged = new Map<string, number>();
-
-    for (const header of headers) {
-      for (const [key, count] of lineageIn(header)) {
-        merged.set(key, Math.max(count, merged.get(key) ?? 0));
-      }
-    }
-
-    return merged;
-  },
+  fromTraceHeaders: simAwsLineageFromTraceHeaders,
 };
 
 function hashOf(functionKey: string): string {
   return createHash("sha256").update(functionKey).digest("hex").slice(0, 8);
-}
-
-function lineageIn(header: string | undefined): [string, number][] {
-  const field = header
-    ?.split(";")
-    .find((part) => part.startsWith("Lineage="))
-    ?.slice("Lineage=".length);
-
-  return (field ?? "")
-    .split("|")
-    .map((entry) => entry.split(":"))
-    .filter(([key, count]) => key !== "" && Number.isSafeInteger(Number(count)))
-    .map(([key = "", count]) => [key, Number(count)]);
 }
