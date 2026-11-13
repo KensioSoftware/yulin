@@ -13,6 +13,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
@@ -34,9 +36,7 @@ describe("Lambda ListVersionsByFunctionCommand", () => {
     await lambda.publishVersion(
       new PublishVersionCommand({ FunctionName: "orders" }),
     );
-    await lambda.publishVersion(
-      new PublishVersionCommand({ FunctionName: "orders" }),
-    );
+    await publishChangedVersion(simAws, "orders");
 
     // When the function's versions are listed.
     const listed = await lambda.listVersionsByFunction(

@@ -2,6 +2,8 @@ import {
   CreateFunctionCommand,
   GetFunctionCommand,
   PublishVersionCommand,
+  TagResourceCommand,
+  UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
@@ -52,7 +54,8 @@ describe("Lambda PublishVersionCommand", () => {
   });
 
   it("numbers each later version upwards", async () => {
-    // Given a function that has published a version already.
+    // Given a function that has published a version already, and has been
+    // changed since.
     const simAws = new SimAws();
     const lambda = simAws.lambda();
     await lambda.createFunction(
@@ -65,6 +68,13 @@ describe("Lambda PublishVersionCommand", () => {
     await lambda.publishVersion(
       new PublishVersionCommand({ FunctionName: "orders" }),
     );
+    await lambda.updateFunctionConfiguration(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "orders",
+        Timeout: 30,
+      }),
+    );
+    await simAws.backgroundTasksComplete();
 
     // When another is published.
     const published = await lambda.publishVersion(
@@ -73,6 +83,75 @@ describe("Lambda PublishVersionCommand", () => {
 
     // Then it is the next number up.
     assertIdentical(published.Version, "2");
+  });
+
+  it("answers with the latest version when a setting was changed and changed back", async () => {
+    // Given a function that has published a version, and had its timeout
+    // changed and then put back.
+    const simAws = new SimAws();
+    const lambda = simAws.lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+        Timeout: 30,
+      }),
+    );
+    const first = await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+    for (const Timeout of [31, 30]) {
+      // oxlint-disable-next-line no-await-in-loop -- changed in order
+      await lambda.updateFunctionConfiguration(
+        new UpdateFunctionConfigurationCommand({
+          FunctionName: "orders",
+          Timeout,
+        }),
+      );
+      // oxlint-disable-next-line no-await-in-loop -- each change settles first
+      await simAws.backgroundTasksComplete();
+    }
+
+    // When it is published again.
+    const again = await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+
+    // Then the same version comes back.
+    assertIdentical(again.Version, first.Version);
+  });
+
+  it("answers with the latest version when nothing has changed since", async () => {
+    // Given a function that has published a version, and has only been
+    // tagged since.
+    const simAws = new SimAws();
+    const lambda = simAws.lambda();
+    const { FunctionArn } = await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+      }),
+    );
+    const first = await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+    await lambda.tagResource(
+      new TagResourceCommand({ Resource: FunctionArn, Tags: { team: "a" } }),
+    );
+
+    // When it is published again.
+    const again = await lambda.publishVersion(
+      new PublishVersionCommand({
+        FunctionName: "orders",
+        Description: "unchanged",
+      }),
+    );
+
+    // Then the same version comes back, as it was published.
+    assertIdentical(again.Version, first.Version);
+    assertIdentical(again.Description, first.Description);
   });
 
   it("leaves the function itself reporting $LATEST", async () => {

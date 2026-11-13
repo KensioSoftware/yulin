@@ -35,11 +35,23 @@ export interface SimLambdaDeadLetterRequest {
 }
 
 /**
+ * One failed stream batch on its way to an S3 Bucket, as an object.
+ */
+export interface SimLambdaDestinationStoreRequest {
+  readonly bucketName: string;
+  readonly key: string;
+  readonly body: string;
+  readonly sourceFunctionArn: string;
+  readonly sourceFunctionRoleArn: string;
+}
+
+/**
  * Everywhere a simulated function's asynchronous invocation results can go.
  */
 export interface SimLambdaDestinationTargets {
   deliver(request: SimLambdaDestinationDeliveryRequest): Promise<void>;
   deadLetter(request: SimLambdaDeadLetterRequest): Promise<void>;
+  store(request: SimLambdaDestinationStoreRequest): Promise<void>;
 }
 
 /**
@@ -61,7 +73,14 @@ export class SimLambdaNoDestinationTargets implements SimLambdaDestinationTarget
     throw this.unreachable(request.targetArn);
   }
 
-  private unreachable(arn: SimLambdaDestinationArn): Error {
+  /**
+   * Say that this SimLambda has nowhere to store a failed batch.
+   */
+  store(request: SimLambdaDestinationStoreRequest): Promise<never> {
+    throw this.unreachable({ value: `arn:aws:s3:::${request.bucketName}` });
+  }
+
+  private unreachable(arn: Pick<SimLambdaDestinationArn, "value">): Error {
     return new SimLambdaError(
       `Cannot deliver to ${arn.value}: this SimLambda has no wider ` +
         "simulation to send an invocation result to. Create the function " +

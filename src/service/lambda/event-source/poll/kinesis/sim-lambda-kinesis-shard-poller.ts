@@ -1,5 +1,4 @@
 import { processSimLambdaStreamBatch } from "../sim-lambda-stream-batch-processing.js";
-import { simLambdaKinesisStreamRecordTimes } from "../sim-lambda-stream-record-times.js";
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
 import type { SimLambdaFunctionLookup } from "../../../function/url/sim-lambda-function-lookup.js";
 import type { SimLambdaEventSourceMapping } from "../../sim-lambda-event-source-mapping.js";
@@ -106,7 +105,7 @@ export class SimLambdaKinesisShardPoller implements SimLambdaEventSourcePolls {
       batch,
       progress,
       simFunction,
-      times: simLambdaKinesisStreamRecordTimes,
+      times: (records) => this.delivery.times(records),
       deliver: async (records) => await this.delivery.to(simFunction, records),
     });
   }

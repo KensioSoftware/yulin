@@ -86,7 +86,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
     expect(response.status).toBe(200);
   });
 
-  it("authorizes an assumed-role session against the Role behind it", async () => {
+  it("authorizes an assumed-role session against the Role behind it, and describes it", async () => {
     // Given a function behind an AWS_IAM Function URL
     const simAws = new SimAws();
     const reporter = await simAws.lambda().createFunction(
@@ -103,8 +103,9 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
       }),
     );
 
-    // And a Role allowed to invoke it
-    await simAws.iam().createRole(
+    // And a Role allowed to invoke it, in an Account inside an organization
+    simAws.organizations().moveAccount(accountId);
+    const deployer = await simAws.iam().createRole(
       new CreateRoleCommand({
         RoleName: "Deployer",
         AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
@@ -158,9 +159,17 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
     // Then it is allowed: the session ARN owns no policies of its own, so the
     // permission has to come from the Role it was assumed from
     expect(response.status).toBe(200);
+
+    // And the handler is told the session by the key it signed with, its
+    // unique id, and its organization
     const context = (await response.json()) as SimPayload2RequestContext;
-    expect(context.authorizer?.iam?.userArn).toBe(
-      `arn:aws:sts::${accountId}:assumed-role/Deployer/deploy-session`,
-    );
+    const sessionId = `${deployer.Role.RoleId}:deploy-session`;
+    expect(context.authorizer?.iam).toMatchObject({
+      accessKey: credentials.AccessKeyId,
+      callerId: sessionId,
+      userId: sessionId,
+      principalOrgId: simAws.organizations().organizationId(),
+      userArn: `arn:aws:sts::${accountId}:assumed-role/Deployer/deploy-session`,
+    });
   });
 });

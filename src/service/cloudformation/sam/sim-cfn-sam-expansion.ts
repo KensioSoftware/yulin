@@ -25,6 +25,7 @@ import {
 import type { SamTemplateGlobals } from "./sim-cfn-sam-globals.js";
 import { samTemplateGlobals } from "./sim-cfn-sam-globals.js";
 import { isSamTemplateRecord } from "./sim-cfn-sam-record.js";
+import { samConditions } from "./sim-cfn-sam-conditions.js";
 import {
   templateNamesSamTransform,
   withoutSamSections,
@@ -62,6 +63,12 @@ export function samExpandedTemplate(
 
   return {
     ...withoutSamSections(template),
+    ...samConditions({
+      declared: template.Conditions,
+      resources,
+      globals,
+      apiAuth,
+    }),
     Resources: samEditedResources(
       Object.fromEntries(
         resources.flatMap(([logicalId, resource]) =>

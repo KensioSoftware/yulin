@@ -952,19 +952,24 @@ API's Account.
 
 An admitted caller reaches the handler under `requestContext.identity`.
 
-| Field       | What it carries                    |
-| ----------- | ---------------------------------- |
-| `accountId` | The Account the caller's ARN names |
-| `caller`    | The caller's ARN                   |
-| `user`      | The caller's ARN                   |
-| `userArn`   | The caller's ARN                   |
+| Field            | What it carries                               |
+| ---------------- | --------------------------------------------- |
+| `accountId`      | The Account the caller's ARN names            |
+| `caller`         | The caller's unique ID                        |
+| `user`           | The caller's unique ID                        |
+| `userArn`        | The caller's ARN                              |
+| `accessKey`      | The access key the request was signed with    |
+| `principalOrgId` | The organization the caller's Account sits in |
 
-Real API Gateway puts the principal's unique ID in `caller` and `user`, such as `AIDA...` for a user.
-The simulation receives only the caller ARN and uses it for each identity field it can populate.
+The unique ID is the one simulated IAM holds for the caller, such as `AIDA...` for a User or
+`AROA...:<session>` for an assumed-role session, as real API Gateway reports it. A caller simulated
+IAM has no record of reports its ARN there. `accessKey` is `null` for a caller named by the
+`x-sim-aws-caller` header, which signs nothing, and `principalOrgId` is `null` outside an
+organization.
 
-A method of any other authorization type leaves those four `null`, and so does an `AWS_IAM` method
-called by a principal with no ARN behind it. `accessKey`, `apiKey`, `apiKeyId`, `principalOrgId` and
-the two Cognito identity pool fields are `null` throughout. `sourceIp` and `userAgent` describe the
+A method of any other authorization type leaves those six `null`, and so does an `AWS_IAM` method
+called by a principal with no ARN behind it. `apiKey`, `apiKeyId` and the two Cognito identity pool
+fields are `null` throughout. `sourceIp` and `userAgent` describe the
 request itself and are filled for every method.
 
 ## Authorizing a method with a user pool

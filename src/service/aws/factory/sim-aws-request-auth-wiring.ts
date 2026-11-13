@@ -3,9 +3,11 @@ import { SimIamAccessKeyRegistry } from "../../iam/registry/sim-iam-access-key-r
 import { SimIamGlobalCredentialResolver } from "../../iam/registry/sim-iam-global-credential-resolver.js";
 import { SimIamSigV4Verifier } from "../../iam/sigv4/sim-iam-sigv4-verifier.js";
 import { SimAwsRequestCallerResolver } from "../../iam/request/sim-aws-request-caller-resolver.js";
+import type { SimAwsRequestCallerDirectory } from "../../iam/request/sim-aws-request-caller-details.js";
 
 interface SimAwsRequestAuthWiringProperties {
   readonly iamRegistry: SimIamRegistry;
+  readonly organizations?: SimAwsRequestCallerDirectory["organizations"];
 }
 
 /**
@@ -55,6 +57,10 @@ export class SimAwsRequestAuthWiring {
 
     this.requestCallers = new SimAwsRequestCallerResolver({
       signedRequests: this.signedRequests,
+      directory: {
+        iam: properties.iamRegistry,
+        organizations: properties.organizations,
+      },
     });
   }
 }

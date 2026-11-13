@@ -1,4 +1,3 @@
-import { simLambdaDynamoDbStreamRecordTimes } from "./sim-lambda-stream-record-times.js";
 import { processSimLambdaStreamBatch } from "./sim-lambda-stream-batch-processing.js";
 import { simLambdaEventSourceFunction } from "./sim-lambda-event-source-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
@@ -40,7 +39,7 @@ export class SimLambdaDynamoDbStreamPolling {
       batch,
       progress,
       simFunction,
-      times: simLambdaDynamoDbStreamRecordTimes,
+      times: (records) => delivery.times(records),
       deliver: async (records) => await delivery.to(simFunction, records),
     });
   }

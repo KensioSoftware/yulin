@@ -1242,7 +1242,12 @@ An admitted request carries its caller into the event as `requestContext.authori
 ```
 
 `accountId` and `userArn` come from the resolved principal's ARN. `requestContext.accountId` carries
-that Account too, in place of `anonymous`. The block is the same one a Lambda Function URL produces, so
+that Account too, in place of `anonymous`. `accessKey` is the access key a signed request was made
+with. `callerId` and `userId` are the unique id simulated IAM holds for the caller, such as `AIDA...`
+for a User or `AROA...:<session>` for an assumed-role session. `principalOrgId` is the organization
+the caller's Account sits in. The example above names a Role by the `x-sim-aws-caller` header. That
+request signs with no access key, and a Role itself carries no session to give a unique id. Its ARN
+stands in for both. The block is the same one a Lambda Function URL produces, so
 handler code reading it behaves the same behind either.
 
 ### Callers from another Account
@@ -2656,9 +2661,9 @@ Current documented limitations:
 - Only `execute-api:Invoke` is evaluated. The action string a policy names goes unconstrained, so a
   policy can be written with `execute-api:ManageConnections` or `execute-api:InvalidateCache` and
   nothing will ever ask about it.
-- `accessKey` in the `iam` block is empty, `callerId` and `userId` carry the caller ARN rather than
-  the `AIDA`/`AROA` unique id real AWS puts there, and `cognitoIdentity` and `principalOrgId` are
-  always null. None of those is available at the simulator's request boundary.
+- `accessKey` in the `iam` block is empty for a caller named by the `x-sim-aws-caller` header.
+  `callerId` and `userId` carry the caller ARN for a caller simulated IAM has no record of, where real
+  AWS always has a unique id. `cognitoIdentity` is always null.
 - A request signed for another service is refused by the serving boundary before route matching, even
   on a `NONE` route, where real API Gateway would ignore the signature. That boundary answers
   `{"Message":"Forbidden"}` with a capital `M`, unlike the API's own refusals.

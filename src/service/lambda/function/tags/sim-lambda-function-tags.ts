@@ -78,6 +78,17 @@ export class SimLambdaFunctionTags {
   record(): Record<string, string> {
     return Object.fromEntries(this.tags);
   }
+
+  /**
+   * The tags as an IAM policy reads them, under `aws:ResourceTag/<key>`.
+   */
+  resourceTagConditions(): Record<string, string> {
+    return Object.fromEntries(
+      this.tags
+        .entries()
+        .map(([key, value]) => [`aws:ResourceTag/${key}`, value]),
+    );
+  }
 }
 
 function assertWritableKey(key: string): void {

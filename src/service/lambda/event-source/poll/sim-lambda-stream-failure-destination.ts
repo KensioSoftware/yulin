@@ -1,3 +1,5 @@
+import { isBucketArn } from "../sim-lambda-stream-destination-config.js";
+import { simLambdaStreamFailureObject } from "./sim-lambda-stream-failure-object.js";
 import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaDestinationArn } from "../../destination/sim-lambda-destination-arn.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
@@ -40,6 +42,16 @@ export class SimLambdaStreamFailureDestination {
       shardId: batch.shardId,
       functionError: this.functionError,
     });
+    if (isBucketArn(arn)) {
+      await mapping.destinations.store({
+        bucketName: arn.slice("arn:aws:s3:::".length),
+        ...simLambdaStreamFailureObject(mapping.uuid, discard, record),
+        sourceFunctionArn: mapping.functionArn,
+        sourceFunctionRoleArn: simFunction.roleArn,
+      });
+
+      return;
+    }
     await mapping.destinations.deliver({
       destinationArn: SimLambdaDestinationArn.of(arn),
       sourceFunctionArn: mapping.functionArn,

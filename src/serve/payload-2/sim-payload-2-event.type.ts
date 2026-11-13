@@ -79,19 +79,19 @@ export type SimPayload2LambdaAuthorizer = Readonly<Record<string, JSONValue>>;
  * to, which is what makes a handler able to behave differently for different
  * callers.
  *
- * `callerId` and `userId` carry the caller ARN rather than the opaque unique
- * id (`AIDA...`, `AROA...:session`) real AWS puts there: the simulator has no
- * unique-id namespace at the request boundary, and an ARN is what a test would
- * assert on anyway. `accessKey` is empty, as the simulator does not carry the
- * signing access key id past authentication. `cognitoIdentity` and
- * `principalOrgId` are always null, as neither is simulated.
+ * `callerId` and `userId` carry the unique id simulated IAM holds for the
+ * caller (`AIDA...` for a User, `AROA...:session` for an assumed-role
+ * session), and the caller ARN for a caller it has no record of. `accessKey` is
+ * the access key a signed request was made with, and empty for one that named
+ * its caller by header. `principalOrgId` is the organization the caller's
+ * Account belongs to. `cognitoIdentity` is always null.
  */
 export interface SimPayload2IamAuthorizer {
   accessKey: string;
   accountId: string;
   callerId: string;
   cognitoIdentity: null;
-  principalOrgId: null;
+  principalOrgId: string | null;
   userArn: string;
   userId: string;
 }

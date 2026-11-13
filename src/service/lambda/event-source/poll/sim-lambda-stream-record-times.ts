@@ -13,6 +13,25 @@ import type { SimLambdaEventSourceStreamRecord } from "../stream/sim-lambda-even
 export interface SimLambdaStreamRecordTime {
   readonly sequenceNumber: string | undefined;
   readonly at: Date | undefined;
+
+  /**
+   * The record as the function is handed it, which an S3 failure destination
+   * writes back out with the batch.
+   */
+  readonly eventRecord?: unknown;
+}
+
+/**
+ * The record as the function is handed it, for the records it was handed. A
+ * record the mapping's filters kept back gives nothing.
+ */
+export function simLambdaHandedRecordOf<RecordType>(
+  delivered: readonly RecordType[],
+  recordOf: (record: RecordType) => unknown,
+): (record: RecordType) => unknown {
+  const handed = new Set(delivered);
+
+  return (record) => (handed.has(record) ? recordOf(record) : undefined);
 }
 
 /**
@@ -20,10 +39,12 @@ export interface SimLambdaStreamRecordTime {
  */
 export function simLambdaDynamoDbStreamRecordTimes(
   records: readonly SimLambdaEventSourceStreamRecord[],
+  eventRecordOf?: (record: SimLambdaEventSourceStreamRecord) => unknown,
 ): readonly SimLambdaStreamRecordTime[] {
   return records.map((one) => ({
     sequenceNumber: one.dynamodb?.SequenceNumber,
     at: one.dynamodb?.ApproximateCreationDateTime,
+    eventRecord: eventRecordOf?.(one),
   }));
 }
 
@@ -32,9 +53,11 @@ export function simLambdaDynamoDbStreamRecordTimes(
  */
 export function simLambdaKinesisStreamRecordTimes(
   records: readonly SimLambdaKinesisStreamRecord[],
+  eventRecordOf?: (record: SimLambdaKinesisStreamRecord) => unknown,
 ): readonly SimLambdaStreamRecordTime[] {
   return records.map((one) => ({
     sequenceNumber: one.SequenceNumber,
     at: one.ApproximateArrivalTimestamp,
+    eventRecord: eventRecordOf?.(one),
   }));
 }

@@ -11,6 +11,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimLambdaInvalidParameterValueException,
@@ -26,7 +28,8 @@ import type { SimLambda } from "../../sim-lambda.js";
  * here is measured against.
  */
 async function givenFunctionWithTwoVersions(): Promise<SimLambda> {
-  const lambda = new SimAws().lambda();
+  const simAws = new SimAws();
+  const lambda = simAws.lambda();
 
   await lambda.createFunction(
     new CreateFunctionCommand({
@@ -38,9 +41,7 @@ async function givenFunctionWithTwoVersions(): Promise<SimLambda> {
   await lambda.publishVersion(
     new PublishVersionCommand({ FunctionName: "orders" }),
   );
-  await lambda.publishVersion(
-    new PublishVersionCommand({ FunctionName: "orders" }),
-  );
+  await publishChangedVersion(simAws, "orders");
 
   return lambda;
 }

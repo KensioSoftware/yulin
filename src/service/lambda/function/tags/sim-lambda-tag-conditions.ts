@@ -48,13 +48,8 @@ export class SimLambdaTagConditionIam implements SimIamInterServiceAuthZ {
     const name = simLambdaFunctionNameOf(resource);
     const arn = this.#functions.functionArn(name);
     const named = resource === arn || resource.startsWith(`${arn}:`);
-    const tags = named ? this.#functions.find(name)?.tags.record() : undefined;
+    const tags = named ? this.#functions.find(name)?.tags : undefined;
 
-    return Object.fromEntries(
-      Object.entries(tags ?? {}).map(([key, value]) => [
-        `aws:ResourceTag/${key}`,
-        value,
-      ]),
-    );
+    return tags?.resourceTagConditions() ?? {};
   }
 }

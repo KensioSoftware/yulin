@@ -649,7 +649,7 @@ console.log(invoked.StatusCode); // 200
 await simAws.backgroundTasksComplete();
 ```
 
-An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. A reservation of zero throttles every invocation, which is how a function is switched off. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
+An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. An asynchronous invocation that is throttled goes back to be tried again after a second, then two, doubling up to five minutes. Those tries are not retries in the `MaximumRetryAttempts` sense, since the handler never ran. The event is tried until it is older than `MaximumEventAgeInSeconds` (six hours unless configured), and is then given up as `EventAgeExceeded`. A reservation of zero throttles every invocation, which is how a function is switched off. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
 
 `ReservedConcurrentExecutions` on an `AWS::Lambda::Function` or a SAM function makes the same reservation once the function exists. CDK writes it for `reservedConcurrentExecutions`.
 
@@ -749,7 +749,9 @@ Each command is authorized against the IAM action of its own name. Creating a fu
 
 A policy can decide on tags. Every Lambda command, and every Function URL call, gives the function's
 tags as `aws:ResourceTag/<key>`, so a caller allowed `lambda:InvokeFunction` only where
-`aws:ResourceTag/team` is `orders` can invoke that team's functions and no others. A version or
+`aws:ResourceTag/team` is `orders` can invoke that team's functions and no others. The services that
+invoke a function as a role do the same. Those are a Step Functions task, an EventBridge Scheduler
+schedule and a CDK custom resource provider, each decided by its role's own policies. A version or
 alias reads the function's tags. `CreateFunction` and `TagResource` give the tags they carry as
 `aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and `UntagResource` gives the keys it names
 as `aws:TagKeys`.
@@ -1393,7 +1395,9 @@ A function carrying both a dead-letter target and an `OnFailure` destination sen
 ## Versions and aliases
 
 `PublishVersionCommand` creates an immutable numbered copy of the function's code and configuration.
-Versions start at `1`. `CreateAliasCommand` gives a version a name, and `UpdateAliasCommand` moves
+Versions start at `1`. A function whose code and settings match its latest version's gets that version back, as on AWS,
+even where a setting was changed and then changed back. Tags and permissions are outside the
+comparison. `CreateAliasCommand` gives a version a name, and `UpdateAliasCommand` moves
 that name to another version.
 
 `InvokeCommand` and `GetFunctionCommand` take a `Qualifier` naming a version number or an alias.
@@ -2232,7 +2236,7 @@ mapping is refused for naming it, the way real Lambda refuses one.
 ### Sending discarded stream batches to a destination
 
 DynamoDB Streams and Kinesis mappings accept `DestinationConfig.OnFailure` with a standard SQS
-queue or SNS topic ARN. Supply it to `CreateEventSourceMapping` or the
+queue, SNS topic or S3 Bucket ARN. Supply it to `CreateEventSourceMapping` or the
 `AWS::Lambda::EventSourceMapping` resource alongside the retry and record-age limits:
 
 ```json
@@ -2251,7 +2255,8 @@ CDK's `DynamoEventSource` and `KinesisEventSource` accept `onFailure: new SqsDlq
 `onFailure: new SnsDlq(topic)`. Their synthesized destination configuration is passed through to
 the simulated mapping. Create, Get, List and Delete responses preserve that configuration.
 
-The function's execution role needs `sqs:SendMessage` on the queue or `sns:Publish` on the topic.
+The function's execution role needs `sqs:SendMessage` on the queue, `sns:Publish` on the topic, or
+`s3:PutObject` and `s3:ListBucket` on the Bucket.
 Delivery goes through the simulated destination service, so its IAM checks and SNS subscriptions
 apply. An IAM denial or a missing destination rejects `backgroundTasksComplete()` or the clock
 advance that exhausted the batch. The discarded records have already advanced the checkpoint.
@@ -2271,13 +2276,18 @@ notification formats. Import `SimLambdaStreamFailureRecord` from `@kensio/yulin/
 - `DDBStreamBatchInfo` or `KinesisBatchInfo` identifies the stream ARN, shard ID, first and last
   sequence numbers, first and last arrival times, and batch size. Arrival times are ISO 8601 strings.
 
-The original record payloads are absent. A successful batch produces no notification. After a
+A queue or topic receives the original records' positions and none of their content. An S3 Bucket
+receives the same record with `payload` added, a JSON string of the event the discarded records
+were handed to the function in. A record the mapping's filters kept back is counted in the batch
+info and left out of `payload`. The object's key is
+`aws/lambda/<mapping UUID>/<shard ID>/YYYY/MM/DD/YYYY-MM-DDTHH.MM.SS-<UUID>`, dated by the discard,
+as AWS documents it. A successful batch produces no notification. After a
 partial-batch response, the notification covers the discarded suffix starting at the failed
 checkpoint. When only an older prefix expires, its notification excludes the younger records.
 Records already expired on their first poll report zero invocations. Request IDs are generated for
 the notification and are not correlated with the handler's invocation context.
 
-S3 destinations, FIFO queues or topics, and `OnSuccess` are refused. SQS source mappings cannot
+FIFO queues or topics, and `OnSuccess`, are refused. SQS source mappings cannot
 have this destination configuration. The simulator's existing five-retry cap for mappings with
 neither limit also produces a failure notification when it discards a batch.
 
@@ -3349,6 +3359,11 @@ AWS, and `requestContext.accountId` carries the caller's Account, where a `NONE`
 shared with simulated API Gateway HTTP APIs, whose JWT authorizers would fill a `jwt` member
 instead, and `iam` is optional on the type.
 
+The `iam` block names the caller the way real AWS does. `accessKey` is the access key the request
+was signed with. `callerId` and `userId` are the unique id simulated IAM holds for the caller
+(`AIDA...` for a User, `AROA...:<session>` for an assumed-role session, the Account id for the
+root). `principalOrgId` is the organization the caller's Account sits in, and `null` outside one.
+
 ```typescript sim-lambda-function-url-iam-auth
 /**
  * Invoking a simulated Lambda Function URL that requires IAM authentication.
@@ -4333,7 +4348,7 @@ its `FunctionName` and `Qualifier` name. CDK emits one for `onFailure`, `onSucce
 and `maxEventAge` on a function. `DeadLetterConfig` on `AWS::Lambda::Function` is what CDK's
 `deadLetterQueue` emits, and it sets the same dead-letter target `CreateFunction` takes.
 
-A SAM `AWS::Serverless::Function` states the same two with `EventInvokeConfig` and `DeadLetterQueue`. They expand to an `AWS::Lambda::EventInvokeConfig` on `$LATEST` and a `DeadLetterConfig`, as SAM expands them. The execution role SAM generates is given the permission to send to each target. A destination naming only a `Type` of `SQS` or `SNS` gets a queue or topic created for it, named after the function (`<LogicalId>EventInvokeConfigOnFailureQueue`, for example).
+A SAM `AWS::Serverless::Function` states the same two with `EventInvokeConfig` and `DeadLetterQueue`. They expand to an `AWS::Lambda::EventInvokeConfig` on `$LATEST` and a `DeadLetterConfig`, as SAM expands them. The execution role SAM generates is given the permission to send to each target. A destination naming only a `Type` of `SQS` or `SNS` gets a queue or topic created for it, named after the function (`<LogicalId>EventInvokeConfigOnFailureQueue`, for example). So does a `Destination` written as an `Fn::If` with `AWS::NoValue` on one branch. The queue or topic is created under the condition that picks that branch, and the destination is the created one or the stated one as the condition decides. SAM adds the conditions this needs to the template (a `Fn::Not`, and a `Fn::And` with the function's own `Condition`), and so does the simulator.
 
 ```typescript sim-lambda-cloudformation-event-invoke-config
 /**
@@ -4706,8 +4721,9 @@ Sim Lambda currently supports:
 - `GetAccountSettingsCommand`, reporting the default limits, the unreserved concurrency, the
   function count and the stored code size
 - `PutFunctionConcurrencyCommand`, `GetFunctionConcurrencyCommand` and
-  `DeleteFunctionConcurrencyCommand`, throttling an invocation beyond the reservation, and
-  `ReservedConcurrentExecutions` on a template function
+  `DeleteFunctionConcurrencyCommand`, throttling an invocation beyond the reservation, trying a
+  throttled asynchronous event again until it ages out, and `ReservedConcurrentExecutions` on a
+  template function
 - `GetFunctionConfigurationCommand`, reading a function's or a version's configuration alone
 - `ListFunctionsCommand`, reporting every function in the Account and Region, and their published
   versions with `FunctionVersion: "ALL"`, paged by `Marker` and `MaxItems` like the other listings
@@ -4751,6 +4767,8 @@ Sim Lambda currently supports:
   DynamoDB stream and Kinesis events and honouring `BatchSize`
 - `UpdateEventSourceMappingCommand` changing a mapping's function, response types, failure
   destination and stream retry limits, as well as its batch size, enabled state and filters
+- Stream mapping failure destinations on an SQS queue, an SNS topic or an S3 Bucket, the Bucket
+  receiving the discarded records' event under the key layout AWS documents
 - `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns including
   `equals-ignore-case` and `$or`, delivering the records that match and handling the rest without
   an invocation
@@ -4815,15 +4833,11 @@ Current documented limitations:
   event source mapping, tagging, reserved concurrency and account settings commands are supported.
   The provisioned concurrency commands are absent so far.
 - Reserved concurrency is the only concurrency limit applied. A function with none reserved scales
-  without limit, where real Lambda stops at the account's unreserved concurrency. Only a
-  synchronous `Invoke` answers a throttle with `TooManyRequestsException`. Every other path treats
-  a throttle as a failed invocation, so an asynchronous one counts it against
-  `MaximumRetryAttempts`, where real Lambda keeps retrying a throttled event for up to six hours.
+  without limit, where real Lambda stops at the account's unreserved concurrency. A synchronous
+  `Invoke` answers a throttle with `TooManyRequestsException`, and an asynchronous invocation tries
+  a throttled event again. Every other path treats a throttle as a failed invocation.
 - Tags are kept on functions alone. Event source mappings and code signing configs take none, and
-  `Tags` on `CreateEventSourceMapping` is refused. Another simulated service invoking a function
-  (S3, SNS, EventBridge, API Gateway, ELBv2, Step Functions and the rest) is authorized without
-  `aws:ResourceTag/...`, so a resource policy conditioned on the function's tags does not match it.
-  CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
+  `Tags` on `CreateEventSourceMapping` is refused. CloudFormation adds none of the `aws:cloudformation:*` tags real CloudFormation writes.
 - `UpdateFunctionCode` leaves out `Architectures` and `SourceKMSKeyArn`.
   `UpdateFunctionConfiguration` takes only the settings simulated Lambda models, leaving out
   `Layers`, `VpcConfig`, `TracingConfig`, `KMSKeyArn`, `EphemeralStorage`, `SnapStart` and
@@ -4832,13 +4846,11 @@ Current documented limitations:
   `MasterRegion`. A listing's `Marker` is an offset into what that request selected, and a marker
   from a different selection is refused.
 - SAM's `EventInvokeConfig` on `AWS::Serverless::Function` configures `$LATEST`, since
-  `AutoPublishAlias` is left out. A `Destination` written as an `Fn::If` that can resolve to
-  `AWS::NoValue` is passed on as it stands, and no queue or topic is created for the branch naming
-  none.
+  `AutoPublishAlias` is left out.
 - The `MaximumEventAgeInSeconds` an event invoke config carries is measured from when the
   invocation was accepted.
-- Stream mappings support standard SQS and SNS `DestinationConfig.OnFailure` destinations.
-  S3 destinations and `OnSuccess` are refused. Destination delivery is attempted once. A delivery
+- Stream mappings support standard SQS, SNS and S3 `DestinationConfig.OnFailure` destinations.
+  `OnSuccess` is refused. Destination delivery is attempted once. A delivery
   failure rejects the background task after the discarded records have advanced the checkpoint.
   Destination delivery retries and `DestinationDeliveryFailures` metrics are not simulated.
 - An invocation made while a change is `InProgress` runs the changed code and settings. Real Lambda
@@ -4855,9 +4867,10 @@ Current documented limitations:
 - Every Function URL needs `lambda:InvokeFunction` as well as `lambda:InvokeFunctionUrl`, the rule
   real Lambda applies to URLs created since October 2025. Real Lambda still serves a URL created
   before then with the URL action alone. A simulated URL is always created during the run, and the simulator has no switch for the older rule.
-- `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
-  caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
-  are always null.
+- `requestContext.authorizer.iam` reports `accessKey` as empty for a caller named by the
+  `x-sim-aws-caller` header, which signs nothing. `callerId` and `userId` carry the caller's ARN
+  when simulated IAM has no record of it, where real AWS always has a unique id.
+  `cognitoIdentity` is always null.
 - A Function URL's `Cors` block is checked against the bounds the Lambda API documents for each
   member. Values inside those bounds are taken as they are. An `AllowOrigins` entry that is not a
   well-formed Origin is stored and matches no request.
@@ -4872,8 +4885,8 @@ Current documented limitations:
   container image reports a digest of the handler's source text or the image URI, where AWS reports
   one of the package or the image manifest. That is why a template's `CodeSha256` goes unchecked.
   A digest computed for the real package would never match the one simulated Lambda holds.
-- `PublishVersion` publishes a new version every time it is called. Real Lambda answers with the
-  latest version when nothing has changed since it was published.
+- Two `AWS::Lambda::Version` resources published from a function that has not changed in between
+  share one version number. Real CloudFormation fails the second, saying a version already exists.
 - A qualified function ARN reaches a function through S3 notifications, SNS subscriptions,
   CloudWatch Logs subscriptions, Cognito triggers, EventBridge targets, event source mappings and
   API Gateway integration and authorizer URIs, `AWS::Lambda::Permission` and `AWS::Lambda::Url`.
