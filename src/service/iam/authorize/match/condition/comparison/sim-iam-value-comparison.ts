@@ -1,4 +1,5 @@
 import type { SimIamConditionValue } from "../../../../policy/sim-iam-policy.js";
+import type { SimIamVariableMode } from "../../variable/sim-iam-policy-variables.js";
 
 /**
  * One value from a condition, on either side of a comparison.
@@ -36,6 +37,15 @@ export type SimIamValueComparison = (
 export interface SimIamComparisonKeyword {
   readonly comparison: SimIamValueComparison;
   readonly negated: boolean;
+
+  /**
+   * How a policy value is read once its policy variables are replaced, or
+   * undefined for a keyword that takes none.
+   *
+   * AWS replaces variables under the String and ARN operators only. A
+   * `${...}` under any other operator is literal text.
+   */
+  readonly substitution?: SimIamVariableMode | undefined;
 }
 
 /**

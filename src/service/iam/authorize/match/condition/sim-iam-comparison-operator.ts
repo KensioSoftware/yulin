@@ -4,6 +4,7 @@ import {
   type SimIamComparisonKeyword,
   type SimIamScalarConditionValue,
 } from "./comparison/sim-iam-value-comparison.js";
+import type { SimIamPolicyVariables } from "../variable/sim-iam-policy-variables.js";
 import type { SimIamConditionOperator } from "./sim-iam-condition-operator.js";
 
 /**
@@ -25,6 +26,9 @@ export type SimIamSetQualifier = "ForAnyValue" | "ForAllValues" | undefined;
  *
  * A value either side cannot read, such as a word under a numeric keyword,
  * fails the whole condition, negated or not.
+ *
+ * A policy value whose variable has no value equals nothing and is like
+ * nothing. A positive keyword finds no match in it, and a negated one matches.
  */
 export class SimIamComparisonOperator implements SimIamConditionOperator {
   constructor(
@@ -54,6 +58,7 @@ export class SimIamComparisonOperator implements SimIamConditionOperator {
   matches(
     actual: SimIamConditionValue,
     expected: SimIamConditionValue,
+    variables?: SimIamPolicyVariables,
   ): boolean {
     const actualValues = this.requestValues(actual);
 
@@ -62,7 +67,7 @@ export class SimIamComparisonOperator implements SimIamConditionOperator {
     }
 
     const answers = actualValues.map((value) =>
-      this.valueMatches(value, simIamScalarValues(expected)),
+      this.valueMatches(value, simIamScalarValues(expected), variables),
     );
 
     if (answers.includes(undefined)) {
@@ -98,9 +103,10 @@ export class SimIamComparisonOperator implements SimIamConditionOperator {
   private valueMatches(
     actual: SimIamScalarConditionValue,
     expectedValues: readonly SimIamScalarConditionValue[],
+    variables: SimIamPolicyVariables | undefined,
   ): boolean | undefined {
     const results = expectedValues.map((expected) =>
-      this.keyword.comparison(actual, expected),
+      this.compare(actual, expected, variables),
     );
 
     if (results.includes(undefined)) {
@@ -110,5 +116,29 @@ export class SimIamComparisonOperator implements SimIamConditionOperator {
     return this.keyword.negated
       ? results.every((result) => result === false)
       : results.includes(true);
+  }
+
+  /**
+   * Compare one request value with one policy value, replacing the policy
+   * value's variables first where the keyword takes them.
+   */
+  private compare(
+    actual: SimIamScalarConditionValue,
+    expected: SimIamScalarConditionValue,
+    variables: SimIamPolicyVariables | undefined,
+  ): boolean | undefined {
+    const mode = this.keyword.substitution;
+
+    if (
+      mode === undefined ||
+      variables === undefined ||
+      typeof expected !== "string"
+    ) {
+      return this.keyword.comparison(actual, expected);
+    }
+
+    const resolved = variables.resolve(expected, mode);
+
+    return resolved !== undefined && this.keyword.comparison(actual, resolved);
   }
 }

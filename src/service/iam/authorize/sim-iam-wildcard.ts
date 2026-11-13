@@ -30,9 +30,25 @@ const caseSensitivePatterns = new BoundedMemo<RegExp>(compiledPatternLimit);
 const caseInsensitivePatterns = new BoundedMemo<RegExp>(compiledPatternLimit);
 
 /**
+ * Stands in a pattern for an asterisk that matches only an asterisk.
+ *
+ * The policy variable `${*}` puts one there, and so does a variable whose
+ * value carries an asterisk. The character is from Unicode's private use area,
+ * which no policy writes.
+ */
+export const simIamLiteralAsterisk = "";
+
+/**
+ * Stands in a pattern for a question mark that matches only a question mark.
+ */
+export const simIamLiteralQuestionMark = "";
+
+/**
  * Match an IAM-style wildcard pattern.
  *
  * "*" means zero or more characters and "?" means exactly one character.
+ * `simIamLiteralAsterisk` and `simIamLiteralQuestionMark` match the character
+ * they stand for.
  */
 export function simIamWildcardMatch(
   pattern: string,
@@ -63,7 +79,9 @@ function compilePattern(pattern: string, flags: string): RegExp {
   const regexPattern = pattern
     .replaceAll(/[\\^$.*+?()[\]{}|]/gu, String.raw`\$&`)
     .replaceAll(String.raw`\*`, ".*")
-    .replaceAll(String.raw`\?`, ".");
+    .replaceAll(String.raw`\?`, ".")
+    .replaceAll(simIamLiteralAsterisk, String.raw`\*`)
+    .replaceAll(simIamLiteralQuestionMark, String.raw`\?`);
 
   /*
    * IAM wildcard patterns are not accepted as regex syntax. They are converted

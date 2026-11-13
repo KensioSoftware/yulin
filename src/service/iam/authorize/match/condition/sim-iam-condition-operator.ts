@@ -1,4 +1,5 @@
 import type { SimIamConditionValue } from "../../../policy/sim-iam-policy.js";
+import type { SimIamPolicyVariables } from "../variable/sim-iam-policy-variables.js";
 
 /**
  * Contract implemented by every simulated IAM condition operator.
@@ -29,10 +30,15 @@ export interface SimIamConditionOperator {
 
   /**
    * Determine whether an actual request value satisfies the expected policy value.
+   *
+   * `variables` replaces the policy variables in the policy value. It is
+   * absent for a policy whose `Version` predates them, which leaves every
+   * `${...}` as literal text.
    */
   matches(
     actual: SimIamConditionValue,
     expected: SimIamConditionValue,
+    variables?: SimIamPolicyVariables,
   ): boolean;
 }
 
