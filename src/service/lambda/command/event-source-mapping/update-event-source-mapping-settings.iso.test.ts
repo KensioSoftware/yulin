@@ -2,6 +2,7 @@ import { PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
   CreateFunctionCommand,
+  DeleteEventSourceMappingCommand,
   GetEventSourceMappingCommand,
   UpdateEventSourceMappingCommand,
 } from "@aws-sdk/client-lambda";
@@ -25,7 +26,10 @@ import {
 } from "../../../../../test/lambda/event-source-fixture.js";
 import { simAwsWithStreamEventSource } from "../../../../../test/lambda/stream-event-source-fixture.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
-import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
+import {
+  SimLambdaInvalidParameterValueException,
+  SimLambdaResourceNotFoundException,
+} from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";
 
@@ -140,6 +144,53 @@ describe("Lambda UpdateEventSourceMappingCommand settings", () => {
     );
   });
 
+  it("reads a batch's report with the response types it was invoked with", async () => {
+    // Given a queue mapping reading batch item failure reports, whose
+    // function takes two seconds and then reports one failed message.
+    const { simAws, queueUrl, uuid, events } = await simAwsWithSqsEventSource({
+      functionResponseTypes: ["ReportBatchItemFailures"],
+      handlerResult: async (event) => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 2000);
+        });
+
+        return {
+          batchItemFailures: event.Records.filter(
+            (record) => record.body === "order-2",
+          ).map((record) => ({ itemIdentifier: record.messageId })),
+        };
+      },
+    });
+    await simAws.backgroundTasksComplete();
+
+    // When a batch of two is invoked, and the response type is dropped while
+    // the function runs.
+    await simAws.sqs().sendMessageBatch({
+      input: {
+        QueueUrl: queueUrl,
+        Entries: [
+          { Id: "1", MessageBody: "order-1" },
+          { Id: "2", MessageBody: "order-2" },
+        ],
+      },
+    });
+    await simAws.clock().advanceBy({ seconds: 1 });
+    await simAws.lambda().updateEventSourceMapping(
+      new UpdateEventSourceMappingCommand({
+        UUID: uuid,
+        FunctionResponseTypes: [],
+      }),
+    );
+    await simAws.clock().advanceBy({ seconds: 60 });
+
+    // Then the report was read for that batch, and the failed message came
+    // back on its own.
+    assertArrayEquals(
+      events.map((event) => event.Records.map((record) => record.body)),
+      [["order-1", "order-2"], ["order-2"]],
+    );
+  });
+
   it("reports a failure destination added by an update", async () => {
     // Given a stream mapping with no failure destination, and a queue.
     const { simAws, uuid } = await simAwsWithStreamEventSource();
@@ -186,6 +237,32 @@ describe("Lambda UpdateEventSourceMappingCommand settings", () => {
       .lambda()
       .getEventSourceMapping(new GetEventSourceMappingCommand({ UUID: uuid }));
     assertStringIncludes(read.FunctionArn, ":function:order-auditor");
+  });
+
+  it("refuses a move onto another function once the mapping is deleted", async () => {
+    // Given a queue mapping, and a second function sharing the first one's
+    // role.
+    const { simAws, uuid, roleArn } = await simAwsWithSqsEventSource();
+    await makeFunction(simAws, "order-auditor", roleArn, () => "done");
+    await simAws.backgroundTasksComplete();
+
+    // When the mapping is deleted while a move onto the second function is
+    // still checking it.
+    const moving = simAws.lambda().updateEventSourceMapping(
+      new UpdateEventSourceMappingCommand({
+        UUID: uuid,
+        FunctionName: "order-auditor",
+      }),
+    );
+    await simAws
+      .lambda()
+      .deleteEventSourceMapping(
+        new DeleteEventSourceMappingCommand({ UUID: uuid }),
+      );
+    const error = await assertThrowsErrorAsync(async () => moving);
+
+    // Then the move is refused, as an update of any mapping that is gone is.
+    assertInstanceOf(error, SimLambdaResourceNotFoundException);
   });
 
   it("refuses a function whose role cannot poll the queue, changing nothing", async () => {

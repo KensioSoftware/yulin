@@ -20,10 +20,23 @@ import { simLambdaStreamSequenceNumbers } from "./sim-lambda-stream-sequence-num
  * and guessing wrong on a stream skips records rather than repeating them.
  */
 export class SimLambdaStreamBatchResponse {
+  private readonly setting: SimLambdaBatchItemFailureSetting;
   private readonly batchItemFailures: SimLambdaBatchItemFailures;
 
   constructor(setting: SimLambdaBatchItemFailureSetting) {
+    this.setting = setting;
     this.batchItemFailures = new SimLambdaBatchItemFailures(setting);
+  }
+
+  /**
+   * A response fixed to the mapping's settings as they are now, for one batch
+   * about to be invoked. A change to the mapping while the function runs
+   * applies from the next batch.
+   */
+  forBatch(): SimLambdaStreamBatchResponse {
+    const { reportsBatchItemFailures } = this.setting;
+
+    return new SimLambdaStreamBatchResponse({ reportsBatchItemFailures });
   }
 
   /**

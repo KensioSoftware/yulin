@@ -75,6 +75,13 @@ export class UpdateEventSourceMappingCommandHandler {
       options?.caller,
     );
 
+    // Checking a new function reads the event source, and a delete can land
+    // while it does. A mapping deleted by then is not there to update.
+    access.require(
+      "lambda:UpdateEventSourceMapping",
+      command.input.UUID,
+      options?.caller,
+    );
     mapping.update({ ...update, target });
     pollers.settle(mapping);
 

@@ -122,15 +122,17 @@ export class SimLambdaKinesisStreamDelivery {
     times: readonly SimLambdaStreamRecordTime[],
     records: readonly SimLambdaKinesisStreamRecord[],
   ): Promise<SimLambdaStreamBatchOutcome> {
+    const batchResponse = this.batchResponse.forBatch();
+
     try {
-      return this.batchResponse.handled(
+      return batchResponse.handled(
         times,
         await simFunction.invoke(this.eventBuilder.of(delivered)),
       );
     } catch {
       // As on real Lambda, the handler error goes to the function's logs. What
       // the stream sees is the batch being tried again.
-      return this.batchResponse.failed(times);
+      return batchResponse.failed(times);
     } finally {
       countSimLambdaKinesisIteratorAge(simFunction, records);
     }
