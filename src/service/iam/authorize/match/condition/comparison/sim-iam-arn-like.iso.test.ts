@@ -1,10 +1,10 @@
 import { assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimIam } from "../../../../../sim-iam.js";
-import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
-import type { SimIamConditionValue } from "../../../../../policy/sim-iam-policy.js";
-import type { SimIamPolicyDecision } from "../../../../sim-iam-decision.js";
+import { SimIam } from "../../../../sim-iam.js";
+import { simIamAuthZResourcePolicySourceFactory } from "../../../context/sim-iam-auth-z-context.factory.js";
+import type { SimIamConditionValue } from "../../../../policy/sim-iam-policy.js";
+import type { SimIamPolicyDecision } from "../../../sim-iam-decision.js";
 
 const functionArn = "arn:aws:lambda:eu-west-2:111111111111:function:orders";
 const sourceArn =

@@ -1,6 +1,10 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import type { SimIamConditionValue } from "../../policy/sim-iam-policy.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
 
 /**
  * What a request has to say about itself for IAM to derive its global
@@ -24,12 +28,45 @@ export interface SimIamDerivedConditionRequest {
  */
 export class SimIamDerivedConditions {
   /**
+   * The simulation's clock, which the request time is read from.
+   */
+  private readonly clock: SimClock;
+
+  constructor(clock: SimClock = new SimRealClock()) {
+    this.clock = clock;
+  }
+
+  /**
    * Derive what IAM knows about this request.
    */
   of(
     request: SimIamDerivedConditionRequest,
   ): Readonly<Record<string, SimIamConditionValue>> {
-    return { ...this.principalArn(request.caller), ...this.region(request) };
+    return {
+      ...this.principalArn(request.caller),
+      ...this.region(request),
+      ...this.time(),
+    };
+  }
+
+  /**
+   * The time of the request, read from the simulated clock. A test that
+   * advances the clock past a date in a policy sees the policy change its
+   * answer.
+   *
+   * AWS writes `aws:CurrentTime` as ISO 8601 to the second and
+   * `aws:EpochTime` as whole epoch seconds.
+   */
+  private time(): Readonly<Record<string, SimIamConditionValue>> {
+    const now = this.clock.now();
+    const epochSeconds = Math.floor(now.getTime() / 1000);
+
+    return {
+      "aws:CurrentTime": new Date(epochSeconds * 1000)
+        .toISOString()
+        .replace(".000Z", "Z"),
+      "aws:EpochTime": String(epochSeconds),
+    };
   }
 
   /**

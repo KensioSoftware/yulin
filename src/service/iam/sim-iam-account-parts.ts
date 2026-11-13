@@ -125,6 +125,7 @@ export class SimIamAccountParts {
       ambientCaller: properties.ambientCaller,
       iamResolver: properties.iamResolver,
       scpResolver: properties.scpResolver,
+      clock: background,
     });
   }
 

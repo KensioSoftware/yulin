@@ -338,9 +338,21 @@ repository that still says it is there.
 
 ## Policy conditions
 
-Policy statements can carry `Condition` blocks. Sim IAM currently supports the `StringEquals`,
-`StringLike`, `ArnLike`, `ArnEquals`, `NumericLessThanEquals`, `Bool` and `Null` operators, along
-with the `ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
+Policy statements can carry `Condition` blocks. Sim IAM evaluates every condition operator IAM
+documents:
+
+- `StringEquals`, `StringNotEquals`, `StringEqualsIgnoreCase`, `StringNotEqualsIgnoreCase`,
+  `StringLike` and `StringNotLike`
+- `NumericEquals`, `NumericNotEquals`, `NumericLessThan`, `NumericLessThanEquals`,
+  `NumericGreaterThan` and `NumericGreaterThanEquals`
+- `DateEquals`, `DateNotEquals`, `DateLessThan`, `DateLessThanEquals`, `DateGreaterThan` and
+  `DateGreaterThanEquals`
+- `Bool`, `BinaryEquals`, `IpAddress` and `NotIpAddress`
+- `ArnEquals`, `ArnLike`, `ArnNotEquals` and `ArnNotLike`
+- `Null`
+
+Each of them except `Null` also takes the `ForAnyValue:` and `ForAllValues:` set qualifiers and the
+`IfExists` suffix, so `ForAllValues:StringLikeIfExists` is evaluated too.
 
 `Bool` reads `"true"` and `"false"` in either case, as well as JSON booleans, on both sides. A
 request carrying no value for the key matches nothing, so `"aws:SecureTransport": "false"` belongs
@@ -353,6 +365,16 @@ under a positive operator is an OR. A service control policy writes its carve-ou
 `ArnNotLike` on `aws:PrincipalArn` to deny an action to every principal outside a named set of
 roles.
 
+The numeric operators read JSON numbers and numeric strings alike. The date operators read ISO 8601
+text (`2027-01-01T00:00:00Z`, or `2027-01-01` for midnight UTC) and epoch seconds, and compare the
+instants they name, so a time written with an offset compares correctly with one written in UTC.
+`IpAddress` takes CIDR ranges in IPv4 and IPv6, and reads an address with no prefix as a range of one.
+`BinaryEquals` compares the bytes two base64 values encode.
+
+A value an operator cannot read, such as a word under a numeric operator or a malformed CIDR range,
+makes the condition fail. It fails under a negated operator too, so `NotIpAddress` given a range it
+cannot read matches nothing.
+
 `ArnLike` and `ArnEquals` behave identically, as AWS documents them doing. Both compare the six
 colon-delimited components of an ARN separately, and both accept `*` and `?` wildcards in any of
 them. A wildcard stays inside the component it is written in. `arn:aws:s3:*` matches nothing,
@@ -360,8 +382,9 @@ because a pattern needs as many components as the ARN it is matched against. `Ar
 `ArnNotLike` compare an ARN the same way and answer the opposite.
 
 Condition context values are supplied by the service handling the simulated request, such as S3
-object tags. Sim IAM automatically derives the global values it can work out itself, `aws:PrincipalArn`
-from the resolved caller and `aws:RequestedRegion` from the Region the request was made in. A caller
+object tags. Sim IAM automatically derives the global values it can work out itself. `aws:PrincipalArn` comes
+from the resolved caller, `aws:RequestedRegion` from the Region the request was made in, and
+`aws:CurrentTime` and `aws:EpochTime` from the simulation's clock. A caller
 whose Account is in the simulated organization also carries `aws:PrincipalOrgID` (see
 [Organizations](https://yulinsim.dev/services/organizations/)). A value a service supplies under any
 of those names is overwritten by the derived one. Context-key names are matched
@@ -371,6 +394,44 @@ IAM's own requests carry two service keys. A Role handed to a service carries
 [`iam:PassedToService`](#passing-a-role-to-a-service), and a `CreateRole` request carries the
 boundary it declares as
 [`iam:PermissionsBoundary`](#creating-a-role-under-a-permissions-boundary).
+
+The request time follows the simulated clock. A policy dated in the future starts to apply once a
+test advances the clock past its date:
+
+```typescript sim-iam-date-conditions
+/**
+ * Simulated IAM date conditions read the simulated clock.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+await simAws.clock().setTo(new Date("2026-12-31T23:00:00Z"));
+
+simAws.organizations().attachServiceControlPolicy("123456789012", {
+  Version: "2012-10-17",
+  Statement: {
+    Effect: "Deny",
+    Action: "s3:CreateBucket",
+    Resource: "*",
+    Condition: {
+      DateGreaterThanEquals: { "aws:CurrentTime": "2027-01-01T00:00:00Z" },
+    },
+  },
+});
+
+const iam = simAws.account("123456789012").iam();
+const request = {
+  action: "s3:CreateBucket",
+  resource: "arn:aws:s3:::123456789012-reports",
+};
+
+console.log(iam.authorize(request).isAllowed); // true
+
+await simAws.clock().advanceBy({ hours: 2 });
+
+console.log(iam.authorize(request).isAllowed); // false
+```
 
 Every simulated service supplies its own Region. A policy conditioned on `aws:RequestedRegion`
 therefore sees the Region of the service that handled the request, whichever Region the caller was
@@ -444,10 +505,15 @@ matches instead, as AWS documents. With no value in the request there is none fo
 to equal. A `ForAnyValue:` operator answers false for an absent key whatever it wraps, because no
 request value is there to satisfy it.
 
-A `ForAllValues:` operator answers true for an absent key, which is also AWS behaviour. Every value
-the request carries matches when it carries none. AWS warns that this leaves a `ForAllValues:`
+A `ForAllValues:` operator answers true for an absent key, and for a key whose list of values is
+empty, which is also AWS behaviour. Every value the request carries matches when it carries none. AWS warns that this leaves a `ForAllValues:`
 `Allow` overly permissive, and asks for a `Null` check with a `false` value beside it. Write the
 guard and sim IAM evaluates it.
+
+An operator carrying the `IfExists` suffix answers true for an absent key, and compares a key the
+request does carry as the operator without the suffix would. `StringLikeIfExists` on
+`ec2:InstanceType` constrains the instance type where a request has one and passes over the requests
+that have none.
 
 `Null` asks whether the request carries a value for a context key rather than comparing one. `"true"`
 matches where the key is absent and `"false"` where it is present. A key carrying an empty string or
@@ -463,8 +529,10 @@ can also be written as JSON booleans. Any other policy value leaves the conditio
 
 ### Statements left unevaluated
 
-An operator from outside the list above fails closed. The statement holding it matches nothing, and
-a `Deny` written that way stops nothing. The request then goes through on whatever else allows it,
+A keyword IAM does not define, such as a misspelt operator or `ForAnyValue:Null`, fails closed. IAM
+refuses such a policy when it is written. A resource policy handed straight to `authorize`, or a
+service control policy, can still carry one into the simulator. The statement holding it matches nothing, and a `Deny` written that
+way stops nothing. The request then goes through on whatever else allows it,
 which is how a guardrail comes to report a healthy Allow. `decision.unevaluatedStatements` reports
 each of those statements, with the policy it came from (`policy`), how that policy reached the
 request (`sourceType`), the statement as its document declared it (`statement`), and the operator
@@ -495,7 +563,7 @@ simAws.organizations().attachServiceControlPolicy(
       Action: "s3:CreateBucket",
       Resource: "*",
       Condition: {
-        DateGreaterThan: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
+        DateAfter: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
       },
     },
   },
@@ -511,7 +579,7 @@ const [unevaluated] = decision.unevaluatedStatements;
 
 console.log(decision.isAllowed); // true
 console.log(unevaluated?.policy); // "BucketGuardrail"
-console.log(unevaluated?.reason); // "unsupported condition operator DateGreaterThan"
+console.log(unevaluated?.reason); // "unsupported condition operator DateAfter"
 ```
 
 ## Users and access keys
@@ -1804,7 +1872,8 @@ Sim IAM currently supports:
 - `CreateLoginProfileCommand`, for a User's console password
 - `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
-  service-supplied resource policies, and policy conditions with explicit-deny precedence
+  service-supplied resource policies, and every documented condition operator with explicit-deny
+  precedence
 - IAM authorization at simulated service boundaries, such as Route53 actions
 - `iam:PassRole` authorization of a Role handed to simulated Lambda, Scheduler, EventBridge, Step
   Functions, ECS or Firehose, with `iam:PassedToService` supplied
@@ -1842,14 +1911,10 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
   `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
   CloudFormation teardown clears a User's policies before deleting it
-- Only the condition operators listed above are supported. A statement using any other operator
-  fails closed, matching no request. `decision.unevaluatedStatements` names those statements, and a
-  test can assert that a decision was reached over policies read in full
-- The `...IfExists` operator suffix is absent. AWS reads it as the sibling of `Null`, treating a
-  condition on a key the request leaves out as true. A statement using it fails closed here
-- A positive `ForAllValues:` condition fails to match an empty value set, where AWS matches one. An
-  absent context key matches, as it does on AWS. A service here leaves a key out where the request
-  carries no value for it, and the empty set is reached only by a caller passing one to `authorize`
+- A condition keyword IAM does not define fails closed, matching no request.
+  `decision.unevaluatedStatements` names the statements holding one
+- Condition operator keywords are matched case-sensitively. AWS does not document whether it reads
+  `stringequals` as `StringEquals`
 - Signature age is deliberately not enforced. `X-Amz-Date` must be present, well formed, and agree
   with the credential scope date, but is never compared to a clock. A client stamping real time can
   therefore reach a simulation keeping a different one. Session expiry _is_ enforced, against

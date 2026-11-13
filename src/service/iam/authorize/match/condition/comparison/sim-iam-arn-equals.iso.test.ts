@@ -2,8 +2,8 @@ import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../../../../../aws/sim-aws.js";
-import type { SimIam } from "../../../../../sim-iam.js";
+import { SimAws } from "../../../../../aws/sim-aws.js";
+import type { SimIam } from "../../../../sim-iam.js";
 
 const queueArn = "arn:aws:sqs:eu-west-2:111111111111:orders";
 

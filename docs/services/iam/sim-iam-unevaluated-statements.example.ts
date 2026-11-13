@@ -16,7 +16,7 @@ simAws.organizations().attachServiceControlPolicy(
       Action: "s3:CreateBucket",
       Resource: "*",
       Condition: {
-        DateGreaterThan: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
+        DateAfter: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
       },
     },
   },
@@ -32,4 +32,4 @@ const [unevaluated] = decision.unevaluatedStatements;
 
 console.log(decision.isAllowed); // true
 console.log(unevaluated?.policy); // "BucketGuardrail"
-console.log(unevaluated?.reason); // "unsupported condition operator DateGreaterThan"
+console.log(unevaluated?.reason); // "unsupported condition operator DateAfter"
