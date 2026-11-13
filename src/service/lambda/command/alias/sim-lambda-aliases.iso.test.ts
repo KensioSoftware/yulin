@@ -16,6 +16,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
@@ -27,7 +29,8 @@ import type { SimLambda } from "../../sim-lambda.js";
  * command here acts on.
  */
 async function givenFunctionWithTwoVersions(): Promise<SimLambda> {
-  const lambda = new SimAws().lambda();
+  const simAws = new SimAws();
+  const lambda = simAws.lambda();
 
   await lambda.createFunction(
     new CreateFunctionCommand({
@@ -39,9 +42,7 @@ async function givenFunctionWithTwoVersions(): Promise<SimLambda> {
   await lambda.publishVersion(
     new PublishVersionCommand({ FunctionName: "orders" }),
   );
-  await lambda.publishVersion(
-    new PublishVersionCommand({ FunctionName: "orders" }),
-  );
+  await publishChangedVersion(simAws, "orders");
 
   return lambda;
 }

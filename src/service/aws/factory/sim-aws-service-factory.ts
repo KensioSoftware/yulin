@@ -112,6 +112,7 @@ export class SimAwsServiceFactory {
    */
   public readonly requestAuth = new SimAwsRequestAuthWiring({
     iamRegistry: this.iamRegistry,
+    organizations: this.organizations,
   });
 
   /**

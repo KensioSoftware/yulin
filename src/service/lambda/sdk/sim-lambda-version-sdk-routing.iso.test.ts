@@ -8,6 +8,7 @@ import {
   ListAliasesCommand,
   ListVersionsByFunctionCommand,
   PublishVersionCommand,
+  UpdateFunctionConfigurationCommand,
   UpdateAliasCommand,
 } from "@aws-sdk/client-lambda";
 import {
@@ -40,6 +41,13 @@ describe("simulated Lambda version and alias SDK Command routing", () => {
     const first = await client.send(
       new PublishVersionCommand({ FunctionName: "intercepted" }),
     );
+    await client.send(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "intercepted",
+        Description: "changed",
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
     const second = await client.send(
       new PublishVersionCommand({ FunctionName: "intercepted" }),
     );

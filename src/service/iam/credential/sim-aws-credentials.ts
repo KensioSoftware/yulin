@@ -19,4 +19,7 @@ export interface SimIamCredentialIdentity {
   readonly identityPolicyPrincipal: SimAwsPrincipal;
   readonly role?: SimIamRole | undefined;
   readonly session?: SimIamSession | undefined;
+
+  /** The access key the credentials were signed with. */
+  readonly accessKeyId?: string | undefined;
 }

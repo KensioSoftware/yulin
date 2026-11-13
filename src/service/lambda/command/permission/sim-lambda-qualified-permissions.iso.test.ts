@@ -10,6 +10,8 @@ import {
 } from "@aws-sdk/client-lambda";
 import { describe, expect, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
@@ -24,8 +26,10 @@ describe("Simulated Lambda permissions on a version or an alias", () => {
   /**
    * A function with one published version, and an alias pointing at it.
    */
-  async function givenPublishedFunction(): Promise<SimLambda> {
-    const lambda = new SimAws().lambda();
+  async function givenPublishedFunction(
+    simAws = new SimAws(),
+  ): Promise<SimLambda> {
+    const lambda = simAws.lambda();
 
     await lambda.createFunction(
       new CreateFunctionCommand({
@@ -249,11 +253,10 @@ describe("Simulated Lambda permissions on a version or an alias", () => {
 
   it("keeps a grant with the alias when it moves to another version", async () => {
     // Given an alias granted an invocation, moved on to a second version
-    const lambda = await givenPublishedFunction();
+    const simAws = new SimAws();
+    const lambda = await givenPublishedFunction(simAws);
     await grantInvoke(lambda, "AllowLive", "live");
-    await lambda.publishVersion(
-      new PublishVersionCommand({ FunctionName: "orders" }),
-    );
+    await publishChangedVersion(simAws, "orders");
     await lambda.updateAlias(
       new UpdateAliasCommand({
         FunctionName: "orders",

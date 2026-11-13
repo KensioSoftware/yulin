@@ -34,12 +34,30 @@ export class SimLambdaFunctionVersions {
   private nextVersionNumber = 1;
 
   /**
+   * The revision of the function the latest version was published from.
+   */
+  private publishedRevisionId: string | undefined;
+
+  /**
    * Publish the function as it stands as the next version.
+   *
+   * A function whose code and settings are where they were when the latest
+   * version was published gets that version back. Real Lambda answers the
+   * same way. The revision moves on with every code or settings change, and
+   * stays put for a tag or permission change, which matches what real Lambda
+   * counts as a change here.
    */
   publish(
     simFunction: SimLambdaFunction,
     description?: string,
   ): SimLambdaFunction {
+    const { revisionId } = simFunction.updates;
+    const latest = this.published.at(-1);
+
+    if (latest !== undefined && revisionId === this.publishedRevisionId) {
+      return latest;
+    }
+
     const version = simFunction.publishedAs(
       String(this.nextVersionNumber),
       description,
@@ -47,6 +65,7 @@ export class SimLambdaFunctionVersions {
 
     this.nextVersionNumber += 1;
     this.published.push(version);
+    this.publishedRevisionId = revisionId;
 
     return version;
   }

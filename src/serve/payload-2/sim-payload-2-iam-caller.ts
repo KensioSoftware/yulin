@@ -10,9 +10,12 @@ export const simPayload2AnonymousAccountId = "anonymous";
 /**
  * How the IAM caller of an invocation appears in the event.
  *
- * Everything here is derived from the caller's ARN. A caller without one is
- * described the way an unauthenticated caller is, rather than filled in with
- * something no real invocation would carry.
+ * The Account and user ARN come from the caller's ARN. The access key, the
+ * unique id and the organization come from what simulated AWS resolved the
+ * caller to, and a caller it has no record of reports the ARN in place of the
+ * unique id. A caller without an ARN is described the way an unauthenticated
+ * caller is, rather than filled in with something no real invocation would
+ * carry.
  */
 export class SimPayload2IamCaller {
   private readonly caller: SimAwsRequestCaller;
@@ -45,15 +48,21 @@ export class SimPayload2IamCaller {
       return undefined;
     }
 
+    const {
+      accessKeyId = "",
+      userId = arn,
+      principalOrgId = null,
+    } = this.caller.details;
+
     return {
       iam: {
-        accessKey: "",
+        accessKey: accessKeyId,
         accountId: this.accountId(),
-        callerId: arn,
+        callerId: userId,
         cognitoIdentity: null,
-        principalOrgId: null,
+        principalOrgId,
         userArn: arn,
-        userId: arn,
+        userId,
       },
     };
   }

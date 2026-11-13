@@ -13,6 +13,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimLambdaPreconditionFailedException } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
@@ -31,9 +33,7 @@ async function simAwsWithAlias(): Promise<SimAws> {
   await lambda.publishVersion(
     new PublishVersionCommand({ FunctionName: "orders" }),
   );
-  await lambda.publishVersion(
-    new PublishVersionCommand({ FunctionName: "orders" }),
-  );
+  await publishChangedVersion(simAws, "orders");
   await lambda.createAlias(
     new CreateAliasCommand({
       FunctionName: "orders",

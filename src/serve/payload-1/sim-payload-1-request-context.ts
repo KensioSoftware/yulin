@@ -95,14 +95,12 @@ export class SimPayload1RequestContextBuilder {
     return {
       sourceIp: input.sourceIp,
       userAgent: input.request.headers.get("user-agent"),
-      accessKey: null,
       apiKey: null,
       apiKeyId: null,
       cognitoAuthenticationProvider: null,
       cognitoAuthenticationType: null,
       cognitoIdentityId: null,
       cognitoIdentityPoolId: null,
-      principalOrgId: null,
       ...new SimPayload1IamCaller(input.authorization?.caller).identity(),
     };
   }

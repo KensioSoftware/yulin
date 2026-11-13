@@ -36,7 +36,7 @@ export function simLambdaStreamDestinationConfig(
   const destination = failure["Destination"];
   if (destination === undefined) return { OnFailure: {} };
   if (typeof destination !== "string") throw invalid();
-  if (destination !== "") {
+  if (destination !== "" && !isBucketArn(destination)) {
     const arn = SimLambdaDestinationArn.of(destination);
     if (
       (arn.service !== "sqs" && arn.service !== "sns") ||
@@ -48,8 +48,14 @@ export function simLambdaStreamDestinationConfig(
   return { OnFailure: { Destination: destination } };
 }
 
+/** Whether an ARN names an S3 Bucket, which has no Region or Account in it. */
+export function isBucketArn(arn: string): boolean {
+  return /^arn:aws:s3:::[^/]+$/.test(arn);
+}
+
 function invalid(): Error {
   return new SimLambdaInvalidParameterValueException(
-    "DestinationConfig supports only OnFailure with a standard SQS queue or SNS topic ARN.",
+    "DestinationConfig supports only OnFailure with a standard SQS queue, " +
+      "SNS topic or S3 Bucket ARN.",
   );
 }

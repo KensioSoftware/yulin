@@ -18,7 +18,10 @@ import {
 import { samFunctionRoleResource } from "./sim-cfn-sam-function-role.js";
 import { samFunctionUrlResources } from "./sim-cfn-sam-function-url.js";
 import { samFunctionDeadLetterConfig } from "./sim-cfn-sam-function-dead-letter.js";
-import { samFunctionEventInvokeConfigResources } from "./sim-cfn-sam-function-event-invoke-config.js";
+import {
+  samFunctionEventInvokeConfigConditions,
+  samFunctionEventInvokeConfigResources,
+} from "./sim-cfn-sam-function-event-invoke-config.js";
 import { samFunctionTags } from "./sim-cfn-sam-function-tags.js";
 
 interface SamFunctionExpansionProperties {
@@ -103,6 +106,25 @@ export function samFunctionResources(
       apiAuth: properties.apiAuth,
     }),
   };
+}
+
+/**
+ * The conditions one AWS::Serverless::Function adds to the template, for the
+ * destinations of its `EventInvokeConfig` that SAM creates conditionally.
+ */
+export function samFunctionConditions(
+  properties: SamFunctionExpansionProperties,
+): Record<string, SimCfnTemplateValueRecord> {
+  const { logicalId, resource, globals } = properties;
+
+  return samFunctionEventInvokeConfigConditions({
+    logicalId,
+    functionProperties: samMergedFunctionProperties(
+      globals.forFunction,
+      samResourceProperties(resource),
+    ),
+    condition: resource["Condition"],
+  });
 }
 
 /**

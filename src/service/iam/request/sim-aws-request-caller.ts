@@ -12,10 +12,29 @@ import { simAwsCallerHeaderValue } from "./sim-aws-caller-header.js";
  */
 export type SimAwsRequestAuthMethod = "caller-header" | "sigv4" | "none";
 
+/**
+ * What simulated AWS knows about a caller beyond its ARN, which an endpoint
+ * reports back to the code it invokes.
+ */
+export interface SimAwsRequestCallerDetails {
+  /** The access key a signed request was made with. */
+  readonly accessKeyId?: string | undefined;
+
+  /**
+   * The unique id STS reports for the caller, such as `AIDA...` for a User or
+   * `AROA...:session` for an assumed-role session.
+   */
+  readonly userId?: string | undefined;
+
+  /** The organization the caller's Account belongs to. */
+  readonly principalOrgId?: string | undefined;
+}
+
 interface SimAwsRequestCallerProperties {
   readonly principal: SimAwsPrincipal;
   readonly identityPolicyPrincipal?: SimAwsPrincipal | undefined;
   readonly authMethod: SimAwsRequestAuthMethod;
+  readonly details?: SimAwsRequestCallerDetails | undefined;
 }
 
 /**
@@ -35,12 +54,14 @@ export class SimAwsRequestCaller {
   public readonly principal: SimAwsPrincipal;
   public readonly identityPolicyPrincipal: SimAwsPrincipal;
   public readonly authMethod: SimAwsRequestAuthMethod;
+  public readonly details: SimAwsRequestCallerDetails;
 
   constructor(properties: SimAwsRequestCallerProperties) {
     this.principal = properties.principal;
     this.identityPolicyPrincipal =
       properties.identityPolicyPrincipal ?? properties.principal;
     this.authMethod = properties.authMethod;
+    this.details = properties.details ?? {};
   }
 
   /**

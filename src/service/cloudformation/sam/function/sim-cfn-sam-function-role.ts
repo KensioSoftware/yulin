@@ -48,7 +48,11 @@ export function samFunctionRoleResource(
       ...inlinePolicies([
         ...policies.inlinePolicies,
         ...samFunctionDeadLetterPolicies(logicalId, functionProperties),
-        ...samFunctionEventInvokeConfigPolicies(logicalId, functionProperties),
+        ...samFunctionEventInvokeConfigPolicies({
+          logicalId,
+          functionProperties,
+          condition,
+        }),
       ]),
     },
   };

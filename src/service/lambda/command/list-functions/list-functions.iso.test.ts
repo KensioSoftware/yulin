@@ -17,6 +17,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { publishChangedVersion } from "../../../../../test/lambda/changed-version.js";
+
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
@@ -101,14 +103,13 @@ describe("Lambda ListFunctionsCommand", () => {
 
   it("lists the functions themselves without a FunctionVersion", async () => {
     // Given a function with two published versions.
-    const simLambda = new SimLambda();
+    const simAws = new SimAws();
+    const simLambda = simAws.lambda();
     await createFunction(simLambda, "orders");
     await simLambda.publishVersion(
       new PublishVersionCommand({ FunctionName: "orders" }),
     );
-    await simLambda.publishVersion(
-      new PublishVersionCommand({ FunctionName: "orders" }),
-    );
+    await publishChangedVersion(simAws, "orders");
 
     // When the functions are listed.
     const listed = await simLambda.listFunctions(new ListFunctionsCommand({}));
@@ -122,14 +123,13 @@ describe("Lambda ListFunctionsCommand", () => {
 
   it("adds published versions for a FunctionVersion of ALL", async () => {
     // Given a function with two published versions.
-    const simLambda = new SimLambda();
+    const simAws = new SimAws();
+    const simLambda = simAws.lambda();
     await createFunction(simLambda, "orders");
     await simLambda.publishVersion(
       new PublishVersionCommand({ FunctionName: "orders" }),
     );
-    await simLambda.publishVersion(
-      new PublishVersionCommand({ FunctionName: "orders" }),
-    );
+    await publishChangedVersion(simAws, "orders");
 
     // When every version is asked for.
     const listed = await simLambda.listFunctions(

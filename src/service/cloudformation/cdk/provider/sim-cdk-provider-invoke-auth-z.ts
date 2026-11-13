@@ -58,13 +58,15 @@ export function authorizeSimCdkProviderInvoke(
   }
 
   const { accountId, regionName } = properties.resource.accountRegionScope;
-  const decision = simScopeIamAuthZ(
-    properties.simAws.accountRegionScope(accountId, regionName),
-  ).authorize({
-    action: invokeAction,
-    resource: functionArn,
-    caller: properties.caller,
-  });
+  const scope = properties.simAws.accountRegionScope(accountId, regionName);
+  const decision = scope
+    .lambda()
+    .withTagConditions(simScopeIamAuthZ(scope))
+    .authorize({
+      action: invokeAction,
+      resource: functionArn,
+      caller: properties.caller,
+    });
 
   if (decision.isDenied) {
     throw new SimIamAccessDenied({

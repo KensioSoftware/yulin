@@ -45,11 +45,14 @@ export class SimSchedulerDeliveryFunction {
       );
     }
 
-    const decision = simScopeIamAuthZ(this.scope).authorize({
-      action: invokeAction,
-      resource: targetArn.value,
-      caller: delivery.caller,
-    });
+    const decision = this.scope
+      .lambda()
+      .withTagConditions(simScopeIamAuthZ(this.scope))
+      .authorize({
+        action: invokeAction,
+        resource: targetArn.value,
+        caller: delivery.caller,
+      });
 
     if (decision.isDenied) {
       throw new SimSchedulerDeliveryNotPermitted(

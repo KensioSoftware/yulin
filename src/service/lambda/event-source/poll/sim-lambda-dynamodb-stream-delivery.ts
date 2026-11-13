@@ -96,11 +96,23 @@ export class SimLambdaDynamoDbStreamDelivery {
     this.cascade.noteRecordWritten();
   }
 
+  /**
+   * What each record is named by and dated from, with the record as the
+   * function is handed it.
+   */
+  times(
+    records: readonly SimLambdaEventSourceStreamRecord[],
+  ): readonly SimLambdaStreamRecordTime[] {
+    return simLambdaDynamoDbStreamRecordTimes(records, (record) =>
+      this.eventBuilder.recordOf(record),
+    );
+  }
+
   private async handled(
     simFunction: SimLambdaFunction,
     records: readonly SimLambdaEventSourceStreamRecord[],
   ): Promise<SimLambdaStreamBatchOutcome> {
-    const times = simLambdaDynamoDbStreamRecordTimes(records);
+    const times = this.times(records);
 
     return await simLambdaFilteredDelivery({
       criteria: this.filters.filterCriteria,

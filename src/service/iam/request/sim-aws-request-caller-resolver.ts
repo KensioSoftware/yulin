@@ -8,9 +8,16 @@ import {
   simAwsCallerHeaderPrincipal,
 } from "./sim-aws-caller-header.js";
 import { SimAwsRequestCaller } from "./sim-aws-request-caller.js";
+import {
+  type SimAwsRequestCallerDirectory,
+  simAwsRequestCallerDetails,
+} from "./sim-aws-request-caller-details.js";
 
 interface SimAwsRequestCallerResolverProperties {
   readonly signedRequests: SimIamSigV4Verifier;
+
+  /** Where a caller's unique id and organization are looked up. */
+  readonly directory?: SimAwsRequestCallerDirectory | undefined;
 }
 
 /**
@@ -49,9 +56,11 @@ export interface SimAwsCallerResolveOptions {
  */
 export class SimAwsRequestCallerResolver {
   private readonly signedRequests: SimIamSigV4Verifier;
+  private readonly directory: SimAwsRequestCallerDirectory;
 
   constructor(properties: SimAwsRequestCallerResolverProperties) {
     this.signedRequests = properties.signedRequests;
+    this.directory = properties.directory ?? {};
   }
 
   /**
@@ -67,9 +76,12 @@ export class SimAwsRequestCallerResolver {
     const named = request.headers.get(simAwsCallerHeaderName);
 
     if (named !== null) {
+      const principal = simAwsCallerHeaderPrincipal(named);
+
       return new SimAwsRequestCaller({
-        principal: simAwsCallerHeaderPrincipal(named),
+        principal,
         authMethod: "caller-header",
+        details: simAwsRequestCallerDetails({ principal }, this.directory),
       });
     }
 
@@ -110,6 +122,7 @@ export class SimAwsRequestCallerResolver {
       principal: identity.principal,
       identityPolicyPrincipal: identity.identityPolicyPrincipal,
       authMethod: "sigv4",
+      details: simAwsRequestCallerDetails(identity, this.directory),
     });
   }
 }

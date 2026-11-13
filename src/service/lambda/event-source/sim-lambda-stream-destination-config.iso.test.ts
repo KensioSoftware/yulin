@@ -16,6 +16,15 @@ describe("stream destination configuration", () => {
     expect(parsed).toStrictEqual(config);
   });
 
+  it("accepts an S3 Bucket as a failure destination", () => {
+    // Given a configuration naming a Bucket.
+    const config = { OnFailure: { Destination: "arn:aws:s3:::failures" } };
+    // When it is validated, then it is kept as it was written.
+    expect(simLambdaStreamDestinationConfig(config, "kinesis")).toStrictEqual(
+      config,
+    );
+  });
+
   it.each([
     null,
     "queue",
@@ -25,7 +34,7 @@ describe("stream destination configuration", () => {
     { OnFailure: { Extra: true } },
     { OnFailure: { Destination: 1 } },
     { OnFailure: { Destination: "bad-arn" } },
-    { OnFailure: { Destination: "arn:aws:s3:::failures" } },
+    { OnFailure: { Destination: "arn:aws:s3:::failures/prefix" } },
     {
       OnFailure: {
         Destination: "arn:aws:lambda:us-east-1:111111111111:function:failure",

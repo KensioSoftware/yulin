@@ -7,18 +7,17 @@ import type { SimPayload1Identity } from "./sim-payload-1-event.type.js";
  */
 type SimPayload1IdentityCaller = Pick<
   SimPayload1Identity,
-  "accountId" | "caller" | "user" | "userArn"
+  "accessKey" | "accountId" | "caller" | "principalOrgId" | "user" | "userArn"
 >;
 
 /**
  * How the IAM caller of a payload format 1.0 invocation appears in the event.
  *
- * Everything here is derived from the caller's ARN. Real API Gateway puts the
- * unique id of the principal, `AIDA...` for a User, in `caller` and `user`,
- * and the simulator has no such id to give, so the ARN identifying the caller
- * goes in each field it can honestly fill. A caller without an ARN is described
- * the way an unauthenticated one is rather than filled in with something no
- * real invocation would carry.
+ * Real API Gateway puts the unique id of the principal, `AIDA...` for a User,
+ * in `caller` and `user`. The simulator gives the id simulated IAM holds for
+ * the caller, and the caller's ARN for one it has no record of. A caller
+ * without an ARN is described the way an unauthenticated one is rather than
+ * filled in with something no real invocation would carry.
  */
 export class SimPayload1IamCaller {
   private readonly caller: SimAwsRequestCaller | undefined;
@@ -39,13 +38,28 @@ export class SimPayload1IamCaller {
     const arn = this.arn();
 
     if (arn === undefined) {
-      return { accountId: null, caller: null, user: null, userArn: null };
+      return {
+        accessKey: null,
+        accountId: null,
+        caller: null,
+        principalOrgId: null,
+        user: null,
+        userArn: null,
+      };
     }
 
+    const {
+      accessKeyId = null,
+      userId = arn,
+      principalOrgId = null,
+    } = this.caller?.details ?? {};
+
     return {
+      accessKey: accessKeyId,
       accountId: this.accountId(arn),
-      caller: arn,
-      user: arn,
+      caller: userId,
+      principalOrgId,
+      user: userId,
       userArn: arn,
     };
   }

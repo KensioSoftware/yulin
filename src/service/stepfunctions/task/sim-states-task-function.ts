@@ -97,11 +97,14 @@ export class SimStatesTaskFunction {
     request: SimStatesTaskFunctionRequest,
     functionArn: string,
   ): void {
-    const decision = simScopeIamAuthZ(this.#scope).authorize({
-      action: invokeAction,
-      resource: functionArn,
-      caller: request.caller,
-    });
+    const decision = this.#scope
+      .lambda()
+      .withTagConditions(simScopeIamAuthZ(this.#scope))
+      .authorize({
+        action: invokeAction,
+        resource: functionArn,
+        caller: request.caller,
+      });
 
     if (decision.isDenied) {
       throw new SimStatesTaskFailure(

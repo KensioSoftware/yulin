@@ -22,6 +22,7 @@ import {
   ListFunctionUrlConfigsCommand,
   ListVersionsByFunctionCommand,
   PublishVersionCommand,
+  UpdateFunctionConfigurationCommand,
   UpdateAliasCommand,
 } from "@aws-sdk/client-lambda";
 import {
@@ -271,6 +272,13 @@ describe("Serving the simulated Lambda control plane on an endpoint URL", () => 
     // Given a function with two published versions
     await createEchoFunction("versioned");
     await client.send(new PublishVersionCommand({ FunctionName: "versioned" }));
+    await client.send(
+      new UpdateFunctionConfigurationCommand({
+        FunctionName: "versioned",
+        Description: "changed",
+      }),
+    );
+    await simAws.backgroundTasksComplete();
     await client.send(new PublishVersionCommand({ FunctionName: "versioned" }));
 
     // When an alias is created on the first and moved to the second

@@ -1,5 +1,6 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
+import { SimLambdaDestinationBucket } from "./deliver/sim-lambda-destination-bucket.js";
 import { SimLambdaDestinationBus } from "./deliver/sim-lambda-destination-bus.js";
 import { SimLambdaDestinationFunction } from "./deliver/sim-lambda-destination-function.js";
 import { SimLambdaDestinationQueue } from "./deliver/sim-lambda-destination-queue.js";
@@ -9,6 +10,7 @@ import type { SimLambdaDestinationArn } from "./sim-lambda-destination-arn.js";
 import type {
   SimLambdaDeadLetterRequest,
   SimLambdaDestinationDeliveryRequest,
+  SimLambdaDestinationStoreRequest,
   SimLambdaDestinationTargets,
 } from "./sim-lambda-destination-targets.js";
 
@@ -63,6 +65,13 @@ export class SimAwsLambdaDestinations implements SimLambdaDestinationTargets {
         return;
       }
     }
+  }
+
+  /**
+   * Write one failed stream batch to the Bucket it names.
+   */
+  async store(request: SimLambdaDestinationStoreRequest): Promise<void> {
+    await new SimLambdaDestinationBucket(this.simAws).store(request);
   }
 
   /**

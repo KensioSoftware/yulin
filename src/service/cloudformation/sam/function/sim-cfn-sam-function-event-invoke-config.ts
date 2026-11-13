@@ -6,7 +6,7 @@ import { isSamTemplateRecord } from "../sim-cfn-sam-record.js";
 import { samAsyncTargetPolicies } from "./sim-cfn-sam-function-async-targets.js";
 import { samDestinations } from "./sim-cfn-sam-function-destination.js";
 import { samConditionAttribute } from "./sim-cfn-sam-function-properties.js";
-import { conditioned, stated } from "./sim-cfn-sam-function-stated.js";
+import { stated } from "./sim-cfn-sam-function-stated.js";
 
 interface SamEventInvokeConfigProperties {
   readonly logicalId: string;
@@ -29,7 +29,7 @@ export function samFunctionEventInvokeConfigResources(
     return {};
   }
 
-  const destinations = samDestinations(logicalId, declared);
+  const destinations = samDestinations(logicalId, declared, condition);
 
   return {
     [`${logicalId}EventInvokeConfig`]: {
@@ -50,10 +50,29 @@ export function samFunctionEventInvokeConfigResources(
     },
     ...Object.fromEntries(
       destinations.flatMap((destination) =>
-        Object.entries(conditioned(destination.created, condition)),
+        Object.entries(destination.created),
       ),
     ),
   };
+}
+
+/**
+ * The conditions SAM adds to the template for the destinations of a
+ * function's `EventInvokeConfig`.
+ */
+export function samFunctionEventInvokeConfigConditions(
+  properties: SamEventInvokeConfigProperties,
+): Record<string, SimCfnTemplateValueRecord> {
+  const { logicalId, functionProperties, condition } = properties;
+  const declared = functionProperties["EventInvokeConfig"];
+
+  return isSamTemplateRecord(declared)
+    ? Object.fromEntries(
+        samDestinations(logicalId, declared, condition).flatMap((destination) =>
+          Object.entries(destination.conditions),
+        ),
+      )
+    : {};
 }
 
 /**
@@ -61,13 +80,13 @@ export function samFunctionEventInvokeConfigResources(
  * may deliver to each of its destinations.
  */
 export function samFunctionEventInvokeConfigPolicies(
-  logicalId: string,
-  functionProperties: SimCfnTemplateValueRecord,
+  properties: SamEventInvokeConfigProperties,
 ): readonly SimCfnTemplateValueRecord[] {
+  const { logicalId, functionProperties, condition } = properties;
   const declared = functionProperties["EventInvokeConfig"];
 
   return isSamTemplateRecord(declared)
-    ? samDestinations(logicalId, declared).flatMap((destination) =>
+    ? samDestinations(logicalId, declared, condition).flatMap((destination) =>
         samAsyncTargetPolicies(
           `${logicalId}RoleEventInvokeConfig${destination.outcome}Policy`,
           destination.target,
