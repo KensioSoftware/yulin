@@ -229,7 +229,8 @@ repository from a repository with no handlers.
 ## Available functionality
 
 - Repositories, made by naming them, scoped by account and region
-- `simulateImage`, registering a real in-process handler as the image under a tag
+- `simulateImage`, registering a real in-process handler as the image under a tag, or a handler
+  module made with `lambdaHandlerModule` for the function to import at cold start
 - Resolution of a Lambda `Code.ImageUri` to that handler, finding the repository on registry host
   and name alone, then reading the tag to choose between the images it holds
 - Functions created from a repository image through CloudFormation and through `CreateFunction`

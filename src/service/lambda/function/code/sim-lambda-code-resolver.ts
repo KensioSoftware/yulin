@@ -16,7 +16,7 @@ import {
   type SimLambdaCodeStore,
   SimLambdaNoCodeStore,
 } from "./store/sim-lambda-code-store.js";
-import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import type { SimLambdaHandlerSource } from "./sim-lambda-handler-module.js";
 import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaOutboundHttp } from "../outbound/sim-lambda-outbound-http.js";
 
@@ -120,7 +120,7 @@ export class SimLambdaCodeResolver {
    * here is the closest thing to that: an image URI is an identifier, and one
    * naming nothing this simulation holds is a function with no code.
    */
-  private containerImageHandler(imageUri: string): SimLambdaHandler {
+  private containerImageHandler(imageUri: string): SimLambdaHandlerSource {
     const image = this.containerImages.image(imageUri);
 
     if (image.handler === undefined) {

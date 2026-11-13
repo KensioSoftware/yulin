@@ -1,4 +1,4 @@
-import type { SimLambdaHandler } from "../../sim-lambda-handler.type.js";
+import type { SimLambdaHandlerSource } from "../sim-lambda-handler-module.js";
 
 /**
  * What a container image URI resolved to.
@@ -9,11 +9,14 @@ import type { SimLambdaHandler } from "../../sim-lambda-handler.type.js";
  * CloudFormation puts it in a skip, and CreateFunction in a refusal.
  */
 export class SimLambdaContainerImage {
-  public readonly handler: SimLambdaHandler | undefined;
+  public readonly handler: SimLambdaHandlerSource | undefined;
 
   private readonly reason: string;
 
-  private constructor(handler: SimLambdaHandler | undefined, reason: string) {
+  private constructor(
+    handler: SimLambdaHandlerSource | undefined,
+    reason: string,
+  ) {
     this.handler = handler;
     this.reason = reason;
   }
@@ -21,7 +24,7 @@ export class SimLambdaContainerImage {
   /**
    * An image a real in-process handler stands in for.
    */
-  static simulatedBy(handler: SimLambdaHandler): SimLambdaContainerImage {
+  static simulatedBy(handler: SimLambdaHandlerSource): SimLambdaContainerImage {
     return new SimLambdaContainerImage(handler, "");
   }
 
