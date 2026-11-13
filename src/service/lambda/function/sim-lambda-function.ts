@@ -269,7 +269,7 @@ export class SimLambdaFunction {
         async () => invocation.run(this.#code.handlerFunction(), event),
       );
 
-    return await this.concurrency.run(this.metrics, this.name, async () =>
+    return await this.concurrency.run(this.metrics, this, async () =>
       simAwsRunAsContext.run(
         this.runAsOwner,
         { kind: "arn", arn: this.roleArn },

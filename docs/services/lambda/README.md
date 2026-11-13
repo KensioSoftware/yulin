@@ -649,7 +649,7 @@ console.log(invoked.StatusCode); // 200
 await simAws.backgroundTasksComplete();
 ```
 
-An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. An asynchronous invocation that is throttled goes back to be tried again after a second, then two, doubling up to five minutes. Those tries are not retries in the `MaximumRetryAttempts` sense, since the handler never ran. The event is tried until it is older than `MaximumEventAgeInSeconds` (six hours unless configured), and is then given up as `EventAgeExceeded`. A reservation of zero throttles every invocation, which is how a function is switched off. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
+An invocation beyond the reservation is throttled. A synchronous `Invoke` answers with `TooManyRequestsException`, whose `Reason` is `ReservedFunctionConcurrentInvocationLimitExceeded`, and the function's `Throttles` metric counts it. An asynchronous invocation that is throttled goes back to be tried again after a second, then two, doubling up to five minutes. Those tries leave `MaximumRetryAttempts` alone, since the handler never ran. The event is tried until it is older than `MaximumEventAgeInSeconds` (six hours unless configured), and is then given up as `EventAgeExceeded`. A reservation of zero throttles every invocation, which is how a function is switched off. An asynchronous event for a function switched off that way is given up at once, as AWS gives it up, and goes to the failure destination and dead-letter target with the condition `RetriesExhausted`. Reservations across the Account and Region have to leave 100 of the default 1000 concurrent executions unreserved, as on AWS.
 
 `ReservedConcurrentExecutions` on an `AWS::Lambda::Function` or a SAM function makes the same reservation once the function exists. CDK writes it for `reservedConcurrentExecutions`.
 
@@ -1154,6 +1154,45 @@ console.log(dryRunOutput.StatusCode);
 handler keeps failing they reach the function's destinations instead, which is what the next section
 covers.
 
+### Payload limits
+
+An `Invoke` request is held to the limits real Lambda applies. A `RequestResponse` payload may be up
+to 6 MB (6,291,456 bytes), and an `Event` payload up to 1 MB. A larger one is refused with
+`RequestTooLargeException` before the handler runs. A handler answering a synchronous invocation
+with more than 6 MB gets a function error in place of its response, with `errorType`
+`Function.ResponseSizeTooLarge`, as on AWS. A handler error that large is answered the same way.
+
+### The log tail and the client context
+
+`LogType: "Tail"` on a synchronous `Invoke` adds `LogResult` to the output. That holds the last 4 KB
+of what the invocation wrote, base64-encoded, from its `START` line to its `REPORT` line.
+
+`ClientContext` is base64-encoded JSON about the calling client, and a synchronous invocation hands
+it to the handler, decoded, as `context.clientContext`. A value that is not base64-encoded JSON
+describing an object is refused with `InvalidRequestContentException`. AWS documents both for
+synchronous invocations alone, and an `Event` invocation ignores them here too.
+
+Both also travel over HTTP, as the `X-Amz-Log-Type`, `X-Amz-Client-Context` and `X-Amz-Log-Result`
+headers.
+
+### Streaming a response
+
+A handler wrapped in `awslambda.streamifyResponse` is given a response stream as its second argument,
+where another handler gets its context, and the context third. `awslambda.HttpResponseStream.from(stream,
+prelude)` puts a Function URL response's `statusCode`, `headers` and `cookies` in front of the body,
+the way the real runtime does. Everything after that is the body.
+
+A Function URL whose `InvokeMode` is `RESPONSE_STREAM` answers as soon as the handler writes
+something, and passes each later chunk on as it is written. A test reading the body can therefore
+see the first part before the handler finishes. A `BUFFERED` Function URL, and a synchronous
+`Invoke`, answer once the stream has ended. `Invoke` answers with the bytes the handler wrote,
+prelude included, as on AWS.
+
+Zip code finds `awslambda` on its global object, as it would in the real runtime. A handler imported
+into the test process reads the host's global, which a test has to provide itself.
+`simLambdaAwsLambdaGlobal` from `@kensio/yulin/lambda` is the object to assign to
+`globalThis.awslambda` before the handler module is imported.
+
 ## Asynchronous retries and destinations
 
 An `Event` invocation retries a failed handler twice by default. Retries use the simulated clock,
@@ -1392,6 +1431,29 @@ console.log(received.Messages?.[0]?.Body);
 
 A function carrying both a dead-letter target and an `OnFailure` destination sends to both.
 
+## Recursive loops
+
+A function that writes back to the queue, topic or Bucket that invokes it would run forever. Real
+Lambda stops such a loop, and simulated Lambda stops it the same way. The seventeenth invocation of
+a function in one chain of requests is stopped before it starts, and the function's
+`RecursiveInvocationsDropped` metric counts it.
+
+A chain is followed through the hops AWS follows. Those are SQS, SNS, S3 and EventBridge, and one
+function invoking another directly, synchronously or not. A record an asynchronous invocation sends
+to a destination or dead-letter target carries the chain on, so a loop through a destination is
+stopped too. A DynamoDB or Kinesis stream starts a new chain, as it does on AWS. A message a function sends to a queue carries its chain in the
+`AWSTraceHeader` system attribute, which the next invocation's `Records` show too.
+
+What the stop does depends on how the function was invoked. A synchronous `Invoke` is refused with
+`RecursiveInvocationException`. An asynchronous invocation, which is how SNS, S3 and EventBridge
+invoke, is given up and sent to the failure destination and dead-letter target. AWS documents no
+condition of its own for that record, and it reads `RetriesExhausted`. A queue mapping's batch goes
+back to the queue, and the queue's redrive policy moves it to the dead-letter queue in the end.
+
+`PutFunctionRecursionConfigCommand` with `RecursiveLoop: "Allow"` lets a function loop, and
+`GetFunctionRecursionConfigCommand` reads the setting. It belongs to the function and every version
+of it.
+
 ## Versions and aliases
 
 `PublishVersionCommand` creates an immutable numbered copy of the function's code and configuration.
@@ -1521,6 +1583,12 @@ Polling runs on the simulation's background scheduler. A test awaits
 
 `BatchSize` says how many messages one invocation may be given, and defaults to 10. The queue and
 the function have to be in the same account and region, as they do on real AWS.
+
+`MaximumBatchingWindowInSeconds` lets a mapping wait to fill a batch. A partial batch waits until the
+window has run from when the mapping first found it, and a full batch goes at once. A window of up to
+300 seconds is taken, on queue and stream mappings alike, and the simulated clock is what runs it
+out. A queue mapping may deliver up to 10,000 messages at a time with a window of at least a second,
+and is refused a `BatchSize` above 10 without one, as on AWS.
 
 ```typescript sim-lambda-sqs-event-source
 /**
@@ -4730,7 +4798,13 @@ Sim Lambda currently supports:
 - `Tags` on `CreateFunction` and on an `AWS::Lambda::Function`, and `TagResourceCommand`,
   `UntagResourceCommand` and `ListTagsCommand` on a function ARN
 - `aws:ResourceTag/<key>`, `aws:RequestTag/<key>` and `aws:TagKeys` for policies on functions
-- `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
+- `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types, the 6 MB and
+  1 MB payload limits, `LogType: "Tail"` and `ClientContext`
+- Response streaming handlers wrapped in `awslambda.streamifyResponse`, streamed to a
+  `RESPONSE_STREAM` Function URL as they write
+- Recursive loop detection through SQS, SNS, S3, EventBridge and direct invocations, with
+  `PutFunctionRecursionConfigCommand` and `GetFunctionRecursionConfigCommand`
+- `MaximumBatchingWindowInSeconds` on queue and stream mappings
 - Handler timers on the simulation's clock, and the function's `Timeout` as a deadline on the same
   clock, reported as real Lambda reports a timeout
 - Asynchronous invocation retries on the simulated clock, and `OnSuccess`/`OnFailure` destinations
@@ -4874,8 +4948,14 @@ Current documented limitations:
 - A Function URL's `Cors` block is checked against the bounds the Lambda API documents for each
   member. Values inside those bounds are taken as they are. An `AllowOrigins` entry that is not a
   well-formed Origin is stored and matches no request.
-- `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
-  buffered.
+- `InvokeWithResponseStream` is absent. A streaming handler's response reaches a caller through a
+  `RESPONSE_STREAM` Function URL, or all at once through `Invoke`. A handler imported into the test
+  process finds `awslambda` only where the test assigned `simLambdaAwsLambdaGlobal` to it.
+- The payload limits apply to `Invoke`. A Function URL, an API Gateway integration and an event
+  source mapping batch are held to none.
+- A chain of requests reaches the next invocation with the work the handler started, through Node.js
+  asynchronous context tracking, and through a queue message's `AWSTraceHeader`. Work that leaves
+  that context, such as a timer a handler sets outside the simulation's own, starts a new chain.
 - A published version keeps what it was published with, so `UpdateFunctionCode` moves `$LATEST`
   alone. Alias `RoutingConfig` weights and provisioned concurrency are left out. `CodeSha256`,
   `RuntimePolicy` and `ProvisionedConcurrencyConfig` on `AWS::Lambda::Version`, and `RoutingConfig`
@@ -4966,12 +5046,9 @@ Current documented limitations:
   filters whatever the Account's quota, where AWS takes five unless the quota was raised.
   `KMSKeyArn` is refused, so criteria are held in plaintext.
 - A shard iterator never expires, where a real one is good for 15 minutes.
-- `MaximumBatchingWindowInSeconds` is only simulated as 0. A partial batch is delivered as soon as
-  anything is on the event source, leaving a batching window nothing to wait for. A non-zero value
-  is refused, which also caps a queue mapping's `BatchSize` at 10. The documented rule that a
-  `BatchSize` above 10 needs a batching window goes unenforced, because the same AWS documentation
-  gives a stream mapping `BatchSize` 100 and window 0 as simultaneous defaults, and CDK emits
-  exactly that.
+- A batching window holds a partial batch for the window's length, and nothing else ends it early
+  but a full batch. Real Lambda also delivers once a batch reaches the 6 MB payload limit. A retried
+  stream batch goes when its retry falls due, without waiting out the window again.
 - An execution role that gets its stream permissions from the AWS managed policy
   `AWSLambdaDynamoDBExecutionRole` has none here, since simulated IAM has no model for managed
   policy ARNs, so the mapping is refused when it is created. A hand-written template and a SAM application
@@ -4991,6 +5068,6 @@ Current documented limitations:
 - The `vm` context is a namespacing convenience rather than a security boundary. Function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- `serveSimAws` serves thirty-five of these operations over HTTP, listed in the
+- `serveSimAws` serves thirty-seven of these operations over HTTP, listed in the
   [serving docs](https://yulinsim.dev/serve/#lambda-over-the-endpoint). The provisioned concurrency
   operations have no route there, as they have no simulation behind them.

@@ -172,15 +172,18 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "its own Account and Region");
   });
 
-  it("refuses a batch size larger than a queue with no batching window gives", async () => {
+  it("refuses a queue batch over ten with no batching window", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping asks for a batch of fifty.
+    // When a mapping asks for a batch of fifty and no window to gather it in.
     const error = await refusedMapping(ready, { BatchSize: 50 });
 
-    // Then it is refused rather than delivering ten.
-    assertStringIncludes(error.message, "BatchSize 50 is out of range");
+    // Then it is refused as real Lambda refuses it.
+    assertStringIncludes(
+      error.message,
+      "Maximum batch window in seconds must be greater than 0",
+    );
   });
 
   it("refuses a batch size that is not a whole number", async () => {
@@ -194,17 +197,18 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "BatchSize 2.5 is out of range");
   });
 
-  it("refuses a batching window, which nothing here would wait out", async () => {
+  it("refuses a batching window longer than five minutes", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping asks to batch for five seconds.
+    // When a mapping asks to batch for longer than real Lambda allows.
     const error = await refusedMapping(ready, {
-      MaximumBatchingWindowInSeconds: 5,
+      MaximumBatchingWindowInSeconds: 301,
     });
 
-    // Then it is refused rather than silently ignored.
-    assertStringIncludes(error.message, "MaximumBatchingWindowInSeconds");
+    // Then it is refused.
+    assertIdentical(error.name, "ValidationException");
+    assertStringIncludes(error.message, "maximumBatchingWindowInSeconds");
   });
 
   it("refuses a failed-batch limit on a queue mapping", async () => {

@@ -27,6 +27,7 @@ export async function processSimLambdaStreamBatch<RecordType>(
     progress.caughtUp(batch);
     return;
   }
+  if (progress.holding(batch.records.length)) return;
   const firstLive = await progress.before(
     properties.times(batch.records),
     batch,

@@ -56,15 +56,15 @@ export class SimLambdaFunctionMetrics {
    * `Throttles` counts one.
    */
   throttled(functionName: string): void {
-    this.#metrics?.publish([
-      {
-        namespace: simLambdaMetricNamespace,
-        metricName: "Throttles",
-        dimensions: simLambdaFunctionDimensions(functionName),
-        value: 1,
-        unit: "Count",
-      },
-    ]);
+    this.#counted(functionName, "Throttles");
+  }
+
+  /**
+   * Count an invocation stopped for running in a recursive loop, as real
+   * Lambda's `RecursiveInvocationsDropped` counts one.
+   */
+  recursionDropped(functionName: string): void {
+    this.#counted(functionName, "RecursiveInvocationsDropped");
   }
 
   /**
@@ -97,6 +97,18 @@ export class SimLambdaFunctionMetrics {
         }),
       );
     }
+  }
+
+  #counted(functionName: string, metricName: string): void {
+    this.#metrics?.publish([
+      {
+        namespace: simLambdaMetricNamespace,
+        metricName,
+        dimensions: simLambdaFunctionDimensions(functionName),
+        value: 1,
+        unit: "Count",
+      },
+    ]);
   }
 }
 

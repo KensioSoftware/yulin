@@ -58,6 +58,7 @@ export class SimLambdaSqsEventSourceConsumer implements SimSqsPollConsumer {
     return {
       caller: { kind: "arn", arn: simFunction.roleArn },
       batchSize: this.mapping.batchSize,
+      batchingWindowSeconds: this.mapping.batchingWindowSeconds,
       handle: async (
         messages: readonly SimSqsPollMessage[],
       ): Promise<SimSqsPollOutcome> =>

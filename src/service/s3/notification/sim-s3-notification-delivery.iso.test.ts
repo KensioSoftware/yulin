@@ -11,7 +11,6 @@ import {
 import {
   assertArrayLength,
   assertIdentical,
-  assertInstanceOf,
   assertStringIncludes,
   assertTrue,
 } from "@kensio/smartass";
@@ -226,7 +225,7 @@ describe("Delivering a simulated S3 event notification", () => {
     warn.mockRestore();
   });
 
-  it("stops a notification loop rather than running forever", async () => {
+  it("has Lambda stop a notification loop after sixteen invocations", async () => {
     // Given a Bucket whose handler writes back into the Bucket that triggered
     // it, with no filter to keep its own writes out
     const simAws = new SimAws();
@@ -291,16 +290,9 @@ describe("Delivering a simulated S3 event notification", () => {
       }),
     );
 
-    // Then the simulation gives up with something to read, rather than
-    // draining background work that never runs out
-    let raised: unknown;
-    try {
-      await simAws.backgroundTasksComplete();
-    } catch (error) {
-      raised = error;
-    }
+    // Then Lambda's recursive loop detection stops it, as it does on AWS
+    await simAws.backgroundTasksComplete();
 
-    assertInstanceOf(raised, Error);
-    assertStringIncludes(raised.message, "notifies itself forever");
+    assertIdentical(written, 16);
   });
 });

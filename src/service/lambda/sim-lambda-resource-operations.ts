@@ -75,6 +75,22 @@ export abstract class SimLambdaResourceOperations extends SimLambdaInspection {
     return await this.commands.concurrency.delete(command, options);
   }
 
+  /** Handle a Put Function Recursion Config Command from the SDK. */
+  async putFunctionRecursionConfig(
+    command: simLambdaCommands.SimPutFunctionRecursionConfigCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimFunctionRecursionConfigCommandOutput> {
+    return await this.commands.concurrency.putRecursionConfig(command, options);
+  }
+
+  /** Handle a Get Function Recursion Config Command from the SDK. */
+  async getFunctionRecursionConfig(
+    command: simLambdaCommands.SimGetFunctionRecursionConfigCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimFunctionRecursionConfigCommandOutput> {
+    return await this.commands.concurrency.getRecursionConfig(command, options);
+  }
+
   /** Handle an Update Event Source Mapping Command from the SDK. */
   async updateEventSourceMapping(
     command: simLambdaCommands.SimUpdateEventSourceMappingCommand,

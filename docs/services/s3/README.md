@@ -2092,10 +2092,11 @@ A handler that threw is also warned about on the console, once per destination a
 destination that refused the event, because its resource policy no longer admits the Bucket, is
 recorded without a warning.
 
-A handler that writes back into the Bucket that triggered it notifies itself forever, and in process
-there is nothing to slow it down. Filter the configuration by prefix or suffix, so the handler's own
-writes fall outside it. Without that, the simulation stops after a thousand deliveries and
-`backgroundTasksComplete()` raises an error naming the Bucket.
+A Lambda function that writes back into the Bucket that triggered it notifies itself again with every
+write. Simulated Lambda stops that loop after sixteen invocations, as real Lambda does. Filter the
+configuration by prefix or suffix, so the handler's own writes fall outside it. A function allowed to
+loop by its recursion config is stopped by simulated S3 instead, after a thousand deliveries, with an
+error from `backgroundTasksComplete()` naming the Bucket.
 
 ### Limitations
 

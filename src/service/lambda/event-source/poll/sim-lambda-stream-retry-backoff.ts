@@ -46,6 +46,13 @@ export class SimLambdaStreamRetryBackoff {
   }
 
   /**
+   * Whether the batch has failed at least once and is being tried again.
+   */
+  get isRetrying(): boolean {
+    return this.attempts > 0;
+  }
+
+  /**
    * Whether this batch has had all the attempts it gets.
    */
   get isExhausted(): boolean {

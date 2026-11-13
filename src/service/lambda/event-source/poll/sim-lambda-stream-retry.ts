@@ -48,6 +48,13 @@ export class SimLambdaStreamRetry {
   }
 
   /**
+   * Whether the batch being read is one that failed and is being tried again.
+   */
+  get isRetrying(): boolean {
+    return this.backoff.isRetrying;
+  }
+
+  /**
    * Start counting again, which a batch that is finished with does.
    */
   reset(): void {

@@ -7,6 +7,7 @@ import {
   type SimClock,
   SimRealClock,
 } from "../../../../util/clock/sim-clock.js";
+import { simLambdaInvokeRequestContext } from "./sim-lambda-invoke-request-context.js";
 
 interface SimLambdaInvokeContextBuilderProperties {
   readonly functionName: string;
@@ -61,8 +62,12 @@ export class SimLambdaInvokeContextBuilder {
       awsRequestId = randomUUID(),
     } = this.properties;
     const startedAtMs = clock.now().getTime();
+    const request = simLambdaInvokeRequestContext.of(logGroupName);
 
     return {
+      ...(request?.clientContext !== undefined && {
+        clientContext: request.clientContext,
+      }),
       callbackWaitsForEmptyEventLoop: true,
       functionName,
       functionVersion,

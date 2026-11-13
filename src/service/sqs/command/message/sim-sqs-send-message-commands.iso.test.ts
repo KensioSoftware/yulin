@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+} from "@aws-sdk/client-sqs";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -159,25 +163,32 @@ describe("SQS SendMessage", () => {
     assertInstanceOf(error, SimSqsUnsupportedOperation);
   });
 
-  it("refuses message system attributes", async () => {
+  it("keeps the X-Ray trace header a message is sent with", async () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();
 
-    // When an X-Ray trace header is sent with the message.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.sqs().sendMessage(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: "order-1",
-          MessageSystemAttributes: {
-            AWSTraceHeader: { DataType: "String", StringValue: "Root=1-2-3" },
-          },
-        }),
-      );
-    });
+    // When a message is sent with a trace header, and received asking for it.
+    await simAws.sqs().sendMessage(
+      new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: "order-1",
+        MessageSystemAttributes: {
+          AWSTraceHeader: { DataType: "String", StringValue: "Root=1-2-3" },
+        },
+      }),
+    );
+    const received = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MessageSystemAttributeNames: ["AWSTraceHeader"],
+      }),
+    );
 
-    // Then it is refused, since they are not modelled.
-    assertInstanceOf(error, SimSqsUnsupportedOperation);
+    // Then the header comes back with it.
+    assertIdentical(
+      received.Messages?.[0]?.Attributes?.["AWSTraceHeader"],
+      "Root=1-2-3",
+    );
   });
 
   it("refuses a send with no queue URL", async () => {

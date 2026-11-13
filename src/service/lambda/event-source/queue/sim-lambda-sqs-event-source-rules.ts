@@ -20,12 +20,13 @@ export const sqsPollingOperations = [
  *
  * Ten is both the batch real Lambda uses when the mapping names none, and the
  * largest batch it delivers from a standard queue without a batching window to
- * fill a bigger one.
+ * fill a bigger one. With a window it delivers up to 10,000.
  */
 export const sqsBatchRules = new SimLambdaEventSourceBatchRules({
   defaultSize: 10,
-  maximumSize: 10,
-  sourceDescription: "a queue with no batching window",
+  maximumSize: 10_000,
+  largestWithoutWindow: 10,
+  sourceDescription: "a queue",
   unitName: "messages",
 });
 

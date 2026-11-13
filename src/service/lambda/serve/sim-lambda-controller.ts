@@ -14,6 +14,7 @@ import {
 } from "./sim-lambda-url-router.js";
 import { SimLambdaUrlAdmission } from "./auth/sim-lambda-url-admission.js";
 import type { SimAwsRequestCaller } from "../../iam/request/sim-aws-request-caller.js";
+import { simLambdaUrlInvoked } from "./sim-lambda-url-invocation.js";
 
 interface SimLambdaServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -120,8 +121,8 @@ export class SimLambdaServiceController implements SimAwsServiceController {
         { caller: authenticatedCaller },
       );
 
-      return this.responseBuilder.build(
-        await route.simFunction.invoke(event, route.resource.arn),
+      return await simLambdaUrlInvoked(route, event, (result) =>
+        this.responseBuilder.build(result),
       );
     } catch {
       // Real Function URLs report an unhandled function error as a bad

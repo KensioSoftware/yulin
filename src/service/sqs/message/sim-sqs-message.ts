@@ -1,6 +1,7 @@
 import type { SimSqsMessageAttributes } from "./sim-sqs-message-attributes.js";
 import type { SimSqsMessageBody } from "./sim-sqs-message-body.js";
 import { SimSqsMessageVisibility } from "./sim-sqs-message-visibility.js";
+import { simSqsMessageSystemValues } from "./sim-sqs-message-system-values.js";
 
 const millisecondsPerSecond = 1000;
 
@@ -11,6 +12,7 @@ interface SimSqsMessageProperties {
   readonly sentAt: Date;
   readonly visibleFrom: Date;
   readonly deadLetterSourceArn?: string | undefined;
+  readonly traceHeader?: string | undefined;
 }
 
 /**
@@ -27,6 +29,7 @@ export class SimSqsMessage {
 
   private readonly visibility: SimSqsMessageVisibility;
   private readonly deadLetterSourceArn: string | undefined;
+  private readonly traceHeader: string | undefined;
   private receiptHandle: string | undefined;
 
   constructor(properties: SimSqsMessageProperties) {
@@ -36,6 +39,7 @@ export class SimSqsMessage {
     this.sentAt = properties.sentAt;
     this.visibility = new SimSqsMessageVisibility(properties.visibleFrom);
     this.deadLetterSourceArn = properties.deadLetterSourceArn;
+    this.traceHeader = properties.traceHeader;
   }
 
   /**
@@ -141,6 +145,7 @@ export class SimSqsMessage {
       sentAt: this.sentAt,
       visibleFrom: instant,
       deadLetterSourceArn: sourceQueueArn,
+      traceHeader: this.traceHeader,
     });
   }
 
@@ -151,18 +156,12 @@ export class SimSqsMessage {
    * available rather than what is returned.
    */
   systemAttributeValues(): ReadonlyMap<string, string> {
-    const values = new Map<string, string>([
-      ["SentTimestamp", String(this.sentAt.getTime())],
-      ["ApproximateReceiveCount", String(this.visibility.receiveCount)],
-      [
-        "ApproximateFirstReceiveTimestamp",
-        String(this.visibility.firstReceived.getTime()),
-      ],
-      ...(this.deadLetterSourceArn === undefined
-        ? []
-        : [["DeadLetterQueueSourceArn", this.deadLetterSourceArn] as const]),
-    ]);
-
-    return values;
+    return simSqsMessageSystemValues({
+      sentAt: this.sentAt,
+      receiveCount: this.visibility.receiveCount,
+      firstReceived: this.visibility.firstReceived,
+      deadLetterSourceArn: this.deadLetterSourceArn,
+      traceHeader: this.traceHeader,
+    });
   }
 }

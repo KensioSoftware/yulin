@@ -23,6 +23,7 @@ export interface SimLambdaEventSourceMappingTarget {
  */
 export interface SimLambdaEventSourceMappingUpdate {
   readonly batchSize?: number | undefined;
+  readonly batchingWindowSeconds?: number | undefined;
   readonly enabled?: boolean | undefined;
   readonly filterCriteria?: SimLambdaFilterCriteria | null | undefined;
   readonly functionResponseTypes?:
@@ -41,6 +42,7 @@ export interface SimLambdaEventSourceMappingUpdate {
  */
 interface SimLambdaEventSourceMappingCurrent {
   readonly batchSize: number;
+  readonly batchingWindowSeconds: number;
   readonly filterCriteria: SimLambdaFilterCriteria | undefined;
 }
 
@@ -50,6 +52,7 @@ interface SimLambdaEventSourceMappingCurrent {
  */
 interface SimLambdaEventSourceMappingNext {
   readonly batchSize: number;
+  readonly batchingWindowSeconds: number;
   readonly filterCriteria: SimLambdaFilterCriteria | undefined;
   readonly enabled: boolean;
   readonly state: SimLambdaEventSourceMappingState;
@@ -68,6 +71,8 @@ export function simLambdaEventSourceMappingNext(
 
   return {
     batchSize: update.batchSize ?? current.batchSize,
+    batchingWindowSeconds:
+      update.batchingWindowSeconds ?? current.batchingWindowSeconds,
     filterCriteria:
       update.filterCriteria === undefined
         ? current.filterCriteria

@@ -35,11 +35,18 @@ export function simLambdaEventSourceMappingUpdateOf(
   // Checked by the source's own rules, which refuse all three for a queue.
   eventSourceArn.retryLimitRules.limitsIn(retryLimits);
 
+  const { batchRules } = eventSourceArn;
+  const batchSize =
+    input.BatchSize === undefined
+      ? undefined
+      : batchRules.sizeIn(input.BatchSize);
+
   return {
-    batchSize:
-      input.BatchSize === undefined
-        ? undefined
-        : eventSourceArn.batchRules.sizeIn(input.BatchSize),
+    batchSize,
+    batchingWindowSeconds: batchRules.windowIn(
+      input.MaximumBatchingWindowInSeconds ?? mapping.batchingWindowSeconds,
+      batchSize ?? mapping.batchSize,
+    ),
     enabled: enabledIn(input.Enabled),
     // An empty FilterCriteria is how real Lambda is told to drop the filters,
     // which the criteria reader answers with no criteria at all.

@@ -72,6 +72,8 @@ export function invokeInput(input: SimRestJsonInput): Record<string, unknown> {
     FunctionName: input.label("FunctionName"),
     InvocationType: invocationType(input.header("x-amz-invocation-type")),
     Qualifier: input.query("Qualifier"),
+    LogType: input.header("x-amz-log-type"),
+    ClientContext: input.header("x-amz-client-context"),
     Payload: input.body,
   };
 }

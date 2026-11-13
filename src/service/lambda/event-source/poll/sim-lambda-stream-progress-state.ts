@@ -1,3 +1,4 @@
+import { BatchingWindow } from "../../../../util/background/batching-window.js";
 import { SimLambdaStreamExpiry } from "./sim-lambda-stream-expiry.js";
 import { SimLambdaStreamBatchAge } from "./sim-lambda-stream-batch-age.js";
 import { SimLambdaStreamFailureDestination } from "./sim-lambda-stream-failure-destination.js";
@@ -25,8 +26,13 @@ export class SimLambdaStreamProgressState {
   readonly cursor: SimLambdaStreamCursor;
   readonly retry: SimLambdaStreamRetry;
   readonly bisect: SimLambdaStreamBisect;
+  readonly window = new BatchingWindow();
+  readonly mapping: SimLambdaEventSourceMapping;
+  readonly background: BackgroundScheduler;
   constructor(properties: SimLambdaStreamProgressProperties) {
     const { mapping, background } = properties;
+    this.mapping = mapping;
+    this.background = background;
     this.failures = new SimLambdaStreamFailureDestination(mapping);
     // A stream mapping is refused at creation unless it names a starting
     // position, so one that has got this far without one is the simulator
@@ -49,6 +55,23 @@ export class SimLambdaStreamProgressState {
         this.handled(batch);
       },
     });
+  }
+  /**
+   * Whether a partial batch waits out the mapping's batching window, polling
+   * again when the window closes. A batch being retried is never held.
+   */
+  holds(found: number, batchSize: number): boolean {
+    const batching = {
+      batchSize,
+      batchingWindowSeconds: this.mapping.batchingWindowSeconds,
+    };
+
+    return (
+      !this.retry.isRetrying &&
+      this.window.holds(this.background.now(), found, batching, (instant) => {
+        this.cursor.pollAt(instant);
+      })
+    );
   }
   handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.failures.reset();

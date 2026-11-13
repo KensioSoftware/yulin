@@ -99,6 +99,7 @@ interface KinesisEventSourceOptions {
   readonly roleActions?: readonly string[];
   readonly handlerResult?: (event: SimLambdaKinesisStreamEvent) => unknown;
   readonly batchSize?: number;
+  readonly batchingWindowSeconds?: number;
   readonly startingPosition?: EventSourcePosition;
   readonly startingPositionTimestamp?: Date;
   readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
@@ -151,6 +152,9 @@ export async function simAwsWithKinesisEventSource(
         StartingPositionTimestamp: options.startingPositionTimestamp,
       }),
       ...(options.batchSize !== undefined && { BatchSize: options.batchSize }),
+      ...(options.batchingWindowSeconds !== undefined && {
+        MaximumBatchingWindowInSeconds: options.batchingWindowSeconds,
+      }),
       ...(options.functionResponseTypes !== undefined && {
         FunctionResponseTypes: [...options.functionResponseTypes],
       }),

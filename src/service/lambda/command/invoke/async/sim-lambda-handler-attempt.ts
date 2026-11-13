@@ -1,3 +1,4 @@
+import { SimLambdaRecursiveInvocationException } from "../../../error/sim-lambda-invoke.error.js";
 import type { SimLambdaFunction } from "../../../function/sim-lambda-function.js";
 
 export type SimLambdaHandlerAttempt =
@@ -31,4 +32,20 @@ export async function simLambdaHandlerAttempt(invocation: {
   } catch (error) {
     return { succeeded: false, error, throttled };
   }
+}
+
+/**
+ * Whether an attempt the function turned away is given up on at once, as
+ * real Lambda gives up an invocation stopped for running in a recursive loop,
+ * and one for a function with no concurrency reserved at all. A throttle is
+ * tried again later.
+ */
+export function simLambdaGivenUpAtOnce(
+  error: unknown,
+  simFunction: SimLambdaFunction,
+): boolean {
+  return (
+    error instanceof SimLambdaRecursiveInvocationException ||
+    simFunction.concurrency.reserved === 0
+  );
 }

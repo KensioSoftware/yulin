@@ -160,6 +160,23 @@ describe("Serving the simulated Lambda control plane on an endpoint URL", () => 
     );
   });
 
+  it("answers LogType Tail with the log tail header", async () => {
+    // Given a function reached over the endpoint
+    await createEchoFunction("tailed");
+
+    // When it is invoked asking for the log tail
+    const invoked = await client.send(
+      new InvokeCommand({ FunctionName: "tailed", LogType: "Tail" }),
+    );
+
+    // Then the tail came back as LogResult
+    assertDefined(invoked.LogResult, "a log result");
+    assertStringIncludes(
+      Buffer.from(invoked.LogResult, "base64").toString(),
+      "REPORT RequestId:",
+    );
+  });
+
   it("reports a handler failure with the function error header", async () => {
     // Given a function whose handler throws for this event
     await createEchoFunction("failing");

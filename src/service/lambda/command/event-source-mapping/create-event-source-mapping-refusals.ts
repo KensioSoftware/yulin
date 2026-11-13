@@ -65,18 +65,6 @@ export function refuseUnsimulatedInput(
       );
     }
   }
-
-  if (
-    input.MaximumBatchingWindowInSeconds !== undefined &&
-    input.MaximumBatchingWindowInSeconds !== 0
-  ) {
-    throw new SimLambdaInvalidParameterValueException(
-      "MaximumBatchingWindowInSeconds on an event source mapping is only " +
-        "simulated as 0: a partial batch is delivered as soon as anything is " +
-        "on the event source, so a batching window would have nothing to " +
-        "wait for",
-    );
-  }
 }
 
 /**

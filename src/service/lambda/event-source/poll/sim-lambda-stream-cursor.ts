@@ -25,6 +25,9 @@ export class SimLambdaStreamCursor {
   pollNow(): void {
     this.schedule.now();
   }
+  pollAt(instant: Date): void {
+    this.schedule.at(instant);
+  }
   handled(batch: SimLambdaEventSourceStreamProgressBatch): void {
     this.advanceTo(batch.next);
     if (!batch.drained) this.pollNow();

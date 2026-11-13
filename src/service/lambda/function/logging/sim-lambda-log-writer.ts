@@ -1,4 +1,5 @@
 import type { SimLogsServiceWriter } from "../../../logs/write/sim-logs-service-writer.js";
+import { simLambdaInvokeRequestContext } from "../invoke/sim-lambda-invoke-request-context.js";
 
 interface SimLambdaLogWriterProperties {
   readonly logGroupName: string;
@@ -36,6 +37,7 @@ export class SimLambdaLogWriter {
    * write that completes it, so a line is never split across two events.
    */
   write(chunk: string): void {
+    simLambdaInvokeRequestContext.of(this.#logGroupName)?.tail?.push(chunk);
     const text = this.#pending + chunk;
     const lastNewline = text.lastIndexOf("\n");
 
