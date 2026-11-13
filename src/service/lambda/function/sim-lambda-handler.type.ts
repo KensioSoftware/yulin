@@ -15,6 +15,12 @@ export interface SimLambdaContext {
   readonly logGroupName: string;
   readonly logStreamName: string;
 
+  /**
+   * What a synchronous Invoke request's `ClientContext` said about its
+   * client, decoded. Absent for every other invocation.
+   */
+  readonly clientContext?: unknown;
+
   getRemainingTimeInMillis(): number;
 
   done(error?: Error, result?: unknown): void;

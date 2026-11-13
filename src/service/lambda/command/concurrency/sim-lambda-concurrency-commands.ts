@@ -18,6 +18,12 @@ import type {
   SimPutFunctionConcurrencyCommandOutput,
 } from "./concurrency.command.js";
 import { simLambdaReservedConcurrencyIn } from "./reserved-concurrency-limit.js";
+import type {
+  SimFunctionRecursionConfigCommandOutput,
+  SimGetFunctionRecursionConfigCommand,
+  SimPutFunctionRecursionConfigCommand,
+} from "./recursion-config.command.js";
+import { simLambdaRecursiveLoopIn } from "./recursion-config.command.js";
 
 interface SimLambdaConcurrencyCommandsProperties {
   readonly functions: SimLambdaFunctionLookup;
@@ -31,7 +37,8 @@ interface SimLambdaConcurrencyCommandOptions {
 }
 
 /**
- * The reserved concurrency commands of one simulated Lambda scope.
+ * The reserved concurrency and recursion config commands of one simulated
+ * Lambda scope.
  *
  * Each names a function, authorizes the IAM action of its own name against
  * the function's ARN, and reads or changes the reservation the function and
@@ -102,6 +109,44 @@ export class SimLambdaConcurrencyCommands {
     simFunction.concurrency.reserve(undefined);
 
     return { $metadata: {} };
+  }
+
+  /**
+   * Allow a function to run in a recursive loop, or have loops through it
+   * stopped again.
+   */
+  async putRecursionConfig(
+    command: SimPutFunctionRecursionConfigCommand,
+    options?: SimLambdaConcurrencyCommandOptions,
+  ): Promise<SimFunctionRecursionConfigCommandOutput> {
+    const simFunction = await this.named(
+      "lambda:PutFunctionRecursionConfig",
+      command.input.FunctionName,
+      options,
+    );
+    const loop = simLambdaRecursiveLoopIn(command.input.RecursiveLoop);
+    simFunction.concurrency.recursiveLoop = loop;
+
+    return { $metadata: {}, RecursiveLoop: loop };
+  }
+
+  /**
+   * Read whether a function's recursive loops are stopped.
+   */
+  async getRecursionConfig(
+    command: SimGetFunctionRecursionConfigCommand,
+    options?: SimLambdaConcurrencyCommandOptions,
+  ): Promise<SimFunctionRecursionConfigCommandOutput> {
+    const simFunction = await this.named(
+      "lambda:GetFunctionRecursionConfig",
+      command.input.FunctionName,
+      options,
+    );
+
+    return {
+      $metadata: {},
+      RecursiveLoop: simFunction.concurrency.recursiveLoop,
+    };
   }
 
   private async named(

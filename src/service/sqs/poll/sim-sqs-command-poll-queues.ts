@@ -1,6 +1,10 @@
 import type { SimSqsQueueWatcher } from "../queue/sim-sqs-queue-activity.js";
 import { sqsQueueUrlOf } from "../queue/sim-sqs-queue-arn.js";
 import type { SimSqsPollMessage } from "./sim-sqs-poll-message.js";
+import {
+  simSqsDeleteGroups,
+  simSqsGatheredBatch,
+} from "./sim-sqs-poll-batches.js";
 import type { SimSqsPollQueueService } from "./sim-sqs-poll-queue-service.js";
 import type {
   SimSqsPollDeleteRequest,
@@ -68,19 +72,9 @@ export class SimSqsCommandPollQueues implements SimSqsPollQueues {
   async receive(
     request: SimSqsPollReceiveRequest,
   ): Promise<readonly SimSqsPollMessage[]> {
-    const output = await this.sqs.receiveMessage(
-      {
-        input: {
-          QueueUrl: this.queueUrl(request),
-          MaxNumberOfMessages: request.batchSize,
-          MessageSystemAttributeNames: ["All"],
-          MessageAttributeNames: ["All"],
-        },
-      },
-      { caller: request.caller },
+    return await simSqsGatheredBatch(request.batchSize, async (count) =>
+      this.receiveUpTo(request, count),
     );
-
-    return output.Messages ?? [];
   }
 
   /**
@@ -91,22 +85,21 @@ export class SimSqsCommandPollQueues implements SimSqsPollQueues {
    * action real IAM has.
    */
   async deleteMessages(request: SimSqsPollDeleteRequest): Promise<void> {
-    if (request.receiptHandles.length === 0) {
-      return;
-    }
-
-    await this.sqs.deleteMessageBatch(
-      {
-        input: {
-          QueueUrl: this.queueUrl(request),
-          Entries: request.receiptHandles.map((receiptHandle, index) => ({
-            Id: String(index),
-            ReceiptHandle: receiptHandle,
-          })),
+    for (const group of simSqsDeleteGroups(request.receiptHandles)) {
+      // oxlint-disable-next-line no-await-in-loop -- one batch delete at a time
+      await this.sqs.deleteMessageBatch(
+        {
+          input: {
+            QueueUrl: this.queueUrl(request),
+            Entries: group.map((receiptHandle, index) => ({
+              Id: String(index),
+              ReceiptHandle: receiptHandle,
+            })),
+          },
         },
-      },
-      { caller: request.caller },
-    );
+        { caller: request.caller },
+      );
+    }
   }
 
   /**
@@ -115,6 +108,13 @@ export class SimSqsCommandPollQueues implements SimSqsPollQueues {
    */
   nextAvailability(queueArn: string): Date | undefined {
     return this.sqs.queueActivity().nextAvailability(queueArn);
+  }
+
+  /**
+   * How many messages a queue could hand out now.
+   */
+  receivableCount(queueArn: string): number {
+    return this.sqs.queueActivity().receivableCount(queueArn);
   }
 
   /**
@@ -129,6 +129,25 @@ export class SimSqsCommandPollQueues implements SimSqsPollQueues {
    */
   unwatch(queueArn: string, watcher: SimSqsQueueWatcher): void {
     this.sqs.queueActivity().unwatch(queueArn, watcher);
+  }
+
+  private async receiveUpTo(
+    request: SimSqsPollReceiveRequest,
+    count: number,
+  ): Promise<readonly SimSqsPollMessage[]> {
+    const output = await this.sqs.receiveMessage(
+      {
+        input: {
+          QueueUrl: this.queueUrl(request),
+          MaxNumberOfMessages: count,
+          MessageSystemAttributeNames: ["All"],
+          MessageAttributeNames: ["All"],
+        },
+      },
+      { caller: request.caller },
+    );
+
+    return output.Messages ?? [];
   }
 
   private queueUrl(request: SimSqsPollQueueRequest): string {

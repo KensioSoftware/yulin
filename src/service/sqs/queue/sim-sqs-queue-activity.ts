@@ -55,6 +55,16 @@ export class SimSqsQueueActivity {
   }
 
   /**
+   * How many messages a queue could hand out now, or none for a queue that is
+   * not there.
+   */
+  receivableCount(queueArn: string): number {
+    return (
+      this.queues.findByArn(queueArn)?.receivableCount(this.clock.now()) ?? 0
+    );
+  }
+
+  /**
    * Watch a queue for messages arriving on it.
    */
   watch(queueArn: string, watcher: SimSqsQueueWatcher): void {

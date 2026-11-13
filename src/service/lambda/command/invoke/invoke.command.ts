@@ -37,6 +37,15 @@ export interface SimInvokeCommandInput {
   readonly InvocationType?: SimLambdaInvocationType | undefined;
   readonly Payload?: SimInvokePayload | undefined;
   readonly Qualifier?: string | undefined;
+
+  /** `Tail` asks for the last 4 KB of the invocation's log in `LogResult`. */
+  readonly LogType?: "None" | "Tail" | undefined;
+
+  /**
+   * Base64-encoded JSON about the invoking client, which a synchronous
+   * invocation hands the handler as `context.clientContext`.
+   */
+  readonly ClientContext?: string | undefined;
 }
 
 /**
@@ -48,4 +57,7 @@ export interface SimInvokeCommandOutput {
   ExecutedVersion?: string | undefined;
   FunctionError?: string | undefined;
   Payload?: Uint8Array | undefined;
+
+  /** The last 4 KB of the invocation's log, base64-encoded. */
+  LogResult?: string | undefined;
 }

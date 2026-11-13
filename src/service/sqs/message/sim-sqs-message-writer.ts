@@ -17,6 +17,9 @@ export interface SimSqsMessageWrite {
   readonly body: string | undefined;
   readonly attributes: SimSqsMessageAttributes;
   readonly delaySeconds: number | undefined;
+
+  /** The X-Ray trace header the message carries, if any. */
+  readonly traceHeader?: string | undefined;
 }
 
 interface SimSqsMessageWriterProperties {
@@ -52,6 +55,7 @@ export class SimSqsMessageWriter {
         queue.attributes.maximumMessageSizeBytes,
       ),
       attributes: requested.attributes,
+      traceHeader: requested.traceHeader,
       sentAt,
       visibleFrom: new Date(
         sentAt.getTime() + delaySeconds * millisecondsPerSecond,

@@ -24,6 +24,7 @@ import { installSimLambdaTimerModules } from "../../invoke/timer/sim-lambda-time
 import type { SimLambdaOutboundHttp } from "../../outbound/sim-lambda-outbound-http.js";
 import { simLambdaVmHostGlobals } from "./sim-lambda-vm-host-globals.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
+import { simLambdaAwsLambdaGlobal } from "../../stream/sim-lambda-awslambda-global.js";
 
 /**
  * What the sandbox a function's code runs in is built from.
@@ -120,6 +121,8 @@ export function makeSimLambdaVmContext(
     // The Fetch API client, routed into the simulation. The types it works
     // with are the host's own.
     fetch: makeSimLambdaOutboundFetch(outboundHttp),
+    // The runtime's own global, for response streaming.
+    awslambda: simLambdaAwsLambdaGlobal,
   });
 
   // Node.js names its global object `global` as well as `globalThis`, and

@@ -58,6 +58,7 @@ interface SimLambdaEventSourceMappingProperties {
   readonly qualifier?: string | undefined;
   readonly functionArn: SimLambdaFunctionArn;
   readonly batchSize: number;
+  readonly batchingWindowSeconds?: number | undefined;
   readonly start?: SimLambdaEventSourceStart | undefined;
   readonly enabled?: boolean | undefined;
   readonly functionResponseTypes?:
@@ -132,6 +133,8 @@ export class SimLambdaEventSourceMapping {
    * update applies from the next batch on.
    */
   public batchSize: number;
+  /** How long a partial batch waits to fill, read on every poll. */
+  public batchingWindowSeconds: number;
   /**
    * Where this mapping started reading, for a source that has a choice.
    *
@@ -176,6 +179,7 @@ export class SimLambdaEventSourceMapping {
     this.qualifier = properties.qualifier;
     this.functionArn = properties.functionArn;
     this.batchSize = properties.batchSize;
+    this.batchingWindowSeconds = properties.batchingWindowSeconds ?? 0;
     this.start = properties.start;
     // Copied rather than held, so a caller keeping the list it passed in
     // cannot change what this mapping does with a batch afterwards.
@@ -240,6 +244,7 @@ export class SimLambdaEventSourceMapping {
     const next = simLambdaEventSourceMappingNext(this, this.enabled, update);
 
     this.batchSize = next.batchSize;
+    this.batchingWindowSeconds = next.batchingWindowSeconds;
     this.filterCriteria = next.filterCriteria;
     this.functionResponseTypes = [
       ...(update.functionResponseTypes ?? this.functionResponseTypes),
@@ -271,7 +276,7 @@ export class SimLambdaEventSourceMapping {
       StartingPositionTimestamp: this.start?.timestamp,
       // Partial batches are delivered as soon as anything is available, so the
       // batching window is always zero. Anything else is refused at creation.
-      MaximumBatchingWindowInSeconds: 0,
+      MaximumBatchingWindowInSeconds: this.batchingWindowSeconds,
       // Real Lambda reports both failed-batch limits for a stream mapping and
       // neither for a queue one, so a mapping with no limits to keep leaves
       // them out rather than reporting a limit it does not have.

@@ -4,8 +4,7 @@ import type { SimSqsMessageAttributeInput } from "../../message/sim-sqs-message-
 /**
  * A message system attribute as a send request carries it.
  *
- * Real SQS accepts only `AWSTraceHeader` here. Simulated SQS models no message
- * system attributes on send, so a request carrying one is refused.
+ * Real SQS accepts only `AWSTraceHeader` here, and so does simulated SQS.
  */
 export interface SimSqsMessageSystemAttributeInput {
   readonly DataType?: string | undefined;

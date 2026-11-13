@@ -30,6 +30,12 @@ export interface SimSqsPollSession {
   readonly batchSize: number;
 
   /**
+   * How long a partial batch waits for more messages, in seconds. A consumer
+   * naming none delivers whatever it finds.
+   */
+  readonly batchingWindowSeconds?: number | undefined;
+
+  /**
    * Hand a batch to whatever consumes it, answering with what became of it.
    */
   handle(messages: readonly SimSqsPollMessage[]): Promise<SimSqsPollOutcome>;
@@ -86,7 +92,7 @@ export class SimSqsQueuePoller implements SimSqsQueueWatcher {
 
   constructor(properties: SimSqsQueuePollerProperties) {
     this.consumer = properties.consumer;
-    this.queue = new SimSqsPolledQueue(properties.queues, properties.queueArn);
+    this.queue = new SimSqsPolledQueue(properties);
     this.schedule = new PollSchedule({
       background: properties.background,
       poll: async (): Promise<void> => {
@@ -144,7 +150,8 @@ export class SimSqsQueuePoller implements SimSqsQueueWatcher {
   private async run(): Promise<void> {
     const session = this.session();
 
-    if (session === undefined) {
+    // A partial batch waiting out its batching window is left where it is.
+    if (session === undefined || this.queue.holds(session, this.schedule)) {
       return;
     }
 

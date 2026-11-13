@@ -144,6 +144,15 @@ export class SimSqsQueue {
   }
 
   /**
+   * How many messages this queue could hand out at an instant.
+   */
+  receivableCount(instant: Date): number {
+    this.applyLifecycle(instant);
+
+    return this.messages.countsAt(instant).visible;
+  }
+
+  /**
    * Bring this queue up to date at an instant.
    *
    * Nothing is scheduled to age a message out or to give up on one. Both happen

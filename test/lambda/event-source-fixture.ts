@@ -167,6 +167,7 @@ interface SqsEventSourceOptions {
   readonly roleActions?: readonly string[];
   readonly handlerResult?: (event: SimLambdaSqsEvent) => unknown;
   readonly batchSize?: number;
+  readonly batchingWindowSeconds?: number;
   readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
   readonly filterPatterns?: readonly string[];
 }
@@ -193,6 +194,9 @@ export async function simAwsWithSqsEventSource(
       EventSourceArn: queue.queueArn,
       FunctionName: functionName,
       ...(options.batchSize !== undefined && { BatchSize: options.batchSize }),
+      ...(options.batchingWindowSeconds !== undefined && {
+        MaximumBatchingWindowInSeconds: options.batchingWindowSeconds,
+      }),
       ...(options.functionResponseTypes !== undefined && {
         FunctionResponseTypes: [...options.functionResponseTypes],
       }),

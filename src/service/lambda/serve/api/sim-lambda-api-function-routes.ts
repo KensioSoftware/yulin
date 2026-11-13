@@ -65,6 +65,21 @@ export const simLambdaFunctionApiRoutes: readonly SimRestJsonRoute[] = [
     input: (input) => ({ FunctionName: input.label("FunctionName") }),
   },
   {
+    method: "PUT",
+    path: "/2024-08-31/functions/{FunctionName}/recursion-config",
+    commandName: "PutFunctionRecursionConfigCommand",
+    input: (input) => ({
+      ...input.json(),
+      FunctionName: input.label("FunctionName"),
+    }),
+  },
+  {
+    method: "GET",
+    path: "/2024-08-31/functions/{FunctionName}/recursion-config",
+    commandName: "GetFunctionRecursionConfigCommand",
+    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+  },
+  {
     method: "DELETE",
     path: "/2017-10-31/functions/{FunctionName}/concurrency",
     commandName: "DeleteFunctionConcurrencyCommand",

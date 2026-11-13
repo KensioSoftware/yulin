@@ -6,6 +6,7 @@ import {
 } from "./sim-lambda-event-source-batch-response.js";
 import type { SimLambdaFilterCriteria } from "../filter/sim-lambda-filter-criteria.js";
 import { simLambdaFilteredDelivery } from "../filter/sim-lambda-filtered-delivery.js";
+import { simAwsLineage } from "../../../aws/lineage/sim-aws-lineage.js";
 
 /**
  * One record of an event source event.
@@ -108,13 +109,22 @@ export class SimLambdaEventSourceDelivery {
     delivered: readonly SimSqsPollMessage[],
   ): Promise<SimLambdaEventSourceBatchOutcome> {
     const batchResponse = this.batchResponse.forBatch();
+    const traceHeaders = delivered.map(
+      (message) => message.Attributes?.["AWSTraceHeader"],
+    );
 
     try {
       return batchResponse.handled(
         delivered,
-        await simFunction.invoke(
-          this.eventBuilder.of(delivered),
-          this.filters.functionArn,
+        // The batch is part of the chain of requests its messages carry, so
+        // a function that keeps writing back to its own queue is stopped.
+        await simAwsLineage.passing(
+          simAwsLineage.fromTraceHeaders(traceHeaders),
+          async () =>
+            simFunction.invoke(
+              this.eventBuilder.of(delivered),
+              this.filters.functionArn,
+            ),
         ),
       );
     } catch {

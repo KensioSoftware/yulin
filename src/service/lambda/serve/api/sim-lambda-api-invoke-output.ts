@@ -21,6 +21,7 @@ export function simLambdaInvokeResponse(output: SimRestJsonOutput): Response {
         "content-type": "application/json",
         ...header("x-amz-function-error", output["FunctionError"]),
         ...header("x-amz-executed-version", output["ExecutedVersion"]),
+        ...header("x-amz-log-result", output["LogResult"]),
       },
     },
   );

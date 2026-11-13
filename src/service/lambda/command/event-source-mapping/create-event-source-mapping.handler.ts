@@ -143,6 +143,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
       // it, as real Lambda does.
       functionArn: target.resource.arn,
       batchSize: input.batchSize,
+      batchingWindowSeconds: input.batchingWindowSeconds,
       start: input.start,
       enabled: input.enabled,
       functionResponseTypes: input.functionResponseTypes,

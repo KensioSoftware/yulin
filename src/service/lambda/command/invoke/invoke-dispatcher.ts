@@ -9,7 +9,10 @@ import {
 import type { SimLambdaEventInvokeConfigStore } from "../../function/event-invoke/sim-lambda-event-invoke-config-store.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import { SimLambdaAsyncInvocations } from "./async/sim-lambda-async-invocations.js";
-import { parseInvokeEvent } from "./invoke-payload.js";
+import {
+  parseInvokeEvent,
+  simLambdaAsyncPayloadLimit,
+} from "./invoke-payload.js";
 import { simLambdaRequestResponse } from "./invoke-request-response.js";
 import type {
   SimInvokeCommand,
@@ -67,7 +70,7 @@ export class SimLambdaInvocationDispatcher {
       case "Event": {
         this.asyncInvocations.start(
           simFunction,
-          parseInvokeEvent(command.input.Payload),
+          parseInvokeEvent(command.input.Payload, simLambdaAsyncPayloadLimit),
           qualifier,
           invokedFunctionArn,
         );

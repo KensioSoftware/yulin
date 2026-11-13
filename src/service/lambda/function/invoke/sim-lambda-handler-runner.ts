@@ -3,6 +3,8 @@ import type {
   SimLambdaHandler,
 } from "../sim-lambda-handler.type.js";
 import type { SimLambdaInvokeContextBuilder } from "./sim-lambda-invoke-context-builder.js";
+import { isSimLambdaStreamingHandler } from "../stream/sim-lambda-awslambda-global.js";
+import { simLambdaStreamingRun } from "../stream/sim-lambda-streaming-run.js";
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -60,6 +62,18 @@ export class SimLambdaHandlerRunner {
     event: unknown,
     contextBuilder: SimLambdaInvokeContextBuilder,
   ): Promise<unknown> {
+    if (isSimLambdaStreamingHandler(handlerFunction)) {
+      try {
+        return await simLambdaStreamingRun(
+          handlerFunction,
+          event,
+          contextBuilder,
+        );
+      } catch (error) {
+        throw toRejectedError(error);
+      }
+    }
+
     return await new Promise((resolve, reject) => {
       const callback: SimLambdaCallback = (error, result) => {
         if (error === undefined || error === null) {

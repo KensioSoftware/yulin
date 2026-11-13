@@ -39,6 +39,17 @@ export class SimLambdaStreamProgress {
   }
 
   /**
+   * Whether a partial batch waits out the mapping's batching window before it
+   * is delivered, polling again when the window closes. A batch being tried
+   * again after a failure goes when its retry falls due.
+   */
+  holding(found: number): boolean {
+    const { mapping } = this.state;
+
+    return this.state.holds(found, this.batchSizeWithin(mapping.batchSize));
+  }
+
+  /**
    * Take a read that came back with nothing.
    *
    * The place is still worth keeping: it is what a starting position of LATEST

@@ -63,6 +63,22 @@ export function simLambdaResourceRoutes(
         ),
     ],
     [
+      "PutFunctionRecursionConfigCommand",
+      async (command, context): Promise<unknown> =>
+        await simLambda.putFunctionRecursionConfig(
+          command as simLambdaCommands.SimPutFunctionRecursionConfigCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "GetFunctionRecursionConfigCommand",
+      async (command, context): Promise<unknown> =>
+        await simLambda.getFunctionRecursionConfig(
+          command as simLambdaCommands.SimGetFunctionRecursionConfigCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
       "GetFunctionConcurrencyCommand",
       async (command, context): Promise<unknown> =>
         await simLambda.getFunctionConcurrency(

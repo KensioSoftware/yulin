@@ -1,9 +1,6 @@
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
 import type { SimLambdaDestinationTargets } from "../../../destination/sim-lambda-destination-targets.js";
-import {
-  simLambdaEventTooOld,
-  simLambdaRetryDueTime,
-} from "../../../function/event-invoke/sim-lambda-event-invoke-settings.js";
+import { simLambdaEventTooOld } from "../../../function/event-invoke/sim-lambda-event-invoke-settings.js";
 import type { SimLambdaFunction } from "../../../function/sim-lambda-function.js";
 import type { SimLambdaAsyncInvocationSettings } from "./sim-lambda-async-invocation-settings.js";
 import {
@@ -12,6 +9,8 @@ import {
   simLambdaSuccessOutcome,
 } from "./sim-lambda-async-outcome.js";
 import { simLambdaHandlerAttempt } from "./sim-lambda-handler-attempt.js";
+import { SimLambdaAsyncAttempts } from "./sim-lambda-async-attempts.js";
+import { simAwsLineage } from "../../../../aws/lineage/sim-aws-lineage.js";
 
 interface SimLambdaAsyncInvocationProperties {
   readonly simFunction: SimLambdaFunction;
@@ -35,14 +34,20 @@ interface SimLambdaAsyncInvocationProperties {
 export class SimLambdaAsyncInvocation {
   private readonly properties: SimLambdaAsyncInvocationProperties;
   private readonly outcomes: SimLambdaAsyncOutcomeDelivery;
+  private readonly attempts: SimLambdaAsyncAttempts;
   private readonly startedAt: Date;
-  private attemptCount = 0;
-  private throttleCount = 0;
+
+  /**
+   * The chain of requests the invocation was made in, which every attempt
+   * carries on.
+   */
+  private readonly lineage = simAwsLineage.current();
 
   constructor(properties: SimLambdaAsyncInvocationProperties) {
     this.properties = properties;
     this.startedAt = properties.background.now();
     this.outcomes = new SimLambdaAsyncOutcomeDelivery(properties);
+    this.attempts = new SimLambdaAsyncAttempts(properties);
   }
 
   /**
@@ -53,66 +58,40 @@ export class SimLambdaAsyncInvocation {
   }
 
   private async attempt(): Promise<void> {
-    const attempt = await simLambdaHandlerAttempt(this.properties);
-
-    if (!attempt.succeeded && attempt.throttled) {
-      this.throttled(attempt.error);
-      return;
-    }
-
-    this.attemptCount += 1;
-
-    if (!attempt.succeeded) {
-      await this.failed(attempt.error);
-      return;
-    }
-
-    await this.outcomes.deliver(
-      simLambdaSuccessOutcome(attempt.result),
-      this.attemptCount,
+    const attempt = await simAwsLineage.passing(this.lineage, async () =>
+      simLambdaHandlerAttempt(this.properties),
     );
+
+    if (attempt.succeeded) {
+      this.attempts.count += 1;
+      await this.outcomes.deliver(
+        simLambdaSuccessOutcome(attempt.result),
+        this.attempts.count,
+      );
+      return;
+    }
+
+    this.retryOrAbandon(attempt.error, this.attempts.nextAfter(attempt));
   }
 
   /**
-   * Retry the attempt that threw, or give up where the last one has been
-   * made.
+   * Try the invocation again when it falls due, unless the event is too old
+   * by then, or give it up now. One given up goes to the failure destination
+   * and dead-letter target. A stopped or unrunnable invocation has no
+   * condition of its own on AWS, so it reads `RetriesExhausted` there too.
    */
-  private async failed(error: unknown): Promise<void> {
+  private retryOrAbandon(error: unknown, due: Date | undefined): void {
     const { background, settings } = this.properties;
 
-    if (this.attemptCount > settings.maximumRetryAttempts) {
-      await this.abandon(error, "RetriesExhausted");
+    if (due === undefined) {
+      background.schedule(async () => this.abandon(error, "RetriesExhausted"));
       return;
     }
 
-    background.scheduleAt(
-      simLambdaRetryDueTime(background.now(), this.attemptCount),
-      () =>
-        simLambdaEventTooOld(this.startedAt, background.now(), settings)
-          ? this.abandon(error, "EventAgeExceeded")
-          : this.attempt(),
-    );
-  }
-
-  /**
-   * Put a throttled attempt back to be tried again, as real Lambda does.
-   *
-   * A throttle never ran the handler, so it is not one of the retries
-   * `MaximumRetryAttempts` allows. Real Lambda goes on trying with a backoff
-   * that starts at a second and grows to five minutes, until the event is
-   * older than `MaximumEventAgeInSeconds`, six hours unless configured.
-   */
-  private throttled(error: unknown): void {
-    const { background, settings } = this.properties;
-    const delaySeconds = Math.min(2 ** this.throttleCount, 300);
-    this.throttleCount += 1;
-
-    background.scheduleAt(
-      new Date(background.now().getTime() + delaySeconds * 1000),
-      () =>
-        simLambdaEventTooOld(this.startedAt, background.now(), settings)
-          ? this.abandon(error, "EventAgeExceeded")
-          : this.attempt(),
+    background.scheduleAt(due, () =>
+      simLambdaEventTooOld(this.startedAt, background.now(), settings)
+        ? this.abandon(error, "EventAgeExceeded")
+        : this.attempt(),
     );
   }
 
@@ -126,7 +105,7 @@ export class SimLambdaAsyncInvocation {
   ): Promise<void> {
     await this.outcomes.deliver(
       simLambdaAbandonedOutcome(error, condition),
-      this.attemptCount,
+      this.attempts.count,
     );
     await this.outcomes.deadLetter();
   }

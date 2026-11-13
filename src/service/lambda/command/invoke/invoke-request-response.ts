@@ -1,9 +1,16 @@
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
+import { simLambdaInvokeRequestContext } from "../../function/invoke/sim-lambda-invoke-request-context.js";
 import {
   functionErrorPayload,
+  isOversizedResponse,
+  oversizedResponsePayload,
   parseInvokeEvent,
   resultPayload,
 } from "./invoke-payload.js";
+import {
+  simLambdaInvokeRequestOf,
+  simLambdaLogResult,
+} from "./invoke-request.js";
 import type {
   SimInvokeCommand,
   SimInvokeCommandOutput,
@@ -24,20 +31,33 @@ export async function simLambdaRequestResponse(
   // Read before the attempt, so a payload that is not JSON reaches the
   // caller as a request error rather than as a handler failure.
   const event = parseInvokeEvent(command.input.Payload);
+  const request = simLambdaInvokeRequestOf(
+    command.input,
+    simFunction.logGroupName,
+  );
 
   const refusalsBefore = simFunction.concurrency.refusals;
-  const invocation = simFunction.invoke(event, invokedFunctionArn);
+  const invocation = simLambdaInvokeRequestContext.run(request, async () =>
+    simFunction.invoke(event, invokedFunctionArn),
+  );
   // Read straight after starting: the reservation turns an invocation away
   // before anything awaits, so a refusal counted here is this invocation's.
   const refused = simFunction.concurrency.refusals > refusalsBefore;
+  const answered = {
+    $metadata: {},
+    StatusCode: 200,
+    ExecutedVersion: simFunction.version,
+  };
 
   try {
-    const result = await invocation;
+    const payload = resultPayload(await invocation);
+
     return {
-      $metadata: {},
-      StatusCode: 200,
-      ExecutedVersion: simFunction.version,
-      Payload: resultPayload(result),
+      ...answered,
+      ...simLambdaLogResult(request),
+      ...(isOversizedResponse(payload)
+        ? { FunctionError: "Unhandled", Payload: oversizedResponsePayload() }
+        : { Payload: payload }),
     };
   } catch (error) {
     // A throttled invocation never ran, so real Lambda refuses the request
@@ -48,9 +68,8 @@ export async function simLambdaRequestResponse(
     }
 
     return {
-      $metadata: {},
-      StatusCode: 200,
-      ExecutedVersion: simFunction.version,
+      ...answered,
+      ...simLambdaLogResult(request),
       FunctionError: "Unhandled",
       Payload: functionErrorPayload(error),
     };

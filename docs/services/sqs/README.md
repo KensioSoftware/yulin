@@ -1204,10 +1204,12 @@ Current documented limitations:
   SQS refuses does not deploy here.
 - Tags are left out. `TagQueue`, `UntagQueue` and `ListQueueTags` are absent, and `CreateQueue`
   refuses a `tags` parameter rather than dropping it.
-- `SenderId` is left out, because a simulated caller has no user or role id to report it as.
-  `AWSTraceHeader` is left out too, and `MessageSystemAttributes` on a send are refused. Asking for
-  any of them is accepted, as real SQS accepts a request for an attribute a message has no value for,
-  and they are absent from the response.
+- `SenderId` is left out, because a simulated caller has no user or role id to report it as. Asking
+  for it is accepted, as real SQS accepts a request for an attribute a message has no value for, and
+  it is absent from the response. `AWSTraceHeader` is kept, from a send's `MessageSystemAttributes`
+  or, for a message a Lambda function sent, from the invocation that sent it. That is how a
+  simulated Lambda function looping through its own queue is stopped. Any other
+  `MessageSystemAttributes` entry is refused.
 - SQS condition keys are left out, and a policy relying on one matches nothing. Ordinary condition
   operators on values sim IAM does supply work as usual.
 - `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are absent.

@@ -11,6 +11,7 @@ interface QueueCommandOptions {
  */
 export interface SimSqsPollQueueActivity {
   nextAvailability(queueArn: string): Date | undefined;
+  receivableCount(queueArn: string): number;
   watch(queueArn: string, watcher: SimSqsQueueWatcher): void;
   unwatch(queueArn: string, watcher: SimSqsQueueWatcher): void;
 }

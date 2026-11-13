@@ -62,3 +62,12 @@ export type {
   SimLambdaStreamFailureRecord,
   SimLambdaStreamFailureCondition,
 } from "./event-source/poll/sim-lambda-stream-failure-record.js";
+export {
+  type SimLambdaHttpResponsePrelude,
+  simLambdaAwsLambdaGlobal,
+} from "./function/stream/sim-lambda-awslambda-global.js";
+export { SimLambdaResponseStream } from "./function/stream/sim-lambda-response-stream.js";
+export {
+  SimLambdaRecursiveInvocationException,
+  SimLambdaRequestTooLargeException,
+} from "./error/sim-lambda-invoke.error.js";

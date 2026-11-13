@@ -15,6 +15,7 @@ import {
 } from "./sim-lambda-stream-record-times.js";
 import { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamBatchResponse } from "./sim-lambda-stream-batch-response.js";
+import { simAwsLineage } from "../../../aws/lineage/sim-aws-lineage.js";
 
 interface SimLambdaDynamoDbStreamDeliveryProperties {
   readonly mapping: SimLambdaEventSourceMapping;
@@ -144,9 +145,12 @@ export class SimLambdaDynamoDbStreamDelivery {
     try {
       return batchResponse.handled(
         times,
-        await simFunction.invoke(
-          this.eventBuilder.of(delivered),
-          this.filters.functionArn,
+        // Real Lambda tracks no chain of requests through a stream.
+        await simAwsLineage.passing(undefined, async () =>
+          simFunction.invoke(
+            this.eventBuilder.of(delivered),
+            this.filters.functionArn,
+          ),
         ),
       );
     } catch {

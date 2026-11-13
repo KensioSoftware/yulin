@@ -29,6 +29,7 @@ interface SimLambdaEventSourceMappingInputProperties {
   readonly functionName: string;
   readonly qualifier: string | undefined;
   readonly batchSize: number;
+  readonly batchingWindowSeconds: number;
   readonly start: SimLambdaEventSourceStart | undefined;
   readonly enabled: boolean;
   readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
@@ -62,6 +63,7 @@ export class SimLambdaEventSourceMappingInput {
    */
   public readonly qualifier: string | undefined;
   public readonly batchSize: number;
+  public readonly batchingWindowSeconds: number;
   public readonly start: SimLambdaEventSourceStart | undefined;
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
@@ -86,6 +88,7 @@ export class SimLambdaEventSourceMappingInput {
     this.functionName = properties.functionName;
     this.qualifier = properties.qualifier;
     this.batchSize = properties.batchSize;
+    this.batchingWindowSeconds = properties.batchingWindowSeconds;
     this.start = properties.start;
     this.enabled = properties.enabled;
     this.functionResponseTypes = properties.functionResponseTypes;
@@ -106,6 +109,8 @@ export class SimLambdaEventSourceMappingInput {
 
     refuseUnsupportedEventSourceInput(input);
     refuseUnsimulatedInput(input);
+    const { batchRules } = eventSourceArn;
+    const batchSize = batchRules.sizeIn(input.BatchSize);
 
     return new this({
       eventSourceArn,
@@ -116,7 +121,11 @@ export class SimLambdaEventSourceMappingInput {
       ...simLambdaFunctionReferenceOf(
         requiredString(input.FunctionName, "functionName"),
       ),
-      batchSize: eventSourceArn.batchRules.sizeIn(input.BatchSize),
+      batchSize,
+      batchingWindowSeconds: batchRules.windowIn(
+        input.MaximumBatchingWindowInSeconds,
+        batchSize,
+      ),
       start: eventSourceArn.startingPositionRules.startIn({
         startingPosition: input.StartingPosition,
         startingPositionTimestamp: input.StartingPositionTimestamp,

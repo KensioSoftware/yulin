@@ -63,6 +63,12 @@ export interface SimSqsPollQueues {
   nextAvailability(queueArn: string): Date | undefined;
 
   /**
+   * How many messages the queue could hand out now, which a consumer gathering
+   * a batch over a batching window reads before it receives any.
+   */
+  receivableCount(queueArn: string): number;
+
+  /**
    * Watch a queue for messages arriving on it.
    */
   watch(queueArn: string, watcher: SimSqsQueueWatcher): void;
@@ -117,6 +123,13 @@ export abstract class SimSqsUnreachablePollQueues implements SimSqsPollQueues {
    */
   nextAvailability(): Date | undefined {
     return;
+  }
+
+  /**
+   * Answer with none: there is no queue to count.
+   */
+  receivableCount(): number {
+    return 0;
   }
 
   /**
