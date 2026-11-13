@@ -9,6 +9,7 @@ import { SimLambdaStreamHalt } from "../../stream/sim-lambda-stream-halt.js";
 import { countSimLambdaKinesisIteratorAge } from "../sim-lambda-stream-iterator-age.js";
 import {
   simLambdaKinesisStreamRecordTimes,
+  simLambdaHandedRecordOf,
   type SimLambdaStreamRecordTime,
 } from "../sim-lambda-stream-record-times.js";
 import { SimLambdaStreamBatchOutcome } from "../sim-lambda-stream-batch-outcome.js";
@@ -100,13 +101,17 @@ export class SimLambdaKinesisStreamDelivery {
 
   /**
    * What each record is named by and dated from, with the record as the
-   * function is handed it.
+   * function is handed it for the ones it was handed.
    */
   times(
     records: readonly SimLambdaKinesisStreamRecord[],
+    delivered = records,
   ): readonly SimLambdaStreamRecordTime[] {
-    return simLambdaKinesisStreamRecordTimes(records, (record) =>
-      this.eventBuilder.recordOf(record),
+    return simLambdaKinesisStreamRecordTimes(
+      records,
+      simLambdaHandedRecordOf(delivered, (one) =>
+        this.eventBuilder.recordOf(one),
+      ),
     );
   }
 
@@ -124,17 +129,17 @@ export class SimLambdaKinesisStreamDelivery {
       // never saw it, as a filtered record advances a real checkpoint too.
       handled: () => SimLambdaStreamBatchOutcome.handled(times),
       invoke: async (delivered) =>
-        await this.invoked(simFunction, delivered, times, records),
+        await this.invoked(simFunction, delivered, records),
     });
   }
 
   private async invoked(
     simFunction: SimLambdaFunction,
     delivered: readonly SimLambdaKinesisStreamRecord[],
-    times: readonly SimLambdaStreamRecordTime[],
     records: readonly SimLambdaKinesisStreamRecord[],
   ): Promise<SimLambdaStreamBatchOutcome> {
     const batchResponse = this.batchResponse.forBatch();
+    const times = this.times(records, delivered);
 
     try {
       return batchResponse.handled(

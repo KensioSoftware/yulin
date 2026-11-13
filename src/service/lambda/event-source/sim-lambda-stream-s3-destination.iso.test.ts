@@ -1,3 +1,4 @@
+import { PutRecordsCommand } from "@aws-sdk/client-kinesis";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { assertNonNullable } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
@@ -64,4 +65,49 @@ describe("an S3 Bucket as a stream mapping's failure destination", () => {
       expect(await bucketKeys(simAws, bucket)).toStrictEqual([]);
     });
   }
+
+  it("writes only the records the filters handed the function to the payload", async () => {
+    // Given a failing Kinesis mapping whose filter passes orders alone.
+    const { simAws, bucket } = await failingMappingWithBucket(
+      "kinesis",
+      ["s3:PutObject", "s3:ListBucket"],
+      ['{"data":{"kind":["order"]}}'],
+    );
+
+    // When an order and an audit entry arrive in one batch, and the batch
+    // exhausts its retries.
+    await simAws.kinesis().putRecords(
+      new PutRecordsCommand({
+        StreamName: "orders",
+        Records: ["order", "audit"].map((kind) => ({
+          PartitionKey: "order",
+          Data: new TextEncoder().encode(JSON.stringify({ kind })),
+        })),
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+    await simAws.clock().advanceBy({ hours: 1 });
+
+    // Then the payload holds the order alone.
+    const [key] = await bucketKeys(simAws, bucket);
+    assertNonNullable(key);
+    const object = await simAws
+      .s3()
+      .getObject(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    assertNonNullable(object.Body);
+    const bytes = await simS3BodyToBuffer(object.Body);
+    const body = JSON.parse(bytes.toString("utf8")) as {
+      readonly payload: string;
+    };
+    const payload = JSON.parse(body.payload) as {
+      readonly Records: readonly {
+        readonly kinesis: { readonly data: string };
+      }[];
+    };
+    expect(
+      payload.Records.map((record) =>
+        Buffer.from(record.kinesis.data, "base64").toString("utf8"),
+      ),
+    ).toStrictEqual(['{"kind":"order"}']);
+  });
 });

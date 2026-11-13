@@ -85,6 +85,43 @@ describe("Lambda PublishVersionCommand", () => {
     assertIdentical(published.Version, "2");
   });
 
+  it("answers with the latest version when a setting was changed and changed back", async () => {
+    // Given a function that has published a version, and had its timeout
+    // changed and then put back.
+    const simAws = new SimAws();
+    const lambda = simAws.lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "handled") },
+        Timeout: 30,
+      }),
+    );
+    const first = await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+    for (const Timeout of [31, 30]) {
+      // oxlint-disable-next-line no-await-in-loop -- changed in order
+      await lambda.updateFunctionConfiguration(
+        new UpdateFunctionConfigurationCommand({
+          FunctionName: "orders",
+          Timeout,
+        }),
+      );
+      // oxlint-disable-next-line no-await-in-loop -- each change settles first
+      await simAws.backgroundTasksComplete();
+    }
+
+    // When it is published again.
+    const again = await lambda.publishVersion(
+      new PublishVersionCommand({ FunctionName: "orders" }),
+    );
+
+    // Then the same version comes back.
+    assertIdentical(again.Version, first.Version);
+  });
+
   it("answers with the latest version when nothing has changed since", async () => {
     // Given a function that has published a version, and has only been
     // tagged since.

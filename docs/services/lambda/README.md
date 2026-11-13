@@ -1395,8 +1395,9 @@ A function carrying both a dead-letter target and an `OnFailure` destination sen
 ## Versions and aliases
 
 `PublishVersionCommand` creates an immutable numbered copy of the function's code and configuration.
-Versions start at `1`. A function whose code and settings have not changed since its latest version
-was published gets that version back, as on AWS. A tag or permission change leaves it unchanged. `CreateAliasCommand` gives a version a name, and `UpdateAliasCommand` moves
+Versions start at `1`. A function whose code and settings match its latest version's gets that version back, as on AWS,
+even where a setting was changed and then changed back. Tags and permissions are outside the
+comparison. `CreateAliasCommand` gives a version a name, and `UpdateAliasCommand` moves
 that name to another version.
 
 `InvokeCommand` and `GetFunctionCommand` take a `Qualifier` naming a version number or an alias.
@@ -2276,8 +2277,9 @@ notification formats. Import `SimLambdaStreamFailureRecord` from `@kensio/yulin/
   sequence numbers, first and last arrival times, and batch size. Arrival times are ISO 8601 strings.
 
 A queue or topic receives the original records' positions and none of their content. An S3 Bucket
-receives the same record with `payload` added, a JSON string of the whole event the discarded
-records were handed to the function in. The object's key is
+receives the same record with `payload` added, a JSON string of the event the discarded records
+were handed to the function in. A record the mapping's filters kept back is counted in the batch
+info and left out of `payload`. The object's key is
 `aws/lambda/<mapping UUID>/<shard ID>/YYYY/MM/DD/YYYY-MM-DDTHH.MM.SS-<UUID>`, dated by the discard,
 as AWS documents it. A successful batch produces no notification. After a
 partial-batch response, the notification covers the discarded suffix starting at the failed

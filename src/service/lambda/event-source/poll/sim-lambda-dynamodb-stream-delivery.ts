@@ -10,6 +10,7 @@ import { SimLambdaDynamoDbStreamEventBuilder } from "./sim-lambda-dynamodb-strea
 import { countSimLambdaDynamoDbIteratorAge } from "./sim-lambda-stream-iterator-age.js";
 import {
   simLambdaDynamoDbStreamRecordTimes,
+  simLambdaHandedRecordOf,
   type SimLambdaStreamRecordTime,
 } from "./sim-lambda-stream-record-times.js";
 import { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
@@ -98,13 +99,17 @@ export class SimLambdaDynamoDbStreamDelivery {
 
   /**
    * What each record is named by and dated from, with the record as the
-   * function is handed it.
+   * function is handed it for the ones it was handed.
    */
   times(
     records: readonly SimLambdaEventSourceStreamRecord[],
+    delivered = records,
   ): readonly SimLambdaStreamRecordTime[] {
-    return simLambdaDynamoDbStreamRecordTimes(records, (record) =>
-      this.eventBuilder.recordOf(record),
+    return simLambdaDynamoDbStreamRecordTimes(
+      records,
+      simLambdaHandedRecordOf(delivered, (one) =>
+        this.eventBuilder.recordOf(one),
+      ),
     );
   }
 
@@ -124,17 +129,17 @@ export class SimLambdaDynamoDbStreamDelivery {
       // never saw it, as a filtered record advances a real checkpoint too.
       handled: () => SimLambdaStreamBatchOutcome.handled(times),
       invoke: async (delivered) =>
-        await this.invoked(simFunction, delivered, times, records),
+        await this.invoked(simFunction, delivered, records),
     });
   }
 
   private async invoked(
     simFunction: SimLambdaFunction,
     delivered: readonly SimLambdaEventSourceStreamRecord[],
-    times: readonly SimLambdaStreamRecordTime[],
     records: readonly SimLambdaEventSourceStreamRecord[],
   ): Promise<SimLambdaStreamBatchOutcome> {
     const batchResponse = this.batchResponse.forBatch();
+    const times = this.times(records, delivered);
 
     try {
       return batchResponse.handled(

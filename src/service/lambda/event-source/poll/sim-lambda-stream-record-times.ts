@@ -22,6 +22,19 @@ export interface SimLambdaStreamRecordTime {
 }
 
 /**
+ * The record as the function is handed it, for the records it was handed. A
+ * record the mapping's filters kept back gives nothing.
+ */
+export function simLambdaHandedRecordOf<RecordType>(
+  delivered: readonly RecordType[],
+  recordOf: (record: RecordType) => unknown,
+): (record: RecordType) => unknown {
+  const handed = new Set(delivered);
+
+  return (record) => (handed.has(record) ? recordOf(record) : undefined);
+}
+
+/**
  * What a DynamoDB Streams batch's records are named by and dated from.
  */
 export function simLambdaDynamoDbStreamRecordTimes(

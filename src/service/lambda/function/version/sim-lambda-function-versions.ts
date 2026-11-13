@@ -34,27 +34,26 @@ export class SimLambdaFunctionVersions {
   private nextVersionNumber = 1;
 
   /**
-   * The revision of the function the latest version was published from.
+   * The code and settings the latest version was published with.
    */
-  private publishedRevisionId: string | undefined;
+  private publishedContent: string | undefined;
 
   /**
    * Publish the function as it stands as the next version.
    *
-   * A function whose code and settings are where they were when the latest
+   * A function whose code and settings are what they were when the latest
    * version was published gets that version back. Real Lambda answers the
-   * same way. The revision moves on with every code or settings change, and
-   * stays put for a tag or permission change, which matches what real Lambda
-   * counts as a change here.
+   * same way, and compares the content: a setting changed and changed back
+   * leaves nothing to publish. Tags and permissions are outside it.
    */
   publish(
     simFunction: SimLambdaFunction,
     description?: string,
   ): SimLambdaFunction {
-    const { revisionId } = simFunction.updates;
+    const content = publishableContent(simFunction);
     const latest = this.published.at(-1);
 
-    if (latest !== undefined && revisionId === this.publishedRevisionId) {
+    if (latest !== undefined && content === this.publishedContent) {
       return latest;
     }
 
@@ -65,7 +64,7 @@ export class SimLambdaFunctionVersions {
 
     this.nextVersionNumber += 1;
     this.published.push(version);
-    this.publishedRevisionId = revisionId;
+    this.publishedContent = content;
 
     return version;
   }
@@ -142,6 +141,26 @@ export class SimLambdaFunctionVersions {
   deleteAlias(name: string): void {
     this.aliases.delete(name);
   }
+}
+
+/**
+ * The code and settings a version would be published with, in a form two
+ * publishes can compare.
+ */
+function publishableContent(simFunction: SimLambdaFunction): string {
+  const configuration = simFunction.configuration();
+
+  return JSON.stringify([
+    configuration.CodeSha256,
+    configuration.Role,
+    configuration.Handler,
+    configuration.Runtime,
+    configuration.Timeout,
+    configuration.MemorySize,
+    configuration.Description,
+    configuration.Environment,
+    configuration.DeadLetterConfig,
+  ]);
 }
 
 /**

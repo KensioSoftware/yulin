@@ -25,6 +25,7 @@ import { simAwsWithStreamEventSource } from "./stream-event-source-fixture.js";
 export async function failingMappingWithBucket(
   source: "dynamodb" | "kinesis",
   actions: readonly string[],
+  filterPatterns?: readonly string[],
 ): Promise<
   (SimDynamoDbStreamEventSourceFixture | SimKinesisEventSourceFixture) & {
     readonly bucket: string;
@@ -35,6 +36,7 @@ export async function failingMappingWithBucket(
   await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: bucket }));
   const options = {
     simAws,
+    ...(filterPatterns !== undefined && { filterPatterns }),
     destinationArn: `arn:aws:s3:::${bucket}`,
     maximumRetryAttempts: 1,
     handlerResult: (): never => {
