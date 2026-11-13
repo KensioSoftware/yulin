@@ -25,6 +25,11 @@ import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
 } from "./create-user/create-user.command.js";
+import { ListAttachedUserPoliciesCommandHandler } from "./list-attached-user-policies/list-attached-user-policies.handler.js";
+import type {
+  SimListAttachedUserPoliciesCommand,
+  SimListAttachedUserPoliciesCommandOutput,
+} from "./list-attached-user-policies/list-attached-user-policies.command.js";
 import { DeleteUserCommandHandler } from "./delete-user/delete-user.handler.js";
 import type {
   SimDeleteUserCommand,
@@ -151,6 +156,25 @@ export class SimIamUserCommandHandlers {
   }
 
   /**
+   * Handle a ListAttachedUserPolicies command from the SDK.
+   */
+  async listAttachedUserPolicies(
+    command: SimListAttachedUserPoliciesCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimListAttachedUserPoliciesCommandOutput> {
+    this.authorizer.authorize(
+      "iam:ListAttachedUserPolicies",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
+    const handler = new ListAttachedUserPoliciesCommandHandler({
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
    * Handle a CreateAccessKey command from the SDK.
    */
   async createAccessKey(
@@ -175,6 +199,9 @@ export class SimIamUserCommandHandlers {
    * The User ARN a command operates on, for authorization.
    */
   private userArn(username = "*"): string {
-    return `arn:aws:iam::${this.accountId}:user/${username}`;
+    return (
+      this.users.get(username as SimIamUsername)?.arn ??
+      `arn:aws:iam::${this.accountId}:user/${username}`
+    );
   }
 }

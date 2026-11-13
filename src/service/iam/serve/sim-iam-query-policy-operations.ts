@@ -55,6 +55,22 @@ export function simIamQueryPolicyOperations(): SimQueryOperations {
       },
     ],
     [
+      "GetPolicyVersion",
+      {
+        input: (fields): Record<string, unknown> => ({
+          PolicyArn: fields.text("PolicyArn"),
+          VersionId: fields.text("VersionId"),
+        }),
+        result: (output): string =>
+          iamQueryEntity(output, "PolicyVersion", [
+            "Document",
+            "VersionId",
+            "IsDefaultVersion",
+            "CreateDate",
+          ]),
+      },
+    ],
+    [
       "ListPolicies",
       {
         input: (fields): Record<string, unknown> => ({

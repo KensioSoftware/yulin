@@ -6,6 +6,7 @@ import {
 } from "../../../../../util/background/background.js";
 import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
+import { simIamManagedPolicyLookup } from "../../../policy/sim-iam-managed-policy-lookup.js";
 import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
@@ -18,6 +19,10 @@ interface GetPolicyCommandHandlerProperties {
 
 /**
  * IAM GetPolicyCommand handler.
+ *
+ * An AWS-managed policy ARN answers from the catalogue of AWS-managed
+ * policies. One outside the catalogue is refused, as an ARN naming no policy
+ * is.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/iam/command/GetPolicyCommand/
  */
@@ -50,7 +55,7 @@ export class GetPolicyCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const policy = this.policies.get(policyArn);
+    const policy = simIamManagedPolicyLookup(this.policies, policyArn);
 
     if (policy === undefined) {
       throw new SimIamNoSuchEntity(`No IAM Policy with ARN ${policyArn}`);

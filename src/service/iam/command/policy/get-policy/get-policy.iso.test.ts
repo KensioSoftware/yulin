@@ -90,4 +90,40 @@ describe("IAM GetPolicyCommand", () => {
 
     assertInstanceOf(error, SimIamNoSuchEntity);
   });
+
+  it("describes an AWS-managed policy from the catalogue", async () => {
+    // Given a simulation that has created no policies.
+    const simIam = new SimAws().iam();
+
+    // When it is asked for AWSLambdaBasicExecutionRole.
+    const output = await simIam.getPolicy(
+      new GetPolicyCommand({
+        PolicyArn:
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+      }),
+    );
+
+    // Then it describes the policy as AWS does.
+    assertIdentical(output.Policy.PolicyName, "AWSLambdaBasicExecutionRole");
+    assertIdentical(output.Policy.Path, "/service-role/");
+    assertIdentical(output.Policy.DefaultVersionId, "v1");
+    assertTrue(output.Policy.IsAttachable);
+  });
+
+  it("refuses an AWS-managed policy outside the catalogue", async () => {
+    // Given a simulation.
+    const simIam = new SimAws().iam();
+
+    // When it is asked for an AWS-managed policy the catalogue does not hold.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.getPolicy(
+        new GetPolicyCommand({
+          PolicyArn: "arn:aws:iam::aws:policy/AmazonMacieFullAccess",
+        }),
+      ),
+    );
+
+    // Then it answers as IAM does for a policy that does not exist.
+    assertInstanceOf(error, SimIamNoSuchEntity);
+  });
 });

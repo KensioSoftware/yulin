@@ -22,6 +22,18 @@ export type {
   SimGetPolicyCommandOutput,
 } from "./policy/get-policy/get-policy.command.js";
 export type {
+  SimGetPolicyVersionCommand,
+  SimGetPolicyVersionCommandOutput,
+} from "./policy/get-policy-version/get-policy-version.command.js";
+export type {
+  SimListAttachedRolePoliciesCommand,
+  SimListAttachedRolePoliciesCommandOutput,
+} from "./role/list-attached-role-policies/list-attached-role-policies.command.js";
+export type {
+  SimListAttachedUserPoliciesCommand,
+  SimListAttachedUserPoliciesCommandOutput,
+} from "./user/list-attached-user-policies/list-attached-user-policies.command.js";
+export type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
 } from "./policy/list-policies/list-policies.command.js";

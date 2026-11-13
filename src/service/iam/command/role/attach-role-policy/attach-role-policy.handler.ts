@@ -21,12 +21,13 @@ interface AttachRolePolicyCommandHandlerProperties {
  *
  * AttachRolePolicy records that a managed policy is attached to a role by ARN.
  * The attachment refers to the managed policy rather than copying its document,
- * so authorization resolves the referenced policy from the account policy store
- * at evaluation time.
+ * so authorization resolves the referenced policy at evaluation time, from the
+ * account policy store or from the catalogue of AWS-managed policies.
  *
  * Attachment state is stored independently of policy storage. Attaching an ARN
- * that has no stored managed policy (for example an AWS-managed policy ARN) is
- * allowed and simply contributes no statements to authorization decisions.
+ * that resolves to neither (for example an AWS-managed policy outside the
+ * catalogue) is allowed and contributes no statements to authorization
+ * decisions.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/iam/command/AttachRolePolicyCommand/
  */

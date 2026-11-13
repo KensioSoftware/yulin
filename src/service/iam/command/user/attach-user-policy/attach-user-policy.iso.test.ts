@@ -56,7 +56,7 @@ describe("IAM AttachUserPolicyCommand", () => {
   });
 
   it("attaches a Policy ARN with no stored Policy behind it", async () => {
-    // Given a User and an AWS-managed Policy ARN the simulation does not hold.
+    // Given a User and an AWS-managed Policy ARN outside the catalogue.
     const simAws = new SimAws();
     const simIam = simAws.account(makeSimAwsAccountId()).iam();
     const userCreation = await simIam.createUser(
@@ -67,7 +67,7 @@ describe("IAM AttachUserPolicyCommand", () => {
     await simIam.attachUserPolicy(
       new AttachUserPolicyCommand({
         UserName: "ApplicationUser",
-        PolicyArn: "arn:aws:iam::aws:policy/ReadOnlyAccess",
+        PolicyArn: "arn:aws:iam::aws:policy/AmazonMacieFullAccess",
       }),
     );
 
@@ -75,7 +75,9 @@ describe("IAM AttachUserPolicyCommand", () => {
     const user = simIam.users.get("ApplicationUser" as never);
 
     assertTrue(
-      user?.attachedPolicyArns.has("arn:aws:iam::aws:policy/ReadOnlyAccess"),
+      user?.attachedPolicyArns.has(
+        "arn:aws:iam::aws:policy/AmazonMacieFullAccess",
+      ),
     );
 
     const decision = simIam.authorize({
