@@ -24,7 +24,7 @@ export function unsimulatedOperatorRefusal(
   return eventPatternRefusal(
     `the ${operator} operator is not simulated, so this pattern cannot be ` +
       `evaluated. Simulated EventBridge supports exact values, prefix, ` +
-      `suffix, anything-but, numeric and exists.`,
+      `suffix, equals-ignore-case, anything-but, numeric, exists and $or.`,
   );
 }
 

@@ -27,8 +27,8 @@ describe("Serving the simulated Lambda control plane", () => {
     // When a Lambda operation this simulation has not implemented is asked
     // for, at a path that shares its method with one it has
     const response = await send(
-      "POST",
-      "/2015-03-31/functions/orders/versions",
+      "PUT",
+      "/2019-09-30/functions/orders/provisioned-concurrency",
     );
 
     // Then it is refused rather than answered by the operation beside it, and
@@ -37,7 +37,7 @@ describe("Serving the simulated Lambda control plane", () => {
     assertIdentical(response.headers.get("x-amzn-errortype"), "NotImplemented");
     assertStringIncludes(
       await response.text(),
-      "POST /2015-03-31/functions/orders/versions",
+      "PUT /2019-09-30/functions/orders/provisioned-concurrency",
     );
   });
 

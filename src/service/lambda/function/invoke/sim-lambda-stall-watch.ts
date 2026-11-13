@@ -1,4 +1,7 @@
-import { clearTimeout, setTimeout } from "node:timers";
+import {
+  hostClearTimeout as clearTimeout,
+  hostSetTimeout as setTimeout,
+} from "../../../../util/timer/host-timers.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimLambdaPendingTimer } from "./timer/sim-lambda-pending-timer.js";
 

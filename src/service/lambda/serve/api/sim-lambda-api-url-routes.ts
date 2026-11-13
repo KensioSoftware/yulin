@@ -21,7 +21,7 @@ export const simLambdaUrlApiRoutes: readonly SimRestJsonRoute[] = [
     method: "GET",
     path: "/2021-10-31/functions/{FunctionName}/url",
     commandName: "GetFunctionUrlConfigCommand",
-    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+    input: urlConfigTarget,
   },
   {
     method: "PUT",
@@ -34,7 +34,7 @@ export const simLambdaUrlApiRoutes: readonly SimRestJsonRoute[] = [
     path: "/2021-10-31/functions/{FunctionName}/url",
     commandName: "DeleteFunctionUrlConfigCommand",
     status: 204,
-    input: (input) => ({ FunctionName: input.label("FunctionName") }),
+    input: urlConfigTarget,
   },
   {
     method: "GET",
@@ -49,5 +49,16 @@ export const simLambdaUrlApiRoutes: readonly SimRestJsonRoute[] = [
  * the configuration itself in the body.
  */
 function urlConfigInput(input: SimRestJsonInput): Record<string, unknown> {
-  return { ...input.json(), FunctionName: input.label("FunctionName") };
+  return { ...input.json(), ...urlConfigTarget(input) };
+}
+
+/**
+ * Read the function a configuration request names in its path, and the alias
+ * it names in the `Qualifier` query parameter, if any.
+ */
+function urlConfigTarget(input: SimRestJsonInput): Record<string, unknown> {
+  return {
+    FunctionName: input.label("FunctionName"),
+    Qualifier: input.query("Qualifier"),
+  };
 }

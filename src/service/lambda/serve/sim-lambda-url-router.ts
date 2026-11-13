@@ -1,6 +1,7 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimLambdaFunction } from "../function/sim-lambda-function.js";
+import type { SimLambdaPolicyResource } from "../function/policy/sim-lambda-policy-resource.js";
 import type {
   SimLambdaFunctionUrl,
   SimLambdaFunctionUrlId,
@@ -11,6 +12,9 @@ import { simScopeIamAuthZ } from "../../iam/authorize/sim-iam-region-auth-z.js";
 
 export interface SimLambdaFunctionUrlRoute {
   readonly functionUrl: SimLambdaFunctionUrl;
+  /** The function or alias the URL is on, which authorizes the request. */
+  readonly resource: SimLambdaPolicyResource;
+  /** The version that runs, which an alias URL resolves to. */
   readonly simFunction: SimLambdaFunction;
   /**
    * IAM of the Account that owns the function, which is what an `AWS_IAM`
@@ -68,13 +72,16 @@ export class SimLambdaUrlRouter {
       return undefined;
     }
 
-    const simFunction = lambda.getSimFunctionByName(functionUrl.functionName);
+    const functionTarget = lambda.getSimFunctionTarget(
+      functionUrl.functionName,
+      functionUrl.qualifier,
+    );
 
     /* v8 ignore if -- defensive check: a URL cannot outlive its function */
-    if (simFunction === undefined) {
+    if (functionTarget === undefined) {
       return undefined;
     }
 
-    return { functionUrl, simFunction, iam: simScopeIamAuthZ(scope) };
+    return { functionUrl, ...functionTarget, iam: simScopeIamAuthZ(scope) };
   }
 }

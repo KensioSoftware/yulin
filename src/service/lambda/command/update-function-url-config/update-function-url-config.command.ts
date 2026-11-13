@@ -25,6 +25,8 @@ export interface SimUpdateFunctionUrlConfigCommand {
  */
 export interface SimUpdateFunctionUrlConfigCommandInput {
   readonly FunctionName?: string | undefined;
+  /** The alias whose Function URL this is, or none for the function's own. */
+  readonly Qualifier?: string | undefined;
   readonly AuthType?: SimLambdaFunctionUrlAuthType | undefined;
   readonly InvokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
   readonly Cors?: SimLambdaFunctionUrlCors | undefined;

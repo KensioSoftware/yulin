@@ -212,6 +212,7 @@ export class SimLambdaCommands {
     this.aliases = new SimLambdaAliasCommands({
       functions: this.functionLookup,
       aliases: this.aliasStore,
+      functionUrls: this.functionUrlStore,
       iam,
       background,
     });

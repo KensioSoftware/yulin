@@ -219,4 +219,52 @@ describe("EventBridge event pattern matching", () => {
       }),
     );
   });
+
+  it("matches a string in any case with equals-ignore-case", async () => {
+    assertTrue(
+      await matches({ source: [{ "equals-ignore-case": "ORDERS.Service" }] }),
+    );
+    assertTrue(
+      await matches({
+        detail: { currency: [{ prefix: { "equals-ignore-case": "gb" } }] },
+      }),
+    );
+    assertTrue(
+      await matches({
+        source: [{ suffix: { "equals-ignore-case": ".SERVICE" } }],
+      }),
+    );
+    assertFalse(
+      await matches({ source: [{ "equals-ignore-case": "billing.service" }] }),
+    );
+    assertFalse(
+      await matches({ detail: { total: [{ "equals-ignore-case": "4200" }] } }),
+    );
+  });
+
+  it("matches when any one alternative of an $or matches", async () => {
+    // Given an $or alongside a field every alternative shares.
+    // Then one alternative holding is enough, and the shared field still
+    // has to hold too.
+    assertTrue(
+      await matches({
+        source: ["orders.service"],
+        $or: [
+          { region: ["eu-west-2"] },
+          { detail: { customer: { tier: ["gold"] } } },
+        ],
+      }),
+    );
+    assertFalse(
+      await matches({
+        $or: [{ region: ["eu-west-2"] }, { detail: { currency: ["USD"] } }],
+      }),
+    );
+    assertFalse(
+      await matches({
+        source: ["billing.service"],
+        $or: [{ region: ["us-east-1"] }, { detail: { currency: ["GBP"] } }],
+      }),
+    );
+  });
 });

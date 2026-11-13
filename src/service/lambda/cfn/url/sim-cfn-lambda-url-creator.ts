@@ -9,7 +9,7 @@ import type {
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
 import { simCfnLambdaUrlCors } from "./sim-cfn-lambda-url-cors.js";
-import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
+import { simLambdaFunctionUrlReference } from "../../command/function-url/function-url-reference.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
 interface SimCfnLambdaUrlCreatorProperties {
@@ -21,7 +21,8 @@ interface SimCfnLambdaUrlCreatorProperties {
  *
  * This is the resource CDK's `Function.addFunctionUrl()` emits, so a deployed
  * template is the usual way a Function URL comes into existence outside a
- * direct SDK call.
+ * direct SDK call. `Qualifier`, or a qualified `TargetFunctionArn`, puts the
+ * URL on an alias, which is what CDK writes for `Alias.addFunctionUrl()`.
  */
 export class SimCfnLambdaUrlCreator {
   private readonly lambda: SimLambda;
@@ -44,12 +45,20 @@ export class SimCfnLambdaUrlCreator {
       properties["TargetFunctionArn"],
       "TargetFunctionArn",
     );
-    const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
+    const { functionName, qualifier } = simLambdaFunctionUrlReference(
+      targetFunctionArn,
+      this.propertyParser.optionalString(
+        resource,
+        properties["Qualifier"],
+        "Qualifier",
+      ),
+    );
 
     await this.lambda.createFunctionUrlConfig(
       {
         input: {
           FunctionName: functionName,
+          Qualifier: qualifier,
           AuthType: this.propertyParser.requiredString(
             resource,
             properties["AuthType"],
@@ -70,7 +79,7 @@ export class SimCfnLambdaUrlCreator {
       options,
     );
 
-    const functionUrl = this.lambda.getSimFunctionUrl(functionName);
+    const functionUrl = this.lambda.getSimFunctionUrl(functionName, qualifier);
     assertDefined(
       functionUrl,
       `Sim Lambda Function URL for ${functionName} after CloudFormation creation`,

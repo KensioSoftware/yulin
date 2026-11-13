@@ -1,3 +1,4 @@
+import { installSimLambdaTimerModules } from "./timer/sim-lambda-timer-modules.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimLambdaOutput } from "../logging/sim-lambda-output.js";
 import type { SimLambdaOutputSink } from "../logging/sim-lambda-output-sink.js";
@@ -51,9 +52,11 @@ export async function runSimLambdaInHostScope<T>(
 ): Promise<T> {
   const { clock, outboundHttp, output, outputSettings } = scope;
 
-  // Host-scope code reaches for the global timer functions, so the invocation
-  // its handler runs in has to be findable from them.
+  // Host-scope code reaches for the global timer functions, or imports them
+  // from the timer modules, so the invocation its handler runs in has to be
+  // findable from either.
   simLambdaProcessTimers.install();
+  installSimLambdaTimerModules();
 
   const recording =
     output === undefined

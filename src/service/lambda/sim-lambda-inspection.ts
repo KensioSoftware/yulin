@@ -83,11 +83,15 @@ export abstract class SimLambdaInspection {
       : this.commands.versionStore.of(simFunction).alias(aliasName);
   }
 
-  /** Get a simulated Lambda function's Function URL, if it has one. */
+  /**
+   * Get the Function URL of a simulated Lambda function, or of one of its
+   * aliases, if it has one.
+   */
   getSimFunctionUrl(
     functionName: SimLambdaFunctionName | string,
+    aliasName?: string,
   ): SimLambdaFunctionUrl | undefined {
-    return this.commands.functionUrlStore.get(functionName);
+    return this.commands.functionUrlStore.get(functionName, aliasName);
   }
 
   /**

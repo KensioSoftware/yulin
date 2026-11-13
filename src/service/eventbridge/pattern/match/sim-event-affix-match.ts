@@ -1,8 +1,6 @@
 import type { JSONValue } from "../../../../util/type-guard/json.js";
-import {
-  patternString,
-  unsimulatedOperatorRefusal,
-} from "../sim-event-pattern-refusals.js";
+import { isRecord } from "../../../../util/type-guard/record.js";
+import { patternString } from "../sim-event-pattern-refusals.js";
 import { SimEventPatternMatch } from "./sim-event-pattern-match.js";
 
 /**
@@ -12,10 +10,32 @@ export const eventPatternPrefixOperator = "prefix";
 export const eventPatternSuffixOperator = "suffix";
 
 /**
- * The case-insensitive form both operators can be written in, which this
- * simulation does not evaluate.
+ * The case-insensitive form both operators can be written in.
  */
 const ignoreCaseOperator = "equals-ignore-case";
+
+/**
+ * Read the string a `prefix` or `suffix` compares against, and whether it was
+ * written in the case-insensitive form.
+ */
+function affixOperand(
+  written: JSONValue,
+  operator: string,
+): { readonly affix: string; readonly ignoreCase: boolean } {
+  if (!isRecord(written) || !Object.hasOwn(written, ignoreCaseOperator)) {
+    return { affix: patternString(written, operator), ignoreCase: false };
+  }
+
+  const nested = new Map(Object.entries(written)).get(ignoreCaseOperator);
+
+  return {
+    affix: patternString(
+      nested ?? null,
+      `${operator} with ${ignoreCaseOperator}`,
+    ),
+    ignoreCase: true,
+  };
+}
 
 /**
  * `{"prefix": "us-"}` and `{"suffix": ".png"}`.
@@ -24,20 +44,20 @@ const ignoreCaseOperator = "equals-ignore-case";
  * they read. Both compare against a string, so neither matches a number or a
  * boolean in an event, here as on real AWS.
  *
- * Real EventBridge also writes both with a nested `equals-ignore-case` operand
- * to compare regardless of case. That form is refused by name rather than
- * evaluated case-sensitively, which would silently answer a different question
- * from the one the pattern asked. Any other object operand is refused as
- * malformed rather than as that form, so the message says what is actually
- * wrong.
+ * Either can be written with a nested `equals-ignore-case` operand, such as
+ * `{"prefix": {"equals-ignore-case": "us-"}}`, to compare regardless of case.
+ * Any other object operand is refused as malformed.
  */
 export class SimEventAffixMatch extends SimEventPatternMatch {
   private readonly affix: string;
   private readonly atEnd: boolean;
+  private readonly ignoreCase: boolean;
 
-  private constructor(affix: string, atEnd: boolean) {
+  private constructor(written: JSONValue, operator: string, atEnd: boolean) {
     super();
-    this.affix = affix;
+    const { affix, ignoreCase } = affixOperand(written, operator);
+    this.ignoreCase = ignoreCase;
+    this.affix = ignoreCase ? affix.toLowerCase() : affix;
     this.atEnd = atEnd;
   }
 
@@ -45,33 +65,14 @@ export class SimEventAffixMatch extends SimEventPatternMatch {
    * Read a `prefix` condition.
    */
   static prefix(operand: JSONValue): SimEventAffixMatch {
-    return new this(this.affixIn(operand, eventPatternPrefixOperator), false);
+    return new this(operand, eventPatternPrefixOperator, false);
   }
 
   /**
    * Read a `suffix` condition.
    */
   static suffix(operand: JSONValue): SimEventAffixMatch {
-    return new this(this.affixIn(operand, eventPatternSuffixOperator), true);
-  }
-
-  /**
-   * Read the string either operator compares against, refusing the
-   * case-insensitive form.
-   */
-  private static affixIn(operand: JSONValue, operator: string): string {
-    if (
-      operand !== null &&
-      typeof operand === "object" &&
-      !Array.isArray(operand) &&
-      Object.hasOwn(operand, ignoreCaseOperator)
-    ) {
-      throw unsimulatedOperatorRefusal(
-        `${operator} with ${ignoreCaseOperator}`,
-      );
-    }
-
-    return patternString(operand, operator);
+    return new this(operand, eventPatternSuffixOperator, true);
   }
 
   /**
@@ -83,10 +84,10 @@ export class SimEventAffixMatch extends SimEventPatternMatch {
       return false;
     }
 
-    if (this.atEnd) {
-      return value.endsWith(this.affix);
-    }
+    const compared = this.ignoreCase ? value.toLowerCase() : value;
 
-    return value.startsWith(this.affix);
+    return this.atEnd
+      ? compared.endsWith(this.affix)
+      : compared.startsWith(this.affix);
   }
 }

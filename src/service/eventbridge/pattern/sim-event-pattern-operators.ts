@@ -18,6 +18,10 @@ import {
 } from "./match/sim-event-numeric-match.js";
 import type { SimEventPatternMatch } from "./match/sim-event-pattern-match.js";
 import {
+  eventPatternIgnoreCaseOperator,
+  SimEventIgnoreCaseMatch,
+} from "./match/sim-event-ignore-case-match.js";
+import {
   eventPatternRefusal,
   unsimulatedOperatorRefusal,
 } from "./sim-event-pattern-refusals.js";
@@ -56,6 +60,10 @@ const operators: ReadonlyMap<string, SimEventPatternOperatorReader> = new Map<
     eventPatternExistsOperator,
     (operand): SimEventPatternMatch => SimEventExistsMatch.of(operand),
   ],
+  [
+    eventPatternIgnoreCaseOperator,
+    (operand): SimEventPatternMatch => SimEventIgnoreCaseMatch.of(operand),
+  ],
 ]);
 
 /**
@@ -66,12 +74,7 @@ const operators: ReadonlyMap<string, SimEventPatternOperatorReader> = new Map<
  * gets tells them whether they mistyped an operator or reached for one that is
  * not here yet.
  */
-const unsimulatedOperators = new Set([
-  "cidr",
-  "equals-ignore-case",
-  "wildcard",
-  "$or",
-]);
+const unsimulatedOperators = new Set(["cidr", "wildcard"]);
 
 /**
  * Read the one operator a condition object is written with.

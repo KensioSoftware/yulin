@@ -1,3 +1,4 @@
+import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import {
   type BackgroundScheduler,
@@ -21,6 +22,8 @@ import type {
 interface DeleteAliasCommandHandlerProperties {
   readonly functions: SimLambdaFunctionLookup;
   readonly aliases: SimLambdaFunctionAliasStore;
+  /** Where the alias's Function URL is held, which goes with the alias. */
+  readonly functionUrls?: SimLambdaFunctionUrlStore | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
@@ -40,6 +43,7 @@ export class DeleteAliasCommandHandler implements CommandHandler<
 > {
   private readonly functions: SimLambdaFunctionLookup;
   private readonly aliases: SimLambdaFunctionAliasStore;
+  private readonly functionUrls: SimLambdaFunctionUrlStore | undefined;
   private readonly authorizer: VersionAuthorizer;
   private readonly background: BackgroundScheduler;
 
@@ -52,6 +56,7 @@ export class DeleteAliasCommandHandler implements CommandHandler<
     } = properties;
     this.functions = functions;
     this.aliases = aliases;
+    this.functionUrls = properties.functionUrls;
     this.authorizer = new VersionAuthorizer({
       iam,
       action: "lambda:DeleteAlias",
@@ -85,7 +90,13 @@ export class DeleteAliasCommandHandler implements CommandHandler<
       options?.caller,
     );
 
-    this.aliases.delete(this.functions.require(functionName), input.Name);
+    const simFunction = this.functions.require(functionName);
+    this.aliases.delete(simFunction, input.Name);
+    // A Function URL on the alias goes with it.
+    const functionUrl = this.functionUrls?.get(simFunction.name, input.Name);
+    if (functionUrl !== undefined) {
+      this.functionUrls?.delete(functionUrl);
+    }
 
     return { $metadata: {} };
   }

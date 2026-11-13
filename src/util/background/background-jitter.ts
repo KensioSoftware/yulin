@@ -1,4 +1,4 @@
-import { setTimeout } from "node:timers";
+import { hostSetTimeout as setTimeout } from "../timer/host-timers.js";
 
 /**
  * A short random pause between scheduling a task and running it.

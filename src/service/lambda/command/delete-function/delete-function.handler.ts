@@ -118,7 +118,7 @@ export class DeleteFunctionCommandHandler implements CommandHandler<
       );
     }
 
-    this.functionUrls.deleteIfPresent(simFunction);
+    this.functionUrls.deleteAllForFunction(simFunction);
     this.versions.forget(simFunction);
     this.eventInvokeConfigs?.deleteForFunction(functionName);
     this.functions.delete(functionName);

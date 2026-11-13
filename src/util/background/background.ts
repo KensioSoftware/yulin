@@ -1,6 +1,6 @@
 /* oxlint-disable unicorn-js/prefer-await  */
 
-import { setTimeout } from "node:timers";
+import { hostSetTimeout as setTimeout } from "../timer/host-timers.js";
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
 import { BackgroundPendingTasks } from "./background-pending-tasks.js";
 import {

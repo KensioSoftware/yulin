@@ -17,6 +17,8 @@ export interface SimGetFunctionUrlConfigCommand {
  */
 export interface SimGetFunctionUrlConfigCommandInput {
   readonly FunctionName?: string | undefined;
+  /** The alias whose Function URL this is, or none for the function's own. */
+  readonly Qualifier?: string | undefined;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { setTimeout as hostSleep } from "node:timers/promises";
+import { hostSetTimeoutPromise as hostSleep } from "../../../../util/timer/host-timers.js";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,

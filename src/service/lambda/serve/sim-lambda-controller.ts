@@ -105,7 +105,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     }
 
     const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize({
-      simFunction: route.simFunction,
+      resource: route.resource,
       functionUrl: route.functionUrl,
       caller: caller.toCaller(),
       source: serviceRequest.source,
