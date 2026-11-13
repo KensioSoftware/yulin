@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimArn } from "../../../aws/arn.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import type {
@@ -62,6 +63,10 @@ interface SimIamAuthZContextBuilderProperties {
    * standalone SimIam has no organization around it and leaves this out.
    */
   readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
+  /**
+   * The simulation's clock, which a request's time is read from.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -99,10 +104,11 @@ export class SimIamAuthZContextBuilder {
   private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
   private readonly callerAccountResolver: SimIamCallerAccountResolver;
   private readonly allowRequirement = new SimIamAuthZAllowRequirement();
-  private readonly derivedConditions = new SimIamDerivedConditions();
+  private readonly derivedConditions: SimIamDerivedConditions;
   private readonly scpSourceBuilder: SimIamAuthZScpSourceBuilder;
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
+    this.derivedConditions = new SimIamDerivedConditions(properties.clock);
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder({
       accountRootPrincipal: makeSimAwsAccountRootPrincipal(
         properties.accountId,

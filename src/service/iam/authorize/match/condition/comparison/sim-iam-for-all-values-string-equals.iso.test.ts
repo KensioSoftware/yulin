@@ -1,7 +1,7 @@
 import { assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
-import { SimIam } from "../../../../../sim-iam.js";
+import { simIamAuthZResourcePolicySourceFactory } from "../../../context/sim-iam-auth-z-context.factory.js";
+import { SimIam } from "../../../../sim-iam.js";
 
 describe("sim IAM ForAllValues:StringEquals authorization", () => {
   it("allows a request when every context value equals a policy value", () => {
@@ -216,55 +216,66 @@ describe("sim IAM ForAllValues:StringEquals authorization", () => {
     assertTrue(decision.isAllowed);
   });
 
-  it.each([
-    {
-      name: "context values",
-      expectedValues: ["classification"],
-      actualValues: [],
-    },
-    {
-      name: "policy values",
-      expectedValues: [],
-      actualValues: ["classification"],
-    },
-  ])(
-    "implicitly denies a request when $name are empty",
-    ({ expectedValues, actualValues }) => {
-      // Given a policy using the supplied accepted tag-key values.
-      const simIam = new SimIam();
-      const policy = simIamAuthZResourcePolicySourceFactory.make({
-        document: {
-          Statement: {
-            Effect: "Allow",
-            Principal: "*",
-            Action: "s3:PutObjectTagging",
-            Resource: "arn:aws:s3:::example-bucket/example-key.txt",
-            Condition: {
-              "ForAllValues:StringEquals": {
-                "aws:TagKeys": expectedValues,
-              },
-            },
+  it("allows a request whose context values are empty", () => {
+    // Given a policy accepting one tag key.
+    const simIam = new SimIam();
+    const policy = simIamAuthZResourcePolicySourceFactory.make({
+      document: {
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:PutObjectTagging",
+          Resource: "arn:aws:s3:::example-bucket/example-key.txt",
+          Condition: {
+            "ForAllValues:StringEquals": { "aws:TagKeys": ["classification"] },
           },
         },
-      });
+      },
+    });
 
-      // When either side of the condition comparison is empty.
-      const decision = simIam.authorize({
-        action: "s3:PutObjectTagging",
-        resource: "arn:aws:s3:::example-bucket/example-key.txt",
-        caller: {
-          kind: "anonymous",
-        },
-        conditionContext: {
-          "aws:TagKeys": actualValues,
-        },
-        resourcePolicies: [policy],
-      });
+    // When the request supplies the tag-key context with nothing in it.
+    const decision = simIam.authorize({
+      action: "s3:PutObjectTagging",
+      resource: "arn:aws:s3:::example-bucket/example-key.txt",
+      caller: { kind: "anonymous" },
+      conditionContext: { "aws:TagKeys": [] },
+      resourcePolicies: [policy],
+    });
 
-      // Then the empty values do not satisfy the condition.
-      assertTrue(decision.isImplicitDeny);
-    },
-  );
+    // Then no value contradicts the condition. AWS reads an empty set as a
+    // match, and a Null guard is what keeps such a grant tight.
+    assertTrue(decision.isAllowed);
+  });
+
+  it("implicitly denies a request when the policy values are empty", () => {
+    // Given a policy accepting no tag keys at all.
+    const simIam = new SimIam();
+    const policy = simIamAuthZResourcePolicySourceFactory.make({
+      document: {
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:PutObjectTagging",
+          Resource: "arn:aws:s3:::example-bucket/example-key.txt",
+          Condition: {
+            "ForAllValues:StringEquals": { "aws:TagKeys": [] },
+          },
+        },
+      },
+    });
+
+    // When the request supplies a tag key.
+    const decision = simIam.authorize({
+      action: "s3:PutObjectTagging",
+      resource: "arn:aws:s3:::example-bucket/example-key.txt",
+      caller: { kind: "anonymous" },
+      conditionContext: { "aws:TagKeys": ["classification"] },
+      resourcePolicies: [policy],
+    });
+
+    // Then the tag key matches none of the policy values.
+    assertTrue(decision.isImplicitDeny);
+  });
 
   it("implicitly denies a request with a non-string context value", () => {
     // Given a policy requiring an accepted string tag key.

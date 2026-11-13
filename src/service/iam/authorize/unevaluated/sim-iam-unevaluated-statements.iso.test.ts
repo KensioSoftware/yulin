@@ -16,7 +16,7 @@ const denyAfterFreeze = {
     Action: "s3:CreateBucket",
     Resource: "*",
     Condition: {
-      DateGreaterThan: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
+      DateAfter: { "aws:CurrentTime": "2026-01-01T00:00:00Z" },
     },
   },
 } as const;
@@ -24,7 +24,7 @@ const denyAfterFreeze = {
 describe("Sim IAM statements it could not evaluate", () => {
   it("reports a service control policy statement holding an operator it cannot read", () => {
     // Given an organization denying Bucket creation past a date, under a
-    // condition operator sim IAM has no implementation for.
+    // condition operator IAM does not define.
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws({ defaultAccountId: accountId });
 
@@ -55,7 +55,7 @@ describe("Sim IAM statements it could not evaluate", () => {
     assertIdentical(unevaluated.statement.Sid, "DenyBucketCreationAfterFreeze");
     assertIdentical(
       unevaluated.reason,
-      "unsupported condition operator DateGreaterThan",
+      "unsupported condition operator DateAfter",
     );
   });
 
@@ -152,7 +152,7 @@ describe("Sim IAM statements it could not evaluate", () => {
                 Action: "s3:GetObject",
                 Resource: "arn:aws:s3:::reports-bucket/*",
                 Condition: {
-                  DateGreaterThan: {
+                  DateAfter: {
                     "aws:CurrentTime": "2026-01-01T00:00:00Z",
                   },
                   StringEquals: { "aws:SourceVpce": "vpce-1a2b3c4d" },
@@ -193,7 +193,7 @@ describe("Sim IAM statements it could not evaluate", () => {
                 Action: "s3:DeleteObject",
                 Resource: "arn:aws:s3:::reports-bucket/*",
                 Condition: {
-                  DateGreaterThan: {
+                  DateAfter: {
                     "aws:CurrentTime": "2026-01-01T00:00:00Z",
                   },
                 },
@@ -230,7 +230,7 @@ describe("Sim IAM statements it could not evaluate", () => {
                 Action: "s3:GetObject",
                 Resource: "arn:aws:s3:::reports-bucket/*",
                 Condition: {
-                  DateGreaterThan: {
+                  DateAfter: {
                     "aws:CurrentTime": "2026-01-01T00:00:00Z",
                   },
                 },
@@ -270,7 +270,7 @@ describe("Sim IAM statements it could not evaluate", () => {
                 Action: "s3:GetObject",
                 Resource: "arn:aws:s3:::reports-bucket/*",
                 Condition: {
-                  DateGreaterThan: {
+                  DateAfter: {
                     "aws:CurrentTime": "2026-01-01T00:00:00Z",
                   },
                 },

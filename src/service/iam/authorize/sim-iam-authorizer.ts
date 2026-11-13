@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimArn } from "../../aws/arn.js";
 import type { SimIamPolicy } from "../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../role/sim-iam-role.js";
@@ -27,6 +28,10 @@ interface SimIamAuthorizerProperties {
   readonly ambientCaller?: SimAwsAmbientCaller | undefined;
   readonly iamResolver?: SimIamAccountResolver | undefined;
   readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
+  /**
+   * The simulation's clock, which a request's time is read from.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -51,6 +56,7 @@ export class SimIamAuthorizer implements SimIamAccountIdentityPolicies {
       ambientCaller: properties.ambientCaller,
       iamResolver: properties.iamResolver,
       scpResolver: properties.scpResolver,
+      clock: properties.clock,
     });
   }
 

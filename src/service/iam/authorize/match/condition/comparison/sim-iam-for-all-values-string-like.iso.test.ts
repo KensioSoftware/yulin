@@ -1,7 +1,7 @@
 import { assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
-import { SimIam } from "../../../../../sim-iam.js";
+import { simIamAuthZResourcePolicySourceFactory } from "../../../context/sim-iam-auth-z-context.factory.js";
+import { SimIam } from "../../../../sim-iam.js";
 
 describe("sim IAM ForAllValues:StringLike authorization", () => {
   it("allows a request when every context value matches a policy pattern", () => {

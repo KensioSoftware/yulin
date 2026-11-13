@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimArn } from "../../aws/arn.js";
 import type { SimAwsCredentialIdentityResolver } from "../../aws/caller/sim-aws-caller-resolver.js";
@@ -55,6 +56,10 @@ interface SimIamAccountAuthZProperties {
    * has none, and its Accounts sit outside any organization.
    */
   readonly scpResolver?: SimIamServiceControlPolicyResolver | undefined;
+  /**
+   * The simulation's clock, which a request's time is read from.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -108,6 +113,7 @@ export class SimIamAccountAuthZ implements SimIamAccountIdentityPolicies {
       ambientCaller: this.properties.ambientCaller,
       iamResolver: this.properties.iamResolver,
       scpResolver: this.properties.scpResolver,
+      clock: this.properties.clock,
     });
   }
 }

@@ -1,8 +1,8 @@
 import { assertFalse, assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
-import { SimIam } from "../../../../../sim-iam.js";
+import { simIamAuthZResourcePolicySourceFactory } from "../../../context/sim-iam-auth-z-context.factory.js";
+import { SimIam } from "../../../../sim-iam.js";
 
 describe("sim IAM StringEquals authorization", () => {
   it("allows a request when the context value exactly equals the policy value", () => {

@@ -1,6 +1,6 @@
 import {
   assertArrayEquals,
-  assertArrayLength,
+  assertNonNullable,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -8,16 +8,48 @@ import { describe, it } from "vitest";
 
 import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-parser.js";
 
+/**
+ * Every comparison keyword the IAM condition operator reference lists.
+ */
+const documentedKeywords = [
+  "StringEquals",
+  "StringNotEquals",
+  "StringEqualsIgnoreCase",
+  "StringNotEqualsIgnoreCase",
+  "StringLike",
+  "StringNotLike",
+  "NumericEquals",
+  "NumericNotEquals",
+  "NumericLessThan",
+  "NumericLessThanEquals",
+  "NumericGreaterThan",
+  "NumericGreaterThanEquals",
+  "DateEquals",
+  "DateNotEquals",
+  "DateLessThan",
+  "DateLessThanEquals",
+  "DateGreaterThan",
+  "DateGreaterThanEquals",
+  "Bool",
+  "BinaryEquals",
+  "IpAddress",
+  "NotIpAddress",
+  "ArnEquals",
+  "ArnLike",
+  "ArnNotEquals",
+  "ArnNotLike",
+];
+
 const negatedKeywords = [
   "ArnNotEquals",
   "ArnNotLike",
   "StringNotEquals",
   "StringNotLike",
+  "NumericNotEquals",
+  "NotIpAddress",
 ];
 
-const positiveKeywords = ["StringEquals", "StringLike"];
-
-const setQualifiers = ["ForAnyValue", "ForAllValues"];
+const positiveKeywords = ["StringEquals", "StringLike", "DateLessThan", "Bool"];
 
 /**
  * A policy value to ask the absent-key question with.
@@ -28,29 +60,30 @@ const setQualifiers = ["ForAnyValue", "ForAllValues"];
 const policyValue = "arn:aws:iam::123456789012:role/OrdersService";
 
 describe("sim IAM condition operator parsing", () => {
-  it("has an operator for every form of every negated keyword", () => {
-    // Given the keywords a service control policy writes a carve-out with
+  it("has an operator for every documented keyword in every form", () => {
+    // Given the keywords the IAM condition operator reference lists
     const parser = new SimIamConditionOperatorParser();
 
-    // When each is parsed unqualified and in both of its set forms
-    const operators = negatedKeywords
-      .flatMap((keyword) => [
-        keyword,
-        ...setQualifiers.map((qualifier) => `${qualifier}:${keyword}`),
-      ])
-      .map((keyword) => parser.parse(keyword));
+    // When each is parsed unqualified, in both set forms, and with IfExists
+    const forms = documentedKeywords.flatMap((keyword) => [
+      keyword,
+      `ForAnyValue:${keyword}`,
+      `ForAllValues:${keyword}`,
+      `${keyword}IfExists`,
+      `ForAllValues:${keyword}IfExists`,
+    ]);
 
     // Then each yields an operator
-    assertArrayLength(operators, negatedKeywords.length * 3);
-    assertTrue(operators.every((operator) => operator !== undefined));
+    for (const form of forms) {
+      assertNonNullable(parser.parse(form), form);
+    }
   });
 
-  it("matches an absent context key everywhere but the ForAnyValue forms", () => {
-    // Given the same keywords
+  it("matches an absent context key everywhere but the ForAnyValue forms of a negated keyword", () => {
+    // Given the negated keywords
     const parser = new SimIamConditionOperatorParser();
 
-    // When each form is asked whether an absent context key matches it. The
-    // policy value goes unread by every operator but `Null`
+    // When each form is asked whether an absent context key matches it
     const matchesAbsentKey = negatedKeywords.flatMap((keyword) => [
       parser.parse(keyword)?.matchesAbsentKey(policyValue),
       parser.parse(`ForAllValues:${keyword}`)?.matchesAbsentKey(policyValue),
@@ -66,7 +99,7 @@ describe("sim IAM condition operator parsing", () => {
   });
 
   it("matches an absent context key only in the ForAllValues form of a positive keyword", () => {
-    // Given the positive keywords carrying both set forms
+    // Given positive keywords
     const parser = new SimIamConditionOperatorParser();
 
     // When each form is asked whether an absent context key matches it
@@ -76,12 +109,27 @@ describe("sim IAM condition operator parsing", () => {
       parser.parse(`ForAnyValue:${keyword}`)?.matchesAbsentKey(policyValue),
     ]);
 
-    // Then only the `ForAllValues` forms answer true. AWS matches those where
-    // the request carries no value for the key
+    // Then only the `ForAllValues` forms answer true
     assertArrayEquals(
       matchesAbsentKey,
       positiveKeywords.flatMap(() => [false, true, false]),
     );
+  });
+
+  it("matches an absent context key in every IfExists form", () => {
+    // Given the parser
+    const parser = new SimIamConditionOperatorParser();
+
+    // When the IfExists form of each keyword is asked about an absent key
+    const matchesAbsentKey = documentedKeywords.flatMap((keyword) => [
+      parser.parse(`${keyword}IfExists`)?.matchesAbsentKey(policyValue),
+      parser
+        .parse(`ForAnyValue:${keyword}IfExists`)
+        ?.matchesAbsentKey(policyValue),
+    ]);
+
+    // Then every one answers true, which is what the suffix is for
+    assertTrue(matchesAbsentKey.every((matches) => matches === true));
   });
 
   it("reads a Null policy value rather than answering a constant", () => {
@@ -92,18 +140,24 @@ describe("sim IAM condition operator parsing", () => {
     // two values AWS documents for it
     const operator = parser.parse("Null");
 
-    // Then the answer follows the policy value, which is the one operator that
-    // reads it
+    // Then the answer follows the policy value
     assertTrue(operator?.matchesAbsentKey("true") === true);
     assertTrue(operator?.matchesAbsentKey("false") === false);
   });
 
-  it("has no operator for a keyword it cannot evaluate", () => {
+  it.each([
+    "NullIfExists",
+    "ForAnyValue:Null",
+    "ForEveryValue:StringEquals",
+    "ForAnyValue:ForAllValues:StringEquals",
+    "DateAfter",
+    "stringequals",
+  ])("has no operator for %s, which IAM does not define", (keyword) => {
     // Given the parser
     const parser = new SimIamConditionOperatorParser();
 
-    // When a keyword sim IAM does not implement is parsed
-    const operator = parser.parse("StringEqualsIgnoreCase");
+    // When a keyword IAM does not define is parsed
+    const operator = parser.parse(keyword);
 
     // Then nothing comes back, leaving the statement holding it to fail closed
     assertUndefined(operator);

@@ -526,10 +526,10 @@ Simulated Organizations supports:
 - AWS-shaped `r-` and `ou-` node ids, and an `o-` organization id from `organizationId()`
 - `aws:PrincipalOrgID` on every request from a principal in one of the organization's Accounts
 - `Action`, `NotAction`, `Resource`, `NotResource` and `Condition` in an SCP statement
-- The `ArnEquals`, `ArnLike`, `NumericLessThanEquals`, `StringEquals`, `StringLike`, `Bool` and
-  `Null` condition operators, and the `ForAnyValue:` and `ForAllValues:` set forms of the string ones
-- The negated `ArnNotEquals`, `ArnNotLike`, `StringNotEquals` and `StringNotLike` operators and
-  their set forms, which a `Deny` statement exempting named roles hangs on `aws:PrincipalArn`
+- Every condition operator IAM documents, with the set forms and `IfExists` suffix of each but `Null` (see
+  [Policy conditions](https://yulinsim.dev/services/iam/#policy-conditions)), including the negated
+  operators a `Deny` statement exempting named roles hangs on `aws:PrincipalArn` and the date
+  operators a freeze writes against `aws:CurrentTime`
 - `AccessDenied` messages naming the service control policy, as AWS words them
 - Denial reporting through `decision.serviceControlPolicy`, naming the levels that allowed nothing
 - The `AWS::Organizations::Organization`, `::OrganizationalUnit`, `::Account` and `::Policy`
