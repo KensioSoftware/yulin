@@ -34,6 +34,11 @@ import type {
   SimDetachRolePolicyCommand,
   SimDetachRolePolicyCommandOutput,
 } from "./detach-role-policy/detach-role-policy.command.js";
+import { ListAttachedRolePoliciesCommandHandler } from "./list-attached-role-policies/list-attached-role-policies.handler.js";
+import type {
+  SimListAttachedRolePoliciesCommand,
+  SimListAttachedRolePoliciesCommandOutput,
+} from "./list-attached-role-policies/list-attached-role-policies.command.js";
 import { DeleteRoleCommandHandler } from "./delete-role/delete-role.handler.js";
 import type {
   SimDeleteRoleCommand,
@@ -182,6 +187,25 @@ export class SimIamRoleCommandHandlers {
       options?.caller,
     );
     const handler = new DetachRolePolicyCommandHandler({
+      roles: this.roles,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a ListAttachedRolePolicies command from the SDK.
+   */
+  async listAttachedRolePolicies(
+    command: SimListAttachedRolePoliciesCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimListAttachedRolePoliciesCommandOutput> {
+    this.authorizer.authorize(
+      "iam:ListAttachedRolePolicies",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
+    const handler = new ListAttachedRolePoliciesCommandHandler({
       roles: this.roles,
       background: this.background,
     });

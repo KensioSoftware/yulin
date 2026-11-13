@@ -16,6 +16,7 @@
     "oxlint:config": "pnpm tsx scripts/mts/write-oxlint-config.mts",
     "docs:index": "pnpm tsx scripts/mts/write-llms-index.mts",
     "cfn:read-handlers": "pnpm tsx scripts/mts/write-cfn-read-handlers.mts",
+    "iam:aws-managed-policies": "pnpm tsx scripts/mts/write-iam-aws-managed-policies.mts",
     "sdk:wire-shapes": "pnpm tsx scripts/mts/write-sdk-wire-json-shapes.mts",
     "build:check": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm build",

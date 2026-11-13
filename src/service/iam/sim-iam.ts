@@ -133,6 +133,16 @@ export class SimIam
   }
 
   /**
+   * Handle a Get Policy Version Command from the SDK.
+   */
+  async getPolicyVersion(
+    command: simIamCommands.SimGetPolicyVersionCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimGetPolicyVersionCommandOutput> {
+    return await this.commands.policies.getPolicyVersion(command, options);
+  }
+
+  /**
    * Handle a List Policies Command from the SDK.
    */
   async listPolicies(
@@ -190,6 +200,16 @@ export class SimIam
     options?: SimIamRequestOptions,
   ): Promise<simIamCommands.SimDetachRolePolicyCommandOutput> {
     return await this.commands.roles.detachRolePolicy(command, options);
+  }
+
+  /**
+   * Handle a List Attached Role Policies Command from the SDK.
+   */
+  async listAttachedRolePolicies(
+    command: simIamCommands.SimListAttachedRolePoliciesCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimListAttachedRolePoliciesCommandOutput> {
+    return await this.commands.roles.listAttachedRolePolicies(command, options);
   }
 
   /**
@@ -270,6 +290,16 @@ export class SimIam
     options?: SimIamRequestOptions,
   ): Promise<simIamCommands.SimAttachUserPolicyCommandOutput> {
     return await this.commands.users.attachUserPolicy(command, options);
+  }
+
+  /**
+   * Handle an IAM ListAttachedUserPolicies command.
+   */
+  async listAttachedUserPolicies(
+    command: simIamCommands.SimListAttachedUserPoliciesCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimListAttachedUserPoliciesCommandOutput> {
+    return await this.commands.users.listAttachedUserPolicies(command, options);
   }
 
   /**

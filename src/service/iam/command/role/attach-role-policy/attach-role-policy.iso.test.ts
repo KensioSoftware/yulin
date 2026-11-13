@@ -191,7 +191,7 @@ describe("IAM AttachRolePolicyCommand", () => {
 
   it("allows attaching an ARN with no stored managed policy without granting access", async () => {
     // Given a Role and a policy ARN that has no stored managed policy, such as
-    // an AWS-managed policy ARN.
+    // an AWS-managed policy ARN outside the catalogue.
     const simAws = new SimAws();
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
@@ -207,7 +207,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
         RoleName: "AwsManagedReader",
-        PolicyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+        PolicyArn: "arn:aws:iam::aws:policy/AmazonMacieFullAccess",
       }),
     );
 

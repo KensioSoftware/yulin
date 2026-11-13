@@ -1,6 +1,7 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
 import { jsonParse } from "../../../../../util/type-guard/json.js";
+import { simIamManagedPolicyLookup } from "../../../policy/sim-iam-managed-policy-lookup.js";
 import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
 import type { SimIamIdentityPolicyOwner } from "./sim-iam-id-pol-owner-resolver.js";
 
@@ -53,17 +54,19 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
   }
 
   /**
-   * Resolve attached policy ARNs through the account-scoped policy store.
+   * Resolve attached policy ARNs through the account-scoped policy store, and
+   * through the catalogue of AWS-managed policies for an ARN the Account does
+   * not own.
    *
    * Attachment state and policy storage can exist independently in the
-   * simulator. An ARN with no corresponding stored policy contributes no
-   * authorization statements.
+   * simulator. An ARN that resolves to neither, such as an AWS-managed policy
+   * outside the catalogue, contributes no authorization statements.
    */
   private attachedPolicySources(
     owner: SimIamIdentityPolicyOwner,
   ): readonly SimIamAuthZPolicySource[] {
     return [...owner.attachedPolicyArns]
-      .map((policyArn) => this.policies.get(policyArn))
+      .map((policyArn) => simIamManagedPolicyLookup(this.policies, policyArn))
       .filter((policy): policy is SimIamPolicy => policy !== undefined)
       .flatMap((policy) => this.managedPolicySource(policy));
   }

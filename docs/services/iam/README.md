@@ -218,6 +218,109 @@ Creating a duplicate Policy name in the same path throws an error, while the sam
 paths is allowed. Stored Policies can be inspected with `GetPolicyCommand` and
 `ListPoliciesCommand`.
 
+## AWS-managed policies
+
+An ARN under `arn:aws:iam::aws:policy/` names a policy AWS manages. Yulin carries a catalogue of
+these policies, each with the document AWS publishes for its default version. Attaching a catalogued
+ARN grants what that document allows. This holds for `AttachRolePolicyCommand`,
+`AttachUserPolicyCommand`, and `ManagedPolicyArns` on an `AWS::IAM::Role` or `AWS::IAM::User`. The
+partition can be any of them, so the `Fn::Join` over `AWS::Partition` that CDK writes resolves to
+the same policy.
+
+```typescript sim-iam-aws-managed-policy
+/**
+ * Attaching an AWS-managed policy to a simulated IAM Role.
+ */
+
+import {
+  AttachRolePolicyCommand,
+  CreateRoleCommand,
+  GetPolicyVersionCommand,
+  ListAttachedRolePoliciesCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simIam = new SimAws().iam();
+
+const roleCreation = await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "OrdersHandler",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "lambda.amazonaws.com" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  }),
+);
+
+const policyArn =
+  "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
+
+await simIam.attachRolePolicy(
+  new AttachRolePolicyCommand({
+    RoleName: "OrdersHandler",
+    PolicyArn: policyArn,
+  }),
+);
+
+const decision = simIam.authorize({
+  action: "logs:PutLogEvents",
+  resource:
+    "arn:aws:logs:eu-west-2:123456789012:log-group:/aws/lambda/orders:*",
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
+});
+
+const attached = await simIam.listAttachedRolePolicies(
+  new ListAttachedRolePoliciesCommand({ RoleName: "OrdersHandler" }),
+);
+
+const version = await simIam.getPolicyVersion(
+  new GetPolicyVersionCommand({ PolicyArn: policyArn, VersionId: "v1" }),
+);
+
+console.log(decision.isAllowed);
+console.log(attached.AttachedPolicies.map((policy) => policy.PolicyName));
+console.log(decodeURIComponent(version.PolicyVersion.Document ?? ""));
+```
+
+`GetPolicyCommand` describes a catalogued policy with its name, path, description, dates and default
+version ID. The policy ID is derived from the ARN (AWS's own IDs are absent from the reference the
+catalogue is read from). `GetPolicyVersionCommand` returns the document URL-encoded, as IAM does.
+
+The catalogue covers the policies CDK and SAM apps commonly attach for services Yulin simulates:
+
+- `AdministratorAccess`, `PowerUserAccess` and `ReadOnlyAccess`
+- The Lambda execution roles under `service-role/` (`AWSLambdaBasicExecutionRole`,
+  `AWSLambdaVPCAccessExecutionRole`, `AWSLambdaSQSQueueExecutionRole`,
+  `AWSLambdaKinesisExecutionRole`, `AWSLambdaDynamoDBExecutionRole` and `AWSLambdaRole`), plus
+  `AWSLambdaExecute`, `AWSLambda_FullAccess` and `AWSLambda_ReadOnlyAccess`
+- The read-only and full-access policies for S3, DynamoDB (including `AmazonDynamoDBFullAccess_v2`),
+  SQS, SNS, Kinesis, SES, EventBridge and Step Functions
+- `service-role/AmazonECSTaskExecutionRolePolicy` and `AmazonEC2ContainerRegistryReadOnly`
+- `CloudWatchLogsFullAccess`, `CloudWatchLogsReadOnlyAccess`, `CloudWatchReadOnlyAccess` and
+  `CloudWatchFullAccessV2`
+- `AWSXRayDaemonWriteAccess` and `AWSXrayWriteOnlyAccess`, which SAM attaches for tracing
+- `SecretsManagerReadWrite`, `AmazonSSMReadOnlyAccess`, `AmazonAPIGatewayInvokeFullAccess`,
+  `AmazonCognitoReadOnly` and `AmazonCognitoPowerUser`
+
+AWS publishes over a thousand managed policies, and most of them grant access to services Yulin does
+not simulate. Those stay out of the catalogue. An AWS-managed ARN outside it still attaches, from
+the SDK and from a template alike, and contributes no statements to a decision. `GetPolicyCommand`
+and `GetPolicyVersionCommand` refuse it with `NoSuchEntity`, and `ListAttachedRolePoliciesCommand`
+lists it. AWS refuses to attach an ARN that names no policy, and Yulin cannot tell that case apart
+from a real policy it lacks. Refusing would fail templates that deploy on AWS.
+
+The catalogue is a snapshot of the
+[AWS Managed Policy Reference Guide](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/policy-list.html),
+and each document matches the IAM API's copy of the version it names. The guide can trail IAM by a
+version on a policy AWS revises often, such as `ReadOnlyAccess`. `pnpm run iam:aws-managed-policies`
+reads the guide again and rewrites the snapshot.
+
 ## Policy document character limits
 
 IAM caps a policy document by where it is going. A managed policy takes 6,144 characters, an inline
@@ -486,8 +589,8 @@ Invalid credentials throw an AWS-like error before any policies are evaluated, w
 reason such as an unknown access key, a secret access key mismatch, or an expired session.
 
 `AttachUserPolicyCommand` attaches a managed Policy to a User by ARN, the way
-`AttachRolePolicyCommand` does for a Role. An ARN with no stored Policy behind it, such as an
-AWS-managed one, attaches and contributes no statements to a decision.
+`AttachRolePolicyCommand` does for a Role. `ListAttachedUserPoliciesCommand` lists what a User has
+attached. An [AWS-managed policy](#aws-managed-policies) grants a User what it grants a Role.
 
 `CreateLoginProfileCommand` gives a User a console password. The response describes the profile
 without the password, which is how real IAM behaves. See
@@ -1690,10 +1793,14 @@ Sim IAM currently supports:
 - `CreateRoleCommand`, including trust-policy validation
 - `GetRoleCommand` and `ListRolesCommand`, with pagination
 - `PutRolePolicyCommand`, for inline Role policies
-- `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
+- `CreatePolicyCommand`, `GetPolicyCommand`, `GetPolicyVersionCommand` and `ListPoliciesCommand`,
+  for managed Policies
+- A catalogue of [AWS-managed policies](#aws-managed-policies) that grant their published
+  permissions when attached
 - Refusing a policy document over IAM's character limit, with `LimitExceeded`
-- `AttachRolePolicyCommand`
-- `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand` and `AttachUserPolicyCommand`
+- `AttachRolePolicyCommand` and `ListAttachedRolePoliciesCommand`
+- `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand`, `AttachUserPolicyCommand` and
+  `ListAttachedUserPoliciesCommand`
 - `CreateLoginProfileCommand`, for a User's console password
 - `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
@@ -1724,7 +1831,11 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   declares is authorized against `iam:PermissionsBoundary` and described by `GetRole`, and stops
   there. Service control policies are evaluated, and are attached through
   [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
-- Managed Policies have a single version, and the policy version commands are absent
+- Managed Policies have a single version. `GetPolicyVersionCommand` answers for that version, and
+  the commands that create, list or delete versions are absent
+- `ListPoliciesCommand` lists the Account's own policies only. The AWS-managed catalogue is absent
+  from it whatever the `Scope`
+- AWS-managed policies outside the [catalogue](#aws-managed-policies) attach and grant nothing
 - A policy document is measured against IAM's character limit one document at a time. The
   20,480-character cap on the sum of a User's inline policies is absent, and so is the cap on how
   many managed policies a Role may carry

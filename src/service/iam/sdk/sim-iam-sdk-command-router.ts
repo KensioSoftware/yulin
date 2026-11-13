@@ -9,6 +9,9 @@ import type { SimDeleteRolePolicyCommand } from "../command/policy/delete-role-p
 import type { SimDeleteRoleCommand } from "../command/role/delete-role/delete-role.command.js";
 import type { SimDetachRolePolicyCommand } from "../command/role/detach-role-policy/detach-role-policy.command.js";
 import type { SimGetPolicyCommand } from "../command/policy/get-policy/get-policy.command.js";
+import type { SimGetPolicyVersionCommand } from "../command/policy/get-policy-version/get-policy-version.command.js";
+import type { SimListAttachedRolePoliciesCommand } from "../command/role/list-attached-role-policies/list-attached-role-policies.command.js";
+import type { SimListAttachedUserPoliciesCommand } from "../command/user/list-attached-user-policies/list-attached-user-policies.command.js";
 import type { SimListPoliciesCommand } from "../command/policy/list-policies/list-policies.command.js";
 import type { SimPutRolePolicyCommand } from "../command/policy/put-role-policy/put-role-policy.command.js";
 import type { SimPutUserPolicyCommand } from "../command/policy/put-user-policy/put-user-policy.command.js";
@@ -148,6 +151,30 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simIam.listPolicies(
             command as SimListPoliciesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetPolicyVersionCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.getPolicyVersion(
+            command as SimGetPolicyVersionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListAttachedRolePoliciesCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.listAttachedRolePolicies(
+            command as SimListAttachedRolePoliciesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListAttachedUserPoliciesCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.listAttachedUserPolicies(
+            command as SimListAttachedUserPoliciesCommand,
             simSdkCallerOptions(context),
           ),
       ],

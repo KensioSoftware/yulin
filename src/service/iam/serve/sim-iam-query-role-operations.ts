@@ -104,6 +104,20 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
       },
     ],
     [
+      "ListAttachedRolePolicies",
+      {
+        input: (fields): Record<string, unknown> => ({
+          ...iamQueryListingInput(fields),
+          RoleName: fields.text("RoleName"),
+          PathPrefix: fields.text("PathPrefix"),
+        }),
+        result: (output): string =>
+          queryList(output, "AttachedPolicies", (policy) =>
+            queryMembers(policy, ["PolicyName", "PolicyArn"]),
+          ) + iamQueryListingResult(output),
+      },
+    ],
+    [
       "DetachRolePolicy",
       {
         input: (fields): Record<string, unknown> => ({

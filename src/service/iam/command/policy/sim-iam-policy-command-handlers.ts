@@ -16,6 +16,11 @@ import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
 } from "./get-policy/get-policy.command.js";
+import { GetPolicyVersionCommandHandler } from "./get-policy-version/get-policy-version.handler.js";
+import type {
+  SimGetPolicyVersionCommand,
+  SimGetPolicyVersionCommandOutput,
+} from "./get-policy-version/get-policy-version.command.js";
 import { ListPoliciesCommandHandler } from "./list-policies/list-policies.handler.js";
 import type {
   SimListPoliciesCommand,
@@ -122,6 +127,25 @@ export class SimIamPolicyCommandHandlers {
       options?.caller,
     );
     const handler = new GetPolicyCommandHandler({
+      policies: this.policies,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a GetPolicyVersion command from the SDK.
+   */
+  async getPolicyVersion(
+    command: SimGetPolicyVersionCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimGetPolicyVersionCommandOutput> {
+    this.authorizer.authorize(
+      "iam:GetPolicyVersion",
+      command.input.PolicyArn ?? "*",
+      options?.caller,
+    );
+    const handler = new GetPolicyVersionCommandHandler({
       policies: this.policies,
       background: this.background,
     });

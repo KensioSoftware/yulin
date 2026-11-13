@@ -25,6 +25,11 @@ import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
 } from "./create-user/create-user.command.js";
+import { ListAttachedUserPoliciesCommandHandler } from "./list-attached-user-policies/list-attached-user-policies.handler.js";
+import type {
+  SimListAttachedUserPoliciesCommand,
+  SimListAttachedUserPoliciesCommandOutput,
+} from "./list-attached-user-policies/list-attached-user-policies.command.js";
 import { DeleteUserCommandHandler } from "./delete-user/delete-user.handler.js";
 import type {
   SimDeleteUserCommand,
@@ -144,6 +149,25 @@ export class SimIamUserCommandHandlers {
       options?.caller,
     );
     const handler = new CreateLoginProfileCommandHandler({
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a ListAttachedUserPolicies command from the SDK.
+   */
+  async listAttachedUserPolicies(
+    command: SimListAttachedUserPoliciesCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimListAttachedUserPoliciesCommandOutput> {
+    this.authorizer.authorize(
+      "iam:ListAttachedUserPolicies",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
+    const handler = new ListAttachedUserPoliciesCommandHandler({
       users: this.users,
       background: this.background,
     });

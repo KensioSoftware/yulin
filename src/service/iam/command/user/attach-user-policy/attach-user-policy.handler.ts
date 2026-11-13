@@ -21,9 +21,10 @@ interface AttachUserPolicyCommandHandlerProperties {
  *
  * The user-side counterpart of AttachRolePolicy: the attachment records a
  * managed policy ARN on the user, and authorization resolves the referenced
- * policy from the account policy store when it evaluates a request. An ARN
- * with no stored policy behind it, such as an AWS-managed one, attaches and
- * contributes no statements.
+ * policy from the account policy store, or from the catalogue of AWS-managed
+ * policies, when it evaluates a request. An ARN that resolves to neither, such
+ * as an AWS-managed policy outside the catalogue, attaches and contributes no
+ * statements.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/iam/command/AttachUserPolicyCommand/
  */

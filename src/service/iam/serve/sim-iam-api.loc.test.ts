@@ -9,9 +9,11 @@ import {
   DeleteRolePolicyCommand,
   DetachRolePolicyCommand,
   GetPolicyCommand,
+  GetPolicyVersionCommand,
   GetRoleCommand,
   GetUserCommand,
   IAMClient,
+  ListAttachedRolePoliciesCommand,
   ListPoliciesCommand,
   ListRolesCommand,
   PutRolePolicyCommand,
@@ -284,6 +286,40 @@ describe("Serving simulated IAM on an endpoint URL", () => {
         await client.send(new GetPolicyCommand({ PolicyArn: policyArn })),
     );
     assertIdentical(error.name, "NoSuchEntityException");
+  });
+
+  it("attaches an AWS-managed policy and reads its document back", async () => {
+    // Given a Role made over the endpoint, with an AWS-managed policy attached
+    const policyArn =
+      "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
+    await client.send(
+      new CreateRoleCommand({
+        RoleName: "LogWriter",
+        AssumeRolePolicyDocument: lambdaTrustPolicy,
+      }),
+    );
+    await client.send(
+      new AttachRolePolicyCommand({
+        RoleName: "LogWriter",
+        PolicyArn: policyArn,
+      }),
+    );
+
+    // When the Role's attachments and the policy's document are read back
+    const listed = await client.send(
+      new ListAttachedRolePoliciesCommand({ RoleName: "LogWriter" }),
+    );
+    const version = await client.send(
+      new GetPolicyVersionCommand({ PolicyArn: policyArn, VersionId: "v1" }),
+    );
+
+    // Then the attachment is listed and the document decodes to the policy
+    assertIdentical(listed.AttachedPolicies?.[0]?.PolicyArn, policyArn);
+    assertTrue(version.PolicyVersion?.IsDefaultVersion ?? false);
+    assertStringIncludes(
+      decodeURIComponent(version.PolicyVersion?.Document ?? ""),
+      "logs:PutLogEvents",
+    );
   });
 
   it("refuses an IAM operation it does not serve", async () => {
