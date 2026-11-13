@@ -107,6 +107,22 @@ describe("the timer modules a sim Lambda handler imports", () => {
     assertIdentical(await invokedAfter(simAws, 120), "awake");
   });
 
+  it("gives zip code that promisifies the global setTimeout a promise timer", async () => {
+    // Given zip code that promisifies its global setTimeout and imports no
+    // timer module.
+    const simAws = await simAwsWithCode(
+      makeLambdaCodeZip(
+        'const sleep = require("node:util").promisify(setTimeout);\n' +
+          'exports.handler = async () => sleep(90000, "awake");',
+      ),
+      "index.handler",
+    );
+
+    // When it is invoked and simulated time moves on by that long.
+    // Then the promisified timer slept on the clock and answered.
+    assertIdentical(await invokedAfter(simAws, 90), "awake");
+  });
+
   it("leaves the promise timer on real time outside an invocation", async () => {
     // Given the patch installed by an earlier invocation.
     const simAws = await simAwsWithCode(

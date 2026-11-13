@@ -20,6 +20,7 @@ import {
   simLambdaSetInterval,
   simLambdaSetTimeout,
 } from "../../invoke/timer/sim-lambda-process-timers.js";
+import { installSimLambdaTimerModules } from "../../invoke/timer/sim-lambda-timer-modules.js";
 import type { SimLambdaOutboundHttp } from "../../outbound/sim-lambda-outbound-http.js";
 import { simLambdaVmHostGlobals } from "./sim-lambda-vm-host-globals.js";
 import { SimLambdaVmOutputStream } from "./sim-lambda-vm-output-stream.js";
@@ -87,6 +88,12 @@ export function makeSimLambdaVmContext(
   // What function code writes reaches the function's log group through here.
   stdout.recordTo(sink);
   stderr.recordTo(sink);
+
+  // The sandbox's `setTimeout` answers `util.promisify` with its promise form
+  // only once the timer modules are patched. Code can promisify the global
+  // without importing a timer module, so the patch goes in before any code
+  // in the sandbox runs.
+  installSimLambdaTimerModules();
 
   const context = vm.createContext({
     ...simLambdaVmHostGlobals(),
