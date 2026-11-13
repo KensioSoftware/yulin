@@ -6,6 +6,7 @@ import type {
 import { simLambdaResourcePolicies } from "../../command/authorize/sim-lambda-resource-policies.js";
 import {
   simLambdaFunctionUrlAuthTypeConditionKey,
+  simLambdaInvokedViaFunctionUrlConditionKey,
   simLambdaSourceAccountConditionKey,
   simLambdaSourceArnConditionKey,
 } from "../../function/policy/sim-lambda-permission.js";
@@ -93,7 +94,9 @@ export class SimLambdaUrlAuthorizer {
    *
    * The URL's auth type is supplied as `lambda:FunctionUrlAuthType`, which is
    * what a grant conditions on in practice: a permission granted for `AWS_IAM`
-   * should not also open a URL later switched to `NONE`.
+   * should not also open a URL later switched to `NONE`. The request also
+   * carries `lambda:InvokedViaFunctionUrl` as true, which is what restricts a
+   * `lambda:InvokeFunction` grant to calls through the URL.
    *
    * A request made on behalf of a resource supplies `AWS:SourceArn` and
    * `AWS:SourceAccount` with it, which is what the permission granting
@@ -114,6 +117,7 @@ export class SimLambdaUrlAuthorizer {
       resourcePolicies: simLambdaResourcePolicies(input.resource),
       conditionContext: {
         [simLambdaFunctionUrlAuthTypeConditionKey]: input.functionUrl.authType,
+        [simLambdaInvokedViaFunctionUrlConditionKey]: true,
         ...(source?.arn !== undefined && {
           [simLambdaSourceArnConditionKey]: source.arn,
         }),

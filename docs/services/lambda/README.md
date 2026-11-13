@@ -396,8 +396,22 @@ await simAws.backgroundTasksComplete();
 The caller still hears about it too. `Invoke` answers with `FunctionError` set to `Unhandled` and
 the same error document in its response payload.
 
-Real Lambda writes `START`, `END` and `REPORT` lines around every invocation. Simulated Lambda
-writes none of those.
+Each invocation is framed by the platform lines real Lambda writes. `START` names the request id
+and the version before the handler runs. `END` and `REPORT` follow it, whether it returned or threw.
+
+```text
+START RequestId: 3f1c... Version: $LATEST
+INFO handling order-1
+END RequestId: 3f1c...
+REPORT RequestId: 3f1c...	Duration: 1500.00 ms	Billed Duration: 1500 ms	Memory Size: 128 MB	Max Memory Used: 64 MB	Init Duration: 0.00 ms
+```
+
+The duration is simulated time, so a handler that sleeps a minute on a clock the test advances
+reports a minute. Billed duration rounds it up to the next millisecond. Only a cold start reports
+`Init Duration`, and it is always zero, since a cold start here costs no time. `Max Memory Used` is
+a nominal 64 MB (or the memory size, if that is less), because the handler shares a process with
+the rest of the test run and its own use cannot be measured. The request id is the
+`context.awsRequestId` the handler was given.
 
 ## Function code from S3
 
@@ -2807,7 +2821,7 @@ therefore filters here the way it does deployed.
 
 ## Changing a mapping after it is made
 
-`UpdateEventSourceMappingCommand` changes a mapping's `BatchSize`, `Enabled` and `FilterCriteria`. The answer reports the mapping as `Updating`, `Enabling` or `Disabling`, and it settles in the background. A disabled mapping leaves records on its source, and enabling it again delivers what waited there.
+`UpdateEventSourceMappingCommand` changes a mapping's `BatchSize`, `Enabled` and `FilterCriteria`, its `FunctionResponseTypes`, its `DestinationConfig`, the stream retry limits (`MaximumRetryAttempts`, `MaximumRecordAgeInSeconds` and `BisectBatchOnFunctionError`), and the function it delivers to. The answer reports the mapping as `Updating`, `Enabling` or `Disabling`, and it settles in the background. A disabled mapping leaves records on its source, and enabling it again delivers what waited there.
 
 ```typescript sim-lambda-update-event-source-mapping
 /**
@@ -2917,7 +2931,9 @@ await simAws.backgroundTasksComplete();
 console.log(batchSizes); // [1, 1]
 ```
 
-The new batch size and filters apply from the next batch. An empty `FilterCriteria` removes the filters. Each value is checked against the event source's own rules, as on creation.
+Every change applies from the next batch, and a stream mapping's new retry limits also apply to a batch it is already retrying. An empty `FilterCriteria` removes the filters, and an empty `FunctionResponseTypes` stops the mapping reading batch item failure reports. Each value is checked against the event source's own rules, as on creation, so a queue mapping still refuses a retry limit.
+
+A new `FunctionName` is checked the way `CreateEventSourceMapping` checks the first one. The caller needs `lambda:UpdateEventSourceMapping` on the new function, the function and any qualifier have to exist, and the new function's execution role has to be allowed to read the event source.
 
 A mapping that is still being created, or still settling an earlier change, refuses an update with `ResourceInUseException`. Call `simAws.backgroundTasksComplete()` between creating a mapping and changing it.
 
@@ -3441,9 +3457,16 @@ source ARN when it says what it is being made for, which is how a CloudFront ori
 reaches one. A direct `Invoke` and an SQS event source mapping supply no value for either, and a
 statement carrying one matches no request of theirs.
 
-`PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
-the grant that was made. No value is supplied for them at request time, and a statement carrying one
-of those never matches.
+`PrincipalOrgID` becomes a `StringEquals` condition on `aws:PrincipalOrgID`. Simulated IAM supplies
+that key for a caller whose Account is in `simAws.organizations()`, so a grant to `*` restricted to
+the organization admits its Accounts and no others. The organization's id is
+`simAws.organizations().organizationId()`.
+
+`InvokedViaFunctionUrl` becomes a `Bool` condition on `lambda:InvokedViaFunctionUrl`. A Function URL
+request supplies it as true, and `Invoke` supplies nothing, so a `lambda:InvokeFunction` grant
+carrying it covers the URL and not the Invoke API. `EventSourceToken` becomes a `StringEquals`
+condition on `lambda:EventSourceToken`, the way a grant to an Alexa skill is written. No simulated
+service invokes a function as Alexa, so nothing supplies that one.
 
 All three commands take a `Qualifier` naming a published version or an alias, and each qualified
 resource holds its own policy. See
@@ -4625,11 +4648,16 @@ Sim Lambda currently supports:
   handler directly
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
+- `PrincipalOrgID` on a grant, matched against the caller's organization in
+  `simAws.organizations()`, `InvokedViaFunctionUrl`, matched by Function URL calls, and
+  `EventSourceToken`
 - SQS, DynamoDB stream and Kinesis stream event source mappings, created with
   `CreateEventSourceMappingCommand`, changed with `UpdateEventSourceMappingCommand` and read with
   `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
   `DeleteEventSourceMappingCommand`, delivering real-shaped SQS,
   DynamoDB stream and Kinesis events and honouring `BatchSize`
+- `UpdateEventSourceMappingCommand` changing a mapping's function, response types, failure
+  destination and stream retry limits, as well as its batch size, enabled state and filters
 - `FilterCriteria` on any of those mappings, evaluated with EventBridge event patterns including
   `equals-ignore-case` and `$or`, delivering the records that match and handling the rest without
   an invocation
@@ -4650,6 +4678,7 @@ Sim Lambda currently supports:
   own console
 - Handler output recorded into the function's log group and forwarded to the host console, with
   `simAws.lambda().output().captureOnly()` to drop the forwarding
+- The `START`, `END` and `REPORT` lines around each invocation, with the duration in simulated time
 - Per-function environment variables with `Environment.Variables`
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
   environment
@@ -4725,14 +4754,13 @@ Current documented limitations:
 - A cross-account grant is only half of what admits a call. The caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account outside the simulation is denied.
-- `lambda:FunctionUrlAuthType`, `AWS:SourceArn` and `AWS:SourceAccount` are the only condition keys
-  given a value at request time. The first is supplied when a Function URL is invoked, and the other
-  two when another simulated service invokes the function on a resource's behalf. See
+- `AWS:SourceArn` and `AWS:SourceAccount` are given a value only when another simulated service
+  invokes the function on a resource's behalf. See
   [Resource-based policies](#resource-based-policies) for which paths those are.
-  `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
-  the grant that was made, and no value is supplied for them, so a statement carrying one never
-  matches.
-- `EventSourceToken` on `AddPermission` is left out.
+  `lambda:EventSourceToken` is never given one, so a grant to an Alexa skill never matches.
+- A Function URL call needs `lambda:InvokeFunction` as well as `lambda:InvokeFunctionUrl` only when
+  CloudFront makes it through an origin access control. Real Lambda asks every caller of a Function
+  URL created since October 2025 for both.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
@@ -4769,9 +4797,9 @@ Current documented limitations:
   streams, both of which a test runner is free to replace. `console.trace` and `console.dir`
   decorate what they print, and either one reaches the log group only where the host console passes
   it on to `process.stdout`. See [What a handler prints](#what-a-handler-prints).
-- The platform `START`, `END` and `REPORT` lines a real log stream carries are left out, and
-  execution environments are never recycled, so a function keeps one log stream for as long as it
-  exists.
+- Execution environments are never recycled, so a function keeps one log stream for as long as it
+  exists. The `REPORT` line's `Max Memory Used` is a nominal figure, and a timed-out invocation's
+  `REPORT` line carries no `Status: timeout`.
 - Container image functions are never run. Yulin never reads a container image, and stays
   Docker-free.
   A function with `PackageType: Image` is skipped, or refused on `CreateFunction`, unless a real
@@ -4846,10 +4874,8 @@ Current documented limitations:
   policy ARNs, so the mapping is refused when it is created. A hand-written template and a SAM application
   usually attach that policy where CDK writes an inline one, so the two declaration paths differ.
   Write the grant inline to deploy either.
-- `UpdateEventSourceMapping` changes `BatchSize`, `Enabled` and `FilterCriteria` alone. The
-  function, the response types, the destination and the stream retry limits a mapping was created
-  with are fixed, and an update naming one is refused. Delete the mapping and create it again to
-  change them.
+- A Kinesis mapping moved onto a function with a different execution role goes on reading its
+  shards as the role it started with, and reports that role in each record's `invokeIdentityArn`.
 - One poll of one shard delivers one batch. Real Lambda runs several pollers at once and scales them
   with the event source, and what that concurrency does to ordering or to a downstream service is
   invisible here. A simulated DynamoDB stream has one shard and never splits, so a mapping on one has

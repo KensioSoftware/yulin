@@ -17,13 +17,18 @@ export const simLambdaFunctionUrlAuthTypeConditionKey =
  * The condition key restricting an `lambda:InvokeFunction` grant to requests
  * that arrived through the function's own URL.
  *
- * Nothing supplies a value for it, so a statement carrying it never matches.
- * That is deliberate and is the safe direction: the simulator does not model
- * the distinction, and refusing is better than granting the plain Invoke API
- * something real AWS would only allow through the URL.
+ * A Function URL request supplies it as true. The Invoke API supplies nothing,
+ * so a statement carrying it allows the URL and never the plain Invoke API.
  */
 export const simLambdaInvokedViaFunctionUrlConditionKey =
   "lambda:InvokedViaFunctionUrl";
+
+/**
+ * The condition key restricting a grant to Alexa to one skill.
+ *
+ * No simulated service invokes a function as Alexa, so nothing supplies it.
+ */
+export const simLambdaEventSourceTokenConditionKey = "lambda:EventSourceToken";
 
 /**
  * The condition key naming what a simulated service is invoking the function
@@ -47,6 +52,7 @@ interface SimLambdaPermissionProperties {
   readonly sourceAccount?: string | undefined;
   readonly principalOrgId?: string | undefined;
   readonly invokedViaFunctionUrl?: boolean | undefined;
+  readonly eventSourceToken?: string | undefined;
 }
 
 /**
@@ -69,6 +75,7 @@ export class SimLambdaPermission {
   private readonly sourceAccount?: string | undefined;
   private readonly principalOrgId?: string | undefined;
   private readonly invokedViaFunctionUrl?: boolean | undefined;
+  private readonly eventSourceToken?: string | undefined;
 
   constructor(properties: SimLambdaPermissionProperties) {
     this.statementId = properties.statementId;
@@ -80,6 +87,7 @@ export class SimLambdaPermission {
     this.sourceAccount = properties.sourceAccount;
     this.principalOrgId = properties.principalOrgId;
     this.invokedViaFunctionUrl = properties.invokedViaFunctionUrl;
+    this.eventSourceToken = properties.eventSourceToken;
   }
 
   /**
@@ -101,13 +109,11 @@ export class SimLambdaPermission {
   /**
    * The condition block the qualifying properties expand into.
    *
-   * `lambda:FunctionUrlAuthType` is given a value when a Function URL is
-   * invoked, and `AWS:SourceArn` and `AWS:SourceAccount` when a simulated
-   * service invokes the function. `aws:PrincipalOrgID` and
-   * `lambda:InvokedViaFunctionUrl` are still written into the statement,
-   * because `GetPolicy` should report the permission that was granted; a
-   * statement carrying one of them simply never matches, which is the safe
-   * direction for a condition the simulator cannot evaluate.
+   * `lambda:FunctionUrlAuthType` and `lambda:InvokedViaFunctionUrl` are given
+   * values when a Function URL is invoked, and `AWS:SourceArn` and
+   * `AWS:SourceAccount` when a simulated service invokes the function.
+   * Simulated IAM supplies `aws:PrincipalOrgID` for a caller whose Account is
+   * in the simulated organization.
    */
   private condition(): SimIamPolicyDocumentCondition | undefined {
     const stringEquals = this.stringEqualsConditions();
@@ -141,6 +147,9 @@ export class SimLambdaPermission {
       }),
       ...(this.principalOrgId !== undefined && {
         "aws:PrincipalOrgID": this.principalOrgId,
+      }),
+      ...(this.eventSourceToken !== undefined && {
+        [simLambdaEventSourceTokenConditionKey]: this.eventSourceToken,
       }),
     };
   }

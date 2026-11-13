@@ -14,6 +14,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimInvokeCommandOutput } from "../../command/invoke/invoke.command.js";
 import { makeLambdaZipFileInput } from "../code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 const functionName = "slowcoach";
 const roleArn = "arn:aws:iam::888888888888:role/SlowcoachRole";
@@ -79,7 +80,7 @@ async function loggedLines(simAws: SimAws): Promise<readonly string[]> {
 
   assertNonNullable(events, "the log group answered with its events");
 
-  return events.map((event) => event.message);
+  return handlerLines(events.map((event) => event.message));
 }
 
 /** The `Sum` of one AWS/Lambda metric this function published. */

@@ -1,5 +1,20 @@
+import type { SimLambdaFunctionArn } from "../function/sim-lambda-function-configuration.js";
 import type { SimLambdaFilterCriteria } from "./filter/sim-lambda-filter-criteria.js";
-import type { SimLambdaEventSourceMappingState } from "./sim-lambda-event-source-mapping.js";
+import type {
+  SimLambdaEventSourceMappingState,
+  SimLambdaFunctionResponseType,
+} from "./sim-lambda-event-source-mapping.js";
+import type { SimLambdaStreamDestinationConfiguration } from "./sim-lambda-stream-destination-config.js";
+import type { SimLambdaEventSourceRetryLimitsInput } from "./sim-lambda-stream-retry-limits.js";
+
+/**
+ * The function an update moves a mapping onto.
+ */
+export interface SimLambdaEventSourceMappingTarget {
+  readonly functionName: string;
+  readonly qualifier: string | undefined;
+  readonly functionArn: SimLambdaFunctionArn;
+}
 
 /**
  * What UpdateEventSourceMapping changes about a mapping, each member already
@@ -10,6 +25,14 @@ export interface SimLambdaEventSourceMappingUpdate {
   readonly batchSize?: number | undefined;
   readonly enabled?: boolean | undefined;
   readonly filterCriteria?: SimLambdaFilterCriteria | null | undefined;
+  readonly functionResponseTypes?:
+    | readonly SimLambdaFunctionResponseType[]
+    | undefined;
+  readonly destinationConfig?:
+    | SimLambdaStreamDestinationConfiguration
+    | undefined;
+  readonly retryLimits?: SimLambdaEventSourceRetryLimitsInput | undefined;
+  readonly target?: SimLambdaEventSourceMappingTarget | undefined;
   readonly updatedAt: Date;
 }
 

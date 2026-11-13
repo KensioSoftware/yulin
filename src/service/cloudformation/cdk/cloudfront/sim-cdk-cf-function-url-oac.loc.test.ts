@@ -23,12 +23,12 @@ exports.handler = async () => ({
 `;
 
 /**
- * The grant CDK does not write.
+ * The `lambda:InvokeFunction` grant an app on an older CDK adds by hand.
  *
- * `FunctionUrlOrigin.withOriginAccessControl()` writes one `CfnPermission`,
- * for `lambda:InvokeFunctionUrl`. Reaching the URL also takes
- * `lambda:InvokeFunction` for the same principal and the same Distribution, so
- * a CDK app has to add this itself.
+ * `FunctionUrlOrigin.withOriginAccessControl()` once wrote only the
+ * `lambda:InvokeFunctionUrl` grant. It now writes this one too, restricted to
+ * calls through the URL with `InvokedViaFunctionUrl`. An app written for the
+ * older CDK still carries its own copy, unrestricted.
  */
 const invokeFunctionGrantSource = `
 greeterFunction.addPermission("InvokeFunctionFromCloudFront", {
@@ -123,12 +123,11 @@ async function fetchThroughCdkDistribution(
  * the Function URL open to anyone who finds its endpoint.
  */
 describe("Sim CDK CloudFront Function URL origin access control local integration", () => {
-  it("serves an AWS_IAM Function URL through a Distribution once both grants are written", async () => {
+  it("serves an AWS_IAM Function URL through a Distribution with the grants CDK writes", async () => {
     // Given the CDK stack for a Function URL Origin with an origin access
-    // control, plus the `lambda:InvokeFunction` grant CDK leaves out.
-    const response = await fetchThroughCdkDistribution(
-      invokeFunctionGrantSource,
-    );
+    // control and nothing added, so the grants are the two CDK writes, the
+    // second restricted to calls through the URL.
+    const response = await fetchThroughCdkDistribution("");
 
     // Then the Origin request is admitted and the handler runs, with nothing
     // but the Distribution able to invoke the URL.
@@ -136,14 +135,14 @@ describe("Sim CDK CloudFront Function URL origin access control local integratio
     assertIdentical(await response.text(), "Hello from behind CloudFront");
   });
 
-  it("is refused when only the permission CDK writes is deployed", async () => {
-    // Given the same stack with nothing added, so the only permission is the
-    // `lambda:InvokeFunctionUrl` one CDK writes beside the Distribution.
-    const response = await fetchThroughCdkDistribution("");
+  it("serves it too with the Invoke grant an older CDK app adds by hand", async () => {
+    // Given the same stack with an unrestricted `lambda:InvokeFunction` grant
+    // beside the two CDK writes.
+    const response = await fetchThroughCdkDistribution(
+      invokeFunctionGrantSource,
+    );
 
-    // Then real Lambda refuses the Origin request, and so does this: the
-    // Stack deploys clean and the site answers 403 with no log stream to show
-    // for it, which is what makes the mistake so slow to find.
-    assertResponseStatus(response, 403, await describeResponse(response));
+    // Then the extra grant changes nothing about who may reach the URL.
+    assertResponseStatus(response, 200, await describeResponse(response));
   });
 });

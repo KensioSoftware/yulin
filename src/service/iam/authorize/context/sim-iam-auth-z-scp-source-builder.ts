@@ -74,6 +74,24 @@ export class SimIamAuthZScpSourceBuilder {
   }
 
   /**
+   * The `aws:PrincipalOrgID` value for a resolved caller, which is the
+   * organization its own Account belongs to.
+   */
+  principalOrgConditions(
+    caller: SimAwsResolvedCaller,
+  ): Readonly<Record<string, string>> {
+    const accountId = this.callerAccountId(caller);
+    const organizationId =
+      accountId === undefined
+        ? undefined
+        : this.scpResolver?.organizationIdFor?.(accountId);
+
+    return organizationId === undefined
+      ? {}
+      : { "aws:PrincipalOrgID": organizationId };
+  }
+
+  /**
    * The Account whose organization decides this request.
    *
    * A caller identified only by a service name or by nothing at all has no

@@ -62,29 +62,54 @@ export interface SimLambdaStreamRetryLimitsConfiguration {
  * or a List reports back exactly what was asked for.
  */
 export class SimLambdaStreamRetryLimits {
-  public readonly maximumRetryAttempts: number;
-  public readonly maximumRecordAgeInSeconds: number;
+  #maximumRetryAttempts = infinite;
+  #maximumRecordAgeInSeconds = infinite;
+  #bisectBatchOnFunctionError = false;
+
+  constructor(input: SimLambdaEventSourceRetryLimitsInput = {}) {
+    this.apply(input);
+  }
+
+  get maximumRetryAttempts(): number {
+    return this.#maximumRetryAttempts;
+  }
+
+  get maximumRecordAgeInSeconds(): number {
+    return this.#maximumRecordAgeInSeconds;
+  }
 
   /**
    * Whether a batch the function threw on is split in half and delivered again
    * as two batches.
    */
-  public readonly bisectBatchOnFunctionError: boolean;
+  get bisectBatchOnFunctionError(): boolean {
+    return this.#bisectBatchOnFunctionError;
+  }
 
-  constructor(input: SimLambdaEventSourceRetryLimitsInput = {}) {
-    this.maximumRetryAttempts = checkedLimit({
+  /**
+   * Change the settings an UpdateEventSourceMapping request names, keeping the
+   * others. The pollers hold these limits, so a change applies from the next
+   * failed batch on.
+   */
+  apply(input: SimLambdaEventSourceRetryLimitsInput): void {
+    const retryAttempts = checkedLimit({
       value: input.maximumRetryAttempts,
       field: "maximumRetryAttempts",
       maximum: maximumRetryAttemptsLimit,
       unit: "retries",
     });
-    this.maximumRecordAgeInSeconds = checkedLimit({
+    const recordAge = checkedLimit({
       value: input.maximumRecordAgeInSeconds,
       field: "maximumRecordAgeInSeconds",
       maximum: maximumRecordAgeLimit,
       unit: "seconds",
     });
-    this.bisectBatchOnFunctionError = input.bisectBatchOnFunctionError ?? false;
+
+    this.#maximumRetryAttempts = retryAttempts ?? this.#maximumRetryAttempts;
+    this.#maximumRecordAgeInSeconds =
+      recordAge ?? this.#maximumRecordAgeInSeconds;
+    this.#bisectBatchOnFunctionError =
+      input.bisectBatchOnFunctionError ?? this.#bisectBatchOnFunctionError;
   }
 
   /**
@@ -150,11 +175,11 @@ interface CheckedLimitProperties {
 /**
  * One limit as Lambda takes it, refusing a value outside the range it documents.
  */
-function checkedLimit(properties: CheckedLimitProperties): number {
+function checkedLimit(properties: CheckedLimitProperties): number | undefined {
   const { value, field, maximum, unit } = properties;
 
   if (value === undefined) {
-    return infinite;
+    return undefined;
   }
 
   if (!Number.isSafeInteger(value) || value < infinite || value > maximum) {

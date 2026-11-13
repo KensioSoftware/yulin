@@ -1,4 +1,7 @@
-import { SimLambdaBatchItemFailures } from "./sim-lambda-batch-item-failures.js";
+import {
+  SimLambdaBatchItemFailures,
+  type SimLambdaBatchItemFailureSetting,
+} from "./sim-lambda-batch-item-failures.js";
 import { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import type { SimLambdaStreamRecordTime } from "./sim-lambda-stream-record-times.js";
 import { simLambdaStreamSequenceNumbers } from "./sim-lambda-stream-sequence-numbers.js";
@@ -19,10 +22,8 @@ import { simLambdaStreamSequenceNumbers } from "./sim-lambda-stream-sequence-num
 export class SimLambdaStreamBatchResponse {
   private readonly batchItemFailures: SimLambdaBatchItemFailures;
 
-  constructor(reportsBatchItemFailures: boolean) {
-    this.batchItemFailures = new SimLambdaBatchItemFailures(
-      reportsBatchItemFailures,
-    );
+  constructor(setting: SimLambdaBatchItemFailureSetting) {
+    this.batchItemFailures = new SimLambdaBatchItemFailures(setting);
   }
 
   /**

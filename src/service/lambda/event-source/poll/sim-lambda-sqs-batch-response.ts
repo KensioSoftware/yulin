@@ -1,5 +1,8 @@
 import type { SimSqsPollMessage } from "../../../sqs/poll/sim-sqs-poll-message.js";
-import { SimLambdaBatchItemFailures } from "./sim-lambda-batch-item-failures.js";
+import {
+  SimLambdaBatchItemFailures,
+  type SimLambdaBatchItemFailureSetting,
+} from "./sim-lambda-batch-item-failures.js";
 import {
   SimLambdaEventSourceBatchOutcome,
   type SimLambdaEventSourceBatchResponse,
@@ -17,10 +20,8 @@ import {
 export class SimLambdaSqsBatchResponse implements SimLambdaEventSourceBatchResponse {
   private readonly batchItemFailures: SimLambdaBatchItemFailures;
 
-  constructor(reportsBatchItemFailures: boolean) {
-    this.batchItemFailures = new SimLambdaBatchItemFailures(
-      reportsBatchItemFailures,
-    );
+  constructor(setting: SimLambdaBatchItemFailureSetting) {
+    this.batchItemFailures = new SimLambdaBatchItemFailures(setting);
   }
 
   /**

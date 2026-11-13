@@ -1,6 +1,13 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
 
 /**
+ * Whether a mapping expects its function to report batch item failures.
+ */
+export interface SimLambdaBatchItemFailureSetting {
+  readonly reportsBatchItemFailures: boolean;
+}
+
+/**
  * The batch item failure report a function may send back.
  *
  * Reading the report is the same for every event source that accepts one: the
@@ -9,17 +16,21 @@ import { isRecord } from "../../../../util/type-guard/record.js";
  * stays with the source's own batch response.
  */
 export class SimLambdaBatchItemFailures {
-  private readonly reportsBatchItemFailures: boolean;
+  private readonly setting: SimLambdaBatchItemFailureSetting;
 
-  constructor(reportsBatchItemFailures: boolean) {
-    this.reportsBatchItemFailures = reportsBatchItemFailures;
+  /**
+   * The setting is read on every batch, so an update to the mapping's
+   * response types applies from the next batch on.
+   */
+  constructor(setting: SimLambdaBatchItemFailureSetting) {
+    this.setting = setting;
   }
 
   /**
    * The item ids a report names, or undefined when the function reported none.
    */
   idsIn(result: unknown): readonly string[] | undefined {
-    if (!this.reportsBatchItemFailures || !isRecord(result)) {
+    if (!this.setting.reportsBatchItemFailures || !isRecord(result)) {
       return undefined;
     }
 

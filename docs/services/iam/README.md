@@ -236,8 +236,12 @@ repository that still says it is there.
 ## Policy conditions
 
 Policy statements can carry `Condition` blocks. Sim IAM currently supports the `StringEquals`,
-`StringLike`, `ArnLike`, `ArnEquals`, `NumericLessThanEquals` and `Null` operators, along with the
-`ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
+`StringLike`, `ArnLike`, `ArnEquals`, `NumericLessThanEquals`, `Bool` and `Null` operators, along
+with the `ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
+
+`Bool` reads `"true"` and `"false"` in either case, as well as JSON booleans, on both sides. A
+request carrying no value for the key matches nothing, so `"aws:SecureTransport": "false"` belongs
+in a `Deny`.
 
 The negated operators `StringNotEquals`, `StringNotLike`, `ArnNotEquals` and `ArnNotLike` are
 supported too, each unqualified and in both set forms. A list of policy values under a negated
@@ -254,8 +258,10 @@ because a pattern needs as many components as the ARN it is matched against. `Ar
 
 Condition context values are supplied by the service handling the simulated request, such as S3
 object tags. Sim IAM automatically derives the global values it can work out itself, `aws:PrincipalArn`
-from the resolved caller and `aws:RequestedRegion` from the Region the request was made in. A value a
-service supplies under either name is overwritten by the derived one. Context-key names are matched
+from the resolved caller and `aws:RequestedRegion` from the Region the request was made in. A caller
+whose Account is in the simulated organization also carries `aws:PrincipalOrgID` (see
+[Organizations](https://yulinsim.dev/services/organizations/)). A value a service supplies under any
+of those names is overwritten by the derived one. Context-key names are matched
 case-insensitively, while string values remain case-sensitive.
 
 IAM's own requests carry two service keys. A Role handed to a service carries

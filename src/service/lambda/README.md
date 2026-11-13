@@ -908,8 +908,7 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   and `MasterRegion` on `ListFunctions`
 - the previous code and settings answering invocations while a change is `InProgress`, a change
   ending `Failed`, and the refusal of a change to a function still `Pending`
-- `EventSourceToken` on `AddPermission`, alias
-  `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
+- alias `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment

@@ -38,7 +38,9 @@ function retryFrom(position: SimLambdaEventSourceStreamPosition): string {
 describe("sim Lambda stream batch responses", () => {
   it("goes back to the lowest sequence number a report names", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function reports the last two records, out of order.
     const outcome = response.handled(records, {
@@ -54,7 +56,9 @@ describe("sim Lambda stream batch responses", () => {
 
   it("keeps the whole batch when the mapping expects no failure report", () => {
     // Given a mapping the function does not report batch item failures to.
-    const response = new SimLambdaStreamBatchResponse(false);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: false,
+    });
 
     // When the function returns a report anyway.
     const outcome = response.handled(records, {
@@ -68,7 +72,9 @@ describe("sim Lambda stream batch responses", () => {
 
   it("keeps the whole batch for a report naming nothing", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function returns an empty report.
     const outcome = response.handled(records, { batchItemFailures: [] });
@@ -79,7 +85,9 @@ describe("sim Lambda stream batch responses", () => {
 
   it("reads the whole batch again for a report naming a record outside it", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function names a sequence number that was not in the batch.
     const outcome = response.handled(records, {
@@ -97,7 +105,9 @@ describe("sim Lambda stream batch responses", () => {
 
   it("reads the whole batch again for an entry with no sequence number", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function reports an entry whose identifier is empty.
     const outcome = response.handled(records, {
@@ -114,7 +124,9 @@ describe("sim Lambda stream batch responses", () => {
   it("names no record for a batch whose records carry no sequence number", () => {
     // Given a mapping expecting a failure report, and a batch whose records the
     // stream handed over without sequence numbers, so none can be named.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function reports an entry naming nothing.
     const outcome = response.handled([], {
@@ -131,7 +143,9 @@ describe("sim Lambda stream batch responses", () => {
 
   it("reads the whole batch again when the function threw", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaStreamBatchResponse(true);
+    const response = new SimLambdaStreamBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function threw rather than returning anything.
     const outcome = response.failed(records);

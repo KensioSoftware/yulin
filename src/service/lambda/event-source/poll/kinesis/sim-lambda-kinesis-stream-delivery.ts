@@ -50,9 +50,7 @@ export class SimLambdaKinesisStreamDelivery {
       shardId: properties.shardId,
       roleArn: properties.roleArn,
     });
-    this.batchResponse = new SimLambdaStreamBatchResponse(
-      properties.mapping.reportsBatchItemFailures,
-    );
+    this.batchResponse = new SimLambdaStreamBatchResponse(properties.mapping);
     this.cascade = new SimLambdaStreamCascadeGuard({
       mapping: properties.mapping,
       halt: this.halt,

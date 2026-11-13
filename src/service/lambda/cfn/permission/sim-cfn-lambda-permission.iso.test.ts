@@ -174,9 +174,7 @@ describe("Lambda CloudFormation Permission deployment", () => {
     await stack.waitForDeployComplete();
 
     // Then the statement carries each of them, so GetPolicy reports the grant
-    // that was made. Nothing here can match it: only an API Gateway
-    // integration supplies a source ARN, and nothing supplies a source Account
-    // or a Function URL flag, so an S3 grant like this one never matches
+    // that was made
     const policy = await simAws
       .lambda()
       .getPolicy(new GetPolicyCommand({ FunctionName: "greeter" }));

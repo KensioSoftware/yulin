@@ -12,7 +12,7 @@ const maximumRetryAttempts = 10_000;
 describe("the wait before a failed stream batch is delivered again", () => {
   it("doubles for each attempt a test walks through", () => {
     // Given a mapping allowing a handful of retries.
-    const backoff = new SimLambdaStreamRetryBackoff(10);
+    const backoff = new SimLambdaStreamRetryBackoff({ attemptLimit: 10 });
 
     // When the first three of them are taken.
     const waits = [
@@ -28,7 +28,7 @@ describe("the wait before a failed stream batch is delivered again", () => {
 
   it("starts over once a batch is finished with", () => {
     // Given a backoff that has already waited out two attempts.
-    const backoff = new SimLambdaStreamRetryBackoff(10);
+    const backoff = new SimLambdaStreamRetryBackoff({ attemptLimit: 10 });
     backoff.nextSeconds();
     backoff.nextSeconds();
 
@@ -43,7 +43,9 @@ describe("the wait before a failed stream batch is delivered again", () => {
   it("stays a wait the simulation's clock can be scheduled at", () => {
     // Given a mapping allowing the most retries Lambda takes, which is more
     // than a doubling wait can go on doubling for.
-    const backoff = new SimLambdaStreamRetryBackoff(maximumRetryAttempts);
+    const backoff = new SimLambdaStreamRetryBackoff({
+      attemptLimit: maximumRetryAttempts,
+    });
 
     // When a batch fails past the point where doubling leaves the range a date
     // can hold.

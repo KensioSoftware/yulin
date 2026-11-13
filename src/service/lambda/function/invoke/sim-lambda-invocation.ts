@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimLambdaPlatformLogInvocation } from "../logging/sim-lambda-platform-log.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 import { SimLambdaHandlerRunner } from "./sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./sim-lambda-invoke-context-builder.js";
@@ -46,6 +47,19 @@ export class SimLambdaInvocation {
 
   constructor(properties: SimLambdaInvocationProperties) {
     this.#properties = properties;
+  }
+
+  /**
+   * What the platform lines real Lambda writes around this invocation say
+   * about it.
+   */
+  get platformLog(): SimLambdaPlatformLogInvocation {
+    return {
+      requestId: this.#awsRequestId,
+      version: this.#properties.functionVersion,
+      memorySizeMb: this.#properties.memorySizeMb,
+      clock: this.#properties.clock,
+    };
   }
 
   /**

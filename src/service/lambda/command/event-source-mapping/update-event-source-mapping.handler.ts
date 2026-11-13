@@ -9,8 +9,12 @@ import type {
   SimUpdateEventSourceMappingCommandOutput,
 } from "./event-source-mapping.command.js";
 import { simLambdaEventSourceMappingUpdateOf } from "./update-event-source-mapping-input.js";
+import {
+  type SimLambdaEventSourceMappingRetargetProperties,
+  simLambdaEventSourceMappingTargetOf,
+} from "./update-event-source-mapping-target.js";
 
-interface UpdateEventSourceMappingCommandHandlerProperties {
+interface UpdateEventSourceMappingCommandHandlerProperties extends SimLambdaEventSourceMappingRetargetProperties {
   readonly access: SimLambdaEventSourceMappingAccess;
   readonly pollers: SimLambdaEventSourcePollers;
   readonly background: BackgroundScheduler;
@@ -37,7 +41,7 @@ export class UpdateEventSourceMappingCommandHandler {
   }
 
   /**
-   * Change a mapping's batch size, enabled state or filters.
+   * Change what a mapping delivers, how, and to which function.
    */
   async handle(
     command: SimUpdateEventSourceMappingCommand,
@@ -64,7 +68,14 @@ export class UpdateEventSourceMappingCommandHandler {
       );
     }
 
-    mapping.update(update);
+    const target = await simLambdaEventSourceMappingTargetOf(
+      this.properties,
+      command.input.FunctionName,
+      mapping,
+      options?.caller,
+    );
+
+    mapping.update({ ...update, target });
     pollers.settle(mapping);
 
     return { $metadata: {}, ...mapping.configuration() };

@@ -177,27 +177,6 @@ describe("Lambda UpdateEventSourceMappingCommand", () => {
     );
   });
 
-  it("refuses a member it keeps as the mapping was created, changing nothing", async () => {
-    const { simAws, uuid } = await simAwsWithSqsEventSource();
-
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.lambda().updateEventSourceMapping(
-        new UpdateEventSourceMappingCommand({
-          UUID: uuid,
-          BatchSize: 5,
-          FunctionResponseTypes: ["ReportBatchItemFailures"],
-        }),
-      ),
-    );
-    const read = await simAws
-      .lambda()
-      .getEventSourceMapping(new GetEventSourceMappingCommand({ UUID: uuid }));
-
-    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
-    assertIdentical(read.BatchSize, 10);
-    await simAws.backgroundTasksComplete();
-  });
-
   it("refuses a batch size the event source would never fill", async () => {
     const { simAws, uuid } = await simAwsWithSqsEventSource();
 

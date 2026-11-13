@@ -13,6 +13,7 @@ import { SimIamNumericLessThanEquals } from "./numeric/less-than-equals/sim-iam-
 import { SimIamArnEquals } from "./arn/equals/sim-iam-arn-equals.js";
 import { SimIamArnLike } from "./arn/like/sim-iam-arn-like.js";
 import { SimIamNull } from "./null/sim-iam-null.js";
+import { SimIamBool } from "./bool/sim-iam-bool.js";
 
 const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
   ["ArnEquals", (): SimIamConditionOperator => new SimIamArnEquals()],
@@ -24,6 +25,7 @@ const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
   ["StringEquals", (): SimIamConditionOperator => new SimIamStringEquals()],
   ["StringLike", (): SimIamConditionOperator => new SimIamStringLike()],
   ["Null", (): SimIamConditionOperator => new SimIamNull()],
+  ["Bool", (): SimIamConditionOperator => new SimIamBool()],
   [
     "ForAnyValue:StringEquals",
     (): SimIamConditionOperator => new SimIamForAnyValueStringEquals(),

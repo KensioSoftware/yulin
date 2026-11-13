@@ -48,9 +48,7 @@ export class SimLambdaDynamoDbStreamDelivery {
     this.eventBuilder = new SimLambdaDynamoDbStreamEventBuilder(
       properties.eventSourceArn,
     );
-    this.batchResponse = new SimLambdaStreamBatchResponse(
-      properties.mapping.reportsBatchItemFailures,
-    );
+    this.batchResponse = new SimLambdaStreamBatchResponse(properties.mapping);
     this.cascade = new SimLambdaStreamCascadeGuard({
       mapping: properties.mapping,
       halt: this.halt,
