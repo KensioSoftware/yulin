@@ -3332,8 +3332,9 @@ CloudFront without leaving the Function URL open to anyone who finds its endpoin
 Both permissions are needed. One grants `lambda:InvokeFunctionUrl` and the other
 `lambda:InvokeFunction`, to the same principal with the same `SourceArn`, as
 [Restrict access to an AWS Lambda function URL origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda.html)
-sets out. CDK's `FunctionUrlOrigin.withOriginAccessControl` writes only the first. A CDK app has to
-add the second itself:
+sets out. CDK's `FunctionUrlOrigin.withOriginAccessControl` writes both, and restricts the second to
+calls through the Function URL with `InvokedViaFunctionUrl`. Older CDK versions wrote only the
+first, and an app on one has to add the second itself:
 
 ```typescript
 greeterFunction.addPermission("InvokeFunctionFromCloudFront", {

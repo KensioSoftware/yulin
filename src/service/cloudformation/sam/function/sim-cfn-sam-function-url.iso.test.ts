@@ -51,6 +51,19 @@ describe("SAM function FunctionUrlConfig expansion", () => {
     assertIdentical(functionUrl.invokeMode, "BUFFERED");
     assertArrayEmpty(stack.skippedResources);
 
+    // And the two permissions SAM writes to open it to anyone
+    assertIdentical(
+      stack.getResource(`${samFunctionTemplateLogicalId}UrlPublicPermissions`)
+        ?.type,
+      "AWS::Lambda::Permission",
+    );
+    assertIdentical(
+      stack.getResource(
+        `${samFunctionTemplateLogicalId}URLInvokeAllowPublicAccess`,
+      )?.type,
+      "AWS::Lambda::Permission",
+    );
+
     // And a request to it runs the bound handler
     const response = await new SimAwsHttp({ simAws }).fetch(
       new SimAwsLocalUrl({ input: `${functionUrl.url}rates` }).toString(),
@@ -90,6 +103,31 @@ describe("SAM function FunctionUrlConfig expansion", () => {
       AllowMethods: ["GET"],
       MaxAge: 300,
     });
+  });
+
+  it("writes no public permission for an AWS_IAM URL", async () => {
+    // Given a SAM function declaring an IAM-authenticated Function URL
+    const simAws = new SimAws();
+
+    // When it is deployed
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "rates-iam-url-stack",
+      template: simCfnSamFunctionTemplateFactory.make({
+        functionProperties: { FunctionUrlConfig: { AuthType: "AWS_IAM" } },
+      }),
+    });
+
+    // Then the URL is there and nothing opens it to anyone, as SAM leaves the
+    // grants to the template
+    assertNonNullable(stack.getResource(`${samFunctionTemplateLogicalId}Url`));
+    assertUndefined(
+      stack.getResource(`${samFunctionTemplateLogicalId}UrlPublicPermissions`),
+    );
+    assertUndefined(
+      stack.getResource(
+        `${samFunctionTemplateLogicalId}URLInvokeAllowPublicAccess`,
+      ),
+    );
   });
 
   it("leaves a function stating no URL config without one", async () => {

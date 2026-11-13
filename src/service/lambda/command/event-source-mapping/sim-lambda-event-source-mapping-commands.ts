@@ -140,7 +140,7 @@ export class SimLambdaEventSourceMappingCommands {
   }
 
   /**
-   * Change a mapping's batch size, enabled state or filters.
+   * Change a mapping's settings or the function it delivers to.
    */
   async update(
     command: SimUpdateEventSourceMappingCommand,

@@ -43,6 +43,13 @@ export class SimLambdaEventSourceBatchOutcome {
  */
 export interface SimLambdaEventSourceBatchResponse {
   /**
+   * A response fixed to the mapping's settings as they are now, for one batch
+   * about to be invoked. A change to the mapping while the function runs
+   * applies from the next batch.
+   */
+  forBatch(): SimLambdaEventSourceBatchResponse;
+
+  /**
    * What became of a batch the function returned from.
    */
   handled(

@@ -196,6 +196,7 @@ export class SimIamAuthZContextBuilder {
       ...input.conditionContext,
       ...input.callerConditions?.conditionValuesFor(caller),
       ...this.derivedConditions.of({ caller, region: input.region }),
+      ...this.scpSourceBuilder.principalOrgConditions(caller),
     };
   }
 

@@ -21,9 +21,7 @@ export function makeSimLambdaSqsDelivery(
 ): SimLambdaEventSourceDelivery {
   return new SimLambdaEventSourceDelivery({
     eventBuilder: new SimLambdaSqsEventBuilder(properties.eventSourceArn),
-    batchResponse: new SimLambdaSqsBatchResponse(
-      properties.mapping.reportsBatchItemFailures,
-    ),
+    batchResponse: new SimLambdaSqsBatchResponse(properties.mapping),
     filters: properties.mapping,
   });
 }

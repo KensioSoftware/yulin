@@ -22,7 +22,9 @@ const messages: readonly SimSqsPollMessage[] = [
 describe("sim Lambda SQS batch responses", () => {
   it("keeps the whole batch when the mapping expects no failure report", () => {
     // Given a mapping the function does not report batch item failures to.
-    const response = new SimLambdaSqsBatchResponse(false);
+    const response = new SimLambdaSqsBatchResponse({
+      reportsBatchItemFailures: false,
+    });
 
     // When the function returns a report anyway.
     const outcome = response.handled(messages, {
@@ -37,7 +39,9 @@ describe("sim Lambda SQS batch responses", () => {
 
   it("returns the whole batch for a report entry that is not an object", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaSqsBatchResponse(true);
+    const response = new SimLambdaSqsBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function reports a bare string.
     const outcome = response.handled(messages, {
@@ -50,7 +54,9 @@ describe("sim Lambda SQS batch responses", () => {
 
   it("returns the whole batch for an entry with no message id", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaSqsBatchResponse(true);
+    const response = new SimLambdaSqsBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function reports an entry whose identifier is not a string.
     const outcome = response.handled(messages, {
@@ -63,7 +69,9 @@ describe("sim Lambda SQS batch responses", () => {
 
   it("keeps the whole batch when the function returns nothing", () => {
     // Given a mapping expecting a failure report.
-    const response = new SimLambdaSqsBatchResponse(true);
+    const response = new SimLambdaSqsBatchResponse({
+      reportsBatchItemFailures: true,
+    });
 
     // When the function returns undefined, as a handler with no return does.
     const outcome = response.handled(messages, undefined);

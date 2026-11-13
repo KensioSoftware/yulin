@@ -1,4 +1,5 @@
 import { functionErrorDocument } from "../../command/invoke/invoke-payload.js";
+import type { SimLambdaLogWriter } from "./sim-lambda-log-writer.js";
 
 /**
  * What real Lambda writes to a function's log group when an invocation ends in
@@ -17,4 +18,23 @@ export function simLambdaInvokeErrorLine(error: unknown): string {
   const document = JSON.stringify({ errorType, errorMessage, stack: trace });
 
   return `ERROR Invoke Error ${document}\n`;
+}
+
+/**
+ * Record an invocation that ended in an error nothing caught, as real Lambda's
+ * runtime records one.
+ *
+ * The caller still gets the error: an Invoke answers with `FunctionError` and
+ * the trace in its payload as before, and this only puts the same failure in
+ * the place code goes looking for it. Whatever the handler wrote without
+ * closing the line is a line of its own first. A handler that printed half a
+ * line before failing would otherwise have the error appended to it, where a
+ * filter for the error misses it.
+ */
+export function simLambdaRecordInvokeError(
+  writer: SimLambdaLogWriter | undefined,
+  error: unknown,
+): void {
+  writer?.flush();
+  writer?.write(simLambdaInvokeErrorLine(error));
 }

@@ -104,8 +104,10 @@ export class SimLambdaEventSourceDelivery {
     simFunction: SimLambdaFunction,
     delivered: readonly SimSqsPollMessage[],
   ): Promise<SimLambdaEventSourceBatchOutcome> {
+    const batchResponse = this.batchResponse.forBatch();
+
     try {
-      return this.batchResponse.handled(
+      return batchResponse.handled(
         delivered,
         await simFunction.invoke(this.eventBuilder.of(delivered)),
       );
@@ -113,7 +115,7 @@ export class SimLambdaEventSourceDelivery {
       // As on real Lambda, the handler error goes to the function's logs and
       // not to whoever sent the message. What the sender sees is the batch
       // coming back to the source.
-      return this.batchResponse.failed(delivered);
+      return batchResponse.failed(delivered);
     }
   }
 

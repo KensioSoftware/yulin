@@ -89,6 +89,11 @@ export class SimCfnLambdaPermissionCreator {
             properties["PrincipalOrgID"],
             "PrincipalOrgID",
           ),
+          EventSourceToken: this.propertyParser.optionalString(
+            resource,
+            properties["EventSourceToken"],
+            "EventSourceToken",
+          ),
           InvokedViaFunctionUrl: this.propertyParser.optionalBoolean(
             resource,
             properties["InvokedViaFunctionUrl"],

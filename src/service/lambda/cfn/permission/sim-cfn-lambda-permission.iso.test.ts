@@ -20,6 +20,7 @@ const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
 
 function greeterTemplate(
   permissionProperties: SimCfnTemplateValueRecord,
+  otherResources: Record<string, SimCfnTemplateValueRecord> = {},
 ): CfnTemplateBodyRecord {
   return {
     Resources: {
@@ -47,6 +48,7 @@ function greeterTemplate(
         Type: "AWS::Lambda::Permission",
         Properties: permissionProperties,
       },
+      ...otherResources,
     },
     Outputs: {
       FunctionUrl: {
@@ -101,12 +103,27 @@ describe("Lambda CloudFormation Permission deployment", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "greeter-stack",
-      template: greeterTemplate({
-        FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-        FunctionUrlAuthType: "AWS_IAM",
-      }),
+      template: greeterTemplate(
+        {
+          FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+          Action: "lambda:InvokeFunctionUrl",
+          Principal: callerRoleArn,
+          FunctionUrlAuthType: "AWS_IAM",
+        },
+        {
+          // A Function URL takes the Invoke action too, granted only for
+          // calls through a URL.
+          GreeterInvokeViaUrlPermission: {
+            Type: "AWS::Lambda::Permission",
+            Properties: {
+              FunctionName: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+              Action: "lambda:InvokeFunction",
+              Principal: callerRoleArn,
+              InvokedViaFunctionUrl: true,
+            },
+          },
+        },
+      ),
     });
     await stack.waitForDeployComplete();
     // And the calling Role in its own Account, allowed to invoke Function URLs
@@ -130,7 +147,10 @@ describe("Lambda CloudFormation Permission deployment", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -174,9 +194,7 @@ describe("Lambda CloudFormation Permission deployment", () => {
     await stack.waitForDeployComplete();
 
     // Then the statement carries each of them, so GetPolicy reports the grant
-    // that was made. Nothing here can match it: only an API Gateway
-    // integration supplies a source ARN, and nothing supplies a source Account
-    // or a Function URL flag, so an S3 grant like this one never matches
+    // that was made
     const policy = await simAws
       .lambda()
       .getPolicy(new GetPolicyCommand({ FunctionName: "greeter" }));

@@ -12,6 +12,7 @@ import { SimLambda } from "../../sim-lambda.js";
 import { makeLambdaCodeZip } from "../code/make-lambda-code-zip.js";
 import { makeLambdaZipFileInput } from "../code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 /**
  * A handler writing to standard output directly, as AWS Lambda Powertools'
@@ -70,7 +71,7 @@ async function messagesIn(
     .logs()
     .filterLogEvents(new FilterLogEventsCommand({ logGroupName }));
 
-  return events?.map((event) => event.message) ?? [];
+  return handlerLines(events?.map((event) => event.message) ?? []);
 }
 
 describe("a simulated Lambda capturing function output only", () => {

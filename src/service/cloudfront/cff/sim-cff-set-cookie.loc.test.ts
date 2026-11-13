@@ -14,6 +14,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
 import { makeCffFunctionCodeInput } from "./function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 describe("Set-Cookie through a viewer-response sim CloudFront Function", () => {
   const cookies = [
@@ -52,6 +53,7 @@ describe("Set-Cookie through a viewer-response sim CloudFront Function", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "callback");
     assertNonNullable(functionUrl);
 
     // And a viewer-response Function on the behaviour in front of it.

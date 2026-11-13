@@ -110,7 +110,12 @@ export class SimLambdaEventSourceMapping {
   public readonly destinations: SimLambdaDestinationTargets;
   public readonly uuid: string = randomUUID();
   public readonly eventSourceArn: string;
-  public readonly functionName: string;
+
+  /**
+   * The function this mapping delivers to. Read on every poll, so an update
+   * moving the mapping onto another function applies from the next batch on.
+   */
+  public functionName: string;
 
   /**
    * The version or alias this mapping delivers to, if it was created with one.
@@ -118,9 +123,9 @@ export class SimLambdaEventSourceMapping {
    * It is resolved on every poll rather than at creation, so an alias moved to
    * another version moves what the mapping delivers to.
    */
-  public readonly qualifier: string | undefined;
+  public qualifier: string | undefined;
 
-  public readonly functionArn: SimLambdaFunctionArn;
+  public functionArn: SimLambdaFunctionArn;
 
   /**
    * How many records one delivery carries at most. Read on every poll, so an
@@ -133,7 +138,7 @@ export class SimLambdaEventSourceMapping {
    * A queue mapping has none, because a queue only has a front.
    */
   public readonly start: SimLambdaEventSourceStart | undefined;
-  public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
+  public functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
   /**
    * The filters a record has to match before it is delivered, if this mapping
@@ -153,7 +158,7 @@ export class SimLambdaEventSourceMapping {
    */
   public readonly streamRetryLimits: SimLambdaStreamRetryLimits | undefined;
 
-  private readonly destinationConfig:
+  private destinationConfig:
     | SimLambdaStreamDestinationConfiguration
     | undefined;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -236,6 +241,16 @@ export class SimLambdaEventSourceMapping {
 
     this.batchSize = next.batchSize;
     this.filterCriteria = next.filterCriteria;
+    this.functionResponseTypes = [
+      ...(update.functionResponseTypes ?? this.functionResponseTypes),
+    ];
+    this.destinationConfig = update.destinationConfig ?? this.destinationConfig;
+    this.streamRetryLimits?.apply(update.retryLimits ?? {});
+
+    const target = update.target ?? this;
+    this.functionName = target.functionName;
+    this.qualifier = target.qualifier;
+    this.functionArn = target.functionArn;
     this.lastModified = update.updatedAt;
     this.#state = next.state;
     this.enabled = next.enabled;

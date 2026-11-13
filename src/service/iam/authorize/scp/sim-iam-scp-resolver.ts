@@ -56,4 +56,11 @@ export interface SimIamServiceControlPolicyResolver {
   serviceControlPolicySetFor(
     accountId: SimAwsAccountId,
   ): SimIamServiceControlPolicySet;
+
+  /**
+   * The id of the organization an Account belongs to, which a request from one
+   * of its principals carries as `aws:PrincipalOrgID`. An Account outside the
+   * organization has none.
+   */
+  organizationIdFor?(accountId: SimAwsAccountId): string | undefined;
 }

@@ -15,6 +15,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimLambdaFunction } from "../sim-lambda-function.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 const ERROR_LINE_PREFIX = "ERROR Invoke Error ";
 
@@ -101,7 +102,7 @@ async function invokeAndReadLog(
     }),
   );
 
-  return found.events?.map((event) => event.message) ?? [];
+  return handlerLines(found.events?.map((event) => event.message) ?? []);
 }
 
 /**

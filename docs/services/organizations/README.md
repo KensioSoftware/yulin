@@ -467,6 +467,16 @@ These are the properties read from each resource:
 Stack teardown removes resources created by that stack. Policies from other stacks remain attached.
 Accounts and child units move to the deleted unit's parent.
 
+## Restrict a resource policy to the organization
+
+A request from a principal whose Account is in the organization carries `aws:PrincipalOrgID`, and
+its value is `organizations.organizationId()`. A resource policy granting `*` on that condition
+admits the organization's Accounts (the management account included) and no others. The id is the
+`o-` id `AWS::Organizations::Organization` reports, and it shares its suffix with the root's `r-` id.
+
+Lambda writes the condition itself when `AddPermission` is given a `PrincipalOrgID`. Any other
+resource policy can carry it as a `StringEquals` condition.
+
 ## Reading a denial
 
 An authorization decision reports the organization's verdict apart from the identity and resource
@@ -513,10 +523,11 @@ Simulated Organizations supports:
 - Evaluation ahead of identity and resource policies, for every principal in the Account including
   its root
 - Inheritance down the root-to-Account path, with every level having to allow the action
-- AWS-shaped `r-` and `ou-` node ids
+- AWS-shaped `r-` and `ou-` node ids, and an `o-` organization id from `organizationId()`
+- `aws:PrincipalOrgID` on every request from a principal in one of the organization's Accounts
 - `Action`, `NotAction`, `Resource`, `NotResource` and `Condition` in an SCP statement
-- The `ArnEquals`, `ArnLike`, `NumericLessThanEquals`, `StringEquals` and `StringLike` condition
-  operators, and their `ForAnyValue:` and `ForAllValues:` set forms
+- The `ArnEquals`, `ArnLike`, `NumericLessThanEquals`, `StringEquals`, `StringLike`, `Bool` and
+  `Null` condition operators, and the `ForAnyValue:` and `ForAllValues:` set forms of the string ones
 - The negated `ArnNotEquals`, `ArnNotLike`, `StringNotEquals` and `StringNotLike` operators and
   their set forms, which a `Deny` statement exempting named roles hangs on `aws:PrincipalArn`
 - `AccessDenied` messages naming the service control policy, as AWS words them
@@ -533,7 +544,7 @@ Simulated Organizations supports:
 | Service-linked roles        | Evaluated like any other principal. AWS exempts a service-linked role from SCPs.                                                    |
 | Other policy types          | Resource control policies, declarative policies, tag policies, backup policies and AI services opt-out policies are not simulated.  |
 | The Organizations SDK       | `CreatePolicy`, `AttachPolicy`, `ListAccounts` and the rest of the API are not handled. Policies are attached through the accessor. |
-| Organization condition keys | `aws:PrincipalOrgID` and `aws:PrincipalOrgPaths` are not populated. A condition naming either fails to match.                       |
+| Organization condition keys | `aws:PrincipalOrgPaths` is not populated. A condition naming it fails to match.                                                     |
 | Service principals          | A request whose caller is a service principal or anonymous belongs to no Account and is subject to no policy.                       |
 | Condition operator coverage | The operators above are evaluated. Anything else fails closed and the statement holding it matches nothing.                         |
 | HTTP API                    | Organizations is not served as an HTTP API by `serveSimAws`.                                                                        |

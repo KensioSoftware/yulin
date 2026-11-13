@@ -10,7 +10,7 @@ import type { SimCreateEventSourceMappingCommandInput } from "./event-source-map
  * goes back to the record it names and delivers everything from there again.
  */
 export function functionResponseTypesIn(
-  input: SimCreateEventSourceMappingCommandInput,
+  input: Pick<SimCreateEventSourceMappingCommandInput, "FunctionResponseTypes">,
 ): readonly SimLambdaFunctionResponseType[] {
   const responseTypes = input.FunctionResponseTypes ?? [];
 

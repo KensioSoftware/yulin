@@ -8,6 +8,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../service/aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../../service/lambda/function/code/lambda-zip-file-input.js";
 import { serveSimAws } from "./sim-aws-local-server.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 /**
  * A Function URL that redirects to a second one, in the way a sign-in page
@@ -39,6 +40,7 @@ async function makeRedirectingFunctionUrl(simAws: SimAws): Promise<{
       AuthType: "NONE",
     }),
   );
+  await grantPublicFunctionUrl(lambda, "callback");
 
   const callbackUrl = `${callback.FunctionUrl}callback`;
 
@@ -62,6 +64,7 @@ async function makeRedirectingFunctionUrl(simAws: SimAws): Promise<{
       AuthType: "NONE",
     }),
   );
+  await grantPublicFunctionUrl(lambda, "sign-in");
 
   return { signInUrl: signIn.FunctionUrl, callbackUrl };
 }

@@ -27,7 +27,13 @@ export class SimLambdaStreamBisect {
   #half: number | undefined;
   #remaining = 0;
 
-  constructor(private readonly enabled: boolean) {}
+  /**
+   * The setting is read on every failure, so an update to the mapping applies
+   * from the next batch the function throws on.
+   */
+  constructor(
+    private readonly setting: { readonly bisectBatchOnFunctionError: boolean },
+  ) {}
 
   /**
    * How many records the next read may take, within the mapping's batch size.
@@ -50,7 +56,11 @@ export class SimLambdaStreamBisect {
   split(outcome: SimLambdaStreamBatchOutcome): boolean {
     const count = outcome.records.length;
 
-    if (!this.enabled || !outcome.functionError || count < 2) {
+    if (
+      !this.setting.bisectBatchOnFunctionError ||
+      !outcome.functionError ||
+      count < 2
+    ) {
       return false;
     }
 

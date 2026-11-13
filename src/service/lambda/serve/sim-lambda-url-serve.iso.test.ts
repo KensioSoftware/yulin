@@ -14,6 +14,7 @@ import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 function localUrl(functionUrl: string, path = ""): string {
   return new SimAwsLocalUrl({ input: `${functionUrl}${path}` }).toString();
@@ -46,6 +47,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -83,6 +85,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -122,6 +125,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -159,6 +163,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -196,6 +201,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -227,6 +233,7 @@ describe("Serving a sim Lambda Function URL", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
     const secondLambda = simAws.account("222222222222").lambda();
     await secondLambda.createFunction(
       new CreateFunctionCommand({
@@ -241,6 +248,7 @@ describe("Serving a sim Lambda Function URL", () => {
         AuthType: "NONE",
       }),
     );
+    await grantPublicFunctionUrl(secondLambda, "greeter");
     const secondUrl = secondCreated.FunctionUrl;
 
     // When each Function URL is requested.

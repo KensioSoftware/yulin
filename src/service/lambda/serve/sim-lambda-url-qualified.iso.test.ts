@@ -28,6 +28,7 @@ import {
   SimLambdaValidationException,
 } from "../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 /**
  * A function whose version 1 answers "published", with the alias `live` on
@@ -73,6 +74,7 @@ async function createUrl(simAws: SimAws, qualifier?: string): Promise<string> {
       AuthType: "NONE",
     }),
   );
+  await grantPublicFunctionUrl(simAws.lambda(), "orders", qualifier);
 
   return FunctionUrl;
 }
@@ -163,6 +165,7 @@ describe("Function URLs on an alias", () => {
 
     // When a template creates a URL for it the way CDK's
     // Alias.addFunctionUrl() writes one.
+    const liveAliasArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:orders:live`;
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-url",
       template: {
@@ -173,6 +176,25 @@ describe("Function URLs on an alias", () => {
               TargetFunctionArn: `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:orders`,
               Qualifier: "live",
               AuthType: "NONE",
+            },
+          },
+          // And the two grants CDK writes on the alias for a `NONE` URL.
+          LiveUrlPermission: {
+            Type: "AWS::Lambda::Permission",
+            Properties: {
+              FunctionName: liveAliasArn,
+              Action: "lambda:InvokeFunctionUrl",
+              Principal: "*",
+              FunctionUrlAuthType: "NONE",
+            },
+          },
+          LiveInvokePermission: {
+            Type: "AWS::Lambda::Permission",
+            Properties: {
+              FunctionName: liveAliasArn,
+              Action: "lambda:InvokeFunction",
+              Principal: "*",
+              InvokedViaFunctionUrl: true,
             },
           },
         },

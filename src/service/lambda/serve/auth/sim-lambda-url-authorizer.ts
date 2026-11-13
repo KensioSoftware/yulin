@@ -6,13 +6,13 @@ import type {
 import { simLambdaResourcePolicies } from "../../command/authorize/sim-lambda-resource-policies.js";
 import {
   simLambdaFunctionUrlAuthTypeConditionKey,
+  simLambdaInvokedViaFunctionUrlConditionKey,
   simLambdaSourceAccountConditionKey,
   simLambdaSourceArnConditionKey,
 } from "../../function/policy/sim-lambda-permission.js";
 import {
   simLambdaInvokeFunctionAction,
   simLambdaInvokeFunctionUrlAction,
-  simLambdaUrlRequiresInvokeFunction,
 } from "./sim-lambda-url-invoke-actions.js";
 import type { SimAwsRequestSource } from "../../../iam/request/sim-aws-request-source.js";
 import type { SimLambdaPolicyResource } from "../../function/policy/sim-lambda-policy-resource.js";
@@ -56,15 +56,17 @@ export class SimLambdaUrlAuthorizer {
   }
 
   /**
-   * Evaluate the actions reaching this Function URL takes.
+   * Evaluate the two actions every Function URL request takes.
    *
-   * `lambda:InvokeFunctionUrl` is the one a caller signing its own request
-   * needs. CloudFront reaching the URL through an origin access control needs
-   * `lambda:InvokeFunction` on top of it, so a resource policy granting only
-   * the URL action is refused here as real Lambda refuses it.
+   * A caller needs `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`
+   * both, whatever the URL's auth type and whoever the caller is, which is the
+   * rule real Lambda applies to Function URLs created since October 2025. A
+   * resource policy granting only the URL action is refused here as real
+   * Lambda refuses it.
    *
    * Every action is judged against the same request, so a permission
-   * conditioned on the Distribution applies to both.
+   * conditioned on the Distribution or on `lambda:InvokedViaFunctionUrl`
+   * applies to both.
    */
   authorize(
     input: SimLambdaUrlAuthorizationInput,
@@ -72,10 +74,6 @@ export class SimLambdaUrlAuthorizer {
     const urlDecision = this.decide(simLambdaInvokeFunctionUrlAction, input);
 
     if (urlDecision.isDenied) {
-      return urlDecision;
-    }
-
-    if (!simLambdaUrlRequiresInvokeFunction(input.caller)) {
       return urlDecision;
     }
 
@@ -93,7 +91,9 @@ export class SimLambdaUrlAuthorizer {
    *
    * The URL's auth type is supplied as `lambda:FunctionUrlAuthType`, which is
    * what a grant conditions on in practice: a permission granted for `AWS_IAM`
-   * should not also open a URL later switched to `NONE`.
+   * should not also open a URL later switched to `NONE`. The request also
+   * carries `lambda:InvokedViaFunctionUrl` as true, which is what restricts a
+   * `lambda:InvokeFunction` grant to calls through the URL.
    *
    * A request made on behalf of a resource supplies `AWS:SourceArn` and
    * `AWS:SourceAccount` with it, which is what the permission granting
@@ -114,6 +114,7 @@ export class SimLambdaUrlAuthorizer {
       resourcePolicies: simLambdaResourcePolicies(input.resource),
       conditionContext: {
         [simLambdaFunctionUrlAuthTypeConditionKey]: input.functionUrl.authType,
+        [simLambdaInvokedViaFunctionUrlConditionKey]: true,
         ...(source?.arn !== undefined && {
           [simLambdaSourceArnConditionKey]: source.arn,
         }),

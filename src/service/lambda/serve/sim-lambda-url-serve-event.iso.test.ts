@@ -22,6 +22,7 @@ import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.typ
 import { SimFixedClock } from "../../../util/clock/sim-clock.js";
 import { SimLambdaServiceController } from "./sim-lambda-controller.js";
 import { SimLambdaUrlRouter } from "./sim-lambda-url-router.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 /**
  * Function code echoing the invocation event straight back, so a test can
@@ -56,6 +57,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested with a query and a cookie.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -95,6 +97,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested with cookies.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -129,6 +132,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested on localhost.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -169,6 +173,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When JSON is posted to the Function URL.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -207,6 +212,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When binary content is posted to the Function URL.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -251,6 +257,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
     const controller = new SimLambdaServiceController({
       router: new SimLambdaUrlRouter({ simAws }),
     });

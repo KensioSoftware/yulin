@@ -100,6 +100,7 @@ export class AddPermissionCommandHandler implements CommandHandler<
       sourceAccount: input.SourceAccount,
       principalOrgId: input.PrincipalOrgID,
       invokedViaFunctionUrl: input.InvokedViaFunctionUrl,
+      eventSourceToken: input.EventSourceToken,
     });
 
     simLambdaAssertPolicyRevision(resource.resourcePolicy, input.RevisionId);

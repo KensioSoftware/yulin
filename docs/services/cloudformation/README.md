@@ -3360,7 +3360,10 @@ time window gets `OFF`.
 once, and a failed one is recorded by the rule or the schedule that made it.
 
 A `FunctionUrlConfig` on the function expands into an `AWS::Lambda::Url` named after it, `RatesUrl`
-for a function called `Rates`. `AuthType`, `InvokeMode` and `Cors` carry over.
+for a function called `Rates`. `AuthType`, `InvokeMode` and `Cors` carry over. An `AuthType` of
+`NONE` also expands into the two `AWS::Lambda::Permission` Resources SAM writes to open the URL to
+anyone, `RatesUrlPublicPermissions` for `lambda:InvokeFunctionUrl` and
+`RatesURLInvokeAllowPublicAccess` for `lambda:InvokeFunction`.
 
 ### Queue, stream, topic and bucket events
 

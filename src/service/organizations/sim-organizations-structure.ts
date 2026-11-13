@@ -34,6 +34,24 @@ export abstract class SimOrganizationsStructure {
   }
 
   /**
+   * The id of this organization, which a request from a principal in one of
+   * its Accounts carries as `aws:PrincipalOrgID`.
+   */
+  organizationId(): string {
+    return `o-${this.tree.root.id.slice(2)}`;
+  }
+
+  /**
+   * The id of the organization an Account belongs to, or nothing for an
+   * Account outside it.
+   */
+  organizationIdFor(accountId: string): string | undefined {
+    return this.tree.holds(simAwsAccountId(accountId))
+      ? this.organizationId()
+      : undefined;
+  }
+
+  /**
    * Create an organizational unit, under the root unless a parent unit is
    * given.
    */

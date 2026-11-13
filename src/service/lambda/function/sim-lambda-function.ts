@@ -19,6 +19,7 @@ import {
 import type { SimLambdaCodePackage } from "./code/sim-lambda-code-package.js";
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionLogging } from "./logging/sim-lambda-function-logging.js";
+import { simLambdaPlatformLogged } from "./logging/sim-lambda-platform-log.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaFunctionTags } from "./tags/sim-lambda-function-tags.js";
 import { SimLambdaFunctionUpdates } from "./update/sim-lambda-function-updates.js";
@@ -260,20 +261,20 @@ export class SimLambdaFunction {
     this.logging.recordFrom(this.#code);
     this.properties.environmentConflicts?.reportReads();
 
+    const logged = async (): Promise<unknown> =>
+      await simLambdaPlatformLogged(
+        this.logging,
+        invocation.platformLog,
+        async () => invocation.run(this.#code.handlerFunction(), event),
+      );
+
     return await this.concurrency.run(this.metrics, this.name, async () =>
       simAwsRunAsContext.run(
         this.runAsOwner,
         { kind: "arn", arn: this.roleArn },
         async () =>
           await this.environment.runWith(
-            async () =>
-              await this.runInHostScope(
-                async () =>
-                  await this.logging.around(
-                    async () =>
-                      await invocation.run(this.#code.handlerFunction(), event),
-                  ),
-              ),
+            async () => await this.runInHostScope(logged),
           ),
       ),
     );

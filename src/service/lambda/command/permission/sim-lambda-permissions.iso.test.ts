@@ -60,6 +60,37 @@ describe("Simulated Lambda function resource policies", () => {
     expect(policy.RevisionId.length).toBeGreaterThan(0);
   });
 
+  it("restricts an Alexa grant to the skill its event source token names", async () => {
+    // Given a function with nothing granted on it
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // When an Alexa skill is granted Invoke
+    const added = await lambda.addPermission(
+      new AddPermissionCommand({
+        FunctionName: "greeter",
+        StatementId: "AllowSkill",
+        Action: "lambda:InvokeFunction",
+        Principal: "alexa-appkit.amazon.com",
+        EventSourceToken: "amzn1.ask.skill.example",
+      }),
+    );
+
+    // Then the statement is conditioned on that skill
+    expect(JSON.parse(added.Statement)).toMatchObject({
+      Principal: { Service: "alexa-appkit.amazon.com" },
+      Condition: {
+        StringEquals: { "lambda:EventSourceToken": "amzn1.ask.skill.example" },
+      },
+    });
+  });
+
   it("expands each principal shorthand AddPermission accepts", async () => {
     // Given a function granted permissions naming a principal three ways
     const lambda = new SimAws().lambda();

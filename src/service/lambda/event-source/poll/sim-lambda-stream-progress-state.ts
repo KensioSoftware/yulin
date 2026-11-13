@@ -40,9 +40,7 @@ export class SimLambdaStreamProgressState {
       new PollSchedule(properties),
     );
     this.retry = new SimLambdaStreamRetry(streamRetryLimits, background);
-    this.bisect = new SimLambdaStreamBisect(
-      streamRetryLimits.bisectBatchOnFunctionError,
-    );
+    this.bisect = new SimLambdaStreamBisect(streamRetryLimits);
     this.expiry = new SimLambdaStreamExpiry({
       age: new SimLambdaStreamBatchAge(streamRetryLimits, background),
       cursor: this.cursor,

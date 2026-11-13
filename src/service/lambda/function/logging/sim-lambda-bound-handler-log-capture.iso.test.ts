@@ -7,6 +7,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 /**
  * Resolve after a real pause, so two invocations can interleave their output.
@@ -46,7 +47,7 @@ async function messagesIn(
     .logs()
     .filterLogEvents(new FilterLogEventsCommand({ logGroupName }));
 
-  return found.events?.map((event) => event.message) ?? [];
+  return handlerLines(found.events?.map((event) => event.message) ?? []);
 }
 
 describe("bound Lambda handler output in CloudWatch Logs", () => {

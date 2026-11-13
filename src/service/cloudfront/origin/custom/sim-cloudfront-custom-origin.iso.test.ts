@@ -26,6 +26,7 @@ import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fix
 import { makeLambdaZipFileInput } from "../../../lambda/function/code/lambda-zip-file-input.js";
 import { simCfManagedOriginRequestPolicyIds } from "../../origin-request-policy/sim-cf-managed-origin-request-policies.js";
 import { SimCloudFront } from "../../sim-cloudfront.js";
+import { grantPublicFunctionUrl } from "../../../../../test/lambda/public-url-fixture.js";
 
 /**
  * Create a Distribution sending everything to one custom Origin, and return
@@ -131,6 +132,7 @@ describe("Simulated CloudFront custom Origin", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
     assertNonNullable(functionUrl);
 
     // And a Distribution with the Function URL as a custom Origin.

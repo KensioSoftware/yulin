@@ -15,6 +15,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeLambdaCodeZip } from "../code/make-lambda-code-zip.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 const logGroupName = "/aws/lambda/orders";
 
@@ -50,7 +51,7 @@ async function messagesIn(simAws: SimAws): Promise<readonly string[]> {
     .logs()
     .filterLogEvents(new FilterLogEventsCommand({ logGroupName }));
 
-  return found.events?.map((event) => event.message) ?? [];
+  return handlerLines(found.events?.map((event) => event.message) ?? []);
 }
 
 describe("Lambda handler output in CloudWatch Logs", () => {

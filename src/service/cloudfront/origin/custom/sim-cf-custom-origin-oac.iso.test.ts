@@ -30,6 +30,19 @@ describe("Simulated CloudFront custom Origin with an origin access control", () 
     assertIdentical(await response.text(), "Hello from behind CloudFront");
   });
 
+  it("reaches the Function URL through an Invoke grant restricted to it", async () => {
+    // Given the Invoke grant conditioned on the call arriving through the
+    // Function URL, as the AWS documentation recommends.
+    const response = await fetchThroughDistribution(
+      simCfFunctionUrlOriginTemplateFactory.make({
+        invokedViaFunctionUrl: true,
+      }),
+    );
+
+    // Then the condition holds for the Origin request and the handler ran.
+    assertResponseStatus(response, 200, await describeResponse(response));
+  });
+
   it("is refused when only the Function URL action is granted", async () => {
     // Given a permission granting `lambda:InvokeFunctionUrl` and nothing else,
     // which is what CDK writes and what reads as correctly configured

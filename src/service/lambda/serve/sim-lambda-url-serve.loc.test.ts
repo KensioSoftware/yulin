@@ -12,6 +12,7 @@ import { describe, it } from "vitest";
 import { serveSimAws } from "../../../serve/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 describe("Serving a sim Lambda Function URL on localhost", () => {
   it("invokes the function over real localhost HTTP", async () => {
@@ -40,6 +41,7 @@ describe("Serving a sim Lambda Function URL on localhost", () => {
         AuthType: "NONE",
       }),
     );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     const srv = await serveSimAws({ simAws });
 

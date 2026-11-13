@@ -28,6 +28,7 @@ import { simWafRuleFactory } from "../../../wafv2/web-acl/sim-waf-rule.factory.j
 import { makeCffFunctionCodeInput } from "../../cff/function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
 import { simCfSiteRequest } from "../../../../../test/cloudfront/site-fixture.js";
+import { handlerLines } from "../../../../../test/lambda/handler-log-lines.js";
 
 /** The log group the Origin function writes what it served to. */
 const logGroupName = "/aws/lambda/site";
@@ -76,7 +77,7 @@ async function servedByOrigin(simAws: SimAws): Promise<readonly string[]> {
     .logs()
     .filterLogEvents(new FilterLogEventsCommand({ logGroupName }));
 
-  return found.events?.map((event) => event.message) ?? [];
+  return handlerLines(found.events?.map((event) => event.message) ?? []);
 }
 
 /**

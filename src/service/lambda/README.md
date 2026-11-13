@@ -673,24 +673,18 @@ base64, in both directions, decided by content type in `SimPayload2BodyEncoding`
 returning a structured result (one carrying `statusCode`) controls the response, including `cookies`
 becoming `set-cookie` headers; any other return value becomes a 200 JSON response, as on AWS.
 
-A `NONE` auth URL is invokable by anyone on AWS, so its requests are not attributed to a simulated
-principal and the controller invokes the function directly rather than through the Invoke command's
-IAM path.
+Every URL request goes through `serve/auth/`, which evaluates `lambda:InvokeFunctionUrl` and then
+`lambda:InvokeFunction` on the function ARN, and refuses the request if either is denied. Real Lambda
+has asked every caller for both since October 2025, and the two action names live in
+`sim-lambda-url-invoke-actions.ts`. Each request supplies `lambda:InvokedViaFunctionUrl` as true,
+which is what a grant of the second action is conditioned on.
 
-An `AWS_IAM` URL goes through `serve/auth/`, which evaluates `lambda:InvokeFunctionUrl` on the
-function ARN against the caller the HTTP boundary resolved (`SimAwsServiceRequest.caller`, see
-`src/service/iam/request/`). That is a different IAM action from the `lambda:InvokeFunction` the
-Invoke command uses, as it is on AWS. The caller is passed to IAM as a `resolved` caller so an
-assumed-role session is judged against the Role behind it; a request that carried no identity is
-anonymous, owns no policies, and is denied by the same evaluation.
-
-`sim-lambda-url-invoke-actions.ts` holds the one exception to that split.
-`cloudfront.amazonaws.com`, which is how a CloudFront origin access control reaches a Function URL
-Origin, has to be allowed `lambda:InvokeFunction` on top of the URL action, and is refused without
-it. That is real Lambda's rule, and CDK's `FunctionUrlOrigin.withOriginAccessControl` does not write
-the second grant, so a CDK app that has not added it deploys clean and then answers 403 with no log
-stream to look at. The refusal body is real Lambda's wording, since it is the only diagnostic such a
-deployment gets.
+A `NONE` auth URL authenticates nobody. The controller judges its requests as `anonymous`. Only a resource policy statement granting `*` opens it, and the event describes no caller. An `AWS_IAM` URL
+judges the caller the HTTP boundary resolved (`SimAwsServiceRequest.caller`, see
+`src/service/iam/request/`). The caller is passed to IAM as a `resolved` caller so an assumed-role
+session is judged against the Role behind it. A request that carried no identity is anonymous, owns
+no policies, and is denied by the same evaluation. The refusal body is real Lambda's wording, since
+it is the only diagnostic a misconfigured deployment gets.
 
 Authorization is evaluated by the IAM of the Account that owns the function, against two policy
 sources: identity policies belonging to the caller, and the function's own resource policy, passed
@@ -908,8 +902,7 @@ and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
   and `MasterRegion` on `ListFunctions`
 - the previous code and settings answering invocations while a change is `InProgress`, a change
   ending `Failed`, and the refusal of a change to a function still `Pending`
-- `EventSourceToken` on `AddPermission`, alias
-  `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
+- alias `RoutingConfig` weights, and provisioned concurrency, including `RoutingConfig`,
   `ProvisionedConcurrencyConfig`, `CodeSha256` and `RuntimePolicy` on the two template resources
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment

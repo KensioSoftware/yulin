@@ -22,7 +22,7 @@ export class SimLambdaStreamRetry {
 
   constructor(limits: SimLambdaStreamRetryLimits, clock: SimClock) {
     this.clock = clock;
-    this.backoff = new SimLambdaStreamRetryBackoff(limits.attemptLimit);
+    this.backoff = new SimLambdaStreamRetryBackoff(limits);
   }
 
   /**

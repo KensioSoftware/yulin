@@ -48,6 +48,25 @@ const stack = await simAws.cloudFormation().deployTemplate({
           AuthType: "NONE",
         },
       },
+      // The two grants a NONE URL needs before it serves anyone.
+      GreeterUrlPublicPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunctionUrl",
+          Principal: "*",
+          FunctionUrlAuthType: "NONE",
+        },
+      },
+      GreeterUrlInvokePermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunction",
+          Principal: "*",
+          InvokedViaFunctionUrl: true,
+        },
+      },
     },
     Outputs: {
       GreeterFunctionUrl: {

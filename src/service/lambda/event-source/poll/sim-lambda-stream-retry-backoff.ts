@@ -10,6 +10,13 @@
 const longestWaitSeconds = 2 ** 42;
 
 /**
+ * Where the number of attempts a failed batch gets is read from.
+ */
+export interface SimLambdaStreamAttemptLimit {
+  readonly attemptLimit: number;
+}
+
+/**
  * How long a mapping waits before handing a failed batch to its function
  * again, and how many waits it has left.
  *
@@ -27,18 +34,22 @@ const longestWaitSeconds = 2 ** 42;
  * that asked for neither limit gets the simulator's own cap.
  */
 export class SimLambdaStreamRetryBackoff {
-  private readonly attemptLimit: number;
+  private readonly limits: SimLambdaStreamAttemptLimit;
   private attempts = 0;
 
-  constructor(attemptLimit: number) {
-    this.attemptLimit = attemptLimit;
+  /**
+   * The limit is read on every attempt, so an update to the mapping's retry
+   * quota applies to a batch already being retried.
+   */
+  constructor(limits: SimLambdaStreamAttemptLimit) {
+    this.limits = limits;
   }
 
   /**
    * Whether this batch has had all the attempts it gets.
    */
   get isExhausted(): boolean {
-    return this.attempts >= this.attemptLimit;
+    return this.attempts >= this.limits.attemptLimit;
   }
 
   /**

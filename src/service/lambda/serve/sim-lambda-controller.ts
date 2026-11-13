@@ -12,8 +12,7 @@ import {
   type SimLambdaFunctionUrlRoute,
   SimLambdaUrlRouter,
 } from "./sim-lambda-url-router.js";
-import { SimLambdaUrlAuthorizer } from "./auth/sim-lambda-url-authorizer.js";
-import { simLambdaUrlPayloadRefusal } from "./auth/sim-lambda-url-payload-hash.js";
+import { SimLambdaUrlAdmission } from "./auth/sim-lambda-url-admission.js";
 import type { SimAwsRequestCaller } from "../../iam/request/sim-aws-request-caller.js";
 
 interface SimLambdaServiceControllerProperties {
@@ -24,10 +23,10 @@ interface SimLambdaServiceControllerProperties {
 /**
  * Localhost HTTP controller for simulated Lambda Function URLs.
  *
- * A NONE auth URL is invokable by anyone on real AWS, so the request is not
- * attributed to a simulated principal. An AWS_IAM URL is invokable only by a
- * caller allowed `lambda:InvokeFunctionUrl` on the function, evaluated against
- * the principal resolved at the HTTP boundary.
+ * Every request needs `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`
+ * on the function. A NONE auth URL authenticates nobody, so the request is
+ * judged as anonymous and only a resource policy open to everyone admits it.
+ * An AWS_IAM URL judges the principal resolved at the HTTP boundary.
  *
  * Either way the function itself runs as its execution Role, as it does for
  * any other invocation. Who invoked it and what it runs as are separate
@@ -43,6 +42,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
   private readonly eventBuilder: SimPayload2EventBuilder;
   private readonly responseBuilder = new SimPayload2ResponseBuilder();
   private readonly errorResponse = new SimLambdaUrlErrorResponse();
+  private readonly admission = new SimLambdaUrlAdmission();
 
   constructor(properties: SimLambdaServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
@@ -64,58 +64,13 @@ export class SimLambdaServiceController implements SimAwsServiceController {
       return this.errorResponse.notFound();
     }
 
-    if (route.functionUrl.authType === "NONE") {
-      // A NONE URL is invokable by anyone on real AWS, so the request is not
-      // attributed to a principal and the event describes no caller.
-      return await this.invoke(route, serviceRequest.request);
+    const admission = await this.admission.admit(route, serviceRequest);
+
+    if (!admission.admitted) {
+      return admission.response;
     }
 
-    return await this.invokeAuthenticated(route, serviceRequest);
-  }
-
-  /**
-   * Invoke through an `AWS_IAM` Function URL, if the caller may.
-   *
-   * The caller was resolved at the HTTP boundary, from a signature or from a
-   * named principal, and is anonymous when the request offered neither.
-   * Anonymous owns no policies, so an unsigned request is refused by the same
-   * evaluation that admits a permitted one, rather than by a special case.
-   *
-   * What the request is being made on behalf of travels with it, so a
-   * CloudFront Distribution reaching this URL through an origin access control
-   * is judged against the Distribution the permission names.
-   *
-   * What the request declares its body hashes to is settled first, as real
-   * Lambda authenticates a request before it authorizes one. A POST or PUT
-   * arriving through an origin access control declares an unsigned payload
-   * unless the viewer sent a hash of its own, and Lambda takes no unsigned
-   * payload, so it is refused here rather than reaching the function.
-   */
-  private async invokeAuthenticated(
-    route: SimLambdaFunctionUrlRoute,
-    serviceRequest: SimAwsServiceRequest,
-  ): Promise<Response> {
-    const { caller } = serviceRequest;
-    const payloadRefusal = await simLambdaUrlPayloadRefusal(
-      serviceRequest.request,
-    );
-
-    if (payloadRefusal !== undefined) {
-      return this.errorResponse.signatureDoesNotMatch(payloadRefusal);
-    }
-
-    const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize({
-      resource: route.resource,
-      functionUrl: route.functionUrl,
-      caller: caller.toCaller(),
-      source: serviceRequest.source,
-    });
-
-    if (decision.isDenied) {
-      return this.errorResponse.forbidden();
-    }
-
-    return await this.invoke(route, serviceRequest.request, caller);
+    return await this.invoke(route, serviceRequest.request, admission.caller);
   }
 
   /**

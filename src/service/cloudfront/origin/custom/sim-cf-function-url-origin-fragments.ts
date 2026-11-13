@@ -32,6 +32,11 @@ export interface SimCfFunctionUrlOriginTemplateInput {
   readonly permittedActions: readonly string[];
   /** The Distribution the permission is granted for. */
   readonly permissionSourceArn: SimCfnTemplateValue;
+  /**
+   * Whether the `lambda:InvokeFunction` grant is restricted to calls through
+   * the Function URL, as the AWS documentation recommends.
+   */
+  readonly invokedViaFunctionUrl: boolean;
 }
 
 /**
@@ -97,6 +102,10 @@ function invokePermissions(
           Action: action,
           Principal: "cloudfront.amazonaws.com",
           SourceArn: input.permissionSourceArn,
+          ...(input.invokedViaFunctionUrl &&
+            action === "lambda:InvokeFunction" && {
+              InvokedViaFunctionUrl: true,
+            }),
         },
       },
     ]),
