@@ -1,5 +1,6 @@
 import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimSqsMessageWriter } from "../../message/sim-sqs-message-writer.js";
+import type { SimSqsAcceptedSend } from "../../queue/sim-sqs-deduplication-window.js";
 import type { SimSqsQueueAccess } from "../queue/sim-sqs-queue-access.js";
 import { requireBatchEntries, runBatch } from "./sim-sqs-batch-entries.js";
 import {
@@ -49,13 +50,17 @@ export class SimSqsSendMessageCommands {
       command.input.QueueUrl,
       options,
     );
-    const message = this.writer.write(queue, sentMessageWrite(command.input));
+    const { message, accepted } = this.writer.write(
+      queue,
+      sentMessageWrite(command.input),
+    );
 
     return {
       $metadata: {},
-      MessageId: message.messageId,
+      MessageId: accepted.messageId,
       MD5OfMessageBody: message.body.digest,
       MD5OfMessageAttributes: sentMessageAttributesDigest(message),
+      ...sequenceNumberOf(accepted),
     };
   }
 
@@ -79,13 +84,17 @@ export class SimSqsSendMessageCommands {
     const outcome = runBatch(
       entries,
       (entry, id): SimSqsSendMessageBatchResultEntry => {
-        const message = this.writer.write(queue, sentMessageWrite(entry));
+        const { message, accepted } = this.writer.write(
+          queue,
+          sentMessageWrite(entry),
+        );
 
         return {
           Id: id,
-          MessageId: message.messageId,
+          MessageId: accepted.messageId,
           MD5OfMessageBody: message.body.digest,
           MD5OfMessageAttributes: sentMessageAttributesDigest(message),
+          ...sequenceNumberOf(accepted),
         };
       },
     );
@@ -96,4 +105,18 @@ export class SimSqsSendMessageCommands {
       Failed: outcome.failed,
     };
   }
+}
+
+/**
+ * The sequence number a send reports, which only a FIFO queue gives a message.
+ * A standard queue's response leaves the field out.
+ */
+function sequenceNumberOf(accepted: SimSqsAcceptedSend): {
+  SequenceNumber?: string;
+} {
+  if (accepted.sequenceNumber === undefined) {
+    return {};
+  }
+
+  return { SequenceNumber: accepted.sequenceNumber };
 }

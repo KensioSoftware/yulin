@@ -1,5 +1,6 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import {
+  SimSqsInvalidParameterValue,
   SimSqsReceiptHandleIsInvalid,
   SimSqsValidationException,
 } from "../../error/sim-sqs.error.js";
@@ -52,5 +53,34 @@ export class SimSqsMessageHandles {
     }
 
     return message;
+  }
+
+  /**
+   * Refuse a FIFO queue's receipt handle once its visibility timeout has
+   * lapsed.
+   *
+   * A standard queue accepts a stale handle and does nothing with it. A FIFO
+   * queue fails the request instead, since the message may already be with
+   * the next consumer of its group, and real SQS reports the handle as
+   * expired.
+   */
+  assertUnexpired(
+    queue: SimSqsQueue,
+    message: SimSqsMessage,
+    receiptHandle: string,
+  ): void {
+    if (!queue.name.isFifo) {
+      return;
+    }
+
+    if (
+      !message.holdsReceiptHandle(receiptHandle) ||
+      !message.isInFlightAt(this.clock.now())
+    ) {
+      throw new SimSqsInvalidParameterValue(
+        `Value ${receiptHandle} for parameter ReceiptHandle is invalid. ` +
+          `Reason: The receipt handle has expired.`,
+      );
+    }
   }
 }

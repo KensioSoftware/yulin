@@ -1,4 +1,5 @@
 import type { SimSqsMessage } from "./sim-sqs-message.js";
+import { simSqsFifoReceivable } from "./sim-sqs-fifo-receivable.js";
 
 /**
  * How many messages a queue holds in each of the states SQS counts separately.
@@ -20,6 +21,15 @@ export interface SimSqsMessageCounts {
 export class SimSqsMessageStore {
   private messages: readonly SimSqsMessage[] = [];
   private readonly handles = new Map<string, SimSqsMessage>();
+  private readonly fifo: boolean;
+
+  /**
+   * Hold the messages of a standard queue, or of a FIFO queue when `fifo` is
+   * set, which changes which messages can be received.
+   */
+  constructor(fifo: boolean) {
+    this.fifo = fifo;
+  }
 
   /**
    * Take a newly sent message.
@@ -42,12 +52,25 @@ export class SimSqsMessageStore {
   }
 
   /**
-   * The messages that can be received at an instant, oldest first.
+   * The messages that can be received at an instant, oldest first, or in
+   * message group order for a FIFO queue.
    */
   receivable(instant: Date, limit: number): readonly SimSqsMessage[] {
+    if (this.fifo) {
+      return simSqsFifoReceivable(this.messages, instant).slice(0, limit);
+    }
+
     return this.messages
       .filter((message) => message.isVisibleAt(instant))
       .slice(0, limit);
+  }
+
+  /**
+   * Whether a message is still on the queue, rather than deleted, purged,
+   * expired or moved.
+   */
+  holds(message: SimSqsMessage): boolean {
+    return this.messages.includes(message);
   }
 
   /**

@@ -31,6 +31,21 @@ export const sqsBatchRules = new SimLambdaEventSourceBatchRules({
 });
 
 /**
+ * The batch sizes a FIFO queue delivers with.
+ *
+ * Real Lambda caps a FIFO queue mapping at ten messages and takes no batching
+ * window for one, since waiting to fill a batch would hold up every message
+ * group behind the one being gathered.
+ */
+export const sqsFifoBatchRules = new SimLambdaEventSourceBatchRules({
+  defaultSize: 10,
+  maximumSize: 10,
+  sourceDescription: "a FIFO queue",
+  unitName: "messages",
+  windowRefusal: "Batching window is not supported for FIFO queues",
+});
+
+/**
  * A queue has no starting position: a mapping on one takes whatever is at the
  * front of the queue, and there is nowhere else it could start from.
  */

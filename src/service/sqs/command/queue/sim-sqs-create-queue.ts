@@ -3,15 +3,16 @@ import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimSqsDeadLetterTargets } from "../../queue/sim-sqs-dead-letter-targets.js";
 import { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
-import {
-  type SimSqsQueueAttributeInput,
-  SimSqsQueueAttributes,
-} from "../../queue/sim-sqs-queue-attributes.js";
+import { SimSqsQueueAttributes } from "../../queue/sim-sqs-queue-attributes.js";
 import type { SimSqsQueueActivity } from "../../queue/sim-sqs-queue-activity.js";
 import { SimSqsQueueName } from "../../queue/sim-sqs-queue-name.js";
 import type { SimSqsQueueStore } from "../../queue/sim-sqs-queue-store.js";
 import type { SimSqsQueueAccess } from "./sim-sqs-queue-access.js";
 import { refuseUnsimulatedQueueInput } from "./sim-sqs-unsimulated-queue-input.js";
+import {
+  type SimSqsRequestedQueueType,
+  simSqsRequestedQueueType,
+} from "./sim-sqs-requested-queue-type.js";
 import type {
   SimCreateQueueCommand,
   SimCreateQueueCommandOutput,
@@ -63,16 +64,19 @@ export class SimSqsCreateQueue {
     refuseUnsimulatedQueueInput(input);
 
     const name = SimSqsQueueName.required(input.QueueName);
-    const requested = input.Attributes ?? {};
+    const requested = simSqsRequestedQueueType(input.Attributes ?? {});
 
+    name.assertMatchesType(requested.fifo);
     this.access.authorizeName("sqs:CreateQueue", name.value, options);
 
     const existing = this.queues.find(name.value);
 
+    // The name decides the type, so a queue already holding the name is
+    // already of the type asked for.
     if (existing !== undefined) {
       return {
         $metadata: {},
-        QueueUrl: existing.urlWhenAttributesMatch(requested),
+        QueueUrl: existing.urlWhenAttributesMatch(requested.attributes),
       };
     }
 
@@ -89,7 +93,7 @@ export class SimSqsCreateQueue {
    */
   private created(
     name: SimSqsQueueName,
-    requested: SimSqsQueueAttributeInput,
+    requested: SimSqsRequestedQueueType,
   ): SimSqsQueue {
     const createdAt = this.clock.now();
 
@@ -98,13 +102,13 @@ export class SimSqsCreateQueue {
     const queue = new SimSqsQueue({
       name,
       accountRegionScope: this.accountRegionScope,
-      attributes: SimSqsQueueAttributes.defaults(),
+      attributes: SimSqsQueueAttributes.defaults(requested.type),
       createdAt,
       deadLetterTargets: this.deadLetterTargets,
       activity: this.activity,
     });
 
-    queue.applyAttributes(requested, createdAt);
+    queue.applyAttributes(requested.attributes, createdAt);
     this.queues.add(queue);
 
     return queue;

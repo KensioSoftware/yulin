@@ -7,6 +7,7 @@ import {
   type SimSqsQueueAttributeSpec,
   simSqsSettableQueueAttributes,
 } from "./sim-sqs-queue-attribute-specs.js";
+import { simSqsFifoQueueAttributeNames } from "./sim-sqs-fifo-queue-attributes.js";
 
 /**
  * The attributes SQS reports and no request sets, because the queue itself
@@ -28,10 +29,6 @@ const readOnlyNames: ReadonlySet<string> = new Set([
  * one.
  */
 const unsimulatedNames: ReadonlySet<string> = new Set([
-  "ContentBasedDeduplication",
-  "DeduplicationScope",
-  "FifoQueue",
-  "FifoThroughputLimit",
   "KmsDataKeyReusePeriodSeconds",
   "KmsMasterKeyId",
   "RedriveAllowPolicy",
@@ -43,6 +40,7 @@ const knownNames = new Set<string>([
   ...readOnlyNames,
   ...unsimulatedNames,
   ...simSqsJsonQueueAttributeNames,
+  ...simSqsFifoQueueAttributeNames,
 ]);
 
 const settableSpecsByName = new Map<string, SimSqsQueueAttributeSpec>(

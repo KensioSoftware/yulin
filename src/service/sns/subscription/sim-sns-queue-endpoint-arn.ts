@@ -45,9 +45,8 @@ export class SimSnsQueueEndpointArn {
    * Read a queue ARN, refusing anything a queue could not be reached by.
    *
    * A FIFO queue is refused by its name, as real SNS refuses one for a standard
-   * topic: only a FIFO topic delivers to a FIFO queue. Simulated SQS has no
-   * FIFO queues either, so without this the refusal would arrive later as a
-   * queue that does not exist, which points at the wrong thing to fix.
+   * topic: only a FIFO topic delivers to a FIFO queue, and simulated SNS has
+   * no FIFO topics.
    */
   static parse(endpoint: string): SimSnsQueueEndpointArn {
     const parts = endpoint.split(":");

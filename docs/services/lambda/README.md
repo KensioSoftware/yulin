@@ -1590,6 +1590,14 @@ window has run from when the mapping first found it, and a full batch goes at on
 out. A queue mapping may deliver up to 10,000 messages at a time with a window of at least a second,
 and is refused a `BatchSize` above 10 without one, as on AWS.
 
+A mapping on a FIFO queue takes a `BatchSize` of at most 10 and no batching window. A window above
+zero is refused with `Batching window is not supported for FIFO queues`, on create and on update.
+Messages of one group arrive in the order they were sent. A batch the handler throws on stays in
+flight until its visibility timeout lapses, and holds its group back until then while other groups
+are delivered. With `ReportBatchItemFailures`, the handler should report the first failed message of
+a group and every message after it, as AWS advises. A report naming only the failed message lets the
+messages after it be deleted, as it does on AWS.
+
 ```typescript sim-lambda-sqs-event-source
 /**
  * Delivering messages from a simulated queue to a simulated function.

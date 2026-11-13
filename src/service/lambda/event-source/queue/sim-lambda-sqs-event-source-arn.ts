@@ -6,13 +6,14 @@ import { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-sourc
 import type { SimLambdaEventSourceStartingPositionRules } from "../sim-lambda-event-source-starting-position.js";
 import {
   sqsBatchRules,
+  sqsFifoBatchRules,
   sqsPollingOperations,
   sqsRetryLimitRules,
   sqsStartingPositionRules,
 } from "./sim-lambda-sqs-event-source-rules.js";
 
 const queueArnPattern =
-  /^arn:aws:sqs:(?<region>[a-z0-9-]+):(?<account>\d{12}):(?<name>[\w-]{1,80})$/u;
+  /^arn:aws:sqs:(?<region>[a-z0-9-]+):(?<account>\d{12}):(?<name>[\w-]{1,80}|[\w-]{1,75}\.fifo)$/u;
 
 /**
  * The queue ARN an event source mapping is created for.
@@ -82,9 +83,14 @@ export class SimLambdaSqsEventSourceArn {
   }
 
   /**
-   * The batch sizes a mapping on this queue may deliver with.
+   * The batch sizes a mapping on this queue may deliver with, which are
+   * narrower for a FIFO queue.
    */
   get batchRules(): SimLambdaEventSourceBatchRules {
+    if (this.queueName.endsWith(".fifo")) {
+      return sqsFifoBatchRules;
+    }
+
     return sqsBatchRules;
   }
 

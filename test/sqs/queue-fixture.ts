@@ -54,6 +54,26 @@ export async function simAwsWithQueue(
 }
 
 /**
+ * Make a simulated AWS holding one FIFO queue named `orders.fifo`.
+ */
+export async function simAwsWithFifoQueue(
+  attributes?: Record<string, string>,
+  existing?: SimAws,
+): Promise<SimSqsQueueFixture> {
+  const simAws = existing ?? new SimAws();
+  const created = await simAws.sqs().createQueue(
+    new CreateQueueCommand({
+      QueueName: "orders.fifo",
+      Attributes: { FifoQueue: "true", ...attributes },
+    }),
+  );
+
+  assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
+
+  return { simAws, queueUrl: created.QueueUrl };
+}
+
+/**
  * One simulated AWS holding a queue that redrives to a dead-letter queue.
  */
 export interface SimSqsDeadLetterQueueFixture extends SimSqsQueueFixture {

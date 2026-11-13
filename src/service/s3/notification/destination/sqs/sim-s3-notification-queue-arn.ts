@@ -31,9 +31,7 @@ export class SimS3NotificationQueueArn {
    * Read an SQS queue ARN, refusing anything else.
    *
    * A FIFO queue is refused by its name, as real S3 refuses one as an event
-   * notification destination. Simulated SQS has no FIFO queues either, so
-   * without this the refusal would be that the queue does not exist, which
-   * points at the wrong thing to fix.
+   * notification destination.
    */
   static parse(arn: string): SimS3NotificationQueueArn {
     const [prefix, partition, service, region, accountId, name, extra] =
@@ -57,7 +55,7 @@ export class SimS3NotificationQueueArn {
     if (name.endsWith(".fifo")) {
       throw new SimS3NotImplemented(
         `Cannot notify ${arn}: a FIFO queue is not a valid S3 event ` +
-          "notification destination, and simulated SQS has no FIFO queues.",
+          "notification destination.",
       );
     }
 

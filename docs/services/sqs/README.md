@@ -1,11 +1,11 @@
 # Simulated SQS
 
-Yulin simulates Amazon SQS standard queues for tests and local development. You can create queues,
-send and receive messages, test visibility timeouts and redrive messages to dead-letter queues.
-Messages are stored in memory, time-based behavior uses the simulation's clock, and simulated IAM
-authorizes every operation.
+Yulin simulates Amazon SQS standard and FIFO queues for tests and local development. You can create
+queues, send and receive messages, test visibility timeouts and redrive messages to dead-letter
+queues. Messages are stored in memory, time-based behavior uses the simulation's clock, and simulated
+IAM authorizes every operation.
 
-FIFO queues are not simulated. Import SQS-specific types from `@kensio/yulin/sqs`.
+Import SQS-specific types from `@kensio/yulin/sqs`.
 
 ## Creating a queue and sending a message
 
@@ -676,6 +676,130 @@ console.log(sent.Successful?.map((entry) => entry.Id)); // ["one"]
 console.log(sent.Failed?.[0]?.Code); // "InvalidParameterValue"
 ```
 
+## FIFO queues
+
+A FIFO queue is created with the `FifoQueue` attribute set to `true`, under a name ending `.fifo`.
+Each name needs the other. A `.fifo` name without the attribute, or the attribute on any other name,
+is refused with `InvalidParameterValue`. A standard queue leaves `FifoQueue` out, and real SQS
+answers `FifoQueue: "false"` with `InvalidAttributeName`, as this simulation does too.
+
+Every message sent to a FIFO queue names a `MessageGroupId`. Messages in one group are received in
+the order they were sent. A group with a message in flight is held back until that message is
+deleted or its visibility timeout lapses. Other groups carry on meanwhile. A receive
+returns as many messages from one group as it can before moving on to the next.
+
+```typescript sim-sqs-fifo-queue
+/**
+ * A FIFO queue holding back a message group while one of its messages is in
+ * flight, and deduplicating a retried send.
+ */
+
+import {
+  CreateQueueCommand,
+  DeleteMessageCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+  type SendMessageCommandOutput,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sqs = simAws.sqs();
+
+const { QueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({
+    QueueName: "orders.fifo",
+    Attributes: { FifoQueue: "true", ContentBasedDeduplication: "true" },
+  }),
+);
+
+const placeOrder = async (
+  customer: string,
+  order: string,
+): Promise<SendMessageCommandOutput> =>
+  await sqs.sendMessage(
+    new SendMessageCommand({
+      QueueUrl,
+      MessageBody: order,
+      MessageGroupId: customer,
+    }),
+  );
+
+const first = await placeOrder("customer-1", "order-1");
+await placeOrder("customer-1", "order-2");
+await placeOrder("customer-2", "order-3");
+
+// A retry inside five minutes is the same message, under the same id.
+const retried = await placeOrder("customer-1", "order-1");
+
+console.log(retried.MessageId === first.MessageId); // true
+
+const received = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl, MaxNumberOfMessages: 1 }),
+);
+
+console.log(received.Messages?.[0]?.Body); // "order-1"
+
+// While order-1 is in flight, customer-1's next order waits behind it.
+const meanwhile = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl, MaxNumberOfMessages: 10 }),
+);
+
+console.log(meanwhile.Messages?.map((message) => message.Body)); // ["order-3"]
+
+await sqs.deleteMessage(
+  new DeleteMessageCommand({
+    QueueUrl,
+    ReceiptHandle: received.Messages?.[0]?.ReceiptHandle,
+  }),
+);
+
+const next = await sqs.receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+
+console.log(next.Messages?.[0]?.Body); // "order-2"
+```
+
+A send with no `MessageGroupId` fails with `MissingParameter`. A per-message `DelaySeconds` is
+refused with `InvalidParameterValue` (a FIFO queue takes a delay at queue level only).
+
+A FIFO queue drops a message whose deduplication id it accepted in the last five minutes. The send
+still succeeds, and answers with the original message's `MessageId` and `SequenceNumber`. The id is
+the `MessageDeduplicationId` the sender gives, or the SHA-256 of the body when the queue has
+`ContentBasedDeduplication` set to `true`. A send carrying no id to a queue without content-based deduplication fails with
+`InvalidParameterValue`.
+The five minutes run on the simulation's clock, and a deleted message's id is still remembered for
+the rest of them. `DeduplicationScope` set to `messageGroup` makes an id unique within its message
+group, where the default `queue` makes it unique across the whole queue.
+
+Each message gets a `SequenceNumber`, reported by the send and as a system attribute on receive.
+It is a twenty-digit number that grows with every message. The numbers are spaced apart, as real
+ones are, and a test should only compare them.
+
+A receive asking for system attributes gets `MessageGroupId`, `MessageDeduplicationId` and
+`SequenceNumber` on a FIFO message.
+
+`ReceiveRequestAttemptId` repeats a FIFO receive. Retried within five minutes, it returns the same
+messages under the same receipt handles and restarts their visibility timeout. Once any of them has
+been deleted or had its visibility changed, the retry is an ordinary receive.
+
+A FIFO queue refuses to delete a message with a receipt handle whose visibility timeout has lapsed.
+The request fails with `InvalidParameterValue`, and the message stays on the queue. A standard queue
+accepts the same request and leaves the message where it is.
+
+A FIFO queue's dead-letter queue has to be a FIFO queue, and a standard queue's has to be a standard
+queue. A moved message keeps its group, its deduplication id and its sequence number. Its retention
+period starts again on the dead-letter queue, as real SQS restarts it for a FIFO queue.
+
+`FifoThroughputLimit` takes `perQueue` or `perMessageGroupId`, and `perMessageGroupId` needs
+`DeduplicationScope` set to `messageGroup`. The setting is held and validated, and this simulation
+throttles no request. Setting `ContentBasedDeduplication`, `DeduplicationScope` or `FifoThroughputLimit` on a
+standard queue fails with `InvalidAttributeName`.
+
+A standard queue takes a `MessageGroupId` too, as real SQS fair queues do. The group is reported
+back on receive. Delivery order stays the same. A `MessageDeduplicationId` on a standard queue
+is refused with `InvalidParameterValue`.
+
 ## Deleting a queue
 
 `DeleteQueue` removes the queue and everything on it. Real SQS holds a deleted queue's name for 60
@@ -984,6 +1108,11 @@ the clock is what drives it:
 await simAws.clock().advanceBy({ seconds: 31 });
 ```
 
+A mapping on a FIFO queue delivers each message group in order. A batch the handler fails holds its
+group back until the visibility timeout lapses, and other groups are delivered meanwhile. Real
+Lambda caps a FIFO mapping's `BatchSize` at ten and takes no `MaximumBatchingWindowInSeconds` for
+one, and so does this simulation.
+
 See [simulated Lambda](https://yulinsim.dev/services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
 source mapping docs") for the event shape, partial batch failures, and the
 `AWS::Lambda::EventSourceMapping` template resource.
@@ -1089,16 +1218,17 @@ characters, where real CloudFormation ends the name in twelve random ones. The n
 the 80 characters a queue name allows, and [the CloudFormation docs](https://yulinsim.dev/services/cloudformation/#names-cloudformation-generates "Names CloudFormation generates")
 cover how the stack name and the logical ID share what is left.
 
-`FifoQueue: true` fails the resource. Only standard queues are simulated, and a FIFO queue is named
-`<name>.fifo`, a name simulated SQS refuses to an SDK caller as well. There is no queue to create
-under the name the template gave it.
+`FifoQueue: true` deploys a FIFO queue, with `ContentBasedDeduplication`, `DeduplicationScope` and
+`FifoThroughputLimit` passed on as queue attributes. A FIFO queue with no `QueueName` gets a
+generated name ending `.fifo`, trimmed to leave room for the suffix within 80 characters. A
+`QueueName` without the suffix fails the resource, as SQS refuses it. `FifoQueue: false` deploys a
+standard queue.
 
 The properties this simulation has no behaviour for are a different case. The queue is created without
 them and each one is recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 A stack full of queues still deploys. Those properties are `RedriveAllowPolicy`, `KmsMasterKeyId`,
-`KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`, `ContentBasedDeduplication`,
-`DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property outside the `AWS::SQS::Queue`
+`KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled` and `Tags`. A property outside the `AWS::SQS::Queue`
 schema is recorded the same way.
 
 `KmsDataKeyReusePeriodSeconds` is read for one thing before being recorded. Real SQS takes a period
@@ -1145,13 +1275,16 @@ Sim SQS currently supports:
 - `GetQueueUrlCommand` and `ListQueuesCommand`, with a name prefix and paging
 - `GetQueueAttributesCommand`, `SetQueueAttributesCommand` and `PurgeQueueCommand`
 - `SendMessageCommand` and `SendMessageBatchCommand`, with per-message or per-queue delays
+- FIFO queues, with ordered message groups, five-minute deduplication by id or by content,
+  sequence numbers and `ReceiveRequestAttemptId`
 - `ReceiveMessageCommand`, up to ten messages at a time, each under a fresh receipt handle
 - `DeleteMessageCommand`, `DeleteMessageBatchCommand` and `ChangeMessageVisibilityCommand`
 - Visibility timeouts, delays and message retention, all on the simulation's clock
 - `RedrivePolicy`, moving a message to its dead-letter queue once its receives run out
 - `MessageAttributes` round-tripping, with real `MD5OfMessageBody` and `MD5OfMessageAttributes` digests
-- The `SentTimestamp`, `ApproximateReceiveCount`, `ApproximateFirstReceiveTimestamp` and
-  `DeadLetterQueueSourceArn` system attributes
+- The `SentTimestamp`, `ApproximateReceiveCount`, `ApproximateFirstReceiveTimestamp`,
+  `DeadLetterQueueSourceArn`, `MessageGroupId`, `MessageDeduplicationId` and `SequenceNumber`
+  system attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
 - The `Policy` attribute as the queue's resource policy, admitting another account's principal or a
   service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
@@ -1167,9 +1300,14 @@ Sim SQS currently supports:
 
 Current documented limitations:
 
-- Standard queues only. A queue name ending in `.fifo` is refused, as are `MessageGroupId`,
-  `MessageDeduplicationId` and `ReceiveRequestAttemptId`.
-- Ordering and duplicates are stricter here than AWS promises. Messages come back oldest first, and a
+- FIFO throughput is unlimited. `FifoThroughputLimit` is validated and held, and every request
+  goes through. The 120,000 in-flight message quota is absent too.
+- A standard queue refuses `ReceiveRequestAttemptId`, since AWS documents it for FIFO queues only.
+  A standard queue's `MessageGroupId` is kept and reported, and fair queueing has no effect on the
+  order messages come back in.
+- A FIFO queue refuses a stale receipt handle on `DeleteMessage`. `ChangeMessageVisibility` with a
+  stale handle on a FIFO queue behaves as it does on a standard queue.
+- Ordering and duplicates on a standard queue are stricter here than AWS promises. Messages come back oldest first, and a
   message is handed out to one consumer at a time. Real standard queues promise no ordering at all
   and guarantee at-least-once delivery, so a copy of a message can arrive twice there and messages
   can arrive out of order. Redelivery after a visibility timeout lapses is simulated, since that
@@ -1180,8 +1318,7 @@ Current documented limitations:
 - `DeleteQueue` and `PurgeQueue` take effect immediately, where real SQS may take up to 60 seconds
   over either. The 60-second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
-- Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
-  them. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it
+- Dead-letter queues are simulated through the `RedrivePolicy` half of them only. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it
   is recorded and the queue created without it. A dead-letter queue cannot restrict which queues may
   redrive to it either way. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for
   draining a dead-letter queue back to its source are absent. A test moves a redriven message back by

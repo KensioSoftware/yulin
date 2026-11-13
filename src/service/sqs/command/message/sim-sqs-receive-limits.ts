@@ -89,16 +89,38 @@ export function assertWaitTime(requested: number | undefined): void {
   }
 }
 
+const attemptIdPattern = /^[!-~]{1,128}$/u;
+
 /**
- * Refuse the receive inputs this simulation does not model.
+ * The receive request attempt id a FIFO receive can be retried by.
+ *
+ * It applies only to a FIFO queue. What real SQS does with one sent to a
+ * standard queue is not documented, so it is refused there rather than
+ * guessed at.
  */
-export function refuseUnsimulatedReceiveInput(
+export function receiveAttemptIdFor(
+  queue: SimSqsQueue,
   input: SimReceiveMessageCommandInput,
-): void {
-  if (input.ReceiveRequestAttemptId !== undefined) {
+): string | undefined {
+  const attemptId = input.ReceiveRequestAttemptId;
+
+  if (attemptId === undefined) {
+    return undefined;
+  }
+
+  if (!queue.name.isFifo) {
     throw new SimSqsUnsupportedOperation(
-      "ReceiveRequestAttemptId applies to FIFO queues, which simulated SQS " +
-        "does not support",
+      "ReceiveRequestAttemptId applies only to FIFO queues, and simulated " +
+        "SQS refuses it for a standard queue",
     );
   }
+
+  if (!attemptIdPattern.test(attemptId)) {
+    throw new SimSqsInvalidParameterValue(
+      `Value ${attemptId} for parameter ReceiveRequestAttemptId is invalid. ` +
+        `Reason: Must be 1 to 128 alphanumeric or punctuation characters.`,
+    );
+  }
+
+  return attemptId;
 }

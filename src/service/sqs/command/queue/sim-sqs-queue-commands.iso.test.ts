@@ -293,11 +293,11 @@ describe("SQS queue commands", () => {
     assertUndefined(simAws.sqs().findQueue("orders"));
   });
 
-  it("refuses a FIFO queue name", async () => {
+  it("refuses a .fifo name without the FifoQueue attribute", async () => {
     // Given a simulated AWS.
     const simAws = new SimAws();
 
-    // When a FIFO queue is asked for.
+    // When a queue is named like a FIFO queue without asking for one.
     const error = await assertThrowsErrorAsync(async () => {
       await simAws
         .sqs()
@@ -305,8 +305,8 @@ describe("SQS queue commands", () => {
     });
 
     // Then it is refused rather than created as a standard queue.
-    assertInstanceOf(error, SimSqsUnsupportedOperation);
-    assertStringIncludes(error.message, "FIFO");
+    assertInstanceOf(error, SimSqsInvalidParameterValue);
+    assertStringIncludes(error.message, "FifoQueue");
   });
 
   it("refuses a queue name real SQS would refuse", async () => {

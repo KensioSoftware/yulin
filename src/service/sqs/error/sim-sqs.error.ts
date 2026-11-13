@@ -204,12 +204,26 @@ export class SimSqsInvalidBatchEntryId extends SimSqsError {
  * Simulated SQS UnsupportedOperation error.
  *
  * This is what simulated SQS refuses a real SQS feature it does not simulate
- * with, such as a FIFO queue or a redrive policy. Refusing is deliberate: a
+ * with, such as queue tags or an encryption key. Refusing is deliberate: a
  * request that quietly did something else would pass here and behave
  * differently on AWS.
  */
 export class SimSqsUnsupportedOperation extends SimSqsError {
   public override readonly name = "UnsupportedOperation";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated SQS MissingParameter error.
+ *
+ * Real SQS reports a request missing a parameter the queue requires this way,
+ * such as a message sent to a FIFO queue with no `MessageGroupId`.
+ */
+export class SimSqsMissingParameter extends SimSqsError {
+  public override readonly name = "MissingParameter";
 
   constructor(message: string) {
     super(message, { httpStatusCode: 400 });

@@ -8,6 +8,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
   assertUuidV4,
@@ -17,7 +18,6 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimSqsInvalidMessageContents,
   SimSqsInvalidParameterValue,
-  SimSqsUnsupportedOperation,
 } from "../../error/sim-sqs.error.js";
 import { simAwsWithQueue } from "../../../../../test/sqs/queue-fixture.js";
 
@@ -144,23 +144,51 @@ describe("SQS SendMessage", () => {
     assertInstanceOf(error, SimSqsInvalidParameterValue);
   });
 
-  it("refuses the FIFO fields, since there are no FIFO queues here", async () => {
-    // Given a queue.
+  it("refuses a deduplication id on a standard queue", async () => {
+    // Given a standard queue.
     const { simAws, queueUrl } = await simAwsWithQueue();
 
-    // When a message group is named.
+    // When a message is sent with a deduplication id.
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.sqs().sendMessage(
         new SendMessageCommand({
           QueueUrl: queueUrl,
           MessageBody: "order-1",
-          MessageGroupId: "tenant-acme",
+          MessageDeduplicationId: "order-1",
         }),
       );
     });
 
-    // Then it is refused rather than accepted as an ordering that is not there.
-    assertInstanceOf(error, SimSqsUnsupportedOperation);
+    // Then it is refused, since only a FIFO queue deduplicates.
+    assertInstanceOf(error, SimSqsInvalidParameterValue);
+    assertStringIncludes(error.message, "not valid for this queue type");
+  });
+
+  it("keeps a message group on a standard queue for fair queueing", async () => {
+    // Given a standard queue.
+    const { simAws, queueUrl } = await simAwsWithQueue();
+
+    // When a message is sent with a message group, as fair queues use.
+    await simAws.sqs().sendMessage(
+      new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: "order-1",
+        MessageGroupId: "tenant-a",
+      }),
+    );
+
+    // Then a consumer can read the group back.
+    const received = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MessageSystemAttributeNames: ["MessageGroupId"],
+      }),
+    );
+
+    assertIdentical(
+      received.Messages?.[0]?.Attributes?.["MessageGroupId"],
+      "tenant-a",
+    );
   });
 
   it("keeps the X-Ray trace header a message is sent with", async () => {

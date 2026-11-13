@@ -22,6 +22,19 @@ describe("SimCfnSqsQueueName", () => {
     assertStringMatches(name.value, /^orders-stack-OrdersQueue-[\da-f]{12}$/);
   });
 
+  it("ends a FIFO queue's name .fifo within 80 characters", () => {
+    // Given a FIFO queue Resource with long names either side.
+    const name = new SimCfnSqsQueueName({
+      stackName: "s".repeat(60),
+      logicalId: "L".repeat(60),
+      fifo: true,
+    });
+
+    // When the generated name is read, then it ends .fifo and still fits.
+    assertStringMatches(name.value, /^s+-L+-[\da-f]{12}\.fifo$/);
+    assertStringLength(name.value, 80);
+  });
+
   it("falls back to the logical ID with no stack name", () => {
     // Given a Resource created outside a stack, which has no stack name to
     // derive a name from.

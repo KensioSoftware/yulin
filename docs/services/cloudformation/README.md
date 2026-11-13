@@ -4417,8 +4417,7 @@ Three things are still refused outright, and fail the Resource:
   is some type other than a string, or an `AWS::DynamoDB::GlobalTable` whose replica list omits the
   region the stack is deploying into. Real CloudFormation refuses these templates too.
 - A value the simulated service itself refuses, in the same words an SDK caller gets. An
-  `AWS::SQS::Queue` with `FifoQueue: true` is one. A FIFO queue is named `<name>.fifo`, which
-  simulated SQS refuses, leaving no queue to create under the name the template gave it.
+  `AWS::SQS::Queue` with `FifoQueue: true` and a `QueueName` that does not end `.fifo` is one.
 - A value real AWS answers with a 400, on a property that is skipped. Nothing acts on the property
   either way, and what it says is read far enough to catch a template CloudFormation will reject. A
   value that passes is recorded like any other skipped property. One that fails takes the Resource
