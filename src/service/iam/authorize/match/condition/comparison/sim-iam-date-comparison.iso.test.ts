@@ -135,6 +135,80 @@ describe("sim IAM date condition operators", () => {
     assertFalse(allowed(condition, { "aws:TokenIssueTime": "2026-13-01" }));
   });
 
+  it("reads a year and month as midnight UTC on the first", () => {
+    // Given a read allowed from February 2026
+    const condition = {
+      DateGreaterThanEquals: { "aws:TokenIssueTime": "2026-02" },
+    };
+
+    // When the token was issued on the first of February, and a second before
+    // Then the month names the first instant of it
+    assertTrue(
+      allowed(condition, { "aws:TokenIssueTime": "2026-02-01T00:00:00Z" }),
+    );
+    assertFalse(
+      allowed(condition, { "aws:TokenIssueTime": "2026-01-31T23:59:59Z" }),
+    );
+  });
+
+  it.each(["2026-02-30", "2026-02-29T00:00:00Z", "2026-01-01T24:00:00Z"])(
+    "refuses %s, a date that does not exist",
+    (issued) => {
+      // Given a read withheld on New Year's Day
+      const condition = {
+        DateNotEquals: { "aws:TokenIssueTime": "2026-01-01" },
+      };
+
+      // When the issue time names a day or hour the calendar lacks
+      // Then the condition fails rather than rolling it into the next one
+      assertFalse(allowed(condition, { "aws:TokenIssueTime": issued }));
+    },
+  );
+
+  it.each([
+    "2026-1-01",
+    "2026-01T10:00Z",
+    "2026-01-01T10Z",
+    "2026-01-01T10:00.5Z",
+    "2026-01-01T10:00:00.5.5Z",
+    "2026-01-01T10:00:00TZ",
+  ])("refuses %s, which is no W3C date", (issued) => {
+    // Given a read withheld on New Year's Day
+    const condition = { DateNotEquals: { "aws:TokenIssueTime": "2026-01-01" } };
+
+    // When the issue time is written in a shape W3C does not define
+    // Then the condition fails
+    assertFalse(allowed(condition, { "aws:TokenIssueTime": issued }));
+  });
+
+  it("reads a leap day, fractions of a second and a zone offset", () => {
+    // Given a read allowed before 2028-02-29T12:00:00.500Z
+    const condition = {
+      DateLessThan: { "aws:TokenIssueTime": "2028-02-29T12:00:00.500Z" },
+    };
+
+    // When the token was issued a quarter second before it, written five
+    // hours behind UTC, and then a quarter second after it
+    // Then both are read as the instants they name
+    assertTrue(
+      allowed(condition, {
+        "aws:TokenIssueTime": "2028-02-29T07:00:00.250-05:00",
+      }),
+    );
+    assertFalse(
+      allowed(condition, { "aws:TokenIssueTime": "2028-02-29T12:00:00.750Z" }),
+    );
+  });
+
+  it("reads a negative epoch as seconds before 1970", () => {
+    // Given a read allowed before the epoch
+    const condition = { DateLessThan: { "aws:TokenIssueTime": "1970-01-01" } };
+
+    // When the token was issued a minute before it
+    // Then the negative number is read as epoch seconds
+    assertTrue(allowed(condition, { "aws:TokenIssueTime": "-60" }));
+  });
+
   it("derives the request time from the simulated clock over a supplied one", async () => {
     // Given a read allowed until the start of 2027, in a simulation an hour
     // before it

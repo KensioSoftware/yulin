@@ -526,7 +526,7 @@ Simulated Organizations supports:
 - AWS-shaped `r-` and `ou-` node ids, and an `o-` organization id from `organizationId()`
 - `aws:PrincipalOrgID` on every request from a principal in one of the organization's Accounts
 - `Action`, `NotAction`, `Resource`, `NotResource` and `Condition` in an SCP statement
-- Every condition operator IAM documents, with its set forms and `IfExists` suffix (see
+- Every condition operator IAM documents, with the set forms and `IfExists` suffix of each but `Null` (see
   [Policy conditions](https://yulinsim.dev/services/iam/#policy-conditions)), including the negated
   operators a `Deny` statement exempting named roles hangs on `aws:PrincipalArn` and the date
   operators a freeze writes against `aws:CurrentTime`

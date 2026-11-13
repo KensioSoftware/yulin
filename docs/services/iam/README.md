@@ -365,9 +365,11 @@ under a positive operator is an OR. A service control policy writes its carve-ou
 `ArnNotLike` on `aws:PrincipalArn` to deny an action to every principal outside a named set of
 roles.
 
-The numeric operators read JSON numbers and numeric strings alike. The date operators read ISO 8601
-text (`2027-01-01T00:00:00Z`, or `2027-01-01` for midnight UTC) and epoch seconds, and compare the
-instants they name, so a time written with an offset compares correctly with one written in UTC.
+The numeric operators read JSON numbers and numeric strings alike. The date operators read the W3C
+forms of ISO 8601 (`2027-01-01T00:00:00Z`, `2027-01-01` for midnight UTC, or `2027-01` for the first
+of the month) and epoch seconds, and compare the instants they name. A time written with an offset
+compares correctly with one written in UTC. A date the calendar lacks, such as `2026-02-30`, is a
+value the operator cannot read.
 `IpAddress` takes CIDR ranges in IPv4 and IPv6, and reads an address with no prefix as a range of one.
 `BinaryEquals` compares the bytes two base64 values encode.
 
