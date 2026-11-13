@@ -26,6 +26,7 @@ import { SimAwsLocalUrl } from "../../src/serve/http/url/sim-aws-local-url.js";
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../src/service/lambda/function/code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
+import { grantPublicFunctionUrl } from "../lambda/public-url-fixture.js";
 
 /**
  * Create a public Function URL served by this handler, and answer with the
@@ -53,6 +54,7 @@ export async function functionUrlHostname(
       }),
     );
   assertNonNullable(functionUrl, "the Function URL was created");
+  await grantPublicFunctionUrl(simAws.lambda(), functionName);
 
   return new URL(functionUrl).hostname;
 }

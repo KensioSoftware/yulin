@@ -18,6 +18,7 @@ import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.j
 import { simLambdaUrlForbiddenMessage } from "./response/sim-lambda-url-error-response.js";
 import type { SimPayload2RequestContext } from "../../../serve/payload-2/sim-payload-2-event.type.js";
 import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.type.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 const accountId = "888888888888";
 
@@ -62,7 +63,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
         PolicyName: "InvokePolicy",
         PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Action: "lambda:InvokeFunctionUrl",
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
             Resource: reporter.FunctionArn,
           },
         }),
@@ -224,7 +225,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
         PolicyName: "InvokePolicy",
         PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Action: "lambda:InvokeFunctionUrl",
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
             Resource: reporter.FunctionArn,
           },
         }),
@@ -272,6 +273,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
         AuthType: "NONE",
       }),
     );
+    await grantPublicFunctionUrl(simAws.lambda(), "reporter");
 
     // When the handler reads its invocation event
     const response = await new SimAwsHttp({ simAws }).fetch(

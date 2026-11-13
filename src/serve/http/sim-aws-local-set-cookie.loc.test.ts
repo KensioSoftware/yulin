@@ -8,6 +8,7 @@ import { describe, it } from "vitest";
 import { serveSimAws } from "./local-server/sim-aws-local-server.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../service/lambda/function/code/lambda-zip-file-input.js";
+import { grantPublicFunctionUrl } from "../../../test/lambda/public-url-fixture.js";
 
 describe("Repeated Set-Cookie headers served on localhost", () => {
   it("sends one header per cookie the response carries", async () => {
@@ -37,6 +38,7 @@ describe("Repeated Set-Cookie headers served on localhost", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "sign-out");
     assertNonNullable(functionUrl);
 
     const srv = await serveSimAws({ simAws });

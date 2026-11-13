@@ -2951,12 +2951,21 @@ HTTP requests to the function, alongside the other simulated services on the sam
 the Function URL through `srv.localUrl(...)`, which keeps the endpoint's hostname but sends the
 request to the local server, in the same way it adapts simulated S3 website and CloudFront URLs.
 
+A Function URL serves nobody until the function's resource-based policy allows it. Every request
+needs `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function, whatever the URL's
+auth type. AWS has applied that rule to every Function URL created since October 2025 (see
+[Control access to Lambda function URLs](https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html)).
+`CreateFunctionUrlConfig` writes no permission. A `NONE` URL takes two `AddPermission` calls granting `*` one action each. The second carries `InvokedViaFunctionUrl`, and grants
+`lambda:InvokeFunction` for calls through a Function URL only. A URL missing either grant answers
+`403`.
+
 ```typescript sim-lambda-function-url
 /**
  * Serving a simulated Lambda Function URL on localhost.
  */
 
 import {
+  AddPermissionCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
@@ -2989,6 +2998,27 @@ const urlConfig = await lambda.createFunctionUrlConfig(
   new CreateFunctionUrlConfigCommand({
     FunctionName: "greeter",
     AuthType: "NONE",
+  }),
+);
+
+// A Function URL takes both actions. The second grant covers calls through a
+// Function URL only.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "greeter",
+    StatementId: "FunctionURLAllowPublicAccess",
+    Action: "lambda:InvokeFunctionUrl",
+    Principal: "*",
+    FunctionUrlAuthType: "NONE",
+  }),
+);
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "greeter",
+    StatementId: "FunctionURLInvokeAllowPublicAccess",
+    Action: "lambda:InvokeFunction",
+    Principal: "*",
+    InvokedViaFunctionUrl: true,
   }),
 );
 
@@ -3155,6 +3185,7 @@ response it serves, and answers a browser preflight from the block alone.
  */
 
 import {
+  AddPermissionCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
@@ -3192,6 +3223,27 @@ const urlConfig = await lambda.createFunctionUrlConfig(
       AllowCredentials: true,
       MaxAge: 600,
     },
+  }),
+);
+
+// A Function URL takes both actions. The second grant covers calls through a
+// Function URL only.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "rates",
+    StatementId: "FunctionURLAllowPublicAccess",
+    Action: "lambda:InvokeFunctionUrl",
+    Principal: "*",
+    FunctionUrlAuthType: "NONE",
+  }),
+);
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "rates",
+    StatementId: "FunctionURLInvokeAllowPublicAccess",
+    Action: "lambda:InvokeFunction",
+    Principal: "*",
+    InvokedViaFunctionUrl: true,
   }),
 );
 
@@ -3247,11 +3299,12 @@ cannot sign the preflight it sends, and an unsigned request to that URL is answe
 
 ### IAM-authenticated Function URLs
 
-A URL created with `AuthType: "AWS_IAM"` invokes the function only for a caller allowed
-`lambda:InvokeFunctionUrl` on the function ARN, and answers `403` otherwise. That is a different
-action from `lambda:InvokeFunction`, which the Invoke API uses. Real AWS separates the two so a
-policy can grant the HTTP endpoint without granting the SDK operation, and a policy naming only one
-of them grants only that one here as well.
+A URL created with `AuthType: "AWS_IAM"` invokes the function only for a caller allowed both
+`lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function ARN, and answers `403`
+otherwise. A caller allowed one of the two is refused. An identity policy can allow both in one
+statement. A resource policy grant usually takes two statements, the second conditioned on
+`lambda:InvokedViaFunctionUrl` so the grant opens the URL and leaves the Invoke API closed. CDK's
+`grantInvokeUrl` writes both.
 
 The caller comes from the request itself, through either a SigV4 signature or an `x-sim-aws-caller`
 header naming a principal directly. A request that offers no caller at all is anonymous, owns no
@@ -3273,11 +3326,6 @@ declares no hash is invoked as before. That is what makes a POST through a Cloud
 control need the viewer's own digest. See
 [posting to a Function URL Origin](https://yulinsim.dev/services/cloudfront/#posting-to-a-function-url-origin) in the
 CloudFront docs.
-
-CloudFront is the exception to the two actions being separate. A request from
-`cloudfront.amazonaws.com` is authorized against `lambda:InvokeFunctionUrl` and
-`lambda:InvokeFunction`, and needs a grant for both, exactly what real Lambda asks an origin access
-control for. A caller signing its own request still needs only `lambda:InvokeFunctionUrl`.
 
 An `AWS_IAM` invocation carries its caller into the event as `requestContext.authorizer.iam`, the
 part a handler reads. The `authorizer` block is absent for a `NONE` invocation, as it is on real
@@ -3350,7 +3398,7 @@ await simAws.iam().putRolePolicy(
       Version: "2012-10-17",
       Statement: {
         Effect: "Allow",
-        Action: "lambda:InvokeFunctionUrl",
+        Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
         Resource: created.FunctionArn,
       },
     }),
@@ -3494,9 +3542,20 @@ after the logical ID, and so does this.
       "Principal": "222222222222",
       "FunctionUrlAuthType": "AWS_IAM"
     }
+  },
+  "AllowOtherAccountInvoke": {
+    "Type": "AWS::Lambda::Permission",
+    "Properties": {
+      "FunctionName": { "Ref": "GreeterFunction" },
+      "Action": "lambda:InvokeFunction",
+      "Principal": "222222222222",
+      "InvokedViaFunctionUrl": true
+    }
   }
 }
 ```
+
+A grant of a Function URL takes both Resources, since a URL request needs both actions.
 
 `FunctionName` accepts either a `Ref` to the function, giving its name, or an `Fn::GetAtt` on it,
 giving the ARN. A synthesized CDK app deploys either way with no special casing.
@@ -4110,6 +4169,25 @@ const stack = await simAws.cloudFormation().deployTemplate({
           AuthType: "NONE",
         },
       },
+      // The two grants a NONE URL needs before it serves anyone.
+      GreeterUrlPublicPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunctionUrl",
+          Principal: "*",
+          FunctionUrlAuthType: "NONE",
+        },
+      },
+      GreeterUrlInvokePermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunction",
+          Principal: "*",
+          InvokedViaFunctionUrl: true,
+        },
+      },
     },
     Outputs: {
       GreeterFunctionUrl: {
@@ -4133,8 +4211,8 @@ try {
 ```
 
 CDK templates work the same way. Synth the app, deploy the template file, and read
-`functionUrl.url` from the stack outputs. CDK pairs a public Function URL with an
-`AWS::Lambda::Permission`, which deploys alongside it as
+`functionUrl.url` from the stack outputs. CDK pairs a public Function URL with two
+`AWS::Lambda::Permission` Resources granting `*` each action, which deploy alongside it as
 [permissions in templates](#permissions-in-templates) covers.
 
 ## Versions and aliases in templates
@@ -4638,9 +4716,8 @@ Sim Lambda currently supports:
   preflight without invoking the function
 - `iam:PassRole` authorization of the execution role named by `CreateFunctionCommand` and
   `UpdateFunctionConfigurationCommand`, with `iam:PassedToService` supplied
-- `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
-  resolved from the request, and `lambda:InvokeFunction` as well for a CloudFront origin access
-  control
+- `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` and
+  `lambda:InvokeFunction` against the caller resolved from the request
 - Function URLs on an alias, through a `Qualifier` on the URL commands or on `AWS::Lambda::Url`
 - `node:timers` and `node:timers/promises` timers a handler imports, waiting on the simulation's
   clock
@@ -4758,9 +4835,9 @@ Current documented limitations:
   invokes the function on a resource's behalf. See
   [Resource-based policies](#resource-based-policies) for which paths those are.
   `lambda:EventSourceToken` is never given one, so a grant to an Alexa skill never matches.
-- A Function URL call needs `lambda:InvokeFunction` as well as `lambda:InvokeFunctionUrl` only when
-  CloudFront makes it through an origin access control. Real Lambda asks every caller of a Function
-  URL created since October 2025 for both.
+- Every Function URL needs `lambda:InvokeFunction` as well as `lambda:InvokeFunctionUrl`, the rule
+  real Lambda applies to URLs created since October 2025. Real Lambda still serves a URL created
+  before then with the URL action alone. A simulated URL is always created during the run, and the simulator has no switch for the older rule.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.

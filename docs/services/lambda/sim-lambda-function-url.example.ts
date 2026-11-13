@@ -3,6 +3,7 @@
  */
 
 import {
+  AddPermissionCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
@@ -35,6 +36,27 @@ const urlConfig = await lambda.createFunctionUrlConfig(
   new CreateFunctionUrlConfigCommand({
     FunctionName: "greeter",
     AuthType: "NONE",
+  }),
+);
+
+// A Function URL takes both actions. The second grant covers calls through a
+// Function URL only.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "greeter",
+    StatementId: "FunctionURLAllowPublicAccess",
+    Action: "lambda:InvokeFunctionUrl",
+    Principal: "*",
+    FunctionUrlAuthType: "NONE",
+  }),
+);
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "greeter",
+    StatementId: "FunctionURLInvokeAllowPublicAccess",
+    Action: "lambda:InvokeFunction",
+    Principal: "*",
+    InvokedViaFunctionUrl: true,
   }),
 );
 

@@ -4,6 +4,7 @@ import type {
 } from "../../template/value/sim-cfn-template-value.js";
 import { isSamTemplateRecord } from "../sim-cfn-sam-record.js";
 import { samConditionAttribute } from "./sim-cfn-sam-function-properties.js";
+import { samPublicUrlPermissions } from "./sim-cfn-sam-function-url-permissions.js";
 
 interface SamFunctionUrlProperties {
   readonly logicalId: string;
@@ -25,6 +26,9 @@ const carriedNames = new Set(["AuthType", "InvokeMode", "Cors"]);
  * `AuthType` goes over as it came rather than being defaulted, so a config
  * stating none is refused by the Resource it expands into rather than quietly
  * served to anyone.
+ *
+ * A `NONE` config also expands into the two permissions that open the URL to
+ * anyone, which SAM writes and the URL cannot serve without.
  */
 export function samFunctionUrlResources(
   properties: SamFunctionUrlProperties,
@@ -47,5 +51,7 @@ export function samFunctionUrlResources(
         ),
       },
     },
+    ...(config["AuthType"] === "NONE" &&
+      samPublicUrlPermissions(logicalId, condition)),
   };
 }

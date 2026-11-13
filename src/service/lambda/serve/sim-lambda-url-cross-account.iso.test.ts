@@ -1,5 +1,4 @@
 import {
-  AddPermissionCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
   RemovePermissionCommand,
@@ -13,6 +12,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { simAwsCallerHeaderName } from "../../iam/request/sim-aws-caller-header.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
+import { grantFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 const ownerAccountId = "111111111111";
 const callerAccountId = "222222222222";
@@ -72,14 +72,11 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
     );
 
     // And the other Account's Role granted permission on the function
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccount",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccount",
+      Principal: callerRoleArn,
+    });
 
     // And that Role allowed to invoke Function URLs by its own Account
     const callerIam = simAws.account(callerAccountId).iam();
@@ -99,7 +96,10 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -134,14 +134,11 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
     );
 
     // And only the function's own grant to the other Account's Role
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccount",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccount",
+      Principal: callerRoleArn,
+    });
 
     // When that Role calls the URL
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -191,7 +188,10 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );
@@ -226,14 +226,11 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
     );
 
     // And a granted permission that is then revoked
-    await ownerLambda.addPermission(
-      new AddPermissionCommand({
-        FunctionName: "reporter",
-        StatementId: "AllowOtherAccount",
-        Action: "lambda:InvokeFunctionUrl",
-        Principal: callerRoleArn,
-      }),
-    );
+    await grantFunctionUrl(ownerLambda, {
+      FunctionName: "reporter",
+      StatementId: "AllowOtherAccount",
+      Principal: callerRoleArn,
+    });
     await ownerLambda.removePermission(
       new RemovePermissionCommand({
         FunctionName: "reporter",
@@ -259,7 +256,10 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+          Statement: {
+            Action: ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+            Resource: "*",
+          },
         }),
       }),
     );

@@ -454,8 +454,8 @@ carries them as the `x-sim-aws-caller` and `x-sim-aws-source-arn`/`x-sim-aws-sou
 headers, which is how anything else calling into simulated AWS in process states who it is. That is
 what an `AWS_IAM` Function URL evaluates its permissions for `cloudfront.amazonaws.com` against, so
 a template omitting one answers 403 rather than being admitted anyway. An origin access control
-takes two of them, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, which is what real Lambda
-asks for and what `SimLambdaUrlAuthorizer` requires of this principal. The headers are stripped at
+takes two of them, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, as every Function URL
+caller does, and `SimLambdaUrlAuthorizer` requires both. The headers are stripped at
 the boundary, so the function's event shows the request its viewer sent.
 
 A viewer's own control headers are dropped from the Origin request before the Origin's are applied,

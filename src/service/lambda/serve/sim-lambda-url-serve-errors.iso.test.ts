@@ -15,6 +15,7 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
 import { simLambdaUrlForbiddenMessage } from "./response/sim-lambda-url-error-response.js";
+import { grantPublicFunctionUrl } from "../../../../test/lambda/public-url-fixture.js";
 
 function localUrl(functionUrl: string): string {
   return new SimAwsLocalUrl({ input: functionUrl }).toString();
@@ -57,6 +58,7 @@ describe("Serving sim Lambda Function URL failures", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
     await simAws
       .lambda()
       .deleteFunctionUrlConfig(
@@ -92,6 +94,7 @@ describe("Serving sim Lambda Function URL failures", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the same URL id is requested in another region.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -159,6 +162,7 @@ describe("Serving sim Lambda Function URL failures", () => {
           AuthType: "NONE",
         }),
       );
+    await grantPublicFunctionUrl(simAws.lambda(), "greeter");
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(

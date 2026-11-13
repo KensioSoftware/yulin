@@ -22,6 +22,7 @@ import {
   simAwsErrorHeaderName,
 } from "./response/sim-aws-response-hints.js";
 import { SimAwsLocalUrl } from "./url/sim-aws-local-url.js";
+import { grantPublicFunctionUrl } from "../../../test/lambda/public-url-fixture.js";
 
 /**
  * A Function URL served on localhost whose handler echoes the headers it was
@@ -46,6 +47,7 @@ async function serveHeaderEcho(simAws: SimAws): Promise<string> {
       AuthType: "NONE",
     }),
   );
+  await grantPublicFunctionUrl(simAws.lambda(), "echo");
 
   return new SimAwsLocalUrl({ input: created.FunctionUrl }).toString();
 }

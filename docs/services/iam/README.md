@@ -789,6 +789,7 @@ policy evaluation does not read it.
  */
 
 import {
+  AddPermissionCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
@@ -811,6 +812,26 @@ const urlConfig = await simAws.lambda().createFunctionUrlConfig(
   new CreateFunctionUrlConfigCommand({
     FunctionName: "reporter",
     AuthType: "NONE",
+  }),
+);
+
+// The two grants a NONE URL needs before it serves anyone.
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "reporter",
+    StatementId: "FunctionURLAllowPublicAccess",
+    Action: "lambda:InvokeFunctionUrl",
+    Principal: "*",
+    FunctionUrlAuthType: "NONE",
+  }),
+);
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "reporter",
+    StatementId: "FunctionURLInvokeAllowPublicAccess",
+    Action: "lambda:InvokeFunction",
+    Principal: "*",
+    InvokedViaFunctionUrl: true,
   }),
 );
 

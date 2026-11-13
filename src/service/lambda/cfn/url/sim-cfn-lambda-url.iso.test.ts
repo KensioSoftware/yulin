@@ -58,6 +58,27 @@ function greeterTemplate(
         Type: "AWS::Lambda::Url",
         Properties: urlProperties,
       },
+      // The two grants a `NONE` URL needs before it serves anyone, which a
+      // template has to state for itself. They open nothing on an `AWS_IAM`
+      // URL.
+      GreeterPublicUrlPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunctionUrl",
+          Principal: "*",
+          FunctionUrlAuthType: "NONE",
+        },
+      },
+      GreeterPublicInvokePermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: { Ref: "GreeterFunction" },
+          Action: "lambda:InvokeFunction",
+          Principal: "*",
+          InvokedViaFunctionUrl: true,
+        },
+      },
     },
     Outputs: {
       FunctionUrl: {
