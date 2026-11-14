@@ -20,6 +20,7 @@ export interface SimGetRoleCommandOutput {
     readonly CreateDate: Date;
     readonly AssumeRolePolicyDocument?: string | undefined;
     readonly Description?: string | undefined;
+    readonly MaxSessionDuration: number;
     readonly PermissionsBoundary?:
       | SimIamAttachedPermissionsBoundary
       | undefined;

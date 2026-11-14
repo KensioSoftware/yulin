@@ -61,6 +61,27 @@ export interface SimIamAuthZServiceControlPolicies {
   readonly levels: readonly SimIamAuthZServiceControlPolicyLevel[];
 }
 
+/**
+ * A permissions boundary or a set of session policies, which cap what the
+ * caller's identity policies can grant and grant nothing themselves.
+ *
+ * `applies` is a separate fact from how many sources there are. A boundary
+ * naming a policy the simulation cannot find allows nothing, while a caller
+ * with no boundary is unrestricted, and both carry no sources.
+ */
+export interface SimIamAuthZPolicyLimit {
+  readonly applies: boolean;
+  readonly sources: readonly SimIamAuthZPolicySource[];
+}
+
+/**
+ * The limit a caller carries when it has no boundary or session policy.
+ */
+export const simIamNoPolicyLimit: SimIamAuthZPolicyLimit = {
+  applies: false,
+  sources: [],
+};
+
 export interface SimIamAuthZContext {
   /**
    * Identity-based policies that grant permissions to the principal.
@@ -83,6 +104,16 @@ export interface SimIamAuthZContext {
    * they are kept apart from the two sides that can allow a request.
    */
   readonly serviceControlPolicies: SimIamAuthZServiceControlPolicies;
+
+  /**
+   * The permissions boundary of the User or Role the caller acts as.
+   */
+  readonly permissionsBoundary: SimIamAuthZPolicyLimit;
+
+  /**
+   * The session policies passed when the caller's session was created.
+   */
+  readonly sessionPolicy: SimIamAuthZPolicyLimit;
 
   /**
    * How an Allow from each policy side combines into the final decision.

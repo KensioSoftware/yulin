@@ -18,6 +18,7 @@ export class SimIamAllowStatements {
   private readonly trustStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly delegatedStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly namingStatements: SimIamPolicyDocumentStatement[] = [];
+  private readonly unlimitedStatements: SimIamPolicyDocumentStatement[] = [];
 
   /**
    * Record a matching Allow against the policy side it came from.
@@ -41,6 +42,10 @@ export class SimIamAllowStatements {
 
     if (principal.namesCaller) {
       this.namingStatements.push(statement);
+    }
+
+    if (principal.passesPrincipalLimits) {
+      this.unlimitedStatements.push(statement);
     }
 
     this.sideStatements(policy).push(statement);
@@ -78,18 +83,41 @@ export class SimIamAllowStatements {
    * Which sides produced a matching Allow.
    */
   get sides(): SimIamAllowSides {
+    return this.sidesOf(this.identityStatements, this.resourceStatements);
+  }
+
+  /**
+   * Which sides produced a matching Allow that a permissions boundary or
+   * session policy allowing nothing leaves standing.
+   *
+   * The identity side is gone. A resource-policy Allow survives where it
+   * named the caller itself or admitted everyone, and is dropped where it
+   * reached the caller through its Role or its Account.
+   */
+  get unlimitedSides(): SimIamAllowSides {
+    const unlimited = new Set(this.unlimitedStatements);
+
+    return this.sidesOf(
+      [],
+      this.resourceStatements.filter((statement) => unlimited.has(statement)),
+    );
+  }
+
+  /**
+   * The sides that the given Allow statements make up.
+   */
+  private sidesOf(
+    identity: readonly SimIamPolicyDocumentStatement[],
+    resource: readonly SimIamPolicyDocumentStatement[],
+  ): SimIamAllowSides {
     const delegated = new Set(this.delegatedStatements);
     const naming = new Set(this.namingStatements);
 
     return new SimIamAllowSides({
-      identity: this.identityStatements.length > 0,
-      resource: this.resourceStatements.length > 0,
-      resourceDirect: this.resourceStatements.some(
-        (statement) => !delegated.has(statement),
-      ),
-      resourceNamesCaller: this.resourceStatements.some((statement) =>
-        naming.has(statement),
-      ),
+      identity: identity.length > 0,
+      resource: resource.length > 0,
+      resourceDirect: resource.some((statement) => !delegated.has(statement)),
+      resourceNamesCaller: resource.some((statement) => naming.has(statement)),
     });
   }
 

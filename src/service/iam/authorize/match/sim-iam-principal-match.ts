@@ -30,14 +30,25 @@ export class SimIamPrincipalMatch {
    */
   public readonly namesCaller: boolean;
 
+  /**
+   * Whether the statement reached an assumed-role session only by naming the
+   * Role behind it.
+   *
+   * AWS limits such a grant by the session's permissions boundary and session
+   * policy, and leaves a grant naming the session itself unlimited.
+   */
+  public readonly isThroughRole: boolean;
+
   private constructor(
     matched: boolean,
     isAccountDelegation: boolean,
     namesCaller: boolean,
+    isThroughRole = false,
   ) {
     this.matched = matched;
     this.isAccountDelegation = isAccountDelegation;
     this.namesCaller = namesCaller;
+    this.isThroughRole = isThroughRole;
   }
 
   /**
@@ -69,20 +80,49 @@ export class SimIamPrincipalMatch {
   }
 
   /**
-   * The first match among alternatives, since Principal lists are an OR.
+   * The matches among alternatives combined, since Principal lists are an OR.
    *
-   * A statement naming the caller wins over one that admits it some other
-   * way, because naming the caller grants to the caller whatever else the
-   * statement says.
+   * Each alternative contributes what it grants. Any alternative naming the
+   * caller names it. Only alternatives that all go through the caller's
+   * Account delegate to it, and only alternatives that all go through a Role
+   * are held back by the caller's permissions boundary and session policy.
    */
   static first(matches: readonly SimIamPrincipalMatch[]): SimIamPrincipalMatch {
     const matched = matches.filter((result) => result.matched);
 
-    return (
-      matched.find((result) => result.namesCaller) ??
-      matched.find((result) => !result.isAccountDelegation) ??
-      matched[0] ??
-      this.none()
+    if (matched.length === 0) {
+      return this.none();
+    }
+
+    return new SimIamPrincipalMatch(
+      true,
+      matched.every((result) => result.isAccountDelegation),
+      matched.some((result) => result.namesCaller),
+      matched.every((result) => !result.passesPrincipalLimits),
+    );
+  }
+
+  /**
+   * Whether the grant reaches the caller past an implicit deny in its
+   * permissions boundary or session policy.
+   *
+   * A statement naming the caller's own ARN does, and so does a wildcard. A
+   * statement naming the Role behind a session, or the caller's Account, is
+   * limited by them.
+   */
+  get passesPrincipalLimits(): boolean {
+    return this.matched && !this.isAccountDelegation && !this.isThroughRole;
+  }
+
+  /**
+   * The same match, reached through the Role behind a session.
+   */
+  throughRole(): SimIamPrincipalMatch {
+    return new SimIamPrincipalMatch(
+      this.matched,
+      this.isAccountDelegation,
+      this.namesCaller,
+      true,
     );
   }
 
@@ -92,4 +132,12 @@ export class SimIamPrincipalMatch {
   when(matched: boolean): SimIamPrincipalMatch {
     return matched ? this : SimIamPrincipalMatch.none();
   }
+}
+
+/**
+ * Whether an ARN names an IAM Role, which a caller only ever acts as through a
+ * session of it.
+ */
+export function simIamIsRoleArn(arn: string): boolean {
+  return /^arn:[^:]+:iam::\d{12}:role\//u.test(arn);
 }

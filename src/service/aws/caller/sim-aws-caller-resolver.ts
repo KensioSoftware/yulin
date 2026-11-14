@@ -5,8 +5,10 @@ import type {
   SimAwsDefaultCaller,
   SimAwsPrincipal,
   SimCredentialCaller,
+  SimResolvedCaller,
 } from "./sim-aws-caller.js";
 import type { SimIamCredentialIdentity } from "../../iam/credential/sim-aws-credentials.js";
+import type { SimIamSessionPolicy } from "../../iam/credential/session/sim-iam-session-policy.js";
 
 export interface SimAwsCredentialIdentityResolver {
   resolveCredentials(
@@ -28,6 +30,12 @@ export interface SimAwsResolvedCaller {
   readonly identityPolicyArn?: string | undefined;
   readonly accountId?: string | undefined;
   readonly service?: string | undefined;
+
+  /**
+   * The policies passed when the caller's session was created, which cap
+   * what its Role's policies grant. Undefined where none were passed.
+   */
+  readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
 }
 
 /**
@@ -99,7 +107,7 @@ export class SimAwsCallerResolver {
       caller ?? this.ambientCaller?.currentCaller() ?? this.defaultCaller;
 
     if (stated?.kind === "resolved") {
-      return this.normalized(stated.principal, stated.identityPolicyPrincipal);
+      return this.normalized(stated);
     }
 
     if (stated?.kind === "credentials") {
@@ -108,25 +116,21 @@ export class SimAwsCallerResolver {
         "Simulated credential callers require an IAM credential resolver",
       );
 
-      const identity = this.credentialIdentityResolver.resolveCredentials(
-        stated.credentials,
-      );
-
       return this.normalized(
-        identity.principal,
-        identity.identityPolicyPrincipal,
+        this.credentialIdentityResolver.resolveCredentials(stated.credentials),
       );
     }
 
     const principal = stated ?? defaultPrincipal;
-    return this.normalized(principal, principal);
+    return this.normalized({ principal, identityPolicyPrincipal: principal });
   }
 
-  private normalized(
-    principal: SimAwsPrincipal,
-    identityPolicyPrincipal: SimAwsPrincipal,
-  ): SimAwsResolvedCaller {
-    const both = { principal, identityPolicyPrincipal };
+  private normalized({
+    principal,
+    identityPolicyPrincipal,
+    sessionPolicies,
+  }: Omit<SimResolvedCaller, "kind">): SimAwsResolvedCaller {
+    const both = { principal, identityPolicyPrincipal, sessionPolicies };
 
     if (principal.kind === "service") {
       return { ...both, service: principal.service };

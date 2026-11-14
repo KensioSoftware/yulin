@@ -5,7 +5,10 @@ import type {
   SimIamAuthZPolicySource,
 } from "../context/sim-iam-auth-z-context.js";
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
-import { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
+import {
+  SimIamPrincipalMatch,
+  simIamIsRoleArn,
+} from "./sim-iam-principal-match.js";
 
 /**
  * Matches the principal portion of an IAM policy statement.
@@ -143,10 +146,18 @@ export class SimIamPolicyPrincipalMatcher {
       );
     }
 
-    return this.arnPatternMatch(pattern).when(
-      this.arnMatches(pattern, caller.arn) ||
-        this.arnMatches(pattern, caller.identityPolicyArn),
-    );
+    const match = this.arnPatternMatch(pattern);
+
+    if (this.arnMatches(pattern, caller.arn) && !simIamIsRoleArn(caller.arn)) {
+      return match;
+    }
+
+    return match
+      .throughRole()
+      .when(
+        this.arnMatches(pattern, caller.arn) ||
+          this.arnMatches(pattern, caller.identityPolicyArn),
+      );
   }
 
   /**

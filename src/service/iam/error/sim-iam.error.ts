@@ -159,3 +159,32 @@ export class SimIamInvalidInput extends SimIamError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated ValidationError, which IAM and STS both answer with.
+ *
+ * A request member outside its documented constraint gets this, worded the
+ * way the AWS input validation layer words it. So does an STS session
+ * duration longer than the Role allows.
+ */
+export class SimIamValidationError extends SimIamError {
+  public override readonly name = "ValidationError";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+
+  /**
+   * The error for one request member that broke one constraint.
+   */
+  static member(
+    member: string,
+    value: string | number,
+    constraint: string,
+  ): SimIamValidationError {
+    return new SimIamValidationError(
+      `1 validation error detected: Value '${String(value)}' at '${member}' ` +
+        `failed to satisfy constraint: Member must ${constraint}`,
+    );
+  }
+}

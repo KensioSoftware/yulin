@@ -5,6 +5,7 @@ import { SimIamPolicyStatementMatcher } from "./match/sim-iam-policy-statement-m
 import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 import { SimIamPolicyEvaluation } from "./allow/sim-iam-policy-evaluation.js";
 import { SimIamScpGate } from "./scp/sim-iam-scp-gate.js";
+import { SimIamPrincipalLimits } from "./limit/sim-iam-principal-limits.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision-value.js";
 import type { SimIamUnevaluatedStatement } from "./unevaluated/sim-iam-unevaluated-statement.type.js";
 
@@ -15,14 +16,16 @@ export { SimIamPolicyDecisionValue } from "./sim-iam-decision-value.js";
  *
  * This evaluates already-discovered identity, resource, and service control
  * policy documents. It does not fetch attached policies itself, apply trust
- * policy semantics, evaluate permissions boundaries, or enforce service
- * command access.
+ * policy semantics, or enforce service command access.
  *
  * The simulator currently models the common IAM authorization rules:
  *
  * - an explicit Deny in any evaluated policy wins;
  * - the caller's Account has to get past its service control policies, which
  *   filter permissions and grant none;
+ * - the caller's permissions boundary and session policies cap what its
+ *   identity policies grant, and what a resource policy grants through the
+ *   Role behind a session or through the caller's Account;
  * - the Allows found must satisfy the request's allow requirement, which is
  *   either side within one Account and both sides across Accounts;
  * - otherwise the request is implicitly denied.
@@ -35,6 +38,12 @@ export { SimIamPolicyDecisionValue } from "./sim-iam-decision-value.js";
  * target resource.
  */
 export class SimIamPolicyDecision {
+  /**
+   * What the caller's permissions boundary and session policies said about
+   * the request, each on its own.
+   */
+  readonly principalLimits: SimIamPrincipalLimits;
+
   private readonly request: SimIamAuthZContext;
   private readonly policies: SimIamPolicyEvaluation;
   private readonly scpGate: SimIamScpGate;
@@ -58,6 +67,7 @@ export class SimIamPolicyDecision {
       policyDocumentParser,
       statementMatcher,
     });
+    this.principalLimits = new SimIamPrincipalLimits(request, statementMatcher);
   }
 
   /**
@@ -74,7 +84,7 @@ export class SimIamPolicyDecision {
    * Final IAM decision value.
    */
   get value(): SimIamPolicyDecisionValue {
-    if (this.policies.isExplicitDeny) {
+    if (this.policies.isExplicitDeny || this.principalLimits.isExplicitDeny) {
       return SimIamPolicyDecisionValue.ExplicitDeny;
     }
 
@@ -82,7 +92,7 @@ export class SimIamPolicyDecision {
       return this.scpGate.value;
     }
 
-    return this.request.allowRequirement.isSatisfiedBy(this.policies.sides)
+    return this.principalLimits.allowsRequest(this.policies)
       ? SimIamPolicyDecisionValue.Allow
       : SimIamPolicyDecisionValue.ImplicitDeny;
   }
@@ -147,16 +157,13 @@ export class SimIamPolicyDecision {
    * to say than the action and the resource.
    *
    * A service turns a denied decision into an error and passes this through,
-   * so an SCP denial reads the way it does in a real account. A matching Deny
-   * in an identity or resource policy is what `value` reports first, and it
-   * needs nothing added to the message, so it leaves this absent.
+   * so a denial by an SCP, a permissions boundary or a session policy reads
+   * the way it does in a real account. A matching Deny in an identity or
+   * resource policy is what `value` reports first. It needs nothing added to
+   * the message, and leaves this absent.
    */
   get denialReason(): string | undefined {
-    if (this.policies.isExplicitDeny) {
-      return undefined;
-    }
-
-    return this.scpGate.denialReason(this.request.action);
+    return this.principalLimits.denialReason(this.policies, this.scpGate);
   }
 
   /**

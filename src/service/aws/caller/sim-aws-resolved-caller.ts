@@ -19,6 +19,7 @@ export function simAwsCallerFor(
     kind: "resolved",
     principal: caller.principal,
     identityPolicyPrincipal: caller.identityPolicyPrincipal,
+    sessionPolicies: caller.sessionPolicies,
   };
 }
 

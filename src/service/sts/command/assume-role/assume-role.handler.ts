@@ -21,6 +21,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
+import { assertSimStsSessionDuration } from "../../assume/sim-sts-session-duration.js";
 
 interface AssumeRoleCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
@@ -77,6 +78,10 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     this.callerResolver = new SimAwsCallerResolver({
       defaultCaller: properties.defaultCaller,
       ambientCaller: properties.ambientCaller,
+      // Credentials name a caller only to the Account that issued them, which
+      // for a session being chained is the Account this STS belongs to.
+      credentialIdentityResolver:
+        iamResolver.iamForAccount(sourceAccountId).credentials,
     });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,
@@ -125,12 +130,19 @@ export class AssumeRoleCommandHandler implements CommandHandler<
       conditionContext: request.conditionContext,
     });
 
+    assertSimStsSessionDuration(
+      request.durationSeconds,
+      role.MaxSessionDuration,
+      caller.principal,
+    );
+
     return this.sessionCreator.create({
       roleArnParts: request.roleArnParts,
       role,
       roleSessionName: request.roleSessionName,
       sourcePrincipal: caller.principal,
       durationSeconds: request.durationSeconds,
+      sessionPolicy: request.sessionPolicy,
     });
   }
 }

@@ -121,6 +121,7 @@ export class SimAwsRequestCallerResolver {
     return new SimAwsRequestCaller({
       principal: identity.principal,
       identityPolicyPrincipal: identity.identityPolicyPrincipal,
+      sessionPolicies: identity.sessionPolicies,
       authMethod: "sigv4",
       details: simAwsRequestCallerDetails(identity, this.directory),
     });

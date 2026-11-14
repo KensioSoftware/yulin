@@ -1,6 +1,7 @@
 import type { CommandHandler } from "../../../../../command/command-handler.js";
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
 import { BackgroundTasks } from "../../../../../util/background/background.js";
+import type { SimArn } from "../../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
 import { makeSimUserArn } from "../../../user/arn/sim-iam-user-arn.js";
@@ -70,6 +71,9 @@ export class CreateUserCommandHandler implements CommandHandler<
       userName: username,
       creationDate: this.background.now(),
       tags: command.input.Tags,
+      permissionsBoundaryArn: command.input.PermissionsBoundary as
+        | SimArn
+        | undefined,
     });
 
     this.users.set(username, user);

@@ -3,7 +3,11 @@ import {
   type SimIamAllowRequirement,
   SimIamBothSidesAllowRequirement,
 } from "../allow/sim-iam-allow-requirement.js";
-import type { SimIamAuthZPolicySource } from "../context/sim-iam-auth-z-context.js";
+import {
+  type SimIamAuthZPolicyLimit,
+  type SimIamAuthZPolicySource,
+  simIamNoPolicyLimit,
+} from "../context/sim-iam-auth-z-context.js";
 import type { SimIamAccountIdentityPolicies } from "../identity/sim-iam-account-identity-policies.js";
 import type { SimIamCallerAccount } from "./sim-iam-caller-account.js";
 
@@ -33,6 +37,7 @@ interface SimIamCrossAccountCallerProperties {
  */
 export class SimIamCrossAccountCaller implements SimIamCallerAccount {
   readonly identityPolicies: readonly SimIamAuthZPolicySource[];
+  readonly permissionsBoundary: SimIamAuthZPolicyLimit;
 
   readonly allowRequirement: SimIamAllowRequirement =
     new SimIamBothSidesAllowRequirement();
@@ -42,5 +47,9 @@ export class SimIamCrossAccountCaller implements SimIamCallerAccount {
       properties.callerAccountIam?.identityPolicySourcesFor(
         properties.principal,
       ) ?? [];
+    this.permissionsBoundary =
+      properties.callerAccountIam?.permissionsBoundaryFor(
+        properties.principal,
+      ) ?? simIamNoPolicyLimit;
   }
 }

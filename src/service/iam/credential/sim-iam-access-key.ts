@@ -74,6 +74,7 @@ export class SimIamAccessKey {
       identityPolicyPrincipal: this.identityPolicyPrincipal,
       role: this.session?.role,
       session: this.session,
+      sessionPolicies: this.session?.sessionPolicies,
       accessKeyId: this.accessKeyId,
     };
   }

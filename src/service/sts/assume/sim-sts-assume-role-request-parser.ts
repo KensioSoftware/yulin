@@ -5,14 +5,23 @@ import {
   type IamRoleArnParts,
 } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.command.js";
-
-const defaultRoleSessionDurationSeconds = 3600;
+import { SimStsAssumeRoleInputLimits } from "./sim-sts-assume-role-input-limits.js";
+import {
+  simStsSessionPolicyRequest,
+  type SimStsSessionPolicyRequest,
+} from "./sim-sts-session-policy-request.js";
 
 export interface ParsedAssumeRoleRequest {
   readonly roleArn: string;
   readonly roleArnParts: IamRoleArnParts;
   readonly roleSessionName: string;
   readonly durationSeconds: number;
+
+  /**
+   * The session policies the request passed, or undefined where it passed
+   * none.
+   */
+  readonly sessionPolicy: SimStsSessionPolicyRequest | undefined;
   readonly conditionContext:
     | Readonly<Record<string, SimIamConditionValue>>
     | undefined;
@@ -29,13 +38,16 @@ export interface ParsedAssumeRoleRequest {
  *
  * - required Role ARN and session name values;
  * - parsed Role ARN parts used for target-account lookup;
- * - a positive duration with the STS default applied when omitted;
+ * - a duration STS accepts, with the STS default applied when omitted;
+ * - the session policies it passes, with the inline one parsed;
  * - IAM condition context derived from AssumeRole-specific command fields.
  *
  * Authorization and session creation consume the normalized request and remain
  * independent of SDK input validation details.
  */
 export class SimStsAssumeRoleRequestParser {
+  private readonly limits = new SimStsAssumeRoleInputLimits();
+
   constructor(private readonly roleArnParser = new IamRoleArnParser()) {}
 
   /**
@@ -55,33 +67,19 @@ export class SimStsAssumeRoleRequestParser {
       "STS AssumeRole RoleSessionName is required",
     );
 
-    const durationSeconds = this.durationSeconds(command.input.DurationSeconds);
+    this.limits.roleSessionName(roleSessionName);
+    this.limits.externalId(command.input.ExternalId);
 
     return {
       roleArn,
       roleArnParts: this.roleArnParser.parse(roleArn),
       roleSessionName,
-      durationSeconds,
+      durationSeconds: this.limits.durationSeconds(
+        command.input.DurationSeconds,
+      ),
+      sessionPolicy: simStsSessionPolicyRequest(command.input, this.limits),
       conditionContext: this.conditionContext(command.input.ExternalId),
     };
-  }
-
-  /**
-   * Apply the default session duration and reject invalid explicit values.
-   *
-   * Session duration is represented in whole seconds. Zero, negative numbers,
-   * fractional values, NaN, and infinities are rejected because they cannot
-   * describe a valid credential lifetime.
-   */
-  private durationSeconds(value: number | undefined): number {
-    const durationSeconds = value ?? defaultRoleSessionDurationSeconds;
-
-    /* v8 ignore if */
-    if (!Number.isSafeInteger(durationSeconds) || durationSeconds <= 0) {
-      throw new Error("DurationSeconds must be a positive integer");
-    }
-
-    return durationSeconds;
   }
 
   /**

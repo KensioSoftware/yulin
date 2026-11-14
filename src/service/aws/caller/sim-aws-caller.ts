@@ -1,4 +1,5 @@
 import type { SimAwsCredentials } from "../../iam/credential/sim-aws-credentials.js";
+import type { SimIamSessionPolicy } from "../../iam/credential/session/sim-iam-session-policy.js";
 
 /**
  * Resolved sim principal with an ARN, such as an IAM user or role.
@@ -56,6 +57,12 @@ export interface SimResolvedCaller {
   readonly kind: "resolved";
   readonly principal: SimAwsPrincipal;
   readonly identityPolicyPrincipal: SimAwsPrincipal;
+
+  /**
+   * The policies passed when the caller's session was created, which cap
+   * what its Role's policies grant. Undefined where none were passed.
+   */
+  readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
 }
 
 /**

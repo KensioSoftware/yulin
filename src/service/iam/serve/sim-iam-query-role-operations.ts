@@ -2,17 +2,14 @@ import type { SimQueryOperations } from "../../../serve/http/api/query/sim-query
 import {
   queryList,
   queryMembers,
-  queryStructure,
 } from "../../../serve/http/api/query/sim-query-result.js";
-import type { SimQueryOutput } from "../../../serve/http/api/query/sim-query-result.js";
-import { simIamAttachedBoundaryMembers } from "../role/sim-iam-role-boundary.js";
 import { iamQueryEntity } from "./sim-iam-query-entity.js";
 import {
   iamQueryListingInput,
   iamQueryListingResult,
 } from "./sim-iam-query-listing.js";
 import {
-  iamQueryTags,
+  iamQueryBoundaryAndTags,
   iamQueryTagsInput,
 } from "./sim-iam-query-tag-operations.js";
 
@@ -27,22 +24,8 @@ const roleMembers = [
   "CreateDate",
   "AssumeRolePolicyDocument",
   "Description",
+  "MaxSessionDuration",
 ];
-
-/**
- * Write the permissions boundary a Role carries, where it carries one.
- *
- * A boundary is a structure of its own, and `queryMembers` would write it as
- * the JSON text of an object. `ListRoles` leaves the field out altogether, as
- * IAM does, so only the create and the get pass this.
- */
-function roleBoundary(role: SimQueryOutput): string {
-  return (
-    queryStructure(role, "PermissionsBoundary", (boundary) =>
-      queryMembers(boundary, simIamAttachedBoundaryMembers),
-    ) + iamQueryTags(role)
-  );
-}
 
 /**
  * The Role operations simulated IAM serves over the Query protocol.
@@ -61,11 +44,12 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           Path: fields.text("Path"),
           AssumeRolePolicyDocument: fields.text("AssumeRolePolicyDocument"),
           Description: fields.text("Description"),
+          MaxSessionDuration: fields.number("MaxSessionDuration"),
           PermissionsBoundary: fields.text("PermissionsBoundary"),
           Tags: iamQueryTagsInput(fields),
         }),
         result: (output): string =>
-          iamQueryEntity(output, "Role", roleMembers, roleBoundary),
+          iamQueryEntity(output, "Role", roleMembers, iamQueryBoundaryAndTags),
       },
     ],
     [
@@ -75,7 +59,7 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           RoleName: fields.text("RoleName"),
         }),
         result: (output): string =>
-          iamQueryEntity(output, "Role", roleMembers, roleBoundary),
+          iamQueryEntity(output, "Role", roleMembers, iamQueryBoundaryAndTags),
       },
     ],
     [

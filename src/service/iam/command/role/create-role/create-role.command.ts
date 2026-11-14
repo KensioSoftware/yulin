@@ -12,6 +12,12 @@ export interface SimCreateRoleCommandInput {
   readonly Description?: string | undefined;
 
   /**
+   * The longest session STS issues for the Role, from 3,600 to 43,200
+   * seconds.
+   */
+  readonly MaxSessionDuration?: number | undefined;
+
+  /**
    * ARN of the managed policy to attach to the new Role as its permissions
    * boundary.
    *
@@ -40,6 +46,7 @@ export interface SimCreateRoleCommandOutput {
     readonly CreateDate: Date;
     readonly AssumeRolePolicyDocument?: string | undefined;
     readonly Description?: string | undefined;
+    readonly MaxSessionDuration: number;
     readonly PermissionsBoundary?:
       | SimIamAttachedPermissionsBoundary
       | undefined;

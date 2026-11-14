@@ -17,8 +17,10 @@ import type {
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import type {
   SimIamAuthZContext,
+  SimIamAuthZPolicyLimit,
   SimIamAuthZPolicySource,
 } from "./sim-iam-auth-z-context.js";
+import { simIamSessionPolicyLimit } from "./sim-iam-session-policy-limit.js";
 import type { SimIamAuthorizationInput } from "./sim-iam-auth-z-input.js";
 import { SimIamAuthZIdentityPolicyCoordinator } from "./identity-policy-source/sim-iam-auth-z-id-pol-coordinator.js";
 import {
@@ -96,10 +98,10 @@ interface SimIamAuthZContextBuilderProperties {
  * belongs to, read by SimIamAuthZScpSourceBuilder. They filter and grant
  * nothing, so they travel apart from the sides that can allow a request.
  *
- * Permissions boundaries, session policies, and role trust-policy assume-role
- * semantics are not part of this context assembly path yet. Add those concerns
- * through separate policy-source builders so this class stays focused on
- * composing the authorization request.
+ * The caller's permissions boundary comes from the User or Role it acts as,
+ * read by the Account that holds that principal. Session policies travel with
+ * the caller itself, because two sessions sharing one ARN can carry different
+ * ones.
  */
 export class SimIamAuthZContextBuilder {
   private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
@@ -157,6 +159,12 @@ export class SimIamAuthZContextBuilder {
       ],
       resourcePolicies: this.resourcePolicySources(input),
       serviceControlPolicies: this.scpSourceBuilder.build(callerContext.caller),
+      permissionsBoundary:
+        callerAccount.permissionsBoundary ??
+        this.identityPolicyCoordinator.permissionsBoundary(
+          callerContext.caller.identityPolicyArn,
+        ),
+      sessionPolicy: simIamSessionPolicyLimit(callerContext.caller),
       allowRequirement: this.allowRequirement.resolve(callerAccount, input),
       action: input.action,
       resource: input.resource,
@@ -177,6 +185,15 @@ export class SimIamAuthZContextBuilder {
   ): readonly SimIamAuthZPolicySource[] {
     return this.ownIdentityPolicySources(
       this.callerContextBuilder.build(principal),
+    );
+  }
+
+  /**
+   * The permissions boundary this Account sets on one of its own principals.
+   */
+  permissionsBoundaryFor(principal: SimAwsPrincipal): SimIamAuthZPolicyLimit {
+    return this.identityPolicyCoordinator.permissionsBoundary(
+      this.callerContextBuilder.build(principal).caller.identityPolicyArn,
     );
   }
 

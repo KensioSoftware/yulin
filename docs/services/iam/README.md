@@ -921,6 +921,13 @@ the derived `aws:PrincipalArn` come from the underlying Role. A caller that the 
 not allow is denied the assume request, session credentials require their session token, and
 expired sessions are rejected.
 
+A session assumed with `Policy` or `PolicyArns` is capped by those session policies as well as by
+the Role's own policies and [permissions boundary](#permissions-boundaries). The same principal
+rules apply. A resource policy naming the session ARN allows the request past a session policy,
+and one naming the Role is held back by it.
+[Session policies in simulated STS](https://yulinsim.dev/services/sts/#session-policies "Simulated STS session policies usage docs")
+covers the request side.
+
 ## Name the caller a simulation uses by default
 
 Every simulated operation takes a `caller`, and a call that gives none is decided as the root
@@ -1457,9 +1464,9 @@ deploy Role.
 
 `CreateRole` and `GetRole` then describe the boundary the Role carries, in the attachment shape IAM
 answers with (`PermissionsBoundaryType` and `PermissionsBoundaryArn`). `ListRoles` leaves the field
-out, as IAM does, and points a caller at `GetRole`. The boundary is not yet evaluated as a policy
-source of its own, and does not narrow what the Role may then do
-(see [Limitations](#limitations)).
+out, as IAM does, and points a caller at `GetRole`. `CreateUser` checks and describes a User's
+boundary the same way. What a boundary then allows is covered in
+[Permissions boundaries](#permissions-boundaries).
 
 ```typescript sim-iam-permissions-boundary
 /**
@@ -1550,6 +1557,102 @@ try {
   console.error("A Role declaring no boundary was refused", error);
 }
 ```
+
+## Permissions boundaries
+
+A permissions boundary caps what a User's or a Role's identity policies can grant. Set one with
+`PermissionsBoundary` on `CreateUserCommand` or `CreateRoleCommand`, or with the template property of
+the same name on `AWS::IAM::User` and `AWS::IAM::Role`. The boundary is a managed policy, either one
+the Account created or an AWS-managed one from the [catalogue](#aws-managed-policies). It grants
+nothing itself.
+
+A request goes ahead only where the boundary and an identity policy both allow it. A Deny statement
+in the boundary denies the request outright, as a Deny anywhere else does. A boundary naming a
+policy the simulation cannot find allows nothing. A session of a Role carries that Role's boundary.
+
+```typescript sim-iam-permissions-boundary-evaluation
+/**
+ * Capping what a User's own policies grant with a permissions boundary.
+ */
+
+import {
+  CreatePolicyCommand,
+  CreateUserCommand,
+  PutUserPolicyCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+await simIam.createPolicy(
+  new CreatePolicyCommand({
+    PolicyName: "S3Only",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "s3:*", Resource: "*" },
+    }),
+  }),
+);
+
+await simIam.createUser(
+  new CreateUserCommand({
+    UserName: "analyst",
+    PermissionsBoundary: "arn:aws:iam::123456789012:policy/S3Only",
+  }),
+);
+
+await simIam.putUserPolicy(
+  new PutUserPolicyCommand({
+    UserName: "analyst",
+    PolicyName: "Everything",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "*", Resource: "*" },
+    }),
+  }),
+);
+
+const caller = {
+  kind: "arn" as const,
+  arn: "arn:aws:iam::123456789012:user/analyst",
+};
+
+const read = simIam.authorize({
+  action: "s3:GetObject",
+  resource: "arn:aws:s3:::reports/q1.csv",
+  caller,
+});
+
+console.log(read.isAllowed); // true
+
+const send = simIam.authorize({
+  action: "sqs:SendMessage",
+  resource: "arn:aws:sqs:eu-west-2:123456789012:jobs",
+  caller,
+});
+
+console.log(send.isAllowed); // false
+// because no permissions boundary allows the sqs:SendMessage action
+console.log(send.denialReason);
+```
+
+`denialReason` names the boundary where it is what stopped the request, in the words an AWS
+AccessDenied message uses. `decision.principalLimits.permissionsBoundary` reports whether the caller
+carries a boundary and which of its statements matched.
+
+A resource policy can still allow what the boundary leaves out, depending on whom it names. AWS
+draws the line by principal, and the simulator follows it:
+
+- A statement naming the User, or an assumed-role session by its own ARN, allows the request past
+  the boundary
+- A statement whose principal is `*` does too
+- A statement naming the Role behind a session, or the caller's Account, is held back by the
+  boundary
+
+A Deny in the boundary stops the request whatever a resource policy says. A caller from another
+Account is capped by the boundary its own Account sets, and a cross-Account request needs that side
+to allow it.
 
 ## A Role for a CloudFormation deployment
 
@@ -1748,7 +1851,8 @@ Role's inline policies. The `ReadOnlyAccess` policy above is attached to `Lambda
 Authorization for that Role reads the policy document the template gave it.
 
 A Role's `PermissionsBoundary` reaches the authorization decision the deployment is made under, and
-is recorded on the Role it names.
+caps what the Role it names may then do. `MaxSessionDuration` sets the longest session STS issues
+for the Role, as a number or as its decimal text.
 [Creating a Role under a permissions boundary](#creating-a-role-under-a-permissions-boundary) covers
 the guard it exists for.
 
@@ -1758,8 +1862,8 @@ A Role's `Tags` are put on the Role it creates, and so are a User's on the User.
 ### Users
 
 An `AWS::IAM::User` creates a User in the Stack's Account. `UserName` names it and falls back to the
-Resource logical ID. `Path`, the inline `Policies` list and `ManagedPolicyArns` work as they do on a
-Role, and both policy forms reach the authorization decision made for that User. `Ref` returns the
+Resource logical ID. `Path`, `PermissionsBoundary`, the inline `Policies` list and
+`ManagedPolicyArns` work as they do on a Role, and both policy forms reach the authorization decision made for that User. `Ref` returns the
 User name and `Fn::GetAtt` supports `Arn` and `UserId`.
 
 `LoginProfile` gives the User a console password, the way real CloudFormation calls
@@ -2058,8 +2162,11 @@ Sim IAM currently supports:
 - IAM authorization at simulated service boundaries, such as Route53 actions
 - `iam:PassRole` authorization of a Role handed to simulated Lambda, Scheduler, EventBridge, Step
   Functions, ECS or Firehose, with `iam:PassedToService` supplied
-- `iam:CreateRole` authorization against `iam:PermissionsBoundary`, from the `PermissionsBoundary`
-  a request or an `AWS::IAM::Role` declares
+- `iam:CreateRole` and `iam:CreateUser` authorization against `iam:PermissionsBoundary`, from the
+  `PermissionsBoundary` a request, an `AWS::IAM::Role` or an `AWS::IAM::User` declares
+- Permissions boundaries on Users and Roles, and session policies on assumed-role sessions,
+  evaluated as caps on identity policies and on resource policies naming a Role
+- `MaxSessionDuration` on `CreateRoleCommand` and `AWS::IAM::Role`, reported by `GetRoleCommand`
 - Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
   signature, defaulting to anonymous, and the resource it is made on behalf of from
   `x-sim-aws-source-arn` and `x-sim-aws-source-account`
@@ -2077,9 +2184,10 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 
 - Groups are absent. An `AWS::IAM::User` naming one fails, and an `AWS::IAM::Policy` naming one
   fails too
-- Permissions boundaries and session policies are not evaluated. A boundary a `CreateRole` request
-  declares is authorized against `iam:PermissionsBoundary` and described by `GetRole`, and stops
-  there. Service control policies are evaluated, and are attached through
+- A boundary is set when its User or Role is created. `PutRolePermissionsBoundary`,
+  `PutUserPermissionsBoundary` and the matching deletes are absent, and so is `UpdateRole`, which
+  leaves `MaxSessionDuration` fixed at creation. Service control policies are evaluated, and are
+  attached through
   [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
 - Managed Policies have a single version. `GetPolicyVersionCommand` answers for that version, and
   the commands that create, list or delete versions are absent

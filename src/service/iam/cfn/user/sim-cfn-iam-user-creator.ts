@@ -8,7 +8,10 @@ import {
   type SimCfnIamUserProperties,
 } from "./sim-cfn-iam-user-properties-parser.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
-import { simCfnIamTags } from "../sim-cfn-iam-property.js";
+import {
+  simCfnIamOptionalString,
+  simCfnIamTags,
+} from "../sim-cfn-iam-property.js";
 
 interface SimCfnIamUserCreatorProperties {
   readonly iam: SimIam;
@@ -40,6 +43,12 @@ export class SimCfnIamUserCreator {
         input: {
           UserName: userProperties.userName,
           Path: userProperties.path,
+          PermissionsBoundary: simCfnIamOptionalString({
+            resourceType: "AWS::IAM::User",
+            resource,
+            value: properties["PermissionsBoundary"],
+            label: "PermissionsBoundary",
+          }),
           Tags: simCfnIamTags("AWS::IAM::User", resource, properties),
         },
       },

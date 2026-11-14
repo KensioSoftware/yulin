@@ -170,6 +170,7 @@ describe("Serving simulated IAM on an endpoint URL", () => {
     assertNonNullable(read, "GetRole answered with a Role");
     assertIdentical(read.Arn, role.Arn);
     assertIdentical(read.Description, "The checkout function's Role");
+    assertIdentical(read.MaxSessionDuration, 3600);
     assertStringIncludes(
       read.AssumeRolePolicyDocument ?? "",
       "lambda.amazonaws.com",

@@ -3,6 +3,7 @@ import type {
   SimAwsPrincipal,
 } from "../../aws/caller/sim-aws-caller.js";
 import { simAwsCallerHeaderValue } from "./sim-aws-caller-header.js";
+import type { SimIamSessionPolicy } from "../credential/session/sim-iam-session-policy.js";
 
 /**
  * How a request's principal was established.
@@ -33,6 +34,7 @@ export interface SimAwsRequestCallerDetails {
 interface SimAwsRequestCallerProperties {
   readonly principal: SimAwsPrincipal;
   readonly identityPolicyPrincipal?: SimAwsPrincipal | undefined;
+  readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
   readonly authMethod: SimAwsRequestAuthMethod;
   readonly details?: SimAwsRequestCallerDetails | undefined;
 }
@@ -53,6 +55,11 @@ interface SimAwsRequestCallerProperties {
 export class SimAwsRequestCaller {
   public readonly principal: SimAwsPrincipal;
   public readonly identityPolicyPrincipal: SimAwsPrincipal;
+
+  /**
+   * The policies the signing session was created with, where it had any.
+   */
+  public readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
   public readonly authMethod: SimAwsRequestAuthMethod;
   public readonly details: SimAwsRequestCallerDetails;
 
@@ -60,6 +67,7 @@ export class SimAwsRequestCaller {
     this.principal = properties.principal;
     this.identityPolicyPrincipal =
       properties.identityPolicyPrincipal ?? properties.principal;
+    this.sessionPolicies = properties.sessionPolicies;
     this.authMethod = properties.authMethod;
     this.details = properties.details ?? {};
   }
@@ -93,6 +101,7 @@ export class SimAwsRequestCaller {
       kind: "resolved",
       principal: this.principal,
       identityPolicyPrincipal: this.identityPolicyPrincipal,
+      sessionPolicies: this.sessionPolicies,
     };
   }
 }

@@ -1,8 +1,9 @@
 import { StaticFactory } from "@kensio/part-factory";
 import { SimIamEitherSideAllowRequirement } from "../allow/sim-iam-allow-requirement.js";
-import type {
-  SimIamAuthZContext,
-  SimIamAuthZResourcePolicySource,
+import {
+  type SimIamAuthZContext,
+  type SimIamAuthZResourcePolicySource,
+  simIamNoPolicyLimit,
 } from "./sim-iam-auth-z-context.js";
 
 /**
@@ -12,6 +13,8 @@ export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
   identityPolicies: [],
   resourcePolicies: [],
   serviceControlPolicies: { applies: false, levels: [] },
+  permissionsBoundary: simIamNoPolicyLimit,
+  sessionPolicy: simIamNoPolicyLimit,
   allowRequirement: new SimIamEitherSideAllowRequirement(),
   action: "s3:GetObject",
   resource: "arn:aws:s3:::test-bucket/test-key",

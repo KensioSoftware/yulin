@@ -35,6 +35,32 @@ export function simCfnIamOptionalString(
 }
 
 /**
+ * Read a whole-number property an IAM Resource may leave out.
+ *
+ * A template resolves a number to either a number or its decimal text, and
+ * both are read as the number.
+ */
+export function simCfnIamOptionalInteger(
+  properties: SimCfnIamPropertyInput,
+): number | undefined {
+  const { resourceType, resource, value, label } = properties;
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const number = typeof value === "string" ? Number(value) : value;
+
+  if (typeof number !== "number" || !Number.isSafeInteger(number)) {
+    throw new TypeError(
+      `Invalid ${resourceType} ${resource.logicalId}: ${label} must be an integer`,
+    );
+  }
+
+  return number;
+}
+
+/**
  * Read a JSON-object property an IAM Resource requires.
  *
  * A Role's trust policy arrives as the object the template wrote, and IAM

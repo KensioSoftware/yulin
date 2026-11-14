@@ -1,3 +1,4 @@
+import { simIamNoPolicyLimit } from "../../../iam/authorize/context/sim-iam-auth-z-context.js";
 import { SimIamEitherSideAllowRequirement } from "../../../iam/authorize/allow/sim-iam-allow-requirement.js";
 import { SimIamPolicyDecision } from "../../../iam/authorize/sim-iam-decision.js";
 import type { SimIamPolicyDocument } from "../../../iam/policy/sim-iam-policy.js";
@@ -60,6 +61,8 @@ export class SimRestApiAuthorizerPolicy {
       // An authorizer's policy document is evaluated on its own. No Account
       // boundary is being crossed here, so no service control policy applies.
       serviceControlPolicies: { applies: false, levels: [] },
+      permissionsBoundary: simIamNoPolicyLimit,
+      sessionPolicy: simIamNoPolicyLimit,
       allowRequirement: new SimIamEitherSideAllowRequirement(),
       action: simExecuteApiInvokeAction,
       resource: methodArn,

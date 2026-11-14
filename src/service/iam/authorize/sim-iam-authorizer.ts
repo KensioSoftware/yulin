@@ -14,7 +14,10 @@ import type { SimAwsCredentialIdentityResolver } from "../../aws/caller/sim-aws-
 import type { SimAwsAmbientCaller } from "../../aws/caller/sim-aws-ambient-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamAccountResolver } from "../registry/sim-iam-account-resolver.js";
-import type { SimIamAuthZPolicySource } from "./context/sim-iam-auth-z-context.js";
+import type {
+  SimIamAuthZPolicyLimit,
+  SimIamAuthZPolicySource,
+} from "./context/sim-iam-auth-z-context.js";
 import type { SimIamAccountIdentityPolicies } from "./identity/sim-iam-account-identity-policies.js";
 import type { SimIamServiceControlPolicyResolver } from "./scp/sim-iam-scp-resolver.js";
 
@@ -74,5 +77,12 @@ export class SimIamAuthorizer implements SimIamAccountIdentityPolicies {
     principal: SimAwsPrincipal,
   ): readonly SimIamAuthZPolicySource[] {
     return this.contextBuilder.identityPolicySourcesFor(principal);
+  }
+
+  /**
+   * The permissions boundary this Account sets on one of its own principals.
+   */
+  permissionsBoundaryFor(principal: SimAwsPrincipal): SimIamAuthZPolicyLimit {
+    return this.contextBuilder.permissionsBoundaryFor(principal);
   }
 }

@@ -11,7 +11,10 @@ import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
 import type { SimIamAccountIdentityPolicies } from "./authorize/identity/sim-iam-account-identity-policies.js";
-import type { SimIamAuthZPolicySource } from "./authorize/context/sim-iam-auth-z-context.js";
+import type {
+  SimIamAuthZPolicyLimit,
+  SimIamAuthZPolicySource,
+} from "./authorize/context/sim-iam-auth-z-context.js";
 import type {
   SimArnPrincipal,
   SimAwsPrincipal,
@@ -113,6 +116,15 @@ export class SimIam
     principal: SimAwsPrincipal,
   ): readonly SimIamAuthZPolicySource[] {
     return this.accountAuthZ.identityPolicySourcesFor(principal);
+  }
+
+  /**
+   * The permissions boundary this Account sets on one of its own principals,
+   * which caps the caller's side of a cross-Account request.
+   * @internal
+   */
+  permissionsBoundaryFor(principal: SimAwsPrincipal): SimIamAuthZPolicyLimit {
+    return this.accountAuthZ.permissionsBoundaryFor(principal);
   }
 
   /**

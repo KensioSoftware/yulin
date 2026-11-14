@@ -1,4 +1,5 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import { simIamPermissionsBoundaryCondition } from "../../role/sim-iam-role-boundary.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
 import { normaliseUserPath } from "../../user/sim-iam-user-path.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
@@ -97,6 +98,7 @@ export class SimIamUserCommandHandlers {
       normaliseUserPath(command.input.Path),
       command.input.Tags,
       options,
+      simIamPermissionsBoundaryCondition(command.input.PermissionsBoundary),
     );
     const handler = new CreateUserCommandHandler({
       accountId: this.accountId,
