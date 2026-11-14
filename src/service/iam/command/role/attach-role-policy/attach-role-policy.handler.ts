@@ -1,3 +1,4 @@
+import { assertSimIamManagedPolicyQuota } from "../../entity/sim-iam-policy-holder-quota.js";
 import type { CommandHandler } from "../../../../../command/command-handler.js";
 import type { SimArn } from "../../../../aws/arn.js";
 import {
@@ -70,6 +71,7 @@ export class AttachRolePolicyCommandHandler implements CommandHandler<
       throw new SimIamNoSuchEntity(`No IAM Role with name ${roleName}`);
     }
 
+    assertSimIamManagedPolicyQuota(role, "Role", policyArn);
     role.attachedPolicyArns.add(policyArn);
 
     return {};

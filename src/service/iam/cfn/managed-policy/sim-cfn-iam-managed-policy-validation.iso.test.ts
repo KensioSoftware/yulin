@@ -152,58 +152,6 @@ describe("IAM CloudFormation ManagedPolicy validation", () => {
     assertInstanceOf(error, TypeError);
   });
 
-  it("rejects a Users entry", async () => {
-    // Given a CloudFormation template attaching a Managed Policy to a User.
-    const simAws = new SimAws();
-
-    // When / then deploying the template throws.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cloudFormation().deployTemplate({
-        stackName: "iam-managed-policy-users-stack",
-        template: {
-          Resources: {
-            UserPolicy: {
-              Type: "AWS::IAM::ManagedPolicy",
-              Properties: {
-                ManagedPolicyName: "UserPolicy",
-                Users: ["reporting-user"],
-                PolicyDocument: readObjectsDocument,
-              },
-            },
-          },
-        },
-      });
-    });
-
-    assertInstanceOf(error, TypeError);
-  });
-
-  it("rejects a Groups entry", async () => {
-    // Given a CloudFormation template attaching a Managed Policy to a Group.
-    const simAws = new SimAws();
-
-    // When / then deploying the template throws.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cloudFormation().deployTemplate({
-        stackName: "iam-managed-policy-groups-stack",
-        template: {
-          Resources: {
-            GroupPolicy: {
-              Type: "AWS::IAM::ManagedPolicy",
-              Properties: {
-                ManagedPolicyName: "GroupPolicy",
-                Groups: ["reporting-group"],
-                PolicyDocument: readObjectsDocument,
-              },
-            },
-          },
-        },
-      });
-    });
-
-    assertInstanceOf(error, TypeError);
-  });
-
   it("rejects a non-array Roles", async () => {
     // Given a CloudFormation template whose Roles is a bare string.
     const simAws = new SimAws();

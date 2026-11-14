@@ -20,18 +20,16 @@ export interface SimIamRole extends SimIamPrincipal {
    * This is resource-policy-like and must not be evaluated as an ordinary
    * identity permissions policy for service actions.
    */
-  readonly assumeRolePolicyDocument?:
-    | JSONString<SimIamPolicyDocument>
-    | undefined;
+  assumeRolePolicyDocument?: JSONString<SimIamPolicyDocument> | undefined;
 
-  readonly description?: string | undefined;
+  description?: string | undefined;
   readonly creationDate: Date;
 
   /**
    * The longest session STS issues for this Role, in seconds. Undefined means
    * IAM's default of one hour.
    */
-  readonly maxSessionDuration?: number | undefined;
+  maxSessionDuration?: number | undefined;
 
   /**
    * ARN of the managed policy attached to this Role as its permissions
@@ -41,7 +39,7 @@ export interface SimIamRole extends SimIamPrincipal {
    * sessions. A policy conditioned on `iam:PermissionsBoundary` is tested
    * against it when the Role is created.
    */
-  readonly permissionsBoundaryArn?: SimArn | undefined;
+  permissionsBoundaryArn?: SimArn | undefined;
 
   /**
    * Inline identity-based permissions policies stored directly on this role.

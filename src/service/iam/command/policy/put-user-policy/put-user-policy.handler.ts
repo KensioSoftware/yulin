@@ -6,7 +6,7 @@ import {
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-document-validator.js";
-import { assertSimIamInlinePolicyWithinSizeLimit } from "../../../validate/size/sim-iam-policy-document-size.js";
+import { assertSimIamInlinePolicyQuota } from "../../entity/sim-iam-policy-holder-quota.js";
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,
@@ -54,11 +54,6 @@ export class PutUserPolicyCommandHandler implements CommandHandler<
     assertDefined(policyName, "PutUserPolicyCommand.input.PolicyName");
     const policyDocument = command.input.PolicyDocument;
 
-    assertSimIamInlinePolicyWithinSizeLimit(policyDocument, {
-      kind: "user",
-      name: username,
-    });
-
     this.policyDocValidator.validateRequired(policyDocument, {
       attachedTo: "User",
       name: username,
@@ -74,6 +69,10 @@ export class PutUserPolicyCommandHandler implements CommandHandler<
       throw new SimIamNoSuchEntity(`No IAM User with name ${username}`);
     }
 
+    assertSimIamInlinePolicyQuota(user, "User", username, {
+      policyName,
+      document: policyDocument,
+    });
     user.inlinePolicies.set(policyName, policyDocument);
 
     return {};

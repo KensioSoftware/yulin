@@ -31,7 +31,7 @@ export class SimCfnIamManagedPolicyCreator {
     properties: SimCfnTemplateValueRecord,
     options?: SimCfnResourceCallerOptions,
   ): Promise<SimIamManagedPolicy> {
-    const roleNames = this.attacher.roleNames(resource, properties);
+    const targets = this.attacher.targets(resource, properties);
     const policyName = this.managedPolicyName(resource, properties);
     const path = this.path(resource, properties);
     const description = this.description(resource, properties);
@@ -55,7 +55,7 @@ export class SimCfnIamManagedPolicyCreator {
       `Sim IAM Managed Policy ${policyCreation.Policy.Arn} after CloudFormation creation`,
     );
 
-    await this.attacher.attach(policy.arn, roleNames, options);
+    await this.attacher.attach(policy.arn, targets, options);
 
     return policy;
   }

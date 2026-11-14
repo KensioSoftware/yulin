@@ -42,6 +42,7 @@ export class CreateUserRecordFactory {
       attachedPolicyArns: new Set(),
       permissionsBoundaryArn: properties.permissionsBoundaryArn,
       loginProfile: undefined,
+      groups: new Map(),
       tags: makeSimIamIdentityTags(properties.tags, "User"),
     };
   }

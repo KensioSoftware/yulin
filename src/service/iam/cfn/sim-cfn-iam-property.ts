@@ -124,3 +124,29 @@ function isTagShape(
     typeof value.Value === "string"
   );
 }
+
+/**
+ * Read a list of names an IAM Resource may leave out, such as the `Groups` a
+ * User joins or the `Users` added to a group. Refs resolve to names before
+ * creation, so every entry is a string.
+ */
+export function simCfnIamNameList(
+  properties: SimCfnIamPropertyInput,
+): readonly string[] {
+  const { resourceType, resource, value, label } = properties;
+
+  if (value === undefined) {
+    return [];
+  }
+
+  if (
+    !Array.isArray(value) ||
+    !value.every((name): name is string => typeof name === "string")
+  ) {
+    throw new TypeError(
+      `Invalid ${resourceType} ${resource.logicalId}: ${label} must be an array of strings`,
+    );
+  }
+
+  return value;
+}

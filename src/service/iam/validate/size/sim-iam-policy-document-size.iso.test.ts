@@ -11,10 +11,8 @@ import {
   simIamTrustPolicyDocumentOfSize,
 } from "../../policy/sim-iam-policy-document-of-size.js";
 import {
-  assertSimIamInlinePolicyWithinSizeLimit,
   assertSimIamManagedPolicyWithinSizeLimit,
   assertSimIamTrustPolicyWithinSizeLimit,
-  maxSimIamInlinePolicyCharacters,
   maxSimIamManagedPolicyCharacters,
   maxSimIamTrustPolicyCharacters,
   simIamPolicyDocumentSize,
@@ -97,79 +95,6 @@ describe("assertSimIamManagedPolicyWithinSizeLimit", () => {
 
     // When the absent document is measured against the limit.
     assertSimIamManagedPolicyWithinSizeLimit(undefined);
-
-    // Then requiredness is left to the check that owns it.
-  });
-});
-
-describe("assertSimIamInlinePolicyWithinSizeLimit", () => {
-  it("accepts a document of exactly the limit", () => {
-    // Given an inline policy document at the limit itself.
-    const policyDocument = jsonStringify(
-      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters),
-    );
-
-    // When the document is measured against the limit.
-    assertSimIamInlinePolicyWithinSizeLimit(policyDocument, {
-      kind: "role",
-      name: "ReportingRole",
-    });
-
-    // Then it is accepted.
-  });
-
-  it("names the Role a refused document was going onto", () => {
-    // Given an inline policy document one character past the limit.
-    const policyDocument = jsonStringify(
-      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters + 1),
-    );
-
-    // When the document is measured against the limit for a Role.
-    const error = assertThrowsError(() => {
-      assertSimIamInlinePolicyWithinSizeLimit(policyDocument, {
-        kind: "role",
-        name: "ReportingRole",
-      });
-    });
-
-    // Then the refusal names the Role, as IAM's message does.
-    assertInstanceOf(error, SimIamLimitExceeded);
-    assertIdentical(
-      error.message,
-      "Maximum policy size of 10240 bytes exceeded for role ReportingRole",
-    );
-  });
-
-  it("names the User a refused document was going onto", () => {
-    // Given an inline policy document one character past the limit.
-    const policyDocument = jsonStringify(
-      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters + 1),
-    );
-
-    // When the document is measured against the limit for a User.
-    const error = assertThrowsError(() => {
-      assertSimIamInlinePolicyWithinSizeLimit(policyDocument, {
-        kind: "user",
-        name: "Analyst",
-      });
-    });
-
-    // Then the refusal names the User.
-    assertInstanceOf(error, SimIamLimitExceeded);
-    assertIdentical(
-      error.message,
-      "Maximum policy size of 10240 bytes exceeded for user Analyst",
-    );
-  });
-
-  it("has nothing to measure when the document is absent", () => {
-    // Given no inline policy document at all.
-
-    // When the absent document is measured against the limit.
-    assertSimIamInlinePolicyWithinSizeLimit(undefined, {
-      kind: "role",
-      name: "ReportingRole",
-    });
 
     // Then requiredness is left to the check that owns it.
   });

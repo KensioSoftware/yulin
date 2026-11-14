@@ -1,5 +1,6 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
+import type { SimIamPolicyHolder } from "../../../policy/sim-iam-policy-holder.js";
 import { jsonParse } from "../../../../../util/type-guard/json.js";
 import { simIamManagedPolicyLookup } from "../../../policy/sim-iam-managed-policy-lookup.js";
 import {
@@ -33,12 +34,17 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
 
   /**
    * Build all available inline and managed policy sources for an IAM owner.
+   *
+   * A User also gets the policies of every group it is in. A group is never a
+   * principal of its own, so this is the only way its policies apply.
    */
   build(owner: SimIamIdentityPolicyOwner): readonly SimIamAuthZPolicySource[] {
-    return [
-      ...this.inlinePolicySources(owner),
-      ...this.attachedPolicySources(owner),
-    ];
+    const groups = owner.principalType === "user" ? owner.groups.values() : [];
+
+    return [owner, ...groups].flatMap((holder) => [
+      ...this.inlinePolicySources(holder),
+      ...this.attachedPolicySources(holder),
+    ]);
   }
 
   /**
@@ -74,7 +80,7 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
    * retains the name needed for authorization diagnostics.
    */
   private inlinePolicySources(
-    owner: SimIamIdentityPolicyOwner,
+    owner: SimIamPolicyHolder,
   ): readonly SimIamAuthZPolicySource[] {
     return [...owner.inlinePolicies].map(([policyName, policyDocument]) => ({
       sourceType: "identity-inline",
@@ -93,7 +99,7 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
    * outside the catalogue, contributes no authorization statements.
    */
   private attachedPolicySources(
-    owner: SimIamIdentityPolicyOwner,
+    owner: SimIamPolicyHolder,
   ): readonly SimIamAuthZPolicySource[] {
     return [...owner.attachedPolicyArns]
       .map((policyArn) => simIamManagedPolicyLookup(this.policies, policyArn))

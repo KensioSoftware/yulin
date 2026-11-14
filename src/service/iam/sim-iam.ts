@@ -3,6 +3,7 @@ import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
+import type { SimIamGroup, SimIamGroupName } from "./group/sim-iam-group.js";
 import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-input.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
 import type * as simIamCommands from "./command/sim-iam-command.types.js";
@@ -19,7 +20,7 @@ import type {
   SimArnPrincipal,
   SimAwsPrincipal,
 } from "../aws/caller/sim-aws-caller.js";
-import { SimIamTagOperations } from "./sim-iam-tag-operations.js";
+import { SimIamIdentityOperations } from "./sim-iam-identity-operations.js";
 import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
@@ -44,7 +45,7 @@ import {
  * service facade per Account.
  */
 export class SimIam
-  extends SimIamTagOperations
+  extends SimIamIdentityOperations
   implements SimIamInterServiceAuthZ, SimIamAccountIdentityPolicies
 {
   /**
@@ -74,6 +75,12 @@ export class SimIam
    */
   public readonly users: Map<SimIamUsername, SimIamUser>;
 
+  /**
+   * The groups this Account holds, by name.
+   * @internal
+   */
+  public readonly groups: Map<SimIamGroupName, SimIamGroup>;
+
   protected readonly commands: SimIamCommandHandlers;
   private readonly cfnFactory: SimCfnServiceResourceFactory;
   private readonly accountAuthZ: SimIamAccountAuthZ;
@@ -88,6 +95,7 @@ export class SimIam
     this.policies = parts.policies;
     this.roles = parts.roles;
     this.users = parts.users;
+    this.groups = parts.groups;
     this.credentials = parts.credentials;
     this.sessionManager = parts.sessionManager;
     this.accountAuthZ = parts.accountAuthZ;

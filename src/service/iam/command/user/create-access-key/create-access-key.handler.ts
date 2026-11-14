@@ -4,12 +4,20 @@ import { BackgroundTasks } from "../../../../../util/background/background.js";
 import { SimIamAccessKey } from "../../../credential/sim-iam-access-key.js";
 import type { SimIamCredentialRegistry } from "../../../credential/sim-iam-credential-registry.js";
 import type { SimIamUserCredentialGenerator } from "../../../credential/user/sim-iam-user-credential-generator.js";
-import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
+import {
+  SimIamLimitExceeded,
+  SimIamNoSuchEntity,
+} from "../../../error/sim-iam.error.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
 } from "./create-access-key.command.js";
+
+/**
+ * The most access keys IAM lets one User hold, active or not.
+ */
+const maxSimIamAccessKeysPerUser = 2;
 
 interface CreateAccessKeyCommandHandlerProperties {
   readonly users: Map<SimIamUsername, SimIamUser>;
@@ -55,6 +63,12 @@ export class CreateAccessKeyCommandHandler implements CommandHandler<
 
     if (user === undefined) {
       throw new SimIamNoSuchEntity(`Sim IAM User does not exist: ${username}`);
+    }
+
+    if (user.accessKeys.size >= maxSimIamAccessKeysPerUser) {
+      throw new SimIamLimitExceeded(
+        `Cannot exceed quota for AccessKeysPerUser: ${String(maxSimIamAccessKeysPerUser)}`,
+      );
     }
 
     const credentials = this.credentialGenerator.generate();

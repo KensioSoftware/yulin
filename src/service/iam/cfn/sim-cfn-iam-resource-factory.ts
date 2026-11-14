@@ -8,6 +8,7 @@ import { SimCfnIamManagedPolicyCreator } from "./managed-policy/sim-cfn-iam-mana
 import { SimCfnIamPolicyCreator } from "./policy/sim-cfn-iam-policy-creator.js";
 import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
 import { SimCfnIamUserCreator } from "./user/sim-cfn-iam-user-creator.js";
+import { SimCfnIamGroupCreator } from "./group/sim-cfn-iam-group-creator.js";
 import { SimCfnIamResourceDeleter } from "./sim-cfn-iam-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -20,6 +21,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
   private readonly policyCreator: SimCfnIamPolicyCreator;
   private readonly roleCreator: SimCfnIamRoleCreator;
   private readonly userCreator: SimCfnIamUserCreator;
+  private readonly groupCreator: SimCfnIamGroupCreator;
   private readonly deleter: SimCfnIamResourceDeleter;
 
   constructor(iam: SimIam) {
@@ -27,7 +29,11 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
     this.policyCreator = new SimCfnIamPolicyCreator({ iam });
     this.roleCreator = new SimCfnIamRoleCreator({ iam });
     this.userCreator = new SimCfnIamUserCreator({ iam });
-    this.deleter = new SimCfnIamResourceDeleter({ iam });
+    this.groupCreator = new SimCfnIamGroupCreator(iam);
+    this.deleter = new SimCfnIamResourceDeleter({
+      iam,
+      groupCreator: this.groupCreator,
+    });
   }
 
   /**
@@ -58,6 +64,16 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
       }
       case "User": {
         return await this.userCreator.create(resource, properties, options);
+      }
+      case "Group": {
+        return await this.groupCreator.create(resource, properties, options);
+      }
+      case "UserToGroupAddition": {
+        await this.groupCreator.membership(resource, properties, {
+          join: true,
+          options,
+        });
+        return;
       }
       default: {
         throw new Error(

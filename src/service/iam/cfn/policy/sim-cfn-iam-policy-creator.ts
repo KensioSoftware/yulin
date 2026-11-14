@@ -18,7 +18,7 @@ interface SimCfnIamPolicyCreatorProperties {
  * AWS::IAM::Policy is an inline policy put onto the referenced principals,
  * which is how CDK grants such as bucket.grantRead(fn) attach permissions to a
  * function's execution role, and bucket.grantRead(user) to a user (the
- * "DefaultPolicy" resource). Roles and Users are simulated. The policy has no
+ * "DefaultPolicy" resource). Roles, Users and groups are simulated. The policy has no
  * standalone stored resource, so creation returns undefined and Ref resolution
  * uses the default adapter.
  */
@@ -31,7 +31,7 @@ export class SimCfnIamPolicyCreator {
   }
 
   /**
-   * Put the inline policy onto each referenced Role and User.
+   * Put the inline policy onto each referenced Role, User and group.
    */
   async create(
     resource: SimCfnResource,
@@ -43,6 +43,18 @@ export class SimCfnIamPolicyCreator {
     await Promise.all([
       this.putRolePolicies(policyProperties, options),
       this.putUserPolicies(policyProperties, options),
+      ...policyProperties.groupNames.map(async (GroupName) =>
+        this.iam.putGroupPolicy(
+          {
+            input: {
+              GroupName,
+              PolicyName: policyProperties.policyName,
+              PolicyDocument: policyProperties.policyDocument,
+            },
+          },
+          options,
+        ),
+      ),
     ]);
 
     return undefined;

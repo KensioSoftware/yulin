@@ -1,3 +1,4 @@
+import { simIamPolicyVersions } from "../../../policy/sim-iam-policy-versions.js";
 import type { CommandHandler } from "../../../../../command/command-handler.js";
 import {
   type BackgroundScheduler,
@@ -9,8 +10,7 @@ import {
   SimIamNoSuchEntity,
 } from "../../../error/sim-iam.error.js";
 import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
-import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
-import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
+import type { SimIamPolicyUsage } from "../../../policy/sim-iam-policy-usage.js";
 import type {
   SimDeletePolicyCommand,
   SimDeletePolicyCommandOutput,
@@ -18,8 +18,7 @@ import type {
 
 interface DeletePolicyCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
-  readonly roles: Map<SimIamRoleName, SimIamRole>;
-  readonly users: Map<SimIamUsername, SimIamUser>;
+  readonly usage: SimIamPolicyUsage;
   readonly background?: BackgroundScheduler;
 }
 
@@ -38,21 +37,14 @@ export class DeletePolicyCommandHandler implements CommandHandler<
   SimDeletePolicyCommandOutput
 > {
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
-  private readonly roles: Map<SimIamRoleName, SimIamRole>;
-  private readonly users: Map<SimIamUsername, SimIamUser>;
+  private readonly usage: SimIamPolicyUsage;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: DeletePolicyCommandHandlerProperties) {
-    const {
-      policies,
-      roles,
-      users,
-      background = new BackgroundTasks(),
-    } = properties;
+    const { policies, usage, background = new BackgroundTasks() } = properties;
 
     this.policies = policies;
-    this.roles = roles;
-    this.users = users;
+    this.usage = usage;
     this.background = background;
   }
 
@@ -76,24 +68,28 @@ export class DeletePolicyCommandHandler implements CommandHandler<
     }
 
     this.assertNotAttached(policyArn);
+    this.assertOneVersion(policyArn);
     this.policies.delete(policyArn);
 
     return {};
   }
 
   private assertNotAttached(policyArn: SimArn): void {
-    if (this.attachmentCount(policyArn) > 0) {
+    if (this.usage(policyArn).attachmentCount > 0) {
       throw new SimIamDeleteConflict(
         `Cannot delete a policy attached to entities: IAM Policy ${policyArn}`,
       );
     }
   }
 
-  private attachmentCount(policyArn: SimArn): number {
-    const identities = [...this.roles.values(), ...this.users.values()];
+  private assertOneVersion(policyArn: SimArn): void {
+    const policy = this.policies.get(policyArn);
 
-    return identities.filter((identity) =>
-      identity.attachedPolicyArns.has(policyArn),
-    ).length;
+    if (policy !== undefined && simIamPolicyVersions(policy).length > 1) {
+      throw new SimIamDeleteConflict(
+        "This policy has more than one version. Before you delete a policy, " +
+          "you must delete the policy's non-default versions.",
+      );
+    }
   }
 }

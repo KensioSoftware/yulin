@@ -4568,7 +4568,8 @@ The resource types it creates are:
 - `AWS::DynamoDB::Table` and `AWS::DynamoDB::GlobalTable`
 - `AWS::ECR::Repository`
 - `AWS::Events::EventBus` and `AWS::Events::Rule`, with the rule's inline `Targets`
-- `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
+- `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`,
+  `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::Kinesis::Stream`
 - `AWS::KinesisFirehose::DeliveryStream`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
@@ -4600,11 +4601,10 @@ Each service's own docs describe what its resource types support.
   [resources deliberately left out](#resources-deliberately-left-out). Read both when accounting for
   every resource in a template.
 - `AWS::IAM::ManagedPolicy` is created from `ManagedPolicyName`, `Path`, `Description`,
-  `PolicyDocument` and `Roles`. Every `Roles` entry names a Role in the Stack's Account, and the
-  created policy is attached to each of them. An entry naming no simulated Role fails the resource,
-  as an `AWS::IAM::Policy` naming one does. `Users` and `Groups` fail the resource, because neither
-  can hold a managed policy attachment in the simulation. Deleting the stack takes the policy off
-  the Roles still carrying it before deleting the policy itself.
+  `PolicyDocument`, `Roles`, `Users` and `Groups`. Every entry names an entity in the Stack's
+  Account, and the created policy is attached to each of them. An entry naming no simulated entity
+  fails the resource, as an `AWS::IAM::Policy` naming one does. Deleting the stack takes the policy
+  off whatever still carries it before deleting the policy itself.
 - `AWS::Logs::LogGroup` is created, including the one CDK writes for a custom resource provider. That
   one is left empty, because the provider is never invoked. A log group a stack declares for a
   Lambda function is the same group that function writes to, and a group already there is taken over

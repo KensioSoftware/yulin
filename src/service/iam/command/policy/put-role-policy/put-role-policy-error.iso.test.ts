@@ -11,7 +11,7 @@ import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import { jsonStringify } from "../../../../../util/type-guard/json.js";
 import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
 import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
-import { maxSimIamInlinePolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
+import { simIamPolicyHolderQuotas } from "../../../policy/sim-iam-policy-holder.js";
 
 describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when RoleName is undefined", async () => {
@@ -243,7 +243,9 @@ describe("IAM PutRolePolicyCommand errors", () => {
     // When an inline policy one character past the 10,240 IAM takes is put
     // onto it.
     const policyDocument = jsonStringify(
-      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters + 1),
+      simIamPolicyDocumentOfSize(
+        simIamPolicyHolderQuotas.Role.inlineCharacters + 1,
+      ),
     );
     const error = await assertThrowsErrorAsync(async () =>
       simIam.putRolePolicy(

@@ -1,14 +1,14 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
-import type { SimIamTagsInput } from "../../tag/sim-iam-identity-tags.js";
+import type {
+  SimIamIdentityTags,
+  SimIamTagsInput,
+} from "../../tag/sim-iam-identity-tags.js";
 import {
   simIamRequestTagConditions,
   simIamTagKeyConditions,
 } from "../../tag/sim-iam-tag-conditions.js";
-import type {
-  SimIamAuthorizedIdentity,
-  SimIamIdentityAuthorizer,
-} from "../../tag/sim-iam-identity-authorizer.js";
+import type { SimIamIdentityAuthorizer } from "../../tag/sim-iam-identity-authorizer.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type {
   SimIamListTagsCommandOutput,
@@ -108,17 +108,17 @@ export class SimIamTagCommandHandlers {
     name: string | undefined,
     options: SimIamRequestOptions | undefined,
     conditions = {},
-  ): SimIamAuthorizedIdentity {
+  ): { readonly arn: string; readonly tags: SimIamIdentityTags } {
     this.identity.authorize(action, name, options, conditions);
 
     const tagged = this.identity.find(name ?? "");
 
-    if (tagged === undefined) {
+    if (tagged?.tags === undefined) {
       throw new SimIamNoSuchEntity(
         `The ${this.entity.toLowerCase()} with name ${name} cannot be found.`,
       );
     }
 
-    return tagged;
+    return { arn: tagged.arn, tags: tagged.tags };
   }
 }

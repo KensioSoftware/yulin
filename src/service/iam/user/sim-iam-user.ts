@@ -6,6 +6,7 @@ import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 import type { SimIamPrincipal } from "../principal/sim-iam-principal.js";
 import type { SimIamUserLoginProfile } from "./sim-iam-user-login-profile.js";
 import type { SimIamIdentityTags } from "../tag/sim-iam-identity-tags.js";
+import type { SimIamGroup, SimIamGroupName } from "../group/sim-iam-group.js";
 
 export type SimIamUsername = Brand<string, "SimIamUsername">;
 export type SimIamUserId = Brand<string, "SimIamUserId">;
@@ -39,7 +40,13 @@ export interface SimIamUser extends SimIamPrincipal {
    * ARN of the managed policy that caps what this User's identity policies
    * can grant, where it has one.
    */
-  readonly permissionsBoundaryArn?: SimArn | undefined;
+  permissionsBoundaryArn?: SimArn | undefined;
+
+  /**
+   * The groups this User is in, by name. A User gets the policies of every
+   * group it is in as well as its own.
+   */
+  readonly groups: Map<SimIamGroupName, SimIamGroup>;
 
   /**
    * The console sign-in profile, once the user has been given one.

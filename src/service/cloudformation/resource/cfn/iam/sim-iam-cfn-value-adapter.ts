@@ -4,6 +4,8 @@ import type { SimIamUser } from "../../../../iam/user/sim-iam-user.js";
 import { SimIamManagedPolicyCfn } from "./sim-iam-managed-policy-cfn.js";
 import { SimIamRoleCfn } from "./sim-iam-role-cfn.js";
 import { SimIamUserCfn } from "./sim-iam-user-cfn.js";
+import { SimIamGroupCfn } from "./sim-iam-group-cfn.js";
+import type { SimIamGroup } from "../../../../iam/group/sim-iam-group.js";
 import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
@@ -23,6 +25,10 @@ export function iamValueAdapter(
 
   if (properties.type === "AWS::IAM::Role") {
     return new SimIamRoleCfn({ role: properties.simResource as SimIamRole });
+  }
+
+  if (properties.type === "AWS::IAM::Group") {
+    return new SimIamGroupCfn(properties.simResource as SimIamGroup);
   }
 
   if (properties.type === "AWS::IAM::User") {

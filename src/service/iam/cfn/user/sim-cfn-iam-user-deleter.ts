@@ -11,14 +11,16 @@ interface SimCfnIamUserDeleterProperties {
 /**
  * Deletes simulated Users created from AWS::IAM::User Resources.
  *
- * DeleteUser refuses a User that still has policies on it, the way DeleteRole
- * refuses a Role, so the User's policies come off first. Real CloudFormation
- * does the same for the ones it put there itself: a `ManagedPolicyArns` entry
- * is detached and a `Policies` entry removed as part of deleting the User.
+ * DeleteUser refuses a User that still has policies, a login profile or a
+ * group membership, so those come off first. Real CloudFormation does the same
+ * for the ones it put there itself: a `ManagedPolicyArns` entry is detached, a
+ * `Policies` entry removed, the `LoginProfile` deleted and the User taken out
+ * of its `Groups` as part of deleting the User.
  *
- * Sim IAM serves no DeleteUserPolicy or DetachUserPolicy, so both come off the
- * User record here rather than through a command. A DeleteUser the caller is
- * not allowed puts them back, leaving the User as the Stack deployed it.
+ * They come off the User record together, and a DeleteUser the caller is not
+ * allowed puts them all back, leaving the User as the Stack deployed it. An
+ * access key the Stack did not create still refuses the deletion, as it does
+ * in AWS.
  */
 export class SimCfnIamUserDeleter {
   private readonly iam: SimIam;
@@ -42,9 +44,13 @@ export class SimCfnIamUserDeleter {
 
     const attachedPolicyArns = [...user.attachedPolicyArns];
     const inlinePolicies = [...user.inlinePolicies];
+    const groups = [...user.groups];
+    const { loginProfile } = user;
 
     user.attachedPolicyArns.clear();
     user.inlinePolicies.clear();
+    user.groups.clear();
+    user.loginProfile = undefined;
 
     try {
       await this.iam.deleteUser(
@@ -59,6 +65,12 @@ export class SimCfnIamUserDeleter {
       for (const [policyName, document] of inlinePolicies) {
         user.inlinePolicies.set(policyName, document);
       }
+
+      for (const [groupName, group] of groups) {
+        user.groups.set(groupName, group);
+      }
+
+      user.loginProfile = loginProfile;
 
       throw error;
     }

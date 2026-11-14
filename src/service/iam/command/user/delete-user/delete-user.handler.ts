@@ -22,13 +22,9 @@ interface DeleteUserCommandHandlerProperties {
  * IAM DeleteUserCommand handler.
  *
  * Real IAM only deletes a User nothing is hanging off, the way DeleteRole
- * refuses a Role still carrying policies. A User with inline policies or
- * attached managed policies is refused here too, which is why a CloudFormation
- * Stack takes a User's policies off before deleting it.
- *
- * Real IAM also refuses a User that still has access keys, a login profile or
- * an MFA device. The simulator serves no way to remove any of those, so
- * refusing on them would leave a User that could never be deleted.
+ * refuses a Role still carrying policies. A User with inline or attached
+ * policies, access keys, a login profile or a group membership is refused,
+ * which is why a CloudFormation Stack takes those off before deleting it.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/iam/command/DeleteUserCommand/
  */
@@ -74,11 +70,19 @@ export class DeleteUserCommandHandler implements CommandHandler<
   }
 
   private assertNothingAttached(user: SimIamUser): void {
-    const attached = user.inlinePolicies.size + user.attachedPolicyArns.size;
+    const conflict = [
+      [
+        user.inlinePolicies.size + user.attachedPolicyArns.size,
+        "detach all policies",
+      ],
+      [user.accessKeys.size, "delete access keys"],
+      [user.loginProfile === undefined ? 0 : 1, "delete login profile"],
+      [user.groups.size, "remove user from all groups"],
+    ].find(([count]) => count !== 0);
 
-    if (attached > 0) {
+    if (conflict !== undefined) {
       throw new SimIamDeleteConflict(
-        `Cannot delete entity, must detach all policies first: ` +
+        `Cannot delete entity, must ${String(conflict[1])} first: ` +
           `IAM User ${user.userName}`,
       );
     }
