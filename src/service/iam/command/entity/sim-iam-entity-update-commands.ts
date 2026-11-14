@@ -39,9 +39,10 @@ export class SimIamRoleUpdateCommands {
     command: SimUpdateRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
+    await this.properties.background.sequence();
     const { Description, MaxSessionDuration } = command.input;
     assertSimIamMaxSessionDuration(MaxSessionDuration);
-    const role = await this.role("UpdateRole", command.input.RoleName, options);
+    const role = this.role("UpdateRole", command.input.RoleName, options);
 
     role.description = Description ?? role.description;
     role.maxSessionDuration = MaxSessionDuration ?? role.maxSessionDuration;
@@ -56,8 +57,9 @@ export class SimIamRoleUpdateCommands {
     command: SimUpdateAssumeRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
+    await this.properties.background.sequence();
     const { RoleName, PolicyDocument } = command.input;
-    const role = await this.role("UpdateAssumeRolePolicy", RoleName, options);
+    const role = this.role("UpdateAssumeRolePolicy", RoleName, options);
     assertSimIamTrustPolicyWithinSizeLimit(PolicyDocument, role.roleName);
     this.trustValidator.validateRequired(PolicyDocument);
     role.assumeRolePolicyDocument = PolicyDocument;
@@ -65,15 +67,14 @@ export class SimIamRoleUpdateCommands {
     return {};
   }
 
-  private async role(
+  private role(
     action: string,
     roleName: string | undefined,
     options: SimIamRequestOptions | undefined,
-  ): Promise<SimIamRole> {
-    const { roleIdentity, roles, background } = this.properties;
+  ): SimIamRole {
+    const { roleIdentity, roles } = this.properties;
     const name = simIamRequired(roleName, "roleName");
     roleIdentity.authorize(`iam:${action}`, name, options);
-    await background.sequence();
 
     return simIamFound(roles.get(name as SimIamRoleName), "role", name);
   }

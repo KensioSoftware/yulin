@@ -35,8 +35,9 @@ export class SimIamInlinePolicyCommands {
     },
     options: Options,
   ): Promise<SimIamEmptyOutput> {
+    await this.lookup.sequence();
     const { kind } = this.lookup.properties;
-    const holder = await this.lookup.authorized("Put", name, options);
+    const holder = this.lookup.authorized("Put", name, options);
     const policyName = simIamRequired(input.PolicyName, "policyName");
     const document = input.PolicyDocument;
 
@@ -62,7 +63,8 @@ export class SimIamInlinePolicyCommands {
     policyName: string | undefined,
     options: Options,
   ): Promise<SimIamGetInlinePolicyOutput> {
-    const holder = await this.lookup.authorized("Get", name, options);
+    await this.lookup.sequence();
+    const holder = this.lookup.authorized("Get", name, options);
     const policy = this.inlinePolicy(holder.entity, policyName);
 
     return {
@@ -80,7 +82,8 @@ export class SimIamInlinePolicyCommands {
     policyName: string | undefined,
     options: Options,
   ): Promise<SimIamEmptyOutput> {
-    const holder = await this.lookup.authorized("Delete", name, options);
+    await this.lookup.sequence();
+    const holder = this.lookup.authorized("Delete", name, options);
     const policy = this.inlinePolicy(holder.entity, policyName);
     holder.entity.inlinePolicies.delete(policy.policyName);
 
@@ -95,7 +98,8 @@ export class SimIamInlinePolicyCommands {
     input: SimIamPageInput,
     options: Options,
   ): Promise<SimIamListInlinePoliciesOutput> {
-    const holder = await this.lookup.authorized("List", name, options);
+    await this.lookup.sequence();
+    const holder = this.lookup.authorized("List", name, options);
     const names = holder.entity.inlinePolicies
       .keys()
       .toArray()

@@ -23,22 +23,29 @@ export class SimIamUserLookup {
   constructor(readonly properties: SimIamUserLookupProperties) {}
 
   /**
+   * Wait for the simulation's sequencing point. A command waits here first,
+   * so authorizing, finding and changing its entity then run with nothing
+   * in between.
+   */
+  async sequence(): Promise<void> {
+    await this.properties.background.sequence();
+  }
+
+  /**
    * Authorize an action on the named User, or the caller, and find it.
    */
-  async user(
+  user(
     action: string,
     username: string | undefined,
     options: SimIamRequestOptions | undefined,
-  ): Promise<SimIamUser> {
-    const { accountId, authorizer, identity, users, background } =
-      this.properties;
+  ): SimIamUser {
+    const { accountId, authorizer, identity, users } = this.properties;
     const name = simIamUsernameOrCaller(username, {
       accountId,
       authorizer,
       options,
     });
     identity.authorize(`iam:${action}`, name, options);
-    await background.sequence();
 
     return simIamFound(users.get(name as SimIamUsername), "user", name);
   }

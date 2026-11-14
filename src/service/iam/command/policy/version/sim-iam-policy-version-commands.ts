@@ -44,12 +44,9 @@ export class SimIamPolicyVersionCommands {
     command: SimCreatePolicyVersionCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreatePolicyVersionCommandOutput> {
+    await this.store.sequence();
     const document = command.input.PolicyDocument;
-    const policy = await this.store.policy(
-      "CreatePolicyVersion",
-      command,
-      options,
-    );
+    const policy = this.store.policy("CreatePolicyVersion", command, options);
     assertSimIamManagedPolicyWithinSizeLimit(document);
     this.validator.validateRequired(document);
 
@@ -97,11 +94,8 @@ export class SimIamPolicyVersionCommands {
     command: SimListPolicyVersionsCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListPolicyVersionsCommandOutput> {
-    const policy = await this.store.policy(
-      "ListPolicyVersions",
-      command,
-      options,
-    );
+    await this.store.sequence();
+    const policy = this.store.policy("ListPolicyVersions", command, options);
     const { items, ...paging } = simIamPage(
       simIamPolicyVersions(policy).toReversed(),
       (version) => version.versionId,
@@ -125,11 +119,8 @@ export class SimIamPolicyVersionCommands {
     command: SimPolicyVersionCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const policy = await this.store.policy(
-      "DeletePolicyVersion",
-      command,
-      options,
-    );
+    await this.store.sequence();
+    const policy = this.store.policy("DeletePolicyVersion", command, options);
     const version = this.store.version(policy, command.input.VersionId);
 
     simIamRefuseWhen(
@@ -155,7 +146,8 @@ export class SimIamPolicyVersionCommands {
     command: SimPolicyVersionCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const policy = await this.store.policy(
+    await this.store.sequence();
+    const policy = this.store.policy(
       "SetDefaultPolicyVersion",
       command,
       options,

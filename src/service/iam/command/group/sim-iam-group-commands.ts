@@ -44,16 +44,17 @@ export class SimIamGroupCommands {
     command: SimCreateGroupCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateGroupCommandOutput> {
+    await this.lookup.sequence();
     const { accountId } = this;
     const { groups, groupIdentity, background } = this.lookup.properties;
     const name = simIamRequired(command.input.GroupName, "groupName");
     const path = normaliseUserPath(command.input.Path);
     assertSimIamGroupName(name);
     groupIdentity.authorize("iam:CreateGroup", name, options, {}, path);
-    await background.sequence();
 
+    // IAM keeps a name as given, and holds names apart regardless of case.
     simIamRefuseWhen(
-      groups.has(name as SimIamGroupName),
+      groups.keys().some((each) => each.toLowerCase() === name.toLowerCase()),
       () =>
         new SimIamEntityAlreadyExists(
           `Group with name ${name} already exists.`,
@@ -81,7 +82,8 @@ export class SimIamGroupCommands {
     command: SimGetGroupCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetGroupCommandOutput> {
-    const group = await this.lookup.group(
+    await this.lookup.sequence();
+    const group = this.lookup.group(
       "GetGroup",
       command.input.GroupName,
       options,
@@ -106,7 +108,8 @@ export class SimIamGroupCommands {
     command: SimDeleteGroupCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const group = await this.lookup.group(
+    await this.lookup.sequence();
+    const group = this.lookup.group(
       "DeleteGroup",
       command.input.GroupName,
       options,

@@ -28,17 +28,25 @@ export class SimIamGroupLookup {
   constructor(readonly properties: SimIamGroupLookupProperties) {}
 
   /**
+   * Wait for the simulation's sequencing point. A command waits here first,
+   * so authorizing, finding and changing its entity then run with nothing
+   * in between.
+   */
+  async sequence(): Promise<void> {
+    await this.properties.background.sequence();
+  }
+
+  /**
    * Authorize an action on the named group, and find it.
    */
-  async group(
+  group(
     action: string,
     groupName: string | undefined,
     options: SimIamRequestOptions | undefined,
-  ): Promise<SimIamGroup> {
-    const { groupIdentity, groups, background } = this.properties;
+  ): SimIamGroup {
+    const { groupIdentity, groups } = this.properties;
     const name = simIamRequired(groupName, "groupName");
     groupIdentity.authorize(`iam:${action}`, name, options);
-    await background.sequence();
 
     return found(groups.get(name as SimIamGroupName), "group", name);
   }
@@ -46,15 +54,14 @@ export class SimIamGroupLookup {
   /**
    * Authorize an action on the named User, and find it.
    */
-  async user(
+  user(
     action: string,
     username: string | undefined,
     options: SimIamRequestOptions | undefined,
-  ): Promise<SimIamUser> {
-    const { userIdentity, background } = this.properties;
+  ): SimIamUser {
+    const { userIdentity } = this.properties;
     const name = simIamRequired(username, "userName");
     userIdentity.authorize(`iam:${action}`, name, options);
-    await background.sequence();
 
     return this.existingUser(name);
   }

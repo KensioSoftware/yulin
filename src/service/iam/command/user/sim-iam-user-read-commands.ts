@@ -24,11 +24,8 @@ export class SimIamUserReadCommands {
     command: SimGetUserCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetUserCommandOutput> {
-    const user = await this.lookup.user(
-      "GetUser",
-      command.input.UserName,
-      options,
-    );
+    await this.lookup.sequence();
+    const user = this.lookup.user("GetUser", command.input.UserName, options);
 
     return this.records.makeOutput(user);
   }
@@ -40,9 +37,9 @@ export class SimIamUserReadCommands {
     command: SimListUsersCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListUsersCommandOutput> {
-    const { authorizer, users, background } = this.lookup.properties;
+    await this.lookup.sequence();
+    const { authorizer, users } = this.lookup.properties;
     authorizer.authorize("iam:ListUsers", "*", options?.caller);
-    await background.sequence();
 
     const { PathPrefix = "/" } = command.input;
     const listed = users

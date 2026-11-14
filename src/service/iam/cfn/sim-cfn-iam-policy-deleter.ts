@@ -16,6 +16,11 @@ export class SimCfnIamPolicyDeleter {
 
   /**
    * Delete a Managed Policy the Stack created, once nothing carries it.
+   *
+   * DeletePolicy refuses a policy holding versions other than its default, so
+   * those are deleted first, the way CloudFormation's own handler does. That
+   * happens before anything is detached, and a refused version deletion
+   * leaves the attachments in place.
    */
   async deleteManagedPolicy(
     resource: SimCfnResource,
@@ -27,6 +32,20 @@ export class SimCfnIamPolicyDeleter {
       `sim IAM Managed Policy for CloudFormation Resource ${resource.logicalId}`,
     );
 
+    const PolicyArn = policy.arn;
+    const { Versions } = await this.iam.listPolicyVersions(
+      { input: { PolicyArn } },
+      options,
+    );
+    await Promise.all(
+      Versions.filter((version) => !version.IsDefaultVersion).map(
+        async ({ VersionId }) =>
+          this.iam.deletePolicyVersion(
+            { input: { PolicyArn, VersionId } },
+            options,
+          ),
+      ),
+    );
     await this.detachManagedPolicy(policy.arn, options);
     await this.iam.deletePolicy({ input: { PolicyArn: policy.arn } }, options);
   }

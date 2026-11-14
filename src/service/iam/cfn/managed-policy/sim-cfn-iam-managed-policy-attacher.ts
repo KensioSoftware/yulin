@@ -6,6 +6,12 @@ import type { SimIamRoleName } from "../../role/sim-iam-role.js";
 import type { SimIamUsername } from "../../user/sim-iam-user.js";
 import type { SimIamGroupName } from "../../group/sim-iam-group.js";
 import { simCfnIamNameList } from "../sim-cfn-iam-property.js";
+import type {
+  SimIamPolicyHolder,
+  SimIamPolicyHolderKind,
+} from "../../policy/sim-iam-policy-holder.js";
+import { assertSimIamManagedPolicyQuota } from "../../command/entity/sim-iam-policy-holder-quota.js";
+import { simIamDefined } from "../../command/sim-iam-found.js";
 import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -44,8 +50,9 @@ export class SimCfnIamManagedPolicyAttacher {
    * strings.
    *
    * A name no simulated entity answers to fails the Resource before the policy
-   * is created. Checking afterwards would leave a policy behind with nothing
-   * attached to it.
+   * is created, and so does an entity already carrying as many managed
+   * policies as IAM allows. Checking afterwards would leave a policy behind
+   * with nothing attached to it.
    */
   targets(
     resource: SimCfnResource,
@@ -53,7 +60,7 @@ export class SimCfnIamManagedPolicyAttacher {
   ): SimCfnIamManagedPolicyTargets {
     const names = (
       property: SimCfnIamAttachmentProperty,
-      exists: (name: string) => boolean,
+      find: (name: string) => SimIamPolicyHolder | undefined,
     ): readonly string[] =>
       simCfnIamNameList({
         resourceType: "AWS::IAM::ManagedPolicy",
@@ -62,24 +69,26 @@ export class SimCfnIamManagedPolicyAttacher {
         value: properties[property],
         label: property,
       }).map((name) => {
-        if (!exists(name)) {
-          throw new SimIamNoSuchEntity(
-            `No IAM ${property.slice(0, -1)} with name ${name}`,
-          );
-        }
+        const kind = property.slice(0, -1) as SimIamPolicyHolderKind;
+        const holder = simIamDefined(
+          find(name),
+          () => new SimIamNoSuchEntity(`No IAM ${kind} with name ${name}`),
+        );
+        // The policy is new, so it cannot already be attached to the holder.
+        assertSimIamManagedPolicyQuota(holder, kind, "" as SimArn);
 
         return name;
       });
 
     return {
       Roles: names("Roles", (name) =>
-        this.iam.roles.has(name as SimIamRoleName),
+        this.iam.roles.get(name as SimIamRoleName),
       ),
       Users: names("Users", (name) =>
-        this.iam.users.has(name as SimIamUsername),
+        this.iam.users.get(name as SimIamUsername),
       ),
       Groups: names("Groups", (name) =>
-        this.iam.groups.has(name as SimIamGroupName),
+        this.iam.groups.get(name as SimIamGroupName),
       ),
     };
   }

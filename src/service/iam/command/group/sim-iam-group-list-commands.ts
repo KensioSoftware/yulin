@@ -26,10 +26,10 @@ export class SimIamGroupListCommands {
     command: SimListGroupsCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListGroupsCommandOutput> {
+    await this.lookup.sequence();
     const { authorizer } = this;
-    const { groups, background } = this.lookup.properties;
+    const { groups } = this.lookup.properties;
     authorizer.authorize("iam:ListGroups", "*", options?.caller);
-    await background.sequence();
 
     const prefix = command.input.PathPrefix ?? "/";
 
@@ -46,7 +46,8 @@ export class SimIamGroupListCommands {
     command: SimListGroupsForUserCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListGroupsCommandOutput> {
-    const user = await this.lookup.user(
+    await this.lookup.sequence();
+    const user = this.lookup.user(
       "ListGroupsForUser",
       command.input.UserName,
       options,

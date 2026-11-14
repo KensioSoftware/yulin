@@ -24,20 +24,27 @@ export function simIamListedPolicies(
   const own = Scope === "AWS" ? [] : [...local];
   const awsManaged = Scope === "Local" ? [] : simIamAwsManagedPolicies();
 
-  return [...own, ...awsManaged]
-    .toSorted((a, b) => a.arn.localeCompare(b.arn))
-    .filter((policy) => {
-      const counts = usage(policy.arn);
-      const filtered: Readonly<Record<string, number>> = {
-        PermissionsPolicy: counts.attachmentCount,
-        PermissionsBoundary: counts.permissionsBoundaryUsageCount,
-      };
+  const listed = [...own, ...awsManaged]
+    .filter((policy) => policy.path.startsWith(PathPrefix))
+    .toSorted((a, b) => a.arn.localeCompare(b.arn));
 
-      return (
-        (OnlyAttached !== true || counts.attachmentCount > 0) &&
-        policy.path.startsWith(PathPrefix) &&
-        // oxlint-disable-next-line security/detect-object-injection -- read from a fixed table.
-        (filtered[PolicyUsageFilter] ?? 1) > 0
-      );
-    });
+  // Counting what uses a policy scans the Account, so only a filter on it
+  // pays for that.
+  if (OnlyAttached !== true && PolicyUsageFilter === "") {
+    return listed;
+  }
+
+  return listed.filter((policy) => {
+    const counts = usage(policy.arn);
+    const filtered: Readonly<Record<string, number>> = {
+      PermissionsPolicy: counts.attachmentCount,
+      PermissionsBoundary: counts.permissionsBoundaryUsageCount,
+    };
+
+    return (
+      (OnlyAttached !== true || counts.attachmentCount > 0) &&
+      // oxlint-disable-next-line security/detect-object-injection -- read from a fixed table.
+      (filtered[PolicyUsageFilter] ?? 1) > 0
+    );
+  });
 }

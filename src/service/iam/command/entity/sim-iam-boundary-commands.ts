@@ -38,11 +38,12 @@ export class SimIamBoundaryCommands {
     permissionsBoundary: string | undefined,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
+    await this.properties.background.sequence();
     const boundary = simIamRequired(
       permissionsBoundary,
       "permissionsBoundary",
     ) as SimArn;
-    const holder = await this.holder("Put", name, options, {
+    const holder = this.holder("Put", name, options, {
       "iam:PermissionsBoundary": boundary,
     });
     holder.permissionsBoundaryArn = boundary;
@@ -57,24 +58,24 @@ export class SimIamBoundaryCommands {
     name: string | undefined,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const holder = await this.holder("Delete", name, options);
+    await this.properties.background.sequence();
+    const holder = this.holder("Delete", name, options);
     holder.permissionsBoundaryArn = undefined;
 
     return {};
   }
 
-  private async holder(
+  private holder(
     verb: string,
     name: string | undefined,
     options: SimIamRequestOptions | undefined,
     conditions: Readonly<Record<string, string>> = {},
-  ): Promise<SimIamBoundaryHolder> {
-    const { kind, identity, find, background } = this.properties;
+  ): SimIamBoundaryHolder {
+    const { kind, identity, find } = this.properties;
     const lower = kind.toLowerCase();
     const required = simIamRequired(name, `${lower}Name`);
     const action = `iam:${verb}${kind}PermissionsBoundary`;
     identity.authorize(action, required, options, conditions);
-    await background.sequence();
 
     return simIamFound(find(required), lower, required);
   }

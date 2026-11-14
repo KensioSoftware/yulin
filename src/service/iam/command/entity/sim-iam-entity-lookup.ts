@@ -34,15 +34,24 @@ export class SimIamEntityLookup {
   constructor(readonly properties: SimIamEntityLookupProperties) {}
 
   /**
+   * Wait for the simulation's sequencing point. A command waits here first,
+   * so authorizing, finding and changing its entity then run with nothing
+   * in between.
+   */
+  async sequence(): Promise<void> {
+    await this.properties.background.sequence();
+  }
+
+  /**
    * Authorize an action on the named entity, and find it.
    */
-  async authorized(
+  authorized(
     action: string,
     name: string | undefined,
     options: SimIamRequestOptions | undefined,
     conditions: Readonly<Record<string, string>> = {},
-  ): Promise<SimIamFoundEntity> {
-    const { kind, identity, find, background } = this.properties;
+  ): SimIamFoundEntity {
+    const { kind, identity, find } = this.properties;
     const lower = kind.toLowerCase();
     const required = simIamRequired(name, `${lower}Name`);
     identity.authorize(
@@ -51,9 +60,6 @@ export class SimIamEntityLookup {
       options,
       conditions,
     );
-
-    // Allow for potential non-deterministic sequencing of async events.
-    await background.sequence();
 
     return {
       name: required,

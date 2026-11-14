@@ -1,10 +1,8 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnIamUserGroups } from "./sim-cfn-iam-user-groups.js";
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
-import {
-  simCfnIamNameList,
-  simCfnIamOptionalString,
-} from "../sim-cfn-iam-property.js";
+import { simCfnIamOptionalString } from "../sim-cfn-iam-property.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,
@@ -60,12 +58,7 @@ export class SimCfnIamUserPropertiesParser {
         properties,
       ),
       loginProfile: this.loginProfile(resource, properties),
-      groups: simCfnIamNameList({
-        resourceType,
-        resource,
-        value: properties["Groups"],
-        label: "Groups",
-      }),
+      groups: simCfnIamUserGroups(resource, properties),
     };
   }
 

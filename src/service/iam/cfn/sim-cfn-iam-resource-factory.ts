@@ -9,6 +9,7 @@ import { SimCfnIamPolicyCreator } from "./policy/sim-cfn-iam-policy-creator.js";
 import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
 import { SimCfnIamUserCreator } from "./user/sim-cfn-iam-user-creator.js";
 import { SimCfnIamGroupCreator } from "./group/sim-cfn-iam-group-creator.js";
+import { SimCfnIamGroupMembership } from "./group/sim-cfn-iam-group-membership.js";
 import { SimCfnIamResourceDeleter } from "./sim-cfn-iam-resource-deleter.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
@@ -22,6 +23,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
   private readonly roleCreator: SimCfnIamRoleCreator;
   private readonly userCreator: SimCfnIamUserCreator;
   private readonly groupCreator: SimCfnIamGroupCreator;
+  private readonly membership: SimCfnIamGroupMembership;
   private readonly deleter: SimCfnIamResourceDeleter;
 
   constructor(iam: SimIam) {
@@ -30,9 +32,10 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
     this.roleCreator = new SimCfnIamRoleCreator({ iam });
     this.userCreator = new SimCfnIamUserCreator({ iam });
     this.groupCreator = new SimCfnIamGroupCreator(iam);
+    this.membership = new SimCfnIamGroupMembership(iam);
     this.deleter = new SimCfnIamResourceDeleter({
       iam,
-      groupCreator: this.groupCreator,
+      membership: this.membership,
     });
   }
 
@@ -69,7 +72,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
         return await this.groupCreator.create(resource, properties, options);
       }
       case "UserToGroupAddition": {
-        await this.groupCreator.membership(resource, properties, {
+        await this.membership.membership(resource, properties, {
           join: true,
           options,
         });

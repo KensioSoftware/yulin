@@ -6,6 +6,7 @@ import {
   CreatePolicyCommand,
   CreatePolicyVersionCommand,
   CreateUserCommand,
+  DeleteAccessKeyCommand,
   GetGroupCommand,
   GetPolicyVersionCommand,
   GetUserCommand,
@@ -21,6 +22,7 @@ import {
 } from "@aws-sdk/client-iam";
 import {
   assertArrayEquals,
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
@@ -30,6 +32,7 @@ import { describe, it } from "vitest";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import {
+  SimIamEntityAlreadyExists,
   SimIamInvalidMarkerException,
   SimIamNoSuchEntity,
   SimIamValidationError,
@@ -274,5 +277,47 @@ describe("IAM refusals", () => {
     assertInstanceOf(read, SimIamNoSuchEntity);
     assertInstanceOf(policy, SimIamNoSuchEntity);
     assertIdentical(page.Versions[0]?.VersionId, "v2");
+  });
+
+  it("refuses a group name that differs from another only in case", async () => {
+    // Given a group named Readers
+    const iam = await populated();
+
+    // When a group named readers is created
+    const error = await assertThrowsErrorAsync(async () =>
+      iam.createGroup(new CreateGroupCommand({ GroupName: "readers" })),
+    );
+
+    // Then IAM holds the two names as one
+    assertInstanceOf(error, SimIamEntityAlreadyExists);
+  });
+
+  it("leaves a key deleted while it is made active at the same time", async () => {
+    // Given a User's access key
+    const iam = await populated();
+    const { AccessKeyMetadata } = await iam.listAccessKeys(
+      new ListAccessKeysCommand({ UserName: "analyst" }),
+    );
+    const AccessKeyId = AccessKeyMetadata[0]?.AccessKeyId;
+
+    // When it is deleted and made active at once
+    await Promise.allSettled([
+      iam.deleteAccessKey(
+        new DeleteAccessKeyCommand({ UserName: "analyst", AccessKeyId }),
+      ),
+      iam.updateAccessKey(
+        new UpdateAccessKeyCommand({
+          UserName: "analyst",
+          AccessKeyId,
+          Status: "Active",
+        }),
+      ),
+    ]);
+
+    // Then the key is gone
+    const after = await iam.listAccessKeys(
+      new ListAccessKeysCommand({ UserName: "analyst" }),
+    );
+    assertArrayLength(after.AccessKeyMetadata, 1);
   });
 });

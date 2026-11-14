@@ -232,9 +232,21 @@ describe("IAM permissions boundary commands", () => {
   });
 
   it("tests the boundary being put as iam:PermissionsBoundary", async () => {
-    // Given a session of a Role allowed to put only one boundary
+    // Given a Role allowed to put only one boundary, and another Role for it
+    // to put boundaries on
     const { simAws, roleArn } = await withRole();
     const iam = simAws.iam();
+    await iam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Target",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
     await iam.putRolePolicy(
       new PutRolePolicyCommand({
         RoleName: "Worker",
@@ -258,7 +270,7 @@ describe("IAM permissions boundary commands", () => {
     const put = (PermissionsBoundary: string) =>
       iam.putRolePermissionsBoundary(
         new PutRolePermissionsBoundaryCommand({
-          RoleName: "Worker",
+          RoleName: "Target",
           PermissionsBoundary,
         }),
         { caller },

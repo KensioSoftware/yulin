@@ -12,7 +12,7 @@ import type { SimGroupMembershipCommand } from "./sim-iam-group.command.js";
 /**
  * The most groups IAM lets one User be in.
  */
-const maxSimIamGroupsPerUser = 10;
+export const maxSimIamGroupsPerUser = 10;
 
 /**
  * The commands that add a User to a group and take it out.
@@ -30,11 +30,8 @@ export class SimIamGroupMembershipCommands {
     command: SimGroupMembershipCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const { group, user } = await this.membership(
-      "AddUserToGroup",
-      command,
-      options,
-    );
+    await this.lookup.sequence();
+    const { group, user } = this.membership("AddUserToGroup", command, options);
 
     if (
       !user.groups.has(group.groupName) &&
@@ -57,7 +54,8 @@ export class SimIamGroupMembershipCommands {
     command: SimGroupMembershipCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const { group, user } = await this.membership(
+    await this.lookup.sequence();
+    const { group, user } = this.membership(
       "RemoveUserFromGroup",
       command,
       options,
@@ -72,16 +70,12 @@ export class SimIamGroupMembershipCommands {
     return {};
   }
 
-  private async membership(
+  private membership(
     action: string,
     command: SimGroupMembershipCommand,
     options: SimIamRequestOptions | undefined,
-  ): Promise<{ readonly group: SimIamGroup; readonly user: SimIamUser }> {
-    const group = await this.lookup.group(
-      action,
-      command.input.GroupName,
-      options,
-    );
+  ): { readonly group: SimIamGroup; readonly user: SimIamUser } {
+    const group = this.lookup.group(action, command.input.GroupName, options);
 
     return { group, user: this.lookup.existingUser(command.input.UserName) };
   }

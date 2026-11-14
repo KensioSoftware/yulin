@@ -10,16 +10,12 @@ import type {
 import type { SimIam } from "../../sim-iam.js";
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
 import { SimCfnIamPoliciesParser } from "../sim-cfn-iam-policies-parser.js";
-import {
-  simCfnIamNameList,
-  simCfnIamOptionalString,
-} from "../sim-cfn-iam-property.js";
+import { simCfnIamOptionalString } from "../sim-cfn-iam-property.js";
 
 const resourceType = "AWS::IAM::Group";
 
 /**
- * Creates and deletes simulated IAM groups for AWS::IAM::Group Resources, and
- * adds Users to them for AWS::IAM::UserToGroupAddition Resources.
+ * Creates simulated IAM groups for AWS::IAM::Group Resources.
  */
 export class SimCfnIamGroupCreator {
   private readonly policiesParser = new SimCfnIamPoliciesParser({
@@ -84,76 +80,5 @@ export class SimCfnIamGroupCreator {
     assertDefined(group, `Sim IAM group ${GroupName} after creation`);
 
     return group;
-  }
-
-  /**
-   * Delete a group, taking off the policies the Stack gave it first.
-   */
-  async delete(
-    resource: SimCfnResource,
-    options?: SimCfnResourceCallerOptions,
-  ): Promise<void> {
-    const group = resource.simResource as SimIamGroup | undefined;
-    assertDefined(
-      group,
-      `sim IAM group for CloudFormation Resource ${resource.logicalId}`,
-    );
-    const GroupName = group.groupName;
-
-    await Promise.all([
-      ...group.inlinePolicies
-        .keys()
-        .map(async (PolicyName) =>
-          this.iam.deleteGroupPolicy(
-            { input: { GroupName, PolicyName } },
-            options,
-          ),
-        ),
-      ...[...group.attachedPolicyArns].map(async (PolicyArn) =>
-        this.iam.detachGroupPolicy(
-          { input: { GroupName, PolicyArn } },
-          options,
-        ),
-      ),
-    ]);
-    await this.iam.deleteGroup({ input: { GroupName } }, options);
-  }
-
-  /**
-   * Add each User an AWS::IAM::UserToGroupAddition names to its group, or take
-   * each back out.
-   */
-  async membership(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-    request: {
-      readonly join: boolean;
-      readonly options?: SimCfnResourceCallerOptions | undefined;
-    },
-  ): Promise<void> {
-    const additionType = "AWS::IAM::UserToGroupAddition";
-    const GroupName = simCfnIamOptionalString({
-      resourceType: additionType,
-      resource,
-      value: properties["GroupName"],
-      label: "GroupName",
-    });
-    assertDefined(GroupName, `${additionType} ${resource.logicalId} GroupName`);
-    const users = simCfnIamNameList({
-      resourceType: additionType,
-      resource,
-      value: properties["Users"],
-      label: "Users",
-    });
-
-    await Promise.all(
-      users.map(async (username) => {
-        const input = { input: { GroupName, UserName: username } };
-
-        await (request.join
-          ? this.iam.addUserToGroup(input, request.options)
-          : this.iam.removeUserFromGroup(input, request.options));
-      }),
-    );
   }
 }

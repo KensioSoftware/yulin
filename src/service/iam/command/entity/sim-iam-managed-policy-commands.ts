@@ -34,7 +34,8 @@ export class SimIamManagedPolicyCommands {
     policyArn: string | undefined,
     options: Options,
   ): Promise<SimIamEmptyOutput> {
-    const { arn, holder } = await this.attachment("Attach", name, {
+    await this.lookup.sequence();
+    const { arn, holder } = this.attachment("Attach", name, {
       policyArn,
       options,
     });
@@ -56,7 +57,8 @@ export class SimIamManagedPolicyCommands {
     policyArn: string | undefined,
     options: Options,
   ): Promise<SimIamEmptyOutput> {
-    const { arn, holder } = await this.attachment("Detach", name, {
+    await this.lookup.sequence();
+    const { arn, holder } = this.attachment("Detach", name, {
       policyArn,
       options,
     });
@@ -76,7 +78,8 @@ export class SimIamManagedPolicyCommands {
     input: SimIamPageInput & { readonly PathPrefix?: string | undefined },
     options: Options,
   ): Promise<SimIamListAttachedPoliciesOutput> {
-    const holder = await this.lookup.authorized("ListAttached", name, options);
+    await this.lookup.sequence();
+    const holder = this.lookup.authorized("ListAttached", name, options);
     const attached = simIamAttachedPolicies(
       holder.entity.attachedPolicyArns,
       input.PathPrefix,
@@ -94,16 +97,16 @@ export class SimIamManagedPolicyCommands {
    * Authorize attaching or detaching a policy, which IAM tests as
    * `iam:PolicyARN`.
    */
-  private async attachment(
+  private attachment(
     action: string,
     name: string | undefined,
     request: {
       readonly policyArn: string | undefined;
       readonly options: Options;
     },
-  ): Promise<{ readonly arn: SimArn; readonly holder: SimIamFoundEntity }> {
+  ): { readonly arn: SimArn; readonly holder: SimIamFoundEntity } {
     const arn = simIamRequired(request.policyArn, "policyArn") as SimArn;
-    const holder = await this.lookup.authorized(action, name, request.options, {
+    const holder = this.lookup.authorized(action, name, request.options, {
       "iam:PolicyARN": arn,
     });
 

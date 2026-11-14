@@ -22,11 +22,8 @@ export class SimIamLoginProfileCommands {
     command: SimLoginProfileCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetLoginProfileCommandOutput> {
-    const { user, profile } = await this.profile(
-      "GetLoginProfile",
-      command,
-      options,
-    );
+    await this.lookup.sequence();
+    const { user, profile } = this.profile("GetLoginProfile", command, options);
 
     return {
       LoginProfile: {
@@ -44,25 +41,22 @@ export class SimIamLoginProfileCommands {
     command: SimLoginProfileCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const { user } = await this.profile("DeleteLoginProfile", command, options);
+    await this.lookup.sequence();
+    const { user } = this.profile("DeleteLoginProfile", command, options);
     user.loginProfile = undefined;
 
     return {};
   }
 
-  private async profile(
+  private profile(
     action: string,
     command: SimLoginProfileCommand,
     options: SimIamRequestOptions | undefined,
-  ): Promise<{
+  ): {
     readonly user: SimIamUser;
     readonly profile: SimIamUserLoginProfile;
-  }> {
-    const user = await this.lookup.user(
-      action,
-      command.input.UserName,
-      options,
-    );
+  } {
+    const user = this.lookup.user(action, command.input.UserName, options);
 
     if (user.loginProfile === undefined) {
       throw new SimIamNoSuchEntity(

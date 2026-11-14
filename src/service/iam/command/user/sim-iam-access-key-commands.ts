@@ -35,7 +35,8 @@ export class SimIamAccessKeyCommands {
     command: SimListAccessKeysCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListAccessKeysCommandOutput> {
-    const user = await this.lookup.user(
+    await this.lookup.sequence();
+    const user = this.lookup.user(
       "ListAccessKeys",
       command.input.UserName,
       options,
@@ -65,6 +66,7 @@ export class SimIamAccessKeyCommands {
     command: SimUpdateAccessKeyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
+    await this.lookup.sequence();
     const { Status } = command.input;
 
     simIamRefuseWhen(Status !== "Active" && Status !== "Inactive", () =>
@@ -75,7 +77,7 @@ export class SimIamAccessKeyCommands {
       ),
     );
 
-    const { key } = await this.accessKey("UpdateAccessKey", command, options);
+    const { key } = this.accessKey("UpdateAccessKey", command, options);
     key.status = Status as SimIamAccessKeyStatus;
 
     return {};
@@ -88,11 +90,8 @@ export class SimIamAccessKeyCommands {
     command: SimAccessKeyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimIamEmptyOutput> {
-    const { user, key } = await this.accessKey(
-      "DeleteAccessKey",
-      command,
-      options,
-    );
+    await this.lookup.sequence();
+    const { user, key } = this.accessKey("DeleteAccessKey", command, options);
     // The registry keeps the key, so it fails the way an inactive key does.
     key.status = "Inactive";
     user.accessKeys.delete(key.accessKeyId);
@@ -100,14 +99,14 @@ export class SimIamAccessKeyCommands {
     return {};
   }
 
-  private async accessKey(
+  private accessKey(
     action: string,
     command: SimAccessKeyCommand,
     options: SimIamRequestOptions | undefined,
-  ): Promise<{ readonly user: SimIamUser; readonly key: SimIamAccessKey }> {
+  ): { readonly user: SimIamUser; readonly key: SimIamAccessKey } {
     const { UserName, AccessKeyId } = command.input;
     const accessKeyId = simIamRequired(AccessKeyId, "accessKeyId");
-    const user = await this.lookup.user(action, UserName, options);
+    const user = this.lookup.user(action, UserName, options);
     const key = simIamDefined(
       user.accessKeys.get(accessKeyId),
       () =>

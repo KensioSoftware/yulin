@@ -1,6 +1,7 @@
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimCfnIamGroupCreator } from "./group/sim-cfn-iam-group-creator.js";
+import { SimCfnIamGroupDeleter } from "./group/sim-cfn-iam-group-deleter.js";
+import type { SimCfnIamGroupMembership } from "./group/sim-cfn-iam-group-membership.js";
 import type { SimIam } from "../sim-iam.js";
 import { SimCfnIamRoleDeleter } from "./role/sim-cfn-iam-role-deleter.js";
 import { SimCfnIamUserDeleter } from "./user/sim-cfn-iam-user-deleter.js";
@@ -9,7 +10,7 @@ import type { SimCfnResourceCallerOptions } from "../../cloudformation/resource/
 
 interface SimCfnIamResourceDeleterProperties {
   readonly iam: SimIam;
-  readonly groupCreator: SimCfnIamGroupCreator;
+  readonly membership: SimCfnIamGroupMembership;
 }
 
 /**
@@ -19,13 +20,15 @@ export class SimCfnIamResourceDeleter {
   private readonly policyDeleter: SimCfnIamPolicyDeleter;
   private readonly roleDeleter: SimCfnIamRoleDeleter;
   private readonly userDeleter: SimCfnIamUserDeleter;
-  private readonly groupCreator: SimCfnIamGroupCreator;
+  private readonly groupDeleter: SimCfnIamGroupDeleter;
+  private readonly membership: SimCfnIamGroupMembership;
 
   constructor(properties: SimCfnIamResourceDeleterProperties) {
     this.policyDeleter = new SimCfnIamPolicyDeleter(properties.iam);
     this.roleDeleter = new SimCfnIamRoleDeleter({ iam: properties.iam });
     this.userDeleter = new SimCfnIamUserDeleter({ iam: properties.iam });
-    this.groupCreator = properties.groupCreator;
+    this.groupDeleter = new SimCfnIamGroupDeleter(properties.iam);
+    this.membership = properties.membership;
   }
 
   /**
@@ -59,11 +62,11 @@ export class SimCfnIamResourceDeleter {
         return;
       }
       case "Group": {
-        await this.groupCreator.delete(resource, options);
+        await this.groupDeleter.delete(resource, options);
         return;
       }
       case "UserToGroupAddition": {
-        await this.groupCreator.membership(resource, properties, {
+        await this.membership.membership(resource, properties, {
           join: false,
           options,
         });

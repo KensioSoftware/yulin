@@ -29,6 +29,15 @@ export class SimIamPolicyVersionStore {
   constructor(readonly properties: SimIamPolicyVersionStoreProperties) {}
 
   /**
+   * Wait for the simulation's sequencing point. A command waits here first,
+   * so authorizing, finding and changing its entity then run with nothing
+   * in between.
+   */
+  async sequence(): Promise<void> {
+    await this.properties.background.sequence();
+  }
+
+  /**
    * Make a version the default, the one authorization reads.
    */
   makeDefault(policy: SimIamManagedPolicy, version: SimIamPolicyVersion): void {
@@ -76,15 +85,14 @@ export class SimIamPolicyVersionStore {
   /**
    * Authorize an action on the policy, and find it among the Account's own.
    */
-  async policy(
+  policy(
     action: string,
     command: SimIamCommand<{ readonly PolicyArn?: string | undefined }>,
     options: SimIamRequestOptions | undefined,
-  ): Promise<SimIamManagedPolicy> {
-    const { authorizer, background, policies } = this.properties;
+  ): SimIamManagedPolicy {
+    const { authorizer, policies } = this.properties;
     const arn = simIamRequired(command.input.PolicyArn, "policyArn") as SimArn;
     authorizer.authorize(`iam:${action}`, arn, options?.caller);
-    await background.sequence();
 
     return simIamDefined(
       policies.get(arn),

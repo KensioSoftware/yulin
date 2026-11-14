@@ -1,6 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimIam } from "../../sim-iam.js";
 import type { SimIamUser } from "../../user/sim-iam-user.js";
+import { simCfnIamHolderSnapshot } from "../sim-cfn-iam-holder-snapshot.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -17,10 +18,10 @@ interface SimCfnIamUserDeleterProperties {
  * `Policies` entry removed, the `LoginProfile` deleted and the User taken out
  * of its `Groups` as part of deleting the User.
  *
- * They come off the User record together, and a DeleteUser the caller is not
- * allowed puts them all back, leaving the User as the Stack deployed it. An
- * access key the Stack did not create still refuses the deletion, as it does
- * in AWS.
+ * Each comes off through its own IAM command, authorized for the caller the
+ * Stack is deleted as. Where a command or the DeleteUser is refused, the User
+ * is put back as the Stack deployed it. An access key created outside the
+ * Stack refuses the deletion, as it does in AWS.
  */
 export class SimCfnIamUserDeleter {
   private readonly iam: SimIam;
@@ -42,34 +43,48 @@ export class SimCfnIamUserDeleter {
       `sim IAM User for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    const attachedPolicyArns = [...user.attachedPolicyArns];
-    const inlinePolicies = [...user.inlinePolicies];
-    const groups = [...user.groups];
+    const username = user.userName;
     const { loginProfile } = user;
-
-    user.attachedPolicyArns.clear();
-    user.inlinePolicies.clear();
-    user.groups.clear();
-    user.loginProfile = undefined;
+    const restore = simCfnIamHolderSnapshot(user);
 
     try {
-      await this.iam.deleteUser(
-        { input: { UserName: user.userName } },
-        options,
-      );
+      await Promise.all([
+        ...user.attachedPolicyArns
+          .values()
+          .map(async (PolicyArn) =>
+            this.iam.detachUserPolicy(
+              { input: { UserName: username, PolicyArn } },
+              options,
+            ),
+          ),
+        ...user.inlinePolicies
+          .keys()
+          .map(async (PolicyName) =>
+            this.iam.deleteUserPolicy(
+              { input: { UserName: username, PolicyName } },
+              options,
+            ),
+          ),
+        ...user.groups
+          .keys()
+          .map(async (GroupName) =>
+            this.iam.removeUserFromGroup(
+              { input: { GroupName, UserName: username } },
+              options,
+            ),
+          ),
+        ...[loginProfile]
+          .filter(Boolean)
+          .map(async () =>
+            this.iam.deleteLoginProfile(
+              { input: { UserName: username } },
+              options,
+            ),
+          ),
+      ]);
+      await this.iam.deleteUser({ input: { UserName: username } }, options);
     } catch (error) {
-      for (const policyArn of attachedPolicyArns) {
-        user.attachedPolicyArns.add(policyArn);
-      }
-
-      for (const [policyName, document] of inlinePolicies) {
-        user.inlinePolicies.set(policyName, document);
-      }
-
-      for (const [groupName, group] of groups) {
-        user.groups.set(groupName, group);
-      }
-
+      restore();
       user.loginProfile = loginProfile;
 
       throw error;
