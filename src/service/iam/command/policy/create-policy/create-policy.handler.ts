@@ -12,7 +12,7 @@ import {
 import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import { CreatePolicyInputResolver } from "./create-policy-input-resolver.js";
 import { CreatePolicyRecordFactory } from "./create-policy-record-factory.js";
-import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
+import { assertSimIamNewEntity } from "../../sim-iam-account-quota.js";
 
 interface CreatePolicyCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
@@ -56,11 +56,12 @@ export class CreatePolicyCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    if (this.policies.has(arn)) {
-      throw new SimIamEntityAlreadyExists(
-        `Sim IAM Policy already exists: ${arn}`,
-      );
-    }
+    // A policy name is the Account's whatever path it sits at.
+    assertSimIamNewEntity(
+      "Policies",
+      this.policies.values().map((policy) => policy.policyName),
+      policyName,
+    );
 
     const policy = this.policyFactory.makePolicy({
       arn,

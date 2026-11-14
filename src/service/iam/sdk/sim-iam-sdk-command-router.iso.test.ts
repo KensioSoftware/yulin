@@ -4,8 +4,8 @@ import {
   AttachUserPolicyCommand,
   CreateAccessKeyCommand,
   CreateGroupCommand,
-  CreateInstanceProfileCommand,
   CreateLoginProfileCommand,
+  CreateOpenIDConnectProviderCommand,
   CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
@@ -350,13 +350,13 @@ describe("simulated IAM SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new CreateInstanceProfileCommand({
-          InstanceProfileName: "InterceptProfile",
+        new CreateOpenIDConnectProviderCommand({
+          Url: "https://idp.example.com",
         }),
       );
     });
 
-    assertStringIncludes(error.message, "CreateInstanceProfileCommand");
+    assertStringIncludes(error.message, "CreateOpenIDConnectProviderCommand");
     assertStringIncludes(error.message, "CreateRoleCommand");
   });
 });

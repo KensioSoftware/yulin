@@ -30,8 +30,8 @@ interface SimIamAccessKeyProperties {
 export class SimIamAccessKey {
   public readonly accessKeyId: string;
   public readonly secretAccessKey: string;
-  public readonly principal: SimAwsPrincipal;
-  public readonly identityPolicyPrincipal: SimAwsPrincipal;
+  public principal: SimAwsPrincipal;
+  public identityPolicyPrincipal: SimAwsPrincipal;
   public readonly session?: SimIamSession | undefined;
   public readonly creationDate: Date;
   public status: SimIamAccessKeyStatus;

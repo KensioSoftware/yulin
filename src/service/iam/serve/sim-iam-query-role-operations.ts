@@ -16,7 +16,7 @@ import {
 /**
  * The members IAM describes one Role with.
  */
-const roleMembers = [
+export const iamQueryRoleMembers = [
   "Path",
   "RoleName",
   "RoleId",
@@ -49,7 +49,12 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           Tags: iamQueryTagsInput(fields),
         }),
         result: (output): string =>
-          iamQueryEntity(output, "Role", roleMembers, iamQueryBoundaryAndTags),
+          iamQueryEntity(
+            output,
+            "Role",
+            iamQueryRoleMembers,
+            iamQueryBoundaryAndTags,
+          ),
       },
     ],
     [
@@ -59,7 +64,12 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
           RoleName: fields.text("RoleName"),
         }),
         result: (output): string =>
-          iamQueryEntity(output, "Role", roleMembers, iamQueryBoundaryAndTags),
+          iamQueryEntity(
+            output,
+            "Role",
+            iamQueryRoleMembers,
+            iamQueryBoundaryAndTags,
+          ),
       },
     ],
     [
@@ -71,7 +81,7 @@ export function simIamQueryRoleOperations(): SimQueryOperations {
         }),
         result: (output): string =>
           queryList(output, "Roles", (role) =>
-            queryMembers(role, roleMembers),
+            queryMembers(role, iamQueryRoleMembers),
           ) + iamQueryListingResult(output),
       },
     ],

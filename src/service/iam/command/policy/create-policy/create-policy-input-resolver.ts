@@ -6,6 +6,7 @@ import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
 import { normalisePolicyPath } from "../../../policy/sim-iam-policy-path.js";
 import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-document-validator.js";
 import { assertSimIamManagedPolicyWithinSizeLimit } from "../../../validate/size/sim-iam-policy-document-size.js";
+import { assertSimIamEntityName } from "../../group/sim-iam-group-name.js";
 
 /**
  * The validated identity of a policy about to be created, derived from the
@@ -43,6 +44,8 @@ export class CreatePolicyInputResolver {
     if (policyName === undefined || policyName.length === 0) {
       throw new Error("PolicyName is required");
     }
+
+    assertSimIamEntityName(policyName, "policyName");
 
     assertSimIamManagedPolicyWithinSizeLimit(command.input.PolicyDocument);
 

@@ -173,7 +173,7 @@ export function simIamTagsMember(tags: SimIamIdentityTags): {
  */
 export function makeSimIamIdentityTags(
   tags: SimIamTagsInput,
-  entity: "Role" | "User",
+  entity: "Role" | "User" | "InstanceProfile",
 ): SimIamIdentityTags {
   const identityTags = new SimIamIdentityTags();
 

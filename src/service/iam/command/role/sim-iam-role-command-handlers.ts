@@ -51,10 +51,18 @@ import type {
   SimDeleteRolePolicyCommandOutput,
 } from "../policy/delete-role-policy/delete-role-policy.command.js";
 import { SimIamIdentityAuthorizer } from "../../tag/sim-iam-identity-authorizer.js";
+import type {
+  SimIamInstanceProfile,
+  SimIamInstanceProfileName,
+} from "../../instance-profile/sim-iam-instance-profile.js";
 
 interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
   readonly roles: Map<SimIamRoleName, SimIamRole>;
+  readonly instanceProfiles: ReadonlyMap<
+    SimIamInstanceProfileName,
+    SimIamInstanceProfile
+  >;
   readonly background: BackgroundScheduler;
   readonly authorizer: SimIamActionAuthorizer;
 }
@@ -71,6 +79,7 @@ interface SimIamRoleCommandHandlersProperties {
 export class SimIamRoleCommandHandlers {
   private readonly accountId: SimAwsAccountId;
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
+  private readonly instanceProfiles: SimIamRoleCommandHandlersProperties["instanceProfiles"];
   private readonly background: BackgroundScheduler;
   private readonly authorizer: SimIamActionAuthorizer;
   private readonly identity: SimIamIdentityAuthorizer;
@@ -80,6 +89,7 @@ export class SimIamRoleCommandHandlers {
 
     this.accountId = accountId;
     this.roles = roles;
+    this.instanceProfiles = properties.instanceProfiles;
     this.background = background;
     this.authorizer = authorizer;
     this.identity = new SimIamIdentityAuthorizer({
@@ -247,6 +257,7 @@ export class SimIamRoleCommandHandlers {
     this.identity.authorize("iam:DeleteRole", command.input.RoleName, options);
     const handler = new DeleteRoleCommandHandler({
       roles: this.roles,
+      instanceProfiles: this.instanceProfiles,
       background: this.background,
     });
     return await handler.handle(command);

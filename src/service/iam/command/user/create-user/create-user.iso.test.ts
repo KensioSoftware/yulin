@@ -184,7 +184,7 @@ describe("IAM CreateUserCommand", () => {
     // Then IAM reports that the entity already exists.
     assertIdentical(
       error.message,
-      "Sim IAM User already exists: DuplicateUser",
+      "User with name DuplicateUser already exists.",
     );
   });
 });

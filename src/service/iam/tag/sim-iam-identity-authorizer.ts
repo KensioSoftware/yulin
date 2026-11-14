@@ -12,8 +12,23 @@ import {
 } from "./sim-iam-tag-conditions.js";
 
 /**
- * A Role, a User or a group, as far as authorizing a request on it goes. A
- * group carries no tags.
+ * An entity IAM authorizes requests on by name.
+ */
+export type SimIamNamedEntity = "Role" | "User" | "Group" | "InstanceProfile";
+
+/**
+ * The resource type each named entity has in its ARN.
+ */
+const arnResourceTypes: Readonly<Record<SimIamNamedEntity, string>> = {
+  Role: "role",
+  User: "user",
+  Group: "group",
+  InstanceProfile: "instance-profile",
+};
+
+/**
+ * A Role, a User, a group or an instance profile, as far as authorizing a
+ * request on it goes. A group carries no tags.
  */
 export interface SimIamAuthorizedIdentity {
   readonly arn: string;
@@ -25,9 +40,10 @@ interface SimIamIdentityAuthorizerProperties {
   readonly authorizer: SimIamActionAuthorizer;
 
   /**
-   * `Role`, `User` or `Group`, as IAM names the entity in its actions.
+   * The entity as IAM names it in its actions, such as `Role` in
+   * `iam:CreateRole`.
    */
-  readonly entity: "Role" | "User" | "Group";
+  readonly entity: SimIamNamedEntity;
 
   /**
    * Find an existing entity by name.
@@ -72,7 +88,8 @@ export class SimIamIdentityAuthorizer {
     authorizer.authorize(
       action,
       existing?.arn ??
-        `arn:aws:iam::${accountId}:${entity.toLowerCase()}${path}${target}`,
+        // oxlint-disable-next-line security/detect-object-injection -- entity is one of the fixed keys above.
+        `arn:aws:iam::${accountId}:${arnResourceTypes[entity]}${path}${target}`,
       options?.caller,
       { ...conditions, ...simIamResourceTagConditions(existing?.tags) },
     );

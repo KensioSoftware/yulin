@@ -23,3 +23,13 @@ export type SimPutUserPermissionsBoundaryCommand = SimIamCommand<{
 export type SimDeleteUserPermissionsBoundaryCommand = SimIamCommand<{
   readonly UserName?: string | undefined;
 }>;
+export type SimUpdateUserCommand = SimIamCommand<{
+  readonly UserName?: string | undefined;
+  readonly NewUserName?: string | undefined;
+  readonly NewPath?: string | undefined;
+}>;
+export type SimUpdateGroupCommand = SimIamCommand<{
+  readonly GroupName?: string | undefined;
+  readonly NewGroupName?: string | undefined;
+  readonly NewPath?: string | undefined;
+}>;

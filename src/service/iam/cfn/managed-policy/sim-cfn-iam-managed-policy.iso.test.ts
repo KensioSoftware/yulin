@@ -1,14 +1,16 @@
 import {
-  assertArrayLength,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringStartsWith,
+  assertThrowsErrorAsync,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimIamEntityAlreadyExists } from "../../error/sim-iam.error.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
 import type { SimArn } from "../../../aws/arn.js";
 import {
@@ -291,61 +293,58 @@ describe("IAM CloudFormation ManagedPolicy", () => {
     );
   });
 
-  it("supports duplicate Managed Policy names with distinct paths", async () => {
+  it("refuses two Managed Policies of one name at distinct paths", async () => {
     // Given a CloudFormation template declaring two Managed Policies with the
     // same name but distinct paths.
     const simAws = new SimAws();
 
     // When the template is deployed through sim CloudFormation.
-    await simAws.cloudFormation().deployTemplate({
-      stackName: "iam-managed-policy-duplicate-name-stack",
-      template: {
-        Resources: {
-          FirstDuplicatePolicy: {
-            Type: "AWS::IAM::ManagedPolicy",
-            Properties: {
-              ManagedPolicyName: "DuplicatePolicyName",
-              Path: "/first/",
-              PolicyDocument: {
-                Version: "2012-10-17",
-                Statement: [
-                  {
-                    Effect: "Allow",
-                    Action: "s3:GetObject",
-                    Resource: "*",
-                  },
-                ],
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "iam-managed-policy-duplicate-name-stack",
+        template: {
+          Resources: {
+            FirstDuplicatePolicy: {
+              Type: "AWS::IAM::ManagedPolicy",
+              Properties: {
+                ManagedPolicyName: "DuplicatePolicyName",
+                Path: "/first/",
+                PolicyDocument: {
+                  Version: "2012-10-17",
+                  Statement: [
+                    {
+                      Effect: "Allow",
+                      Action: "s3:GetObject",
+                      Resource: "*",
+                    },
+                  ],
+                },
               },
             },
-          },
-          SecondDuplicatePolicy: {
-            Type: "AWS::IAM::ManagedPolicy",
-            Properties: {
-              ManagedPolicyName: "DuplicatePolicyName",
-              Path: "/second/",
-              PolicyDocument: {
-                Version: "2012-10-17",
-                Statement: [
-                  {
-                    Effect: "Allow",
-                    Action: "s3:GetObject",
-                    Resource: "*",
-                  },
-                ],
+            SecondDuplicatePolicy: {
+              Type: "AWS::IAM::ManagedPolicy",
+              Properties: {
+                ManagedPolicyName: "DuplicatePolicyName",
+                Path: "/second/",
+                PolicyDocument: {
+                  Version: "2012-10-17",
+                  Statement: [
+                    {
+                      Effect: "Allow",
+                      Action: "s3:GetObject",
+                      Resource: "*",
+                    },
+                  ],
+                },
               },
             },
           },
         },
-      },
-    });
-
-    // Then both Managed Policies are created under their distinct ARNs.
-    const listOutput = await simAws.iam().listPolicies({ input: {} });
-
-    const duplicateNamed = listOutput.Policies.filter(
-      (policy) => policy.PolicyName === "DuplicatePolicyName",
+      }),
     );
 
-    assertArrayLength(duplicateNamed, 2);
+    // Then IAM refuses the second, since a policy name is unique in the
+    // Account
+    assertInstanceOf(error, SimIamEntityAlreadyExists);
   });
 });
