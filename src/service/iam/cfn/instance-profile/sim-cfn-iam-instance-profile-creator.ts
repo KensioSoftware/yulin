@@ -8,6 +8,7 @@ import type {
   SimIamInstanceProfileName,
 } from "../../instance-profile/sim-iam-instance-profile.js";
 import type { SimIam } from "../../sim-iam.js";
+import { simCfnIamFillInstanceProfile } from "./sim-cfn-iam-instance-profile-roles.js";
 import {
   simCfnIamNameList,
   simCfnIamOptionalString,
@@ -65,13 +66,10 @@ export class SimCfnIamInstanceProfileCreator {
       { input: { InstanceProfileName, Path } },
       options,
     );
-    await Promise.all(
-      roles.map(async (RoleName) =>
-        this.iam.addRoleToInstanceProfile(
-          { input: { InstanceProfileName, RoleName } },
-          options,
-        ),
-      ),
+    await simCfnIamFillInstanceProfile(
+      this.iam,
+      { InstanceProfileName, roles },
+      options,
     );
 
     const profile = this.iam.instanceProfiles.get(

@@ -7,6 +7,7 @@ import {
   GetUserCommand,
   ListGroupsForUserCommand,
   PutUserPolicyCommand,
+  TagUserCommand,
   UpdateGroupCommand,
   UpdateUserCommand,
 } from "@aws-sdk/client-iam";
@@ -25,6 +26,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimIamAccessDenied,
   SimIamEntityAlreadyExists,
+  SimIamValidationError,
 } from "../../error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../policy/sim-iam-policy-document.factory.js";
 import type { SimIam } from "../../sim-iam.js";
@@ -193,6 +195,68 @@ describe("Renaming IAM Users and groups", () => {
 
     // Then IAM refuses it, and the User stays where it was
     assertInstanceOf(error, SimIamAccessDenied);
+    assertIdentical(iam.users.get("analyst" as SimIamUsername)?.path, "/");
+  });
+
+  it("carries the User's tags into the check on its new name", async () => {
+    // Given a User tagged for finance, and a caller allowed to update Users
+    // tagged so
+    const { iam } = await withAnalyst();
+    await iam.tagUser(
+      new TagUserCommand({
+        UserName: "analyst",
+        Tags: [{ Key: "team", Value: "finance" }],
+      }),
+    );
+    const caller = await iam.makeDeployRole({
+      roleName: "finance-admin",
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: "iam:UpdateUser",
+            Resource: "*",
+            Condition: {
+              StringEquals: { "iam:ResourceTag/team": "finance" },
+            },
+          },
+        ],
+      },
+    });
+
+    // When it renames the User
+    await iam.updateUser(
+      new UpdateUserCommand({ UserName: "analyst", NewUserName: "auditor" }),
+      { caller },
+    );
+
+    // Then the rename is allowed
+    assertTrue(iam.users.has("auditor" as SimIamUsername));
+  });
+
+  it("refuses a new path IAM refuses", async () => {
+    // Given a User and a group
+    const { iam } = await withAnalyst();
+
+    // When each is moved to a path holding a space, or past 512 characters
+    const spaced = await assertThrowsErrorAsync(async () =>
+      iam.updateUser(
+        new UpdateUserCommand({ UserName: "analyst", NewPath: "/bad path/" }),
+      ),
+    );
+    const long = await assertThrowsErrorAsync(async () =>
+      iam.updateGroup(
+        new UpdateGroupCommand({
+          GroupName: "Readers",
+          NewPath: `/${"p".repeat(511)}/`,
+        }),
+      ),
+    );
+
+    // Then IAM refuses both, and the User stays where it was
+    assertInstanceOf(spaced, SimIamValidationError);
+    assertInstanceOf(long, SimIamValidationError);
     assertIdentical(iam.users.get("analyst" as SimIamUsername)?.path, "/");
   });
 });

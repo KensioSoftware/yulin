@@ -1,4 +1,4 @@
-import { normaliseUserPath } from "../../user/sim-iam-user-path.js";
+import { simIamValidPath } from "./sim-iam-path.js";
 
 /**
  * What a rename leaves an entity called, and where.
@@ -19,6 +19,6 @@ export function simIamRenamed(
 ): SimIamRenamed {
   return {
     name: name ?? current.name,
-    path: path === undefined ? current.path : normaliseUserPath(path),
+    path: path === undefined ? current.path : simIamValidPath(path, "newPath"),
   };
 }

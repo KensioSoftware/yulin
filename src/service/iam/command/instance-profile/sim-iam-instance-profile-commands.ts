@@ -6,7 +6,7 @@ import {
   type SimIamInstanceProfileName,
 } from "../../instance-profile/sim-iam-instance-profile.js";
 import { makeSimIamIdentityTags } from "../../tag/sim-iam-identity-tags.js";
-import { normaliseUserPath } from "../../user/sim-iam-user-path.js";
+import { simIamValidPath } from "../entity/sim-iam-path.js";
 import type { SimIamEmptyOutput } from "../entity/sim-iam-entity-policy.command.js";
 import { assertSimIamEntityName } from "../group/sim-iam-group-name.js";
 import { assertSimIamNewEntity } from "../sim-iam-account-quota.js";
@@ -45,7 +45,7 @@ export class SimIamInstanceProfileCommands {
       input.InstanceProfileName,
       "instanceProfileName",
     );
-    const path = normaliseUserPath(input.Path);
+    const path = simIamValidPath(input.Path, "path");
     assertSimIamEntityName(name, "instanceProfileName");
     profileIdentity.authorizeCreate(name, path, input.Tags, options);
     assertSimIamNewEntity("InstanceProfiles", instanceProfiles.keys(), name);

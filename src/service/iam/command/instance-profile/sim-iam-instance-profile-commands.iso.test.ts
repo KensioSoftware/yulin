@@ -330,4 +330,46 @@ describe("IAM instance profiles", () => {
       "Instance Profile Missing cannot be found.",
     );
   });
+
+  it("names any instance in the Account as the Role's associated resource", async () => {
+    // Given a caller allowed to pass Roles only to the Account's instances
+    const iam = await withRoles("WebServer");
+    const caller = await iam.makeDeployRole({
+      roleName: "deployer",
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          { Effect: "Allow", Action: "iam:*InstanceProfile", Resource: "*" },
+          {
+            Effect: "Allow",
+            Action: "iam:PassRole",
+            Resource: "*",
+            Condition: {
+              ArnLike: {
+                "iam:AssociatedResourceArn": `arn:aws:ec2:*:${iam.accountId}:instance/*`,
+              },
+            },
+          },
+        ],
+      },
+    });
+    await iam.createInstanceProfile(
+      new CreateInstanceProfileCommand({ InstanceProfileName: "Web" }),
+    );
+
+    // When it adds the Role to an instance profile
+    await iam.addRoleToInstanceProfile(
+      new AddRoleToInstanceProfileCommand({
+        InstanceProfileName: "Web",
+        RoleName: "WebServer",
+      }),
+      { caller },
+    );
+
+    // Then the profile holds the Role
+    assertIdentical(
+      iam.instanceProfiles.get("Web" as SimIamInstanceProfileName)?.roleName,
+      "WebServer",
+    );
+  });
 });

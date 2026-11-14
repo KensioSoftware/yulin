@@ -95,4 +95,27 @@ describe("IAM CloudFormation InstanceProfile", () => {
     assertStringIncludes(error.message, "Roles holds one Role at most");
     assertMapSize(simAws.iam().instanceProfiles, 0);
   });
+
+  it("leaves no instance profile behind when its Role cannot be added", async () => {
+    // Given a template whose instance profile names a Role the Account lacks
+    const simAws = new SimAws();
+
+    // When it is deployed
+    await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "orphan-stack",
+        template: {
+          Resources: {
+            Profile: {
+              Type: "AWS::IAM::InstanceProfile",
+              Properties: { InstanceProfileName: "web", Roles: ["absent"] },
+            },
+          },
+        },
+      }),
+    );
+
+    // Then no profile holds the name
+    assertMapSize(simAws.iam().instanceProfiles, 0);
+  });
 });

@@ -49,7 +49,12 @@ export class SimIamInstanceProfileRoleCommands {
       "iam:PassRole",
       role.arn,
       options?.caller,
-      { "iam:PassedToService": instanceProfileService },
+      {
+        "iam:PassedToService": instanceProfileService,
+        // AWS names any instance in the Account, since the profile has
+        // none yet.
+        "iam:AssociatedResourceArn": `arn:aws:ec2:*:${this.lookup.properties.accountId}:instance/*`,
+      },
     );
 
     simIamRefuseWhen(

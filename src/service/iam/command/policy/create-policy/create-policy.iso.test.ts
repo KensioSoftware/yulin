@@ -2,6 +2,7 @@ import { CreatePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertInstanceOf,
+  assertMapSize,
   assertNonNullable,
   assertThrowsErrorAsync,
   assertTrue,
@@ -14,6 +15,7 @@ import { jsonStringify } from "../../../../../util/type-guard/json.js";
 import {
   SimIamEntityAlreadyExists,
   SimIamLimitExceeded,
+  SimIamValidationError,
 } from "../../../error/sim-iam.error.js";
 import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
 import { maxSimIamManagedPolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
@@ -247,6 +249,33 @@ describe("IAM CreatePolicyCommand", () => {
 
     // Then IAM refuses it, since a policy name is unique in the Account
     assertInstanceOf(error, SimIamEntityAlreadyExists);
+  });
+
+  it("refuses a policy name holding a slash", async () => {
+    // Given a policy named Read under /application/
+    const simIam = new SimAws().account(makeSimAwsAccountId()).iam();
+    await simIam.createPolicy(
+      new CreatePolicyCommand({
+        PolicyName: "Read",
+        Path: "/application/",
+        PolicyDocument: undefined,
+      }),
+    );
+
+    // When a policy named application/Read is created at /, which would
+    // share its ARN
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.createPolicy(
+        new CreatePolicyCommand({
+          PolicyName: "application/Read",
+          PolicyDocument: undefined,
+        }),
+      ),
+    );
+
+    // Then IAM refuses the name, and the first policy is left alone
+    assertInstanceOf(error, SimIamValidationError);
+    assertMapSize(simIam.policies, 1);
   });
 
   it("refuses a policy document over IAM's character limit", async () => {

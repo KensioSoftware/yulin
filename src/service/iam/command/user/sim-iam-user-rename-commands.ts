@@ -7,6 +7,7 @@ import { simIamRenamed } from "../entity/sim-iam-renamed.js";
 import { assertSimIamEntityName } from "../group/sim-iam-group-name.js";
 import { assertSimIamNameFree } from "../sim-iam-account-quota.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
+import { simIamResourceTagConditions } from "../../tag/sim-iam-tag-conditions.js";
 import type { SimIamUserLookup } from "./sim-iam-user-lookup.js";
 
 /**
@@ -45,7 +46,12 @@ export class SimIamUserRenameCommands {
       path: target.path,
       userName: username,
     });
-    this.authorizer.authorize("iam:UpdateUser", arn, options?.caller);
+    this.authorizer.authorize(
+      "iam:UpdateUser",
+      arn,
+      options?.caller,
+      simIamResourceTagConditions(user.tags),
+    );
     assertSimIamNameFree(
       users.keys().filter((name) => name !== user.userName),
       username,
