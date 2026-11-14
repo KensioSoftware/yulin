@@ -8,6 +8,7 @@ import type { SimArnPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsCredentials } from "../sim-aws-credentials.js";
 import { SimIamAccessKey } from "../sim-iam-access-key.js";
 import { SimIamAssumedRolePrincipalFactory } from "./sim-iam-assumed-role-principal-factory.js";
+import type { SimIamSessionPolicy } from "./sim-iam-session-policy.js";
 
 interface SimIamSessionManagerProperties {
   readonly accountId: SimAwsAccountId;
@@ -22,6 +23,7 @@ export interface SimIamCreateRoleSessionInput {
   readonly sourcePrincipal: SimArnPrincipal;
   readonly creationDate: Date;
   readonly expiration: Date;
+  readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
 }
 
 export interface SimIamCreatedRoleSession {
@@ -67,6 +69,7 @@ export class SimIamSessionManager {
       sessionToken: credentials.sessionToken,
       creationDate: input.creationDate,
       expiration: input.expiration,
+      sessionPolicies: input.sessionPolicies,
     });
 
     this.credentialRegistry.registerAccessKey(

@@ -1,5 +1,6 @@
 import {
   CreateAccessKeyCommand,
+  CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
   PutRolePolicyCommand,
@@ -106,6 +107,49 @@ describe("Assuming a Role over the STS endpoint", () => {
     const identity = await sessionClient.send(new GetCallerIdentityCommand({}));
 
     assertIdentical(identity.Arn, assumedRoleUser.Arn);
+  });
+
+  it("carries the session policies the request passes", async () => {
+    // Given a Role this caller is trusted to assume, and a managed policy
+    await createRole("Limited", userArn);
+    const policy = await simAws.iam().createPolicy(
+      new CreatePolicyCommand({
+        PolicyName: "ListOnly",
+        PolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Action: "s3:ListBucket",
+            Resource: "*",
+          },
+        }),
+      }),
+    );
+
+    // When it is assumed over the endpoint with an inline and a managed
+    // session policy
+    const assumed = await client.send(
+      new AssumeRoleCommand({
+        RoleArn: `arn:aws:iam::${accountId}:role/Limited`,
+        RoleSessionName: "limited",
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: { Effect: "Allow", Action: "s3:GetObject", Resource: "*" },
+        }),
+        PolicyArns: [{ arn: policy.Policy.Arn }],
+      }),
+    );
+
+    // Then the session holds both
+    const session = assumed.Credentials;
+    assertDefined(session?.AccessKeyId, "the session access key id");
+    assertDefined(session.SecretAccessKey, "the session secret");
+    const identity = simAws.iam().credentials.resolveCredentials({
+      accessKeyId: session.AccessKeyId,
+      secretAccessKey: session.SecretAccessKey,
+      sessionToken: session.SessionToken,
+    });
+    assertIdentical(identity.session?.sessionPolicies?.length, 2);
   });
 
   it("expires the session on simulated time rather than on the host clock", async () => {

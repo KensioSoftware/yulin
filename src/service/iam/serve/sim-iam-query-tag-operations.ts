@@ -3,8 +3,10 @@ import type { SimQueryFields } from "../../../serve/http/api/query/sim-query-req
 import {
   queryList,
   queryMembers,
+  queryStructure,
   type SimQueryOutput,
 } from "../../../serve/http/api/query/sim-query-result.js";
+import { simIamAttachedBoundaryMembers } from "../role/sim-iam-role-boundary.js";
 
 /**
  * Read the `Tags` list of a request, as `Tags.member.N.Key` and
@@ -25,6 +27,22 @@ export function iamQueryTagsInput(
 export function iamQueryTags(output: SimQueryOutput): string {
   return queryList(output, "Tags", (tag) =>
     queryMembers(tag, ["Key", "Value"]),
+  );
+}
+
+/**
+ * Write the permissions boundary and tags a Role or User carries, where it
+ * carries them.
+ *
+ * A boundary is a structure of its own, and `queryMembers` would write it as
+ * the JSON text of an object. A listing leaves the field out altogether, as
+ * IAM does, so only the create and the get pass this.
+ */
+export function iamQueryBoundaryAndTags(identity: SimQueryOutput): string {
+  return (
+    queryStructure(identity, "PermissionsBoundary", (boundary) =>
+      queryMembers(boundary, simIamAttachedBoundaryMembers),
+    ) + iamQueryTags(identity)
   );
 }
 

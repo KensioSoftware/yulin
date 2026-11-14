@@ -18,6 +18,24 @@ export interface SimAssumeRoleCommandInput {
   readonly RoleSessionName?: string | undefined;
   readonly DurationSeconds?: number | undefined;
   readonly ExternalId?: string | undefined;
+
+  /**
+   * An inline session policy, as JSON. It caps what the Role's policies grant
+   * the session.
+   */
+  readonly Policy?: string | undefined;
+
+  /**
+   * Managed policies in the Role's Account to use as session policies.
+   */
+  readonly PolicyArns?: readonly SimStsPolicyDescriptor[] | undefined;
+}
+
+/**
+ * One managed session policy, named by ARN.
+ */
+export interface SimStsPolicyDescriptor {
+  readonly arn?: string | undefined;
 }
 
 /**

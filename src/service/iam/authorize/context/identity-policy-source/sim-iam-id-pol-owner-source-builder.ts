@@ -2,7 +2,11 @@ import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
 import { jsonParse } from "../../../../../util/type-guard/json.js";
 import { simIamManagedPolicyLookup } from "../../../policy/sim-iam-managed-policy-lookup.js";
-import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
+import {
+  type SimIamAuthZPolicyLimit,
+  type SimIamAuthZPolicySource,
+  simIamNoPolicyLimit,
+} from "../sim-iam-auth-z-context.js";
 import type { SimIamIdentityPolicyOwner } from "./sim-iam-id-pol-owner-resolver.js";
 
 interface SimIamIdentityPolicyOwnerSourceBuilderProperties {
@@ -35,6 +39,32 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
       ...this.inlinePolicySources(owner),
       ...this.attachedPolicySources(owner),
     ];
+  }
+
+  /**
+   * The permissions boundary set on the role or user.
+   *
+   * A boundary naming a policy that has no document to evaluate still
+   * applies, and allows nothing.
+   */
+  permissionsBoundary(
+    owner: SimIamIdentityPolicyOwner,
+  ): SimIamAuthZPolicyLimit {
+    const boundaryArn = owner.permissionsBoundaryArn;
+
+    if (boundaryArn === undefined) {
+      return simIamNoPolicyLimit;
+    }
+
+    const policy = simIamManagedPolicyLookup(this.policies, boundaryArn);
+
+    return {
+      applies: true,
+      sources: (policy === undefined
+        ? []
+        : this.managedPolicySource(policy)
+      ).map((source) => ({ ...source, sourceType: "permissions-boundary" })),
+    };
   }
 
   /**

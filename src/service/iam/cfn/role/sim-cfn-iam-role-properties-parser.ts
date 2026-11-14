@@ -6,6 +6,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
 import {
   simCfnIamJsonObject,
+  simCfnIamOptionalInteger,
   simCfnIamOptionalString,
   simCfnIamTags,
 } from "../sim-cfn-iam-property.js";
@@ -21,6 +22,7 @@ export interface SimCfnIamRoleProperties {
   readonly description: string | undefined;
   readonly assumeRolePolicyDocument: string;
   readonly permissionsBoundary: string | undefined;
+  readonly maxSessionDuration: number | undefined;
   readonly inlinePolicies: readonly SimCfnIamInlinePolicy[];
   readonly managedPolicyArns: readonly string[];
   readonly tags: readonly SimIamTagInput[] | undefined;
@@ -59,6 +61,12 @@ export class SimCfnIamRolePropertiesParser {
         properties,
         "PermissionsBoundary",
       ),
+      maxSessionDuration: simCfnIamOptionalInteger({
+        resourceType,
+        resource,
+        value: properties["MaxSessionDuration"],
+        label: "MaxSessionDuration",
+      }),
       inlinePolicies: this.policiesParser.inlinePolicies(resource, properties),
       managedPolicyArns: this.policiesParser.managedPolicyArns(
         resource,

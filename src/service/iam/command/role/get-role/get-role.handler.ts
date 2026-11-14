@@ -11,6 +11,7 @@ import type {
 } from "./get-role.command.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
+import { simIamRoleMaxSessionDurationMember } from "../../../role/sim-iam-role-session-duration.js";
 import { simIamTagsMember } from "../../../tag/sim-iam-identity-tags.js";
 
 interface GetRoleCommandHandlerProperties {
@@ -65,6 +66,7 @@ export class GetRoleCommandHandler implements CommandHandler<
         CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
+        ...simIamRoleMaxSessionDurationMember(role),
         PermissionsBoundary: simIamAttachedPermissionsBoundary(role),
         ...simIamTagsMember(role.tags),
       },

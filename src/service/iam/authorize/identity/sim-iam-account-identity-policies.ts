@@ -1,5 +1,8 @@
 import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimIamAuthZPolicySource } from "../context/sim-iam-auth-z-context.js";
+import type {
+  SimIamAuthZPolicyLimit,
+  SimIamAuthZPolicySource,
+} from "../context/sim-iam-auth-z-context.js";
 
 /**
  * Identity-based policy discovery for principals belonging to one Account.
@@ -13,4 +16,9 @@ export interface SimIamAccountIdentityPolicies {
   identityPolicySourcesFor(
     principal: SimAwsPrincipal,
   ): readonly SimIamAuthZPolicySource[];
+
+  /**
+   * The permissions boundary this Account sets on one of its own principals.
+   */
+  permissionsBoundaryFor(principal: SimAwsPrincipal): SimIamAuthZPolicyLimit;
 }

@@ -2,7 +2,11 @@ import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
-import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
+import {
+  type SimIamAuthZPolicyLimit,
+  type SimIamAuthZPolicySource,
+  simIamNoPolicyLimit,
+} from "../sim-iam-auth-z-context.js";
 import { SimIamIdentityPolicyOwnerResolver } from "./sim-iam-id-pol-owner-resolver.js";
 import { SimIamIdentityPolicyOwnerSourceBuilder } from "./sim-iam-id-pol-owner-source-builder.js";
 
@@ -56,5 +60,21 @@ export class SimIamAuthZIdentityPolicyCoordinator {
     const owner = this.ownerResolver.resolve(principalArn);
 
     return owner === undefined ? [] : this.ownerSourceBuilder.build(owner);
+  }
+
+  /**
+   * Return the permissions boundary set on the principal ARN's role or user.
+   *
+   * A caller with no matching IAM owner, such as the Account root, carries no
+   * boundary.
+   */
+  permissionsBoundary(
+    principalArn: string | undefined,
+  ): SimIamAuthZPolicyLimit {
+    const owner = this.ownerResolver.resolve(principalArn);
+
+    return owner === undefined
+      ? simIamNoPolicyLimit
+      : this.ownerSourceBuilder.permissionsBoundary(owner);
   }
 }

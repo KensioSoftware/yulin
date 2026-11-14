@@ -46,6 +46,10 @@ function simStsQueryOperations(): SimQueryOperations {
           RoleSessionName: fields.text("RoleSessionName"),
           DurationSeconds: fields.number("DurationSeconds"),
           ExternalId: fields.text("ExternalId"),
+          Policy: fields.text("Policy"),
+          PolicyArns: fields.list("PolicyArns", (policy) => ({
+            arn: policy.text("arn"),
+          })),
         }),
         result: (output): string =>
           queryStructure(output, "Credentials", (credentials) =>

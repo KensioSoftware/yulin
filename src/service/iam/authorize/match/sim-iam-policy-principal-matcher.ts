@@ -143,10 +143,15 @@ export class SimIamPolicyPrincipalMatcher {
       );
     }
 
-    return this.arnPatternMatch(pattern).when(
-      this.arnMatches(pattern, caller.arn) ||
-        this.arnMatches(pattern, caller.identityPolicyArn),
-    );
+    const match = this.arnPatternMatch(pattern);
+
+    if (this.arnMatches(pattern, caller.arn)) {
+      return match;
+    }
+
+    return match
+      .throughRole()
+      .when(this.arnMatches(pattern, caller.identityPolicyArn));
   }
 
   /**

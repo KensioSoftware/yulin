@@ -28,13 +28,18 @@ export interface SimIamRole extends SimIamPrincipal {
   readonly creationDate: Date;
 
   /**
+   * The longest session STS issues for this Role, in seconds. Undefined means
+   * IAM's default of one hour.
+   */
+  readonly maxSessionDuration?: number | undefined;
+
+  /**
    * ARN of the managed policy attached to this Role as its permissions
    * boundary, where the request creating it declared one.
    *
-   * This records what the Role was created with, so that a policy conditioned
-   * on `iam:PermissionsBoundary` can be tested against the Roles a deployment
-   * makes. The boundary is not yet evaluated as a policy source, so it does
-   * not narrow what the Role itself may do.
+   * The boundary caps what the Role's identity policies can grant to its
+   * sessions. A policy conditioned on `iam:PermissionsBoundary` is tested
+   * against it when the Role is created.
    */
   readonly permissionsBoundaryArn?: SimArn | undefined;
 

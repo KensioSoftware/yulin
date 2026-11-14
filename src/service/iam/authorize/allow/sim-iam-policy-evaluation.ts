@@ -59,6 +59,14 @@ export class SimIamPolicyEvaluation {
   }
 
   /**
+   * Which sides produced a matching Allow that a permissions boundary or
+   * session policy allowing nothing leaves standing.
+   */
+  get unlimitedSides(): SimIamAllowSides {
+    return this.allows.unlimitedSides;
+  }
+
+  /**
    * Record the matching statements of one policy.
    */
   private evaluate(

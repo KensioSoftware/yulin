@@ -36,6 +36,12 @@ export interface SimIamUser extends SimIamPrincipal {
   readonly attachedPolicyArns: Set<SimArn>;
 
   /**
+   * ARN of the managed policy that caps what this User's identity policies
+   * can grant, where it has one.
+   */
+  readonly permissionsBoundaryArn?: SimArn | undefined;
+
+  /**
    * The console sign-in profile, once the user has been given one.
    *
    * Mutable because a login profile is created after the user itself, by

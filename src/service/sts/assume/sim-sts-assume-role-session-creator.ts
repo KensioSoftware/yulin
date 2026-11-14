@@ -4,6 +4,8 @@ import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-r
 import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimAssumeRoleCommandOutput } from "../command/assume-role/assume-role.command.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+import { simStsSessionPolicies } from "./sim-sts-session-policies.js";
+import type { SimStsSessionPolicyRequest } from "./sim-sts-session-policy-request.js";
 
 interface AssumeRoleSessionCreatorProperties {
   readonly iamResolver: SimIamAccountResolver;
@@ -20,6 +22,7 @@ interface CreateAssumeRoleSessionInput {
   readonly roleSessionName: string;
   readonly sourcePrincipal: SimArnPrincipal;
   readonly durationSeconds: number;
+  readonly sessionPolicy: SimStsSessionPolicyRequest | undefined;
 }
 
 /**
@@ -31,7 +34,8 @@ interface CreateAssumeRoleSessionInput {
  *
  * - resolving the target account's IAM session manager;
  * - calculating the session creation and expiration timestamps;
- * - creating the temporary Role session and its credentials;
+ * - creating the temporary Role session and its credentials, with the session
+ *   policies the request passed;
  * - mapping internal session data to the public AssumeRole response shape.
  *
  * Keeping these operations together ensures the same expiration timestamp is
@@ -66,6 +70,10 @@ export class SimStsAssumeRoleSessionCreator {
       sourcePrincipal: input.sourcePrincipal,
       creationDate,
       expiration,
+      sessionPolicies: simStsSessionPolicies(
+        input.sessionPolicy,
+        targetIam.policies,
+      ),
     });
 
     return {

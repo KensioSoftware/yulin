@@ -3,6 +3,7 @@ import type {
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamRole } from "../../role/sim-iam-role.js";
+import type { SimIamSessionPolicy } from "./sim-iam-session-policy.js";
 
 interface SimIamSessionProperties {
   readonly principal: SimArnPrincipal;
@@ -12,6 +13,7 @@ interface SimIamSessionProperties {
   readonly sessionToken: string;
   readonly creationDate: Date;
   readonly expiration: Date;
+  readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
 }
 
 /**
@@ -28,6 +30,12 @@ export class SimIamSession {
   public readonly sessionToken: string;
   public readonly creationDate: Date;
   public readonly expiration: Date;
+
+  /**
+   * The policies passed to `AssumeRole`, which cap what the Role's policies
+   * grant this session. Undefined where none were passed.
+   */
+  public readonly sessionPolicies?: readonly SimIamSessionPolicy[] | undefined;
 
   constructor(properties: SimIamSessionProperties) {
     if (properties.sessionName.length === 0) {
@@ -49,6 +57,7 @@ export class SimIamSession {
     this.sessionToken = properties.sessionToken;
     this.creationDate = new Date(properties.creationDate);
     this.expiration = new Date(properties.expiration);
+    this.sessionPolicies = properties.sessionPolicies;
   }
 
   /**

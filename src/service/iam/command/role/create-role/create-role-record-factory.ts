@@ -11,6 +11,10 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { makeSimIamRoleId } from "../../../role/sim-iam-role-id.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
 import {
+  assertSimIamMaxSessionDuration,
+  simIamRoleMaxSessionDurationMember,
+} from "../../../role/sim-iam-role-session-duration.js";
+import {
   makeSimIamIdentityTags,
   simIamTagsMember,
 } from "../../../tag/sim-iam-identity-tags.js";
@@ -29,10 +33,13 @@ interface MakeRoleProperties {
  */
 export class CreateRoleRecordFactory {
   /**
-   * Make a sim IAM Role object from input properties.
+   * Make a sim IAM Role object from input properties, refusing a
+   * `MaxSessionDuration` IAM would refuse.
    */
   makeRole(properties: MakeRoleProperties): SimIamRole {
     const { accountId, arn, path, roleName, cmd, creationDate } = properties;
+
+    assertSimIamMaxSessionDuration(cmd.input.MaxSessionDuration);
 
     return {
       arn,
@@ -47,6 +54,7 @@ export class CreateRoleRecordFactory {
         | undefined,
       description: cmd.input.Description,
       creationDate,
+      maxSessionDuration: cmd.input.MaxSessionDuration,
       permissionsBoundaryArn: cmd.input.PermissionsBoundary as
         | SimArn
         | undefined,
@@ -69,6 +77,7 @@ export class CreateRoleRecordFactory {
         CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
+        ...simIamRoleMaxSessionDurationMember(role),
         PermissionsBoundary: simIamAttachedPermissionsBoundary(role),
         ...simIamTagsMember(role.tags),
       },

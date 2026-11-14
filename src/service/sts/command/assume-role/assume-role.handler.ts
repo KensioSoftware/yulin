@@ -21,6 +21,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAmbientCaller } from "../../../aws/caller/sim-aws-ambient-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
+import { assertSimStsSessionDuration } from "../../assume/sim-sts-session-duration.js";
 
 interface AssumeRoleCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
@@ -125,12 +126,19 @@ export class AssumeRoleCommandHandler implements CommandHandler<
       conditionContext: request.conditionContext,
     });
 
+    assertSimStsSessionDuration(
+      request.durationSeconds,
+      role.MaxSessionDuration,
+      caller.principal,
+    );
+
     return this.sessionCreator.create({
       roleArnParts: request.roleArnParts,
       role,
       roleSessionName: request.roleSessionName,
       sourcePrincipal: caller.principal,
       durationSeconds: request.durationSeconds,
+      sessionPolicy: request.sessionPolicy,
     });
   }
 }
