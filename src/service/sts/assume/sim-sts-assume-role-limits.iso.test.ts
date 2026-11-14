@@ -267,8 +267,9 @@ describe("IAM Role MaxSessionDuration", () => {
     // When Roles are created allowing 30 minutes and 13 hours
     const short = await create(1800);
     const long = await create(46_800);
+    const fractional = await create(7200.5);
 
-    // Then IAM refuses both
+    // Then IAM refuses both, and a duration that is not a whole number
     assertInstanceOf(short, SimIamValidationError);
     assertIdentical(
       short.message,
@@ -276,5 +277,6 @@ describe("IAM Role MaxSessionDuration", () => {
         "failed to satisfy constraint: Member must have value greater than or equal to 3600",
     );
     assertInstanceOf(long, SimIamValidationError);
+    assertInstanceOf(fractional, SimIamValidationError);
   });
 });

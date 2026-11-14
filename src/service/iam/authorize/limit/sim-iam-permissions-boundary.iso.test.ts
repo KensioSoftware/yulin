@@ -280,6 +280,53 @@ describe("sim IAM permissions boundaries", () => {
     assertTrue(receive("*"));
   });
 
+  it("limits a resource policy naming a Role its caller is named by", async () => {
+    // Given a Role whose boundary allows only S3, named as the caller itself
+    const { simIam, boundaryArn } = await boundedAccount();
+    const { roleArn } = await boundedRoleSession(simIam, boundaryArn);
+
+    // When the Role receives from a queue whose policy names it
+    const decision = simIam.authorize({
+      action: "sqs:ReceiveMessage",
+      resource: "arn:aws:sqs:eu-west-2:111122223333:jobs",
+      caller: { kind: "arn", arn: roleArn },
+      resourcePolicies: [queuePolicyFor(roleArn)],
+    });
+
+    // Then the boundary holds the grant back, as it does for a session
+    assertTrue(decision.isImplicitDeny);
+  });
+
+  it("keeps a wildcard grant listed beside a session's Role", async () => {
+    // Given a session of a bounded Role, and a queue policy naming both the
+    // Role and everyone
+    const { simIam, boundaryArn } = await boundedAccount();
+    const { caller, roleArn } = await boundedRoleSession(simIam, boundaryArn);
+
+    // When the session receives from the queue
+    const decision = simIam.authorize({
+      action: "sqs:ReceiveMessage",
+      resource: "arn:aws:sqs:eu-west-2:111122223333:jobs",
+      caller,
+      resourcePolicies: [
+        {
+          document: {
+            Version: "2012-10-17",
+            Statement: {
+              Effect: "Allow",
+              Principal: { AWS: [roleArn, "*"] },
+              Action: "sqs:ReceiveMessage",
+              Resource: "*",
+            },
+          },
+        },
+      ],
+    });
+
+    // Then the wildcard alternative allows it past the boundary
+    assertTrue(decision.isAllowed);
+  });
+
   it("denies through a resource policy where the boundary has a Deny", async () => {
     // Given a User whose boundary denies deletes, named by a bucket policy
     const { simIam, boundaryArn } = await boundedAccount();

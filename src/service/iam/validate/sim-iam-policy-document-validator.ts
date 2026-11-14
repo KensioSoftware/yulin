@@ -74,6 +74,12 @@ export class SimIamPolicyDocumentValidator {
     statement: SimIamPolicyDocumentStatement,
     label: string,
   ): void {
+    // JSON parse can produce a statement of any shape at runtime
+    // oxlint-disable-next-line typescript/no-unnecessary-condition
+    if (typeof statement !== "object" || statement === null) {
+      throw new SimIamMalformedPolicyDocument(`${label}: must be an object`);
+    }
+
     // oxlint-disable-next-line typescript/no-unnecessary-condition
     if (statement.Effect !== "Allow" && statement.Effect !== "Deny") {
       throw new SimIamMalformedPolicyDocument(

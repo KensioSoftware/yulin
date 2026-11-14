@@ -30,7 +30,7 @@ export function assertSimIamMaxSessionDuration(
     return;
   }
 
-  if (value < defaultMaxSessionDuration) {
+  if (!Number.isSafeInteger(value) || value < defaultMaxSessionDuration) {
     throw SimIamValidationError.member(
       "maxSessionDuration",
       value,

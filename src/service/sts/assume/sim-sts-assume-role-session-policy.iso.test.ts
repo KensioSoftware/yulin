@@ -290,6 +290,25 @@ describe("STS AssumeRole session policies", () => {
     assertInstanceOf(error, SimIamMalformedPolicyDocument);
   });
 
+  it("refuses an inline session policy holding a statement that is not an object", async () => {
+    // Given a Role its Account root may assume
+    const { simAws, roleArn } = await assumableRole();
+
+    // When the Role is assumed with a null statement
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.sts().assumeRole(
+        new AssumeRoleCommand({
+          RoleArn: roleArn,
+          RoleSessionName: "reader",
+          Policy: '{"Version":"2012-10-17","Statement":[null]}',
+        }),
+      );
+    });
+
+    // Then STS refuses it as malformed
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+  });
+
   it("refuses more than ten managed session policies", async () => {
     // Given a Role its Account root may assume
     const { simAws, roleArn } = await assumableRole();

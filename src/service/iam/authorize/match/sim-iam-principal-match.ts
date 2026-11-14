@@ -80,21 +80,25 @@ export class SimIamPrincipalMatch {
   }
 
   /**
-   * The first match among alternatives, since Principal lists are an OR.
+   * The matches among alternatives combined, since Principal lists are an OR.
    *
-   * A statement naming the caller wins over one that admits it some other
-   * way, because naming the caller grants to the caller whatever else the
-   * statement says.
+   * Each alternative contributes what it grants. Any alternative naming the
+   * caller names it. Only alternatives that all go through the caller's
+   * Account delegate to it, and only alternatives that all go through a Role
+   * are held back by the caller's permissions boundary and session policy.
    */
   static first(matches: readonly SimIamPrincipalMatch[]): SimIamPrincipalMatch {
     const matched = matches.filter((result) => result.matched);
 
-    return (
-      matched.find((result) => result.namesCaller && !result.isThroughRole) ??
-      matched.find((result) => result.namesCaller) ??
-      matched.find((result) => !result.isAccountDelegation) ??
-      matched[0] ??
-      this.none()
+    if (matched.length === 0) {
+      return this.none();
+    }
+
+    return new SimIamPrincipalMatch(
+      true,
+      matched.every((result) => result.isAccountDelegation),
+      matched.some((result) => result.namesCaller),
+      matched.every((result) => !result.passesPrincipalLimits),
     );
   }
 
@@ -128,4 +132,12 @@ export class SimIamPrincipalMatch {
   when(matched: boolean): SimIamPrincipalMatch {
     return matched ? this : SimIamPrincipalMatch.none();
   }
+}
+
+/**
+ * Whether an ARN names an IAM Role, which a caller only ever acts as through a
+ * session of it.
+ */
+export function simIamIsRoleArn(arn: string): boolean {
+  return /^arn:[^:]+:iam::\d{12}:role\//u.test(arn);
 }
