@@ -3,8 +3,7 @@ import type { BackgroundScheduler } from "../../../../../util/background/backgro
 import { BackgroundTasks } from "../../../../../util/background/background.js";
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
-import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
-import { makeSimUserArn } from "../../../user/arn/sim-iam-user-arn.js";
+import { assertSimIamNewEntity } from "../../sim-iam-account-quota.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { normaliseUserPath } from "../../../user/sim-iam-user-path.js";
 import type {
@@ -50,23 +49,13 @@ export class CreateUserCommandHandler implements CommandHandler<
     }
 
     const path = normaliseUserPath(command.input.Path);
-    const arn = makeSimUserArn({
-      accountId: this.accountId,
-      path,
-      userName: username,
-    });
 
     await this.background.sequence();
 
-    if (this.users.has(username)) {
-      throw new SimIamEntityAlreadyExists(
-        `Sim IAM User already exists: ${username}`,
-      );
-    }
+    assertSimIamNewEntity("Users", this.users.keys(), username);
 
     const user = this.userFactory.makeUser({
       accountId: this.accountId,
-      arn,
       path,
       userName: username,
       creationDate: this.background.now(),

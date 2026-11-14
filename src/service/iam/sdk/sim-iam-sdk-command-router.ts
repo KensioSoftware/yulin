@@ -26,12 +26,14 @@ type SimIamOperationName = {
  * Command without its `Command` suffix and starting lower case.
  */
 const simIamSdkOperations = [
+  "addRoleToInstanceProfile",
   "addUserToGroup",
   "attachGroupPolicy",
   "attachRolePolicy",
   "attachUserPolicy",
   "createAccessKey",
   "createGroup",
+  "createInstanceProfile",
   "createLoginProfile",
   "createPolicy",
   "createPolicyVersion",
@@ -40,6 +42,7 @@ const simIamSdkOperations = [
   "deleteAccessKey",
   "deleteGroup",
   "deleteGroupPolicy",
+  "deleteInstanceProfile",
   "deleteLoginProfile",
   "deletePolicy",
   "deletePolicyVersion",
@@ -52,8 +55,10 @@ const simIamSdkOperations = [
   "detachGroupPolicy",
   "detachRolePolicy",
   "detachUserPolicy",
+  "getAccountSummary",
   "getGroup",
   "getGroupPolicy",
+  "getInstanceProfile",
   "getLoginProfile",
   "getPolicy",
   "getPolicyVersion",
@@ -68,6 +73,8 @@ const simIamSdkOperations = [
   "listGroupPolicies",
   "listGroups",
   "listGroupsForUser",
+  "listInstanceProfiles",
+  "listInstanceProfilesForRole",
   "listPolicies",
   "listPolicyVersions",
   "listRolePolicies",
@@ -81,6 +88,7 @@ const simIamSdkOperations = [
   "putRolePolicy",
   "putUserPermissionsBoundary",
   "putUserPolicy",
+  "removeRoleFromInstanceProfile",
   "removeUserFromGroup",
   "setDefaultPolicyVersion",
   "tagRole",
@@ -89,7 +97,9 @@ const simIamSdkOperations = [
   "untagUser",
   "updateAccessKey",
   "updateAssumeRolePolicy",
+  "updateGroup",
   "updateRole",
+  "updateUser",
 ] as const satisfies readonly SimIamOperationName[];
 
 /**

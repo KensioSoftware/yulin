@@ -11,6 +11,7 @@ import { SimCfnIamUserCreator } from "./user/sim-cfn-iam-user-creator.js";
 import { SimCfnIamGroupCreator } from "./group/sim-cfn-iam-group-creator.js";
 import { SimCfnIamGroupMembership } from "./group/sim-cfn-iam-group-membership.js";
 import { SimCfnIamResourceDeleter } from "./sim-cfn-iam-resource-deleter.js";
+import { SimCfnIamInstanceProfileCreator } from "./instance-profile/sim-cfn-iam-instance-profile-creator.js";
 import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 import { simCfnResourceCallerOptions } from "../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -24,6 +25,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
   private readonly userCreator: SimCfnIamUserCreator;
   private readonly groupCreator: SimCfnIamGroupCreator;
   private readonly membership: SimCfnIamGroupMembership;
+  private readonly instanceProfiles: SimCfnIamInstanceProfileCreator;
   private readonly deleter: SimCfnIamResourceDeleter;
 
   constructor(iam: SimIam) {
@@ -37,6 +39,7 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
       iam,
       membership: this.membership,
     });
+    this.instanceProfiles = new SimCfnIamInstanceProfileCreator(iam);
   }
 
   /**
@@ -70,6 +73,13 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
       }
       case "Group": {
         return await this.groupCreator.create(resource, properties, options);
+      }
+      case "InstanceProfile": {
+        return await this.instanceProfiles.create(
+          resource,
+          properties,
+          options,
+        );
       }
       case "UserToGroupAddition": {
         await this.membership.membership(resource, properties, {

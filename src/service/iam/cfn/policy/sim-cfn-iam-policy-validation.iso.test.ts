@@ -182,16 +182,16 @@ describe("IAM CloudFormation Policy validation", () => {
         accountId: "111111111111" as SimAwsAccountId,
         regionName: "eu-west-2",
       },
-      logicalId: "ExampleProfile",
+      logicalId: "ExampleProvider",
       template: {
-        Type: "AWS::IAM::InstanceProfile",
+        Type: "AWS::IAM::OIDCProvider",
       },
     });
 
     // When creation is attempted, then it rejects with an unsupported
     // Resource type error naming the type for diagnosis.
     const error = await assertThrowsErrorAsync(async () =>
-      factory.create("InstanceProfile", resource, {
+      factory.create("OIDCProvider", resource, {
         simAws,
         resources: new Map(),
       }),
@@ -199,7 +199,7 @@ describe("IAM CloudFormation Policy validation", () => {
 
     assertIdentical(
       error.message,
-      "Unsupported sim IAM CloudFormation Resource InstanceProfile",
+      "Unsupported sim IAM CloudFormation Resource OIDCProvider",
     );
   });
 

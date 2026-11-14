@@ -9,10 +9,10 @@ import {
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
 import { CreateRoleRecordFactory } from "./create-role-record-factory.js";
-import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
+import { assertSimIamNewEntity } from "../../sim-iam-account-quota.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { normaliseRolePath } from "../../../role/sim-iam-role-path.js";
-import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
+import { simIamRoleNameInput } from "../../../role/sim-iam-role-name-input.js";
 import { SimIamTrustPolicyDocumentValidator } from "../../../validate/trust/sim-iam-trust-policy-document-validator.js";
 import { assertSimIamTrustPolicyWithinSizeLimit } from "../../../validate/size/sim-iam-policy-document-size.js";
 
@@ -56,11 +56,7 @@ export class CreateRoleCommandHandler implements CommandHandler<
   async handle(
     command: SimCreateRoleCommand,
   ): Promise<SimCreateRoleCommandOutput> {
-    const roleName = command.input.RoleName as SimIamRoleName | undefined;
-
-    if (roleName === undefined || roleName.length === 0) {
-      throw new Error("RoleName is required");
-    }
+    const roleName = simIamRoleNameInput(command.input.RoleName);
 
     const trustPolicyDocument = command.input.AssumeRolePolicyDocument;
 
@@ -68,24 +64,14 @@ export class CreateRoleCommandHandler implements CommandHandler<
     this.trustPolicyValidator.validateRequired(trustPolicyDocument);
 
     const path = normaliseRolePath(command.input.Path);
-    const arn = makeSimRoleArn({
-      accountId: this.accountId,
-      path,
-      roleName,
-    });
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    if (this.roles.has(roleName)) {
-      throw new SimIamEntityAlreadyExists(
-        `Sim IAM Role already exists: ${roleName}`,
-      );
-    }
+    assertSimIamNewEntity("Roles", this.roles.keys(), roleName);
 
     const role = this.roleFactory.makeRole({
       accountId: this.accountId,
-      arn,
       path,
       roleName,
       cmd: command,

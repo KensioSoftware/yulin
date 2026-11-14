@@ -275,7 +275,7 @@ describe("IAM CreateRoleCommand", () => {
     // Then IAM reports that the entity already exists.
     assertIdentical(
       error.message,
-      "Sim IAM Role already exists: DuplicateRole",
+      "Role with name DuplicateRole already exists.",
     );
   });
 

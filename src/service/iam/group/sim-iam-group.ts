@@ -15,10 +15,14 @@ export type SimIamGroupId = Brand<string, "SimIamGroupId">;
  * the Users record which groups they are in.
  */
 export interface SimIamGroup {
-  readonly arn: SimArn;
+  /**
+   * The group's ARN, name and path, which `UpdateGroup` can change. Its ID
+   * stays the same.
+   */
+  arn: SimArn;
   readonly groupId: SimIamGroupId;
-  readonly groupName: SimIamGroupName;
-  readonly path: string;
+  groupName: SimIamGroupName;
+  path: string;
   readonly creationDate: Date;
 
   /**

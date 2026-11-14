@@ -2,6 +2,7 @@ import type { SimArn } from "../../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { makeSimIamUserId } from "../../../user/sim-iam-user-id.js";
+import { makeSimUserArn } from "../../../user/arn/sim-iam-user-arn.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
 import type { SimCreateUserCommandOutput } from "./create-user.command.js";
 import {
@@ -12,7 +13,6 @@ import {
 
 interface MakeUserProperties {
   readonly accountId: SimAwsAccountId;
-  readonly arn: SimArn;
   readonly path: string;
   readonly userName: SimIamUsername;
   readonly creationDate: Date;
@@ -29,7 +29,7 @@ export class CreateUserRecordFactory {
    */
   makeUser(properties: MakeUserProperties): SimIamUser {
     return {
-      arn: properties.arn,
+      arn: makeSimUserArn(properties),
       accountId: properties.accountId,
       principalType: "user",
       name: properties.userName,

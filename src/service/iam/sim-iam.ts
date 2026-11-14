@@ -20,7 +20,11 @@ import type {
   SimArnPrincipal,
   SimAwsPrincipal,
 } from "../aws/caller/sim-aws-caller.js";
-import { SimIamIdentityOperations } from "./sim-iam-identity-operations.js";
+import { SimIamProfileOperations } from "./sim-iam-profile-operations.js";
+import type {
+  SimIamInstanceProfile,
+  SimIamInstanceProfileName,
+} from "./instance-profile/sim-iam-instance-profile.js";
 import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
@@ -45,7 +49,7 @@ import {
  * service facade per Account.
  */
 export class SimIam
-  extends SimIamIdentityOperations
+  extends SimIamProfileOperations
   implements SimIamInterServiceAuthZ, SimIamAccountIdentityPolicies
 {
   /**
@@ -81,6 +85,15 @@ export class SimIam
    */
   public readonly groups: Map<SimIamGroupName, SimIamGroup>;
 
+  /**
+   * The instance profiles this Account holds, by name.
+   * @internal
+   */
+  public readonly instanceProfiles: Map<
+    SimIamInstanceProfileName,
+    SimIamInstanceProfile
+  >;
+
   protected readonly commands: SimIamCommandHandlers;
   private readonly cfnFactory: SimCfnServiceResourceFactory;
   private readonly accountAuthZ: SimIamAccountAuthZ;
@@ -96,6 +109,7 @@ export class SimIam
     this.roles = parts.roles;
     this.users = parts.users;
     this.groups = parts.groups;
+    this.instanceProfiles = parts.instanceProfiles;
     this.credentials = parts.credentials;
     this.sessionManager = parts.sessionManager;
     this.accountAuthZ = parts.accountAuthZ;

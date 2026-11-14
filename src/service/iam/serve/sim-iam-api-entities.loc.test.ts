@@ -3,8 +3,8 @@ import {
   CreateAccessKeyCommand,
   CreateGroupCommand,
   CreatePolicyCommand,
-  CreateInstanceProfileCommand,
   CreateLoginProfileCommand,
+  CreateOpenIDConnectProviderCommand,
   CreatePolicyVersionCommand,
   CreateUserCommand,
   DeleteAccessKeyCommand,
@@ -227,13 +227,15 @@ describe("Serving simulated IAM groups, Users and policy versions", () => {
     const error = await assertThrowsErrorAsync(
       async () =>
         await client.send(
-          new CreateInstanceProfileCommand({ InstanceProfileName: "Widgets" }),
+          new CreateOpenIDConnectProviderCommand({
+            Url: "https://idp.example.com",
+          }),
         ),
     );
 
     // Then it is refused by name, in the shape the Query protocol states an
     // error, so an SDK raises it rather than failing to parse the response
     assertIdentical(error.name, "NotImplemented");
-    assertStringIncludes(error.message, "CreateInstanceProfile");
+    assertStringIncludes(error.message, "CreateOpenIDConnectProvider");
   });
 });

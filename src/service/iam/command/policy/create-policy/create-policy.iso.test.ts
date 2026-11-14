@@ -11,7 +11,10 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import { jsonStringify } from "../../../../../util/type-guard/json.js";
-import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
+import {
+  SimIamEntityAlreadyExists,
+  SimIamLimitExceeded,
+} from "../../../error/sim-iam.error.js";
 import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
 import { maxSimIamManagedPolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
 
@@ -214,42 +217,36 @@ describe("IAM CreatePolicyCommand", () => {
 
     assertIdentical(
       error.message,
-      "Sim IAM Policy already exists: arn:aws:iam::123456789012:policy/application/DuplicatePolicy",
+      "A policy called DuplicatePolicy already exists. Duplicate names are not allowed.",
     );
   });
 
-  it("allows policies with the same name in different paths", async () => {
+  it("refuses a policy name the Account already holds at another path", async () => {
+    // Given a policy named SharedPolicyName under /application/
     const simAws = new SimAws();
-
     const simIam = simAws.account("123456789012").iam();
-
-    const firstPolicyOutput = await simIam.createPolicy(
+    await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "SharedPolicyName",
         Path: "/application/",
         PolicyDocument: undefined,
       }),
     );
-    const secondPolicyOutput = await simIam.createPolicy(
-      new CreatePolicyCommand({
-        PolicyName: "SharedPolicyName",
-        Path: "/service-role/",
-        PolicyDocument: undefined,
-      }),
+
+    // When a policy of the same name, in another case, is created under
+    // /service-role/
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.createPolicy(
+        new CreatePolicyCommand({
+          PolicyName: "sharedpolicyname",
+          Path: "/service-role/",
+          PolicyDocument: undefined,
+        }),
+      ),
     );
 
-    assertIdentical(firstPolicyOutput.Policy.PolicyName, "SharedPolicyName");
-    assertIdentical(secondPolicyOutput.Policy.PolicyName, "SharedPolicyName");
-    assertIdentical(firstPolicyOutput.Policy.Path, "/application/");
-    assertIdentical(secondPolicyOutput.Policy.Path, "/service-role/");
-    assertIdentical(
-      firstPolicyOutput.Policy.Arn,
-      "arn:aws:iam::123456789012:policy/application/SharedPolicyName",
-    );
-    assertIdentical(
-      secondPolicyOutput.Policy.Arn,
-      "arn:aws:iam::123456789012:policy/service-role/SharedPolicyName",
-    );
+    // Then IAM refuses it, since a policy name is unique in the Account
+    assertInstanceOf(error, SimIamEntityAlreadyExists);
   });
 
   it("refuses a policy document over IAM's character limit", async () => {

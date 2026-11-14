@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnIamGroupDeleter } from "./group/sim-cfn-iam-group-deleter.js";
 import type { SimCfnIamGroupMembership } from "./group/sim-cfn-iam-group-membership.js";
+import { SimCfnIamInstanceProfileDeleter } from "./instance-profile/sim-cfn-iam-instance-profile-deleter.js";
 import type { SimIam } from "../sim-iam.js";
 import { SimCfnIamRoleDeleter } from "./role/sim-cfn-iam-role-deleter.js";
 import { SimCfnIamUserDeleter } from "./user/sim-cfn-iam-user-deleter.js";
@@ -22,6 +23,7 @@ export class SimCfnIamResourceDeleter {
   private readonly userDeleter: SimCfnIamUserDeleter;
   private readonly groupDeleter: SimCfnIamGroupDeleter;
   private readonly membership: SimCfnIamGroupMembership;
+  private readonly instanceProfiles: SimCfnIamInstanceProfileDeleter;
 
   constructor(properties: SimCfnIamResourceDeleterProperties) {
     this.policyDeleter = new SimCfnIamPolicyDeleter(properties.iam);
@@ -29,6 +31,7 @@ export class SimCfnIamResourceDeleter {
     this.userDeleter = new SimCfnIamUserDeleter({ iam: properties.iam });
     this.groupDeleter = new SimCfnIamGroupDeleter(properties.iam);
     this.membership = properties.membership;
+    this.instanceProfiles = new SimCfnIamInstanceProfileDeleter(properties.iam);
   }
 
   /**
@@ -63,6 +66,10 @@ export class SimCfnIamResourceDeleter {
       }
       case "Group": {
         await this.groupDeleter.delete(resource, options);
+        return;
+      }
+      case "InstanceProfile": {
+        await this.instanceProfiles.delete(resource, options);
         return;
       }
       case "UserToGroupAddition": {

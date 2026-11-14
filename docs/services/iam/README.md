@@ -419,17 +419,33 @@ repository that still says it is there.
 
 IAM refuses the following with `LimitExceeded`, at the defaults a new account carries:
 
-| Limit                                | Default | Message                                         |
-| ------------------------------------ | ------- | ----------------------------------------------- |
-| Managed policies attached to a Role  | 20      | `Cannot exceed quota for PoliciesPerRole: 20`   |
-| Managed policies attached to a User  | 10      | `Cannot exceed quota for PoliciesPerUser: 10`   |
-| Managed policies attached to a group | 10      | `Cannot exceed quota for PoliciesPerGroup: 10`  |
-| Access keys on a User, active or not | 2       | `Cannot exceed quota for AccessKeysPerUser: 2`  |
-| Groups a User is in                  | 10      | `Cannot exceed quota for GroupsPerUser: 10`     |
-| Versions of a managed policy         | 5       | `A managed policy can have up to 5 versions...` |
+| Limit                                   | Default | Message                                                         |
+| --------------------------------------- | ------- | --------------------------------------------------------------- |
+| Managed policies attached to a Role     | 20      | `Cannot exceed quota for PoliciesPerRole: 20`                   |
+| Managed policies attached to a User     | 10      | `Cannot exceed quota for PoliciesPerUser: 10`                   |
+| Managed policies attached to a group    | 10      | `Cannot exceed quota for PoliciesPerGroup: 10`                  |
+| Access keys on a User, active or not    | 2       | `Cannot exceed quota for AccessKeysPerUser: 2`                  |
+| Groups a User is in                     | 10      | `Cannot exceed quota for GroupsPerUser: 10`                     |
+| Versions of a managed policy            | 5       | `A managed policy can have up to 5 versions...`                 |
+| Roles in an instance profile            | 1       | `Cannot exceed quota for InstanceSessionsPerInstanceProfile: 1` |
+| Roles in an Account                     | 1,000   | `Cannot exceed quota for RolesPerAccount: 1000`                 |
+| Users in an Account                     | 5,000   | `Cannot exceed quota for UsersPerAccount: 5000`                 |
+| Groups in an Account                    | 300     | `Cannot exceed quota for GroupsPerAccount: 300`                 |
+| Customer managed policies in an Account | 1,500   | `Cannot exceed quota for PoliciesPerAccount: 1500`              |
+| Instance profiles in an Account         | 1,000   | `Cannot exceed quota for InstanceProfilesPerAccount: 1000`      |
 
 Attaching a policy an entity already carries, or adding a User to a group it is already in, counts
-nothing. The Role quota can be raised in a real account. The simulation holds the default.
+nothing. Several of these quotas can be raised in a real account. The simulation holds the
+defaults.
+
+`GetAccountSummaryCommand` reports what the Account holds against its quotas, in a `SummaryMap`
+under IAM's own keys (`Roles` and `RolesQuota`, `Policies` and `PoliciesQuota`, and so on). MFA
+devices, server certificates and the other things the simulator leaves out count zero.
+
+A name is unique in the Account for each kind of entity, and IAM holds names apart regardless of
+case. `CreateRoleCommand` refuses `worker` beside a Role named `Worker` with `EntityAlreadyExists`,
+and the same goes for Users, groups and instance profiles. A customer managed policy name is unique
+whatever path the policy sits at.
 
 ## Policy conditions
 
@@ -776,6 +792,11 @@ key `Inactive` or `Active` again, and an inactive key authenticates nothing.
 `UserName` out. A caller that is no User of the Account, such as a Role session, gets
 `ValidationError` and has to name one.
 
+`UpdateUserCommand` renames a User with `NewUserName`, moves it with `NewPath`, or both. The User
+keeps its ID, its policies, its groups and its access keys, and a request signed with one of its
+keys is made as the User under its new name. The caller needs `iam:UpdateUser` on the User's ARN as
+it is and as it will be.
+
 ## Groups
 
 A group holds policies for the Users in it. A User gets the inline and managed policies of every
@@ -828,6 +849,74 @@ managed policy commands match the Role and User ones: `PutGroupPolicyCommand`,
 `GetGroupPolicyCommand`, `ListGroupPoliciesCommand`, `DeleteGroupPolicyCommand`,
 `AttachGroupPolicyCommand`, `DetachGroupPolicyCommand` and `ListAttachedGroupPoliciesCommand`.
 `DeleteGroupCommand` refuses a group that still has a member or a policy with `DeleteConflict`.
+`UpdateGroupCommand` renames a group or moves it to another path, and its Users stay in it.
+
+## Instance profiles
+
+An instance profile is how EC2 hands a Role to an instance. It holds one Role at most, and adding a
+Role needs `iam:PassRole` on it, with `iam:PassedToService` set to `ec2.amazonaws.com`. The simulator
+runs no EC2 instances, and a profile holds its Role for whatever reads it back. A Role in a
+profile cannot be deleted until it is taken out.
+
+```typescript sim-iam-instance-profiles
+/**
+ * An instance profile holding a Role.
+ */
+
+import {
+  AddRoleToInstanceProfileCommand,
+  CreateInstanceProfileCommand,
+  CreateRoleCommand,
+  DeleteRoleCommand,
+  GetInstanceProfileCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simIam = new SimAws().account("123456789012").iam();
+
+await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "WebServer",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "ec2.amazonaws.com" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  }),
+);
+await simIam.createInstanceProfile(
+  new CreateInstanceProfileCommand({ InstanceProfileName: "Web" }),
+);
+await simIam.addRoleToInstanceProfile(
+  new AddRoleToInstanceProfileCommand({
+    InstanceProfileName: "Web",
+    RoleName: "WebServer",
+  }),
+);
+
+const { InstanceProfile } = await simIam.getInstanceProfile(
+  new GetInstanceProfileCommand({ InstanceProfileName: "Web" }),
+);
+console.log(InstanceProfile.Roles.map((role) => role.RoleName)); // ["WebServer"]
+
+try {
+  await simIam.deleteRole(new DeleteRoleCommand({ RoleName: "WebServer" }));
+} catch (error) {
+  console.log(error instanceof Error ? error.name : "unknown error");
+  // "DeleteConflict"
+}
+```
+
+`CreateInstanceProfileCommand` takes `Path` and `Tags` as well as the name. `GetInstanceProfileCommand`
+and `ListInstanceProfilesCommand` describe each profile with the Role it holds, and
+`ListInstanceProfilesForRoleCommand` lists the profiles holding one Role.
+`RemoveRoleFromInstanceProfileCommand` takes the Role out, and `DeleteInstanceProfileCommand`
+refuses a profile still holding one with `DeleteConflict`.
 
 ## Tags and principal keys
 
@@ -1894,8 +1983,8 @@ be allowed them, or the call wrapped in `simAws.runAs(...)`.
 ## CloudFormation IAM resources
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
-`AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`, `AWS::IAM::ManagedPolicy` and
-`AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles`, each
+`AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`, `AWS::IAM::InstanceProfile`,
+`AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles`, each
 User named in `Users` and each group named in `Groups` as an inline policy. That is the shape CDK
 grants such as `bucket.grantRead(fn)` and `bucket.grantRead(user)` synthesize as a "DefaultPolicy"
 resource. Every entry names an entity in the Stack's Account. An entry naming no simulated entity
@@ -1915,6 +2004,12 @@ An `AWS::IAM::Group` creates a group from `GroupName` (generated like a Role nam
 `Path`, `Policies` and `ManagedPolicyArns`. `Ref` returns the group name and `Fn::GetAtt` supports
 `Arn`. An `AWS::IAM::UserToGroupAddition` adds each User in `Users` to the group `GroupName` names,
 and deleting it takes them back out.
+
+An `AWS::IAM::InstanceProfile` creates an [instance profile](#instance-profiles) from
+`InstanceProfileName` (generated like a policy name when left out) and `Path`, and puts the Role
+`Roles` names in it. A template naming more than one Role fails the resource before the profile is
+created. `Ref` returns the profile name and `Fn::GetAtt` supports `Arn`. Deleting the stack takes
+the Role out and then deletes the profile.
 
 A Role with no `RoleName`, a User with no `UserName` and a Managed Policy with no
 `ManagedPolicyName` are each named from the stack name, the logical ID and a tail derived from both.
@@ -2323,17 +2418,24 @@ Sim IAM currently supports:
 - A catalogue of [AWS-managed policies](#aws-managed-policies) that grant their published
   permissions when attached
 - Refusing a policy document over IAM's character limit, and the [quotas](#quotas) on attachments,
-  access keys, group memberships and policy versions, with `LimitExceeded`
+  access keys, group memberships, policy versions and the entities an Account holds, with
+  `LimitExceeded`
+- `GetAccountSummaryCommand`
 - `AttachRolePolicyCommand`, `DetachRolePolicyCommand` and `ListAttachedRolePoliciesCommand`
-- `CreateUserCommand`, `GetUserCommand`, `ListUsersCommand` and `DeleteUserCommand`
+- `CreateUserCommand`, `GetUserCommand`, `ListUsersCommand`, `UpdateUserCommand` and
+  `DeleteUserCommand`
 - `PutUserPolicyCommand`, `GetUserPolicyCommand`, `ListUserPoliciesCommand`,
   `DeleteUserPolicyCommand`, `AttachUserPolicyCommand`, `DetachUserPolicyCommand` and
   `ListAttachedUserPoliciesCommand`
 - `PutUserPermissionsBoundaryCommand` and `DeleteUserPermissionsBoundaryCommand`
 - `CreateLoginProfileCommand`, `GetLoginProfileCommand` and `DeleteLoginProfileCommand`
 - [Groups](#groups): `CreateGroupCommand`, `GetGroupCommand`, `ListGroupsCommand`,
-  `ListGroupsForUserCommand`, `DeleteGroupCommand`, `AddUserToGroupCommand`,
+  `ListGroupsForUserCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`, `AddUserToGroupCommand`,
   `RemoveUserFromGroupCommand`, and the inline and managed group policy commands
+- [Instance profiles](#instance-profiles): `CreateInstanceProfileCommand`,
+  `GetInstanceProfileCommand`, `ListInstanceProfilesCommand`, `ListInstanceProfilesForRoleCommand`,
+  `AddRoleToInstanceProfileCommand`, `RemoveRoleFromInstanceProfileCommand` and
+  `DeleteInstanceProfileCommand`
 - `TagRoleCommand`, `UntagRoleCommand`, `ListRoleTagsCommand`, `TagUserCommand`, `UntagUserCommand`
   and `ListUserTagsCommand`, along with `Tags` on `CreateRoleCommand` and `CreateUserCommand`
 - `aws:PrincipalTag/`, `iam:ResourceTag/`, `aws:RequestTag/` and `aws:TagKeys`, and the principal
@@ -2359,7 +2461,8 @@ Sim IAM currently supports:
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
 - The `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`,
-  `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
+  `AWS::IAM::InstanceProfile`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation
+  resources
 
 Unsupported IAM options may be ignored or may throw errors depending on whether the simulator needs
 them to model the requested behaviour.
@@ -2371,9 +2474,11 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - An AWS-managed policy has the one version the catalogue holds, and the version commands act on
   the Account's own policies only
 - AWS-managed policies outside the [catalogue](#aws-managed-policies) attach and grant nothing
-- The account-wide counts (Roles, Users, groups and customer managed policies per Account) are not
-  enforced, and the quotas hold their defaults. `UpdateUser`, MFA devices, signing certificates,
-  SSH keys and instance profiles are absent
+- The quotas hold their defaults, with no way to raise one. MFA devices, signing certificates, SSH
+  keys, server certificates and identity providers are absent, and so are the tag commands for
+  instance profiles
+- A resource policy naming a User by ARN keeps the old ARN when the User is renamed, and stops
+  matching it. AWS rewrites such a policy to the new name
 - A condition keyword IAM does not define fails closed, matching no request.
   `decision.unevaluatedStatements` names the statements holding one
 - Condition operator keywords are matched case-sensitively. AWS does not document whether it reads

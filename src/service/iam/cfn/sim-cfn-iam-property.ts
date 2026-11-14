@@ -2,7 +2,7 @@ import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resou
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimIamTagInput } from "../tag/sim-iam-identity-tags.js";
 
-interface SimCfnIamPropertyInput {
+export interface SimCfnIamPropertyInput {
   readonly resourceType: string;
   readonly resource: SimCfnResource;
   readonly value: SimCfnTemplateValueRecord[string] | undefined;

@@ -1,9 +1,7 @@
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import {
-  SimIamDeleteConflict,
-  SimIamEntityAlreadyExists,
-} from "../../error/sim-iam.error.js";
+import { SimIamDeleteConflict } from "../../error/sim-iam.error.js";
+import { assertSimIamNewEntity } from "../sim-iam-account-quota.js";
 import {
   makeSimIamGroupId,
   type SimIamGroup,
@@ -52,14 +50,7 @@ export class SimIamGroupCommands {
     assertSimIamGroupName(name);
     groupIdentity.authorize("iam:CreateGroup", name, options, {}, path);
 
-    // IAM keeps a name as given, and holds names apart regardless of case.
-    simIamRefuseWhen(
-      groups.keys().some((each) => each.toLowerCase() === name.toLowerCase()),
-      () =>
-        new SimIamEntityAlreadyExists(
-          `Group with name ${name} already exists.`,
-        ),
-    );
+    assertSimIamNewEntity("Groups", groups.keys(), name);
 
     const group: SimIamGroup = {
       arn: `arn:aws:iam::${accountId}:group${path}${name}` as SimArn,

@@ -17,8 +17,16 @@ export type SimIamUserId = Brand<string, "SimIamUserId">;
 export interface SimIamUser extends SimIamPrincipal {
   readonly principalType: "user";
   readonly userId: SimIamUserId;
-  readonly userName: SimIamUsername;
-  readonly path: string;
+
+  /**
+   * The User's ARN, name and path, which `UpdateUser` can change. Its ID
+   * stays the same.
+   */
+  arn: SimArn;
+  name: string;
+  userName: SimIamUsername;
+  path: string;
+
   readonly creationDate: Date;
 
   /**

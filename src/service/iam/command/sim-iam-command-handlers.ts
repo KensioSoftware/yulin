@@ -16,7 +16,11 @@ import { SimIamPolicyCommandHandlers } from "./policy/sim-iam-policy-command-han
 import { SimIamRoleCommandHandlers } from "./role/sim-iam-role-command-handlers.js";
 import { SimIamUserCommandHandlers } from "./user/sim-iam-user-command-handlers.js";
 import { SimIamTagCommandHandlers } from "./tag/sim-iam-tag-command-handlers.js";
-import { SimIamIdentityAuthorizer } from "../tag/sim-iam-identity-authorizer.js";
+import {
+  type SimIamAuthorizedIdentity,
+  SimIamIdentityAuthorizer,
+  type SimIamNamedEntity,
+} from "../tag/sim-iam-identity-authorizer.js";
 import type { SimIamGroup, SimIamGroupName } from "../group/sim-iam-group.js";
 import { simIamPolicyUsage } from "../policy/sim-iam-policy-usage.js";
 import { SimIamEntityPolicyCommands } from "./entity/sim-iam-entity-policy-commands.js";
@@ -32,6 +36,16 @@ import { SimIamUserReadCommands } from "./user/sim-iam-user-read-commands.js";
 import { SimIamUserLookup } from "./user/sim-iam-user-lookup.js";
 import { SimIamAccessKeyCommands } from "./user/sim-iam-access-key-commands.js";
 import { SimIamLoginProfileCommands } from "./user/sim-iam-login-profile-commands.js";
+import type {
+  SimIamInstanceProfile,
+  SimIamInstanceProfileName,
+} from "../instance-profile/sim-iam-instance-profile.js";
+import { SimIamInstanceProfileLookup } from "./instance-profile/sim-iam-instance-profile-lookup.js";
+import { SimIamInstanceProfileCommands } from "./instance-profile/sim-iam-instance-profile-commands.js";
+import { SimIamInstanceProfileRoleCommands } from "./instance-profile/sim-iam-instance-profile-role-commands.js";
+import { SimIamUserRenameCommands } from "./user/sim-iam-user-rename-commands.js";
+import { SimIamGroupRenameCommands } from "./group/sim-iam-group-rename-commands.js";
+import { SimIamAccountSummaryCommands } from "./account/sim-iam-account-summary-commands.js";
 
 interface SimIamCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -39,6 +53,10 @@ interface SimIamCommandHandlersProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly users: Map<SimIamUsername, SimIamUser>;
   readonly groups: Map<SimIamGroupName, SimIamGroup>;
+  readonly instanceProfiles: Map<
+    SimIamInstanceProfileName,
+    SimIamInstanceProfile
+  >;
   readonly credentialRegistry: SimIamCredentialRegistry;
   readonly userCredentialGenerator: SimIamUserCredentialGenerator;
   readonly background: BackgroundScheduler;
@@ -76,6 +94,11 @@ export class SimIamCommandHandlers {
   readonly groups: SimIamGroupCommands;
   readonly groupMembers: SimIamGroupMembershipCommands;
   readonly groupLists: SimIamGroupListCommands;
+  readonly instanceProfiles: SimIamInstanceProfileCommands;
+  readonly instanceProfileRoles: SimIamInstanceProfileRoleCommands;
+  readonly userRenames: SimIamUserRenameCommands;
+  readonly groupRenames: SimIamGroupRenameCommands;
+  readonly accountSummary: SimIamAccountSummaryCommands;
 
   constructor(properties: SimIamCommandHandlersProperties) {
     // IAM is global rather than Region-scoped, so its own control-plane
@@ -87,6 +110,7 @@ export class SimIamCommandHandlers {
     this.roles = new SimIamRoleCommandHandlers({
       accountId: properties.accountId,
       roles: properties.roles,
+      instanceProfiles: properties.instanceProfiles,
       background: properties.background,
       authorizer,
     });
@@ -98,10 +122,11 @@ export class SimIamCommandHandlers {
       background: properties.background,
       authorizer,
     });
-    const { accountId, roles, users, groups, background } = properties;
+    const { accountId, roles, users, groups, instanceProfiles, background } =
+      properties;
     const identity = (
-      entity: "Role" | "User" | "Group",
-      find: (name: string) => SimIamRole | SimIamUser | SimIamGroup | undefined,
+      entity: SimIamNamedEntity,
+      find: (name: string) => SimIamAuthorizedIdentity | undefined,
     ): SimIamIdentityAuthorizer =>
       new SimIamIdentityAuthorizer({ accountId, authorizer, entity, find });
     const roleIdentity = identity("Role", (name) =>
@@ -188,6 +213,37 @@ export class SimIamCommandHandlers {
     this.groups = new SimIamGroupCommands(accountId, lookup);
     this.groupMembers = new SimIamGroupMembershipCommands(lookup);
     this.groupLists = new SimIamGroupListCommands(authorizer, lookup);
+    const profileLookup = new SimIamInstanceProfileLookup({
+      accountId,
+      instanceProfiles,
+      roles,
+      profileIdentity: identity("InstanceProfile", (name) =>
+        instanceProfiles.get(name as SimIamInstanceProfileName),
+      ),
+      roleIdentity,
+      authorizer,
+      background,
+    });
+    this.instanceProfiles = new SimIamInstanceProfileCommands(profileLookup);
+    this.instanceProfileRoles = new SimIamInstanceProfileRoleCommands(
+      profileLookup,
+      this.instanceProfiles,
+    );
+    this.userRenames = new SimIamUserRenameCommands(authorizer, userLookup);
+    this.groupRenames = new SimIamGroupRenameCommands(
+      accountId,
+      authorizer,
+      lookup,
+    );
+    this.accountSummary = new SimIamAccountSummaryCommands({
+      policies: properties.policies,
+      roles,
+      users,
+      groups,
+      instanceProfiles,
+      authorizer,
+      background,
+    });
     this.policies = new SimIamPolicyCommandHandlers({
       accountId: properties.accountId,
       policies: properties.policies,

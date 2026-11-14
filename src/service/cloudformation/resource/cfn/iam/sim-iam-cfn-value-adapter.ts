@@ -6,6 +6,8 @@ import { SimIamRoleCfn } from "./sim-iam-role-cfn.js";
 import { SimIamUserCfn } from "./sim-iam-user-cfn.js";
 import { SimIamGroupCfn } from "./sim-iam-group-cfn.js";
 import type { SimIamGroup } from "../../../../iam/group/sim-iam-group.js";
+import { SimIamInstanceProfileCfn } from "./sim-iam-instance-profile-cfn.js";
+import type { SimIamInstanceProfile } from "../../../../iam/instance-profile/sim-iam-instance-profile.js";
 import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
@@ -29,6 +31,12 @@ export function iamValueAdapter(
 
   if (properties.type === "AWS::IAM::Group") {
     return new SimIamGroupCfn(properties.simResource as SimIamGroup);
+  }
+
+  if (properties.type === "AWS::IAM::InstanceProfile") {
+    return new SimIamInstanceProfileCfn(
+      properties.simResource as SimIamInstanceProfile,
+    );
   }
 
   if (properties.type === "AWS::IAM::User") {

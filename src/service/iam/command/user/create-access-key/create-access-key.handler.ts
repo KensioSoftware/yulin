@@ -17,7 +17,7 @@ import type {
 /**
  * The most access keys IAM lets one User hold, active or not.
  */
-const maxSimIamAccessKeysPerUser = 2;
+export const maxSimIamAccessKeysPerUser = 2;
 
 interface CreateAccessKeyCommandHandlerProperties {
   readonly users: Map<SimIamUsername, SimIamUser>;

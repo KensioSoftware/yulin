@@ -9,6 +9,7 @@ import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { makeSimIamRoleId } from "../../../role/sim-iam-role-id.js";
+import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
 import {
   assertSimIamMaxSessionDuration,
@@ -21,7 +22,6 @@ import {
 
 interface MakeRoleProperties {
   readonly accountId: SimAwsAccountId;
-  readonly arn: SimArn;
   readonly path: string;
   readonly roleName: SimIamRoleName;
   readonly cmd: SimCreateRoleCommand;
@@ -37,12 +37,12 @@ export class CreateRoleRecordFactory {
    * `MaxSessionDuration` IAM would refuse.
    */
   makeRole(properties: MakeRoleProperties): SimIamRole {
-    const { accountId, arn, path, roleName, cmd, creationDate } = properties;
+    const { accountId, path, roleName, cmd, creationDate } = properties;
 
     assertSimIamMaxSessionDuration(cmd.input.MaxSessionDuration);
 
     return {
-      arn,
+      arn: makeSimRoleArn({ accountId, path, roleName }),
       accountId,
       principalType: "role",
       name: roleName,
