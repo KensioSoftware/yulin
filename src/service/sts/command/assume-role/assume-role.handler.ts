@@ -78,6 +78,10 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     this.callerResolver = new SimAwsCallerResolver({
       defaultCaller: properties.defaultCaller,
       ambientCaller: properties.ambientCaller,
+      // Credentials name a caller only to the Account that issued them, which
+      // for a session being chained is the Account this STS belongs to.
+      credentialIdentityResolver:
+        iamResolver.iamForAccount(sourceAccountId).credentials,
     });
     this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,

@@ -339,19 +339,10 @@ describe("STS AssumeRole session policies", () => {
     // Given a read-only session, and a second Role its Account root may assume
     const { simAws, roleArn } = await assumableRole();
     const accountId = simAws.iam().accountId;
-    const output = await simAws.sts().assumeRole(
-      new AssumeRoleCommand({
-        RoleArn: roleArn,
-        RoleSessionName: "reader",
-        Policy: readOnly,
-      }),
-    );
-    assertNonNullable(output.Credentials?.AccessKeyId);
-    assertNonNullable(output.Credentials.SecretAccessKey);
-    const identity = simAws.iam().credentials.resolveCredentials({
-      accessKeyId: output.Credentials.AccessKeyId,
-      secretAccessKey: output.Credentials.SecretAccessKey,
-      sessionToken: output.Credentials.SessionToken,
+    const caller = await sessionCaller(simAws, {
+      RoleArn: roleArn,
+      RoleSessionName: "reader",
+      Policy: readOnly,
     });
     await simAws.iam().createRole(
       new CreateRoleCommand({
@@ -365,21 +356,14 @@ describe("STS AssumeRole session policies", () => {
       }),
     );
 
-    // When the session assumes the second Role
+    // When the session assumes the second Role with its own credentials
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.sts().assumeRole(
         new AssumeRoleCommand({
           RoleArn: `arn:aws:iam::${accountId}:role/Next`,
           RoleSessionName: "next",
         }),
-        {
-          caller: {
-            kind: "resolved",
-            principal: identity.principal,
-            identityPolicyPrincipal: identity.identityPolicyPrincipal,
-            sessionPolicies: identity.session?.sessionPolicies,
-          },
-        },
+        { caller },
       );
     });
 
