@@ -3,6 +3,7 @@ import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { makeSimRoleArn } from "./arn/sim-iam-role-arn.js";
 import { makeSimIamRoleId } from "./sim-iam-role-id.js";
 import type { SimIamRole, SimIamRoleName } from "./sim-iam-role.js";
+import { SimIamIdentityTags } from "../tag/sim-iam-identity-tags.js";
 
 /**
  * Generates fake IAM Role records.
@@ -27,5 +28,6 @@ export const simIamRoleFactory = new DynamicFactory<SimIamRole>(() => {
     creationDate: new Date(),
     inlinePolicies: new Map(),
     attachedPolicyArns: new Set(),
+    tags: new SimIamIdentityTags(),
   };
 });

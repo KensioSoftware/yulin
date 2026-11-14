@@ -4,6 +4,7 @@ import type { SimQueryOperations } from "../../../serve/http/api/query/sim-query
 import { simIamQueryPolicyOperations } from "./sim-iam-query-policy-operations.js";
 import { simIamQueryRoleOperations } from "./sim-iam-query-role-operations.js";
 import { simIamQueryUserOperations } from "./sim-iam-query-user-operations.js";
+import { simIamQueryTagOperations } from "./sim-iam-query-tag-operations.js";
 
 /**
  * The XML namespace real IAM stamps on every response it sends.
@@ -38,5 +39,6 @@ function simIamQueryOperations(): SimQueryOperations {
     ...simIamQueryUserOperations(),
     ...simIamQueryRoleOperations(),
     ...simIamQueryPolicyOperations(),
+    ...simIamQueryTagOperations(),
   ]);
 }

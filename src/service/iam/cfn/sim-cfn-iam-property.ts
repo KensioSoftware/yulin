@@ -1,5 +1,6 @@
 import type { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimIamTagInput } from "../tag/sim-iam-identity-tags.js";
 
 interface SimCfnIamPropertyInput {
   readonly resourceType: string;
@@ -52,4 +53,48 @@ export function simCfnIamJsonObject(
   }
 
   return JSON.stringify(value);
+}
+
+/**
+ * Read the `Tags` of a Role or a User.
+ *
+ * A CDK app calling `Tags.of(stack).add(...)` puts these on every taggable
+ * Resource in the template, so a tagged Role is the ordinary case. Each tag
+ * has to be an object holding a string `Key` and a string `Value`. IAM checks
+ * what they say when the Role or User is created.
+ */
+export function simCfnIamTags(
+  resourceType: string,
+  resource: SimCfnResource,
+  properties: SimCfnTemplateValueRecord,
+): readonly SimIamTagInput[] | undefined {
+  const value = properties["Tags"];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value) || !value.every(isTagShape)) {
+    throw new TypeError(
+      `Invalid ${resourceType} ${resource.logicalId}: Tags must be a list of tags with a string Key and Value`,
+    );
+  }
+
+  return value.map((tag) => ({ Key: tag.Key, Value: tag.Value }));
+}
+
+/**
+ * Whether one template value is a tag.
+ */
+function isTagShape(
+  value: unknown,
+): value is { readonly Key: string; readonly Value: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "Key" in value &&
+    "Value" in value &&
+    typeof value.Key === "string" &&
+    typeof value.Value === "string"
+  );
 }

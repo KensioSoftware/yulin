@@ -5,6 +5,7 @@ import type { SimIamAccessKey } from "../credential/sim-iam-access-key.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 import type { SimIamPrincipal } from "../principal/sim-iam-principal.js";
 import type { SimIamUserLoginProfile } from "./sim-iam-user-login-profile.js";
+import type { SimIamIdentityTags } from "../tag/sim-iam-identity-tags.js";
 
 export type SimIamUsername = Brand<string, "SimIamUsername">;
 export type SimIamUserId = Brand<string, "SimIamUserId">;
@@ -41,4 +42,10 @@ export interface SimIamUser extends SimIamPrincipal {
    * `CreateLoginProfile` or by an `AWS::IAM::User` carrying a `LoginProfile`.
    */
   loginProfile: SimIamUserLoginProfile | undefined;
+
+  /**
+   * The tags on this User, which a policy reads as `aws:PrincipalTag/` when
+   * the User makes a request and as `iam:ResourceTag/` when it is acted on.
+   */
+  readonly tags: SimIamIdentityTags;
 }

@@ -1,6 +1,7 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type { SimIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
+import type { SimIamTag } from "../../../tag/sim-iam-identity-tags.js";
 
 export interface SimGetRoleCommandInput {
   readonly RoleName?: string | undefined;
@@ -22,5 +23,6 @@ export interface SimGetRoleCommandOutput {
     readonly PermissionsBoundary?:
       | SimIamAttachedPermissionsBoundary
       | undefined;
+    readonly Tags?: readonly SimIamTag[] | undefined;
   };
 }

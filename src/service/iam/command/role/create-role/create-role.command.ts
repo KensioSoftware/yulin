@@ -1,5 +1,9 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
+import type {
+  SimIamTag,
+  SimIamTagsInput,
+} from "../../../tag/sim-iam-identity-tags.js";
 
 export interface SimCreateRoleCommandInput {
   readonly RoleName?: string | undefined;
@@ -15,6 +19,12 @@ export interface SimCreateRoleCommandInput {
    * key an account requiring a boundary conditions `iam:CreateRole` on.
    */
   readonly PermissionsBoundary?: string | undefined;
+
+  /**
+   * Tags to attach to the new Role. Creating a Role with tags needs
+   * `iam:TagRole` as well as `iam:CreateRole`.
+   */
+  readonly Tags?: SimIamTagsInput;
 }
 
 export interface SimCreateRoleCommand {
@@ -33,5 +43,6 @@ export interface SimCreateRoleCommandOutput {
     readonly PermissionsBoundary?:
       | SimIamAttachedPermissionsBoundary
       | undefined;
+    readonly Tags?: readonly SimIamTag[] | undefined;
   };
 }

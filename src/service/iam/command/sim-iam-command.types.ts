@@ -89,3 +89,13 @@ export type {
   SimDeleteUserCommand,
   SimDeleteUserCommandOutput,
 } from "./user/delete-user/delete-user.command.js";
+export type {
+  SimIamListTagsCommandOutput,
+  SimIamTaggingCommandOutput,
+  SimListRoleTagsCommand,
+  SimListUserTagsCommand,
+  SimTagRoleCommand,
+  SimTagUserCommand,
+  SimUntagRoleCommand,
+  SimUntagUserCommand,
+} from "./tag/sim-iam-tag.command.js";

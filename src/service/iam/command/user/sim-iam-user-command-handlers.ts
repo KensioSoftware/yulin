@@ -1,5 +1,6 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import { normaliseUserPath } from "../../user/sim-iam-user-path.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamCredentialRegistry } from "../../credential/sim-iam-credential-registry.js";
@@ -35,6 +36,7 @@ import type {
   SimDeleteUserCommand,
   SimDeleteUserCommandOutput,
 } from "./delete-user/delete-user.command.js";
+import { SimIamIdentityAuthorizer } from "../../tag/sim-iam-identity-authorizer.js";
 
 interface SimIamUserCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -58,7 +60,7 @@ export class SimIamUserCommandHandlers {
   private readonly credentialRegistry: SimIamCredentialRegistry;
   private readonly credentialGenerator: SimIamUserCredentialGenerator;
   private readonly background: BackgroundScheduler;
-  private readonly authorizer: SimIamActionAuthorizer;
+  private readonly identity: SimIamIdentityAuthorizer;
 
   constructor(properties: SimIamUserCommandHandlersProperties) {
     const {
@@ -75,7 +77,12 @@ export class SimIamUserCommandHandlers {
     this.credentialRegistry = credentialRegistry;
     this.credentialGenerator = credentialGenerator;
     this.background = background;
-    this.authorizer = authorizer;
+    this.identity = new SimIamIdentityAuthorizer({
+      accountId,
+      authorizer,
+      entity: "User",
+      find: (name): SimIamUser | undefined => users.get(name as SimIamUsername),
+    });
   }
 
   /**
@@ -85,10 +92,11 @@ export class SimIamUserCommandHandlers {
     command: SimCreateUserCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateUserCommandOutput> {
-    this.authorizer.authorize(
-      "iam:CreateUser",
-      this.userArn(command.input.UserName),
-      options?.caller,
+    this.identity.authorizeCreate(
+      command.input.UserName,
+      normaliseUserPath(command.input.Path),
+      command.input.Tags,
+      options,
     );
     const handler = new CreateUserCommandHandler({
       accountId: this.accountId,
@@ -105,11 +113,7 @@ export class SimIamUserCommandHandlers {
     command: SimDeleteUserCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimDeleteUserCommandOutput> {
-    this.authorizer.authorize(
-      "iam:DeleteUser",
-      this.userArn(command.input.UserName),
-      options?.caller,
-    );
+    this.identity.authorize("iam:DeleteUser", command.input.UserName, options);
     const handler = new DeleteUserCommandHandler({
       users: this.users,
       background: this.background,
@@ -124,10 +128,10 @@ export class SimIamUserCommandHandlers {
     command: SimAttachUserPolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimAttachUserPolicyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:AttachUserPolicy",
-      this.userArn(command.input.UserName),
-      options?.caller,
+      command.input.UserName,
+      options,
     );
     const handler = new AttachUserPolicyCommandHandler({
       users: this.users,
@@ -143,10 +147,10 @@ export class SimIamUserCommandHandlers {
     command: SimCreateLoginProfileCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateLoginProfileCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:CreateLoginProfile",
-      this.userArn(command.input.UserName),
-      options?.caller,
+      command.input.UserName,
+      options,
     );
     const handler = new CreateLoginProfileCommandHandler({
       users: this.users,
@@ -162,10 +166,10 @@ export class SimIamUserCommandHandlers {
     command: SimListAttachedUserPoliciesCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListAttachedUserPoliciesCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:ListAttachedUserPolicies",
-      this.userArn(command.input.UserName),
-      options?.caller,
+      command.input.UserName,
+      options,
     );
     const handler = new ListAttachedUserPoliciesCommandHandler({
       users: this.users,
@@ -181,10 +185,10 @@ export class SimIamUserCommandHandlers {
     command: SimCreateAccessKeyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateAccessKeyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:CreateAccessKey",
-      this.userArn(command.input.UserName),
-      options?.caller,
+      command.input.UserName,
+      options,
     );
     const handler = new CreateAccessKeyCommandHandler({
       users: this.users,
@@ -193,15 +197,5 @@ export class SimIamUserCommandHandlers {
       background: this.background,
     });
     return await handler.handle(command);
-  }
-
-  /**
-   * The User ARN a command operates on, for authorization.
-   */
-  private userArn(username = "*"): string {
-    return (
-      this.users.get(username as SimIamUsername)?.arn ??
-      `arn:aws:iam::${this.accountId}:user/${username}`
-    );
   }
 }

@@ -10,6 +10,10 @@ import type { JSONString } from "../../../../../util/type-guard/json.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { makeSimIamRoleId } from "../../../role/sim-iam-role-id.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
+import {
+  makeSimIamIdentityTags,
+  simIamTagsMember,
+} from "../../../tag/sim-iam-identity-tags.js";
 
 interface MakeRoleProperties {
   readonly accountId: SimAwsAccountId;
@@ -48,6 +52,7 @@ export class CreateRoleRecordFactory {
         | undefined,
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
+      tags: makeSimIamIdentityTags(cmd.input.Tags, "Role"),
     };
   }
 
@@ -65,6 +70,7 @@ export class CreateRoleRecordFactory {
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
         PermissionsBoundary: simIamAttachedPermissionsBoundary(role),
+        ...simIamTagsMember(role.tags),
       },
     };
   }

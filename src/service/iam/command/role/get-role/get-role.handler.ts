@@ -11,6 +11,7 @@ import type {
 } from "./get-role.command.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { simIamAttachedPermissionsBoundary } from "../../../role/sim-iam-role-boundary.js";
+import { simIamTagsMember } from "../../../tag/sim-iam-identity-tags.js";
 
 interface GetRoleCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
@@ -65,6 +66,7 @@ export class GetRoleCommandHandler implements CommandHandler<
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
         PermissionsBoundary: simIamAttachedPermissionsBoundary(role),
+        ...simIamTagsMember(role.tags),
       },
     };
   }

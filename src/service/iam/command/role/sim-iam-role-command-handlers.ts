@@ -1,9 +1,10 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import { normaliseRolePath } from "../../role/sim-iam-role-path.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
-import type { SimIamConditionValue } from "../../policy/sim-iam-policy.js";
+import { simIamPermissionsBoundaryCondition } from "../../role/sim-iam-role-boundary.js";
 import { CreateRoleCommandHandler } from "./create-role/create-role.handler.js";
 import type {
   SimCreateRoleCommand,
@@ -49,6 +50,7 @@ import type {
   SimDeleteRolePolicyCommand,
   SimDeleteRolePolicyCommandOutput,
 } from "../policy/delete-role-policy/delete-role-policy.command.js";
+import { SimIamIdentityAuthorizer } from "../../tag/sim-iam-identity-authorizer.js";
 
 interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -71,6 +73,7 @@ export class SimIamRoleCommandHandlers {
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
   private readonly authorizer: SimIamActionAuthorizer;
+  private readonly identity: SimIamIdentityAuthorizer;
 
   constructor(properties: SimIamRoleCommandHandlersProperties) {
     const { accountId, roles, background, authorizer } = properties;
@@ -79,6 +82,12 @@ export class SimIamRoleCommandHandlers {
     this.roles = roles;
     this.background = background;
     this.authorizer = authorizer;
+    this.identity = new SimIamIdentityAuthorizer({
+      accountId,
+      authorizer,
+      entity: "Role",
+      find: (name): SimIamRole | undefined => roles.get(name as SimIamRoleName),
+    });
   }
 
   /**
@@ -88,11 +97,12 @@ export class SimIamRoleCommandHandlers {
     command: SimCreateRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateRoleCommandOutput> {
-    this.authorizer.authorize(
-      "iam:CreateRole",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
-      permissionsBoundaryCondition(command.input.PermissionsBoundary),
+    this.identity.authorizeCreate(
+      command.input.RoleName,
+      normaliseRolePath(command.input.Path),
+      command.input.Tags,
+      options,
+      simIamPermissionsBoundaryCondition(command.input.PermissionsBoundary),
     );
     const handler = new CreateRoleCommandHandler({
       accountId: this.accountId,
@@ -109,11 +119,7 @@ export class SimIamRoleCommandHandlers {
     command: SimGetRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetRoleCommandOutput> {
-    this.authorizer.authorize(
-      "iam:GetRole",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
-    );
+    this.identity.authorize("iam:GetRole", command.input.RoleName, options);
     const handler = new GetRoleCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -143,10 +149,10 @@ export class SimIamRoleCommandHandlers {
     command: SimPutRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimPutRolePolicyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:PutRolePolicy",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
+      command.input.RoleName,
+      options,
     );
     const handler = new PutRolePolicyCommandHandler({
       roles: this.roles,
@@ -162,10 +168,10 @@ export class SimIamRoleCommandHandlers {
     command: SimAttachRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimAttachRolePolicyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:AttachRolePolicy",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
+      command.input.RoleName,
+      options,
     );
     const handler = new AttachRolePolicyCommandHandler({
       roles: this.roles,
@@ -181,10 +187,10 @@ export class SimIamRoleCommandHandlers {
     command: SimDetachRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimDetachRolePolicyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:DetachRolePolicy",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
+      command.input.RoleName,
+      options,
     );
     const handler = new DetachRolePolicyCommandHandler({
       roles: this.roles,
@@ -200,10 +206,10 @@ export class SimIamRoleCommandHandlers {
     command: SimListAttachedRolePoliciesCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListAttachedRolePoliciesCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:ListAttachedRolePolicies",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
+      command.input.RoleName,
+      options,
     );
     const handler = new ListAttachedRolePoliciesCommandHandler({
       roles: this.roles,
@@ -219,10 +225,10 @@ export class SimIamRoleCommandHandlers {
     command: SimDeleteRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimDeleteRolePolicyCommandOutput> {
-    this.authorizer.authorize(
+    this.identity.authorize(
       "iam:DeleteRolePolicy",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
+      command.input.RoleName,
+      options,
     );
     const handler = new DeleteRolePolicyCommandHandler({
       roles: this.roles,
@@ -238,45 +244,11 @@ export class SimIamRoleCommandHandlers {
     command: SimDeleteRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimDeleteRoleCommandOutput> {
-    this.authorizer.authorize(
-      "iam:DeleteRole",
-      this.roleArn(command.input.RoleName),
-      options?.caller,
-    );
+    this.identity.authorize("iam:DeleteRole", command.input.RoleName, options);
     const handler = new DeleteRoleCommandHandler({
       roles: this.roles,
       background: this.background,
     });
     return await handler.handle(command);
   }
-
-  /**
-   * The Role ARN a command operates on, for authorization.
-   *
-   * An existing Role is authorized as its stored ARN, which carries its path.
-   * A Role that does not exist yet is named by the path-less ARN.
-   */
-  private roleArn(roleName = "*"): string {
-    return (
-      this.roles.get(roleName as SimIamRoleName)?.arn ??
-      `arn:aws:iam::${this.accountId}:role/${roleName}`
-    );
-  }
-}
-
-/**
- * What a Role-creating request says about the boundary it declares.
- *
- * An account that requires a permissions boundary allows `iam:CreateRole`
- * only under `StringEquals` on `iam:PermissionsBoundary`, and the CDK
- * permissions-boundary guard is written that way. A request declaring no
- * boundary leaves the key out, which is what refuses it: a positive operator
- * over an absent key matches nothing.
- */
-function permissionsBoundaryCondition(
-  permissionsBoundary: string | undefined,
-): Readonly<Record<string, SimIamConditionValue>> | undefined {
-  return permissionsBoundary === undefined
-    ? undefined
-    : { "iam:PermissionsBoundary": permissionsBoundary };
 }

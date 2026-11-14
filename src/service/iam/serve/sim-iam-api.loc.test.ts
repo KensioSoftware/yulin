@@ -13,15 +13,22 @@ import {
   GetRoleCommand,
   GetUserCommand,
   IAMClient,
+  ListRoleTagsCommand,
+  ListUserTagsCommand,
   ListAttachedRolePoliciesCommand,
   ListPoliciesCommand,
   ListRolesCommand,
   PutRolePolicyCommand,
   PutUserPolicyCommand,
+  TagRoleCommand,
+  TagUserCommand,
+  UntagRoleCommand,
+  UntagUserCommand,
 } from "@aws-sdk/client-iam";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import {
   assertArrayIncludes,
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -191,6 +198,61 @@ describe("Serving simulated IAM on an endpoint URL", () => {
         (listedRole) => listedRole.RoleName === "Checkout",
       )?.PermissionsBoundary,
     );
+  });
+
+  it("tags a Role and a User, and reads the tags back", async () => {
+    // Given a Role created over the endpoint with one tag, and a User
+    const created = await client.send(
+      new CreateRoleCommand({
+        RoleName: "TaggedCheckout",
+        AssumeRolePolicyDocument: lambdaTrustPolicy,
+        Tags: [{ Key: "team", Value: "checkout" }],
+      }),
+    );
+    await client.send(new CreateUserCommand({ UserName: "TaggedOperator" }));
+
+    // When each is tagged, the Role untagged, and both read back
+    await client.send(
+      new TagRoleCommand({
+        RoleName: "TaggedCheckout",
+        Tags: [{ Key: "stage", Value: "prod" }],
+      }),
+    );
+    await client.send(
+      new UntagRoleCommand({ RoleName: "TaggedCheckout", TagKeys: ["team"] }),
+    );
+    await client.send(
+      new TagUserCommand({
+        UserName: "TaggedOperator",
+        Tags: [{ Key: "team", Value: "operations" }],
+      }),
+    );
+    const read = await client.send(
+      new GetRoleCommand({ RoleName: "TaggedCheckout" }),
+    );
+    const roleTags = await client.send(
+      new ListRoleTagsCommand({ RoleName: "TaggedCheckout" }),
+    );
+    const userTags = await client.send(
+      new ListUserTagsCommand({ UserName: "TaggedOperator" }),
+    );
+    await client.send(
+      new UntagUserCommand({
+        UserName: "TaggedOperator",
+        TagKeys: ["team", "missing"],
+      }),
+    );
+    const untagged = await client.send(
+      new ListUserTagsCommand({ UserName: "TaggedOperator" }),
+    );
+
+    // Then every answer carries the tags the envelopes set
+    assertIdentical(created.Role?.Tags?.[0]?.Key, "team");
+    assertIdentical(read.Role?.Tags?.[0]?.Key, "stage");
+    assertIdentical(roleTags.Tags?.map((tag) => tag.Key).join(","), "stage");
+    assertFalse(roleTags.IsTruncated);
+    assertIdentical(userTags.Tags?.[0]?.Value, "operations");
+    assertIdentical(untagged.Tags?.length ?? 0, 0);
   });
 
   it("writes an inline policy on a Role and takes it off again", async () => {

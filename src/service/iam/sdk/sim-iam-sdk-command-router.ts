@@ -25,6 +25,7 @@ import type { SimCreateLoginProfileCommand } from "../command/user/create-login-
 import type { SimCreateUserCommand } from "../command/user/create-user/create-user.command.js";
 import type { SimDeleteUserCommand } from "../command/user/delete-user/delete-user.command.js";
 import type { SimIam } from "../sim-iam.js";
+import type * as simIamCommands from "../command/sim-iam-command.types.js";
 
 /**
  * Routes intercepted SDK Commands to one scoped simulated IAM instance.
@@ -34,6 +35,54 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
 
   constructor(simIam: SimIam) {
     this.routes = new Map<string, SimSdkCommandRoute>([
+      [
+        "TagRoleCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.tagRole(
+            command as simIamCommands.SimTagRoleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagRoleCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.untagRole(
+            command as simIamCommands.SimUntagRoleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListRoleTagsCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.listRoleTags(
+            command as simIamCommands.SimListRoleTagsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.tagUser(
+            command as simIamCommands.SimTagUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.untagUser(
+            command as simIamCommands.SimUntagUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListUserTagsCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.listUserTags(
+            command as simIamCommands.SimListUserTagsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
       [
         "AttachRolePolicyCommand",
         async (command, context): Promise<unknown> =>

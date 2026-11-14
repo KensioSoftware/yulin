@@ -16,10 +16,16 @@ import {
   GetPolicyCommand,
   GetRoleCommand,
   IAMClient,
+  ListRoleTagsCommand,
+  ListUserTagsCommand,
   ListPoliciesCommand,
   ListRolesCommand,
   PutRolePolicyCommand,
   PutUserPolicyCommand,
+  TagRoleCommand,
+  TagUserCommand,
+  UntagRoleCommand,
+  UntagUserCommand,
 } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
@@ -72,6 +78,59 @@ describe("simulated IAM SDK Command routing", () => {
         PolicyDocument: allowAllPolicyDocument,
       }),
     );
+  });
+
+  it("round-trips the tagging Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new IAMClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateRoleCommand({
+        RoleName: "TaggedRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await client.send(new CreateUserCommand({ UserName: "tagged-user" }));
+
+    await client.send(
+      new TagRoleCommand({
+        RoleName: "TaggedRole",
+        Tags: [
+          { Key: "team", Value: "orders" },
+          { Key: "stage", Value: "prod" },
+        ],
+      }),
+    );
+    await client.send(
+      new UntagRoleCommand({ RoleName: "TaggedRole", TagKeys: ["stage"] }),
+    );
+    await client.send(
+      new TagUserCommand({
+        UserName: "tagged-user",
+        Tags: [{ Key: "team", Value: "reports" }],
+      }),
+    );
+    await client.send(
+      new UntagUserCommand({ UserName: "tagged-user", TagKeys: ["missing"] }),
+    );
+
+    const roleTags = await client.send(
+      new ListRoleTagsCommand({ RoleName: "TaggedRole" }),
+    );
+    const userTags = await client.send(
+      new ListUserTagsCommand({ UserName: "tagged-user" }),
+    );
+
+    assertIdentical(roleTags.Tags?.map((tag) => tag.Key).join(","), "team");
+    assertIdentical(userTags.Tags?.[0]?.Value, "reports");
   });
 
   it("round-trips the removal Commands through an intercepted client", async () => {

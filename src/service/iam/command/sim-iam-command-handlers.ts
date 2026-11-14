@@ -15,6 +15,8 @@ import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
 import { SimIamPolicyCommandHandlers } from "./policy/sim-iam-policy-command-handlers.js";
 import { SimIamRoleCommandHandlers } from "./role/sim-iam-role-command-handlers.js";
 import { SimIamUserCommandHandlers } from "./user/sim-iam-user-command-handlers.js";
+import { SimIamTagCommandHandlers } from "./tag/sim-iam-tag-command-handlers.js";
+import { SimIamIdentityAuthorizer } from "../tag/sim-iam-identity-authorizer.js";
 
 interface SimIamCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -43,6 +45,8 @@ export class SimIamCommandHandlers {
   readonly roles: SimIamRoleCommandHandlers;
   readonly users: SimIamUserCommandHandlers;
   readonly policies: SimIamPolicyCommandHandlers;
+  readonly roleTags: SimIamTagCommandHandlers;
+  readonly userTags: SimIamTagCommandHandlers;
 
   constructor(properties: SimIamCommandHandlersProperties) {
     // IAM is global rather than Region-scoped, so its own control-plane
@@ -65,6 +69,30 @@ export class SimIamCommandHandlers {
       background: properties.background,
       authorizer,
     });
+    const { accountId, roles, users, background } = properties;
+
+    this.roleTags = new SimIamTagCommandHandlers(
+      "Role",
+      new SimIamIdentityAuthorizer({
+        accountId,
+        authorizer,
+        entity: "Role",
+        find: (name): SimIamRole | undefined =>
+          roles.get(name as SimIamRoleName),
+      }),
+      background,
+    );
+    this.userTags = new SimIamTagCommandHandlers(
+      "User",
+      new SimIamIdentityAuthorizer({
+        accountId,
+        authorizer,
+        entity: "User",
+        find: (name): SimIamUser | undefined =>
+          users.get(name as SimIamUsername),
+      }),
+      background,
+    );
     this.policies = new SimIamPolicyCommandHandlers({
       accountId: properties.accountId,
       policies: properties.policies,

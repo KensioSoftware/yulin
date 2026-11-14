@@ -4,6 +4,7 @@ import type { SimArn } from "../../aws/arn.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 import type { SimIamPrincipal } from "../principal/sim-iam-principal.js";
 import type { SimIamRoleId } from "./sim-iam-role-id.js";
+import type { SimIamIdentityTags } from "../tag/sim-iam-identity-tags.js";
 
 export type SimIamRoleName = Brand<string, "SimIamRoleName">;
 
@@ -46,4 +47,10 @@ export interface SimIamRole extends SimIamPrincipal {
    * ARNs of managed identity-based permissions policies attached to this role.
    */
   readonly attachedPolicyArns: Set<SimArn>;
+
+  /**
+   * The tags on this Role, which a policy reads as `aws:PrincipalTag/` when
+   * the Role makes a request and as `iam:ResourceTag/` when it is acted on.
+   */
+  readonly tags: SimIamIdentityTags;
 }

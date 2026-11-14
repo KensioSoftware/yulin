@@ -7,11 +7,13 @@ import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-n
 import {
   simCfnIamJsonObject,
   simCfnIamOptionalString,
+  simCfnIamTags,
 } from "../sim-cfn-iam-property.js";
 import {
   SimCfnIamPoliciesParser,
   type SimCfnIamInlinePolicy,
 } from "../sim-cfn-iam-policies-parser.js";
+import type { SimIamTagInput } from "../../tag/sim-iam-identity-tags.js";
 
 export interface SimCfnIamRoleProperties {
   readonly roleName: string;
@@ -21,6 +23,7 @@ export interface SimCfnIamRoleProperties {
   readonly permissionsBoundary: string | undefined;
   readonly inlinePolicies: readonly SimCfnIamInlinePolicy[];
   readonly managedPolicyArns: readonly string[];
+  readonly tags: readonly SimIamTagInput[] | undefined;
 }
 
 const resourceType = "AWS::IAM::Role";
@@ -61,6 +64,7 @@ export class SimCfnIamRolePropertiesParser {
         resource,
         properties,
       ),
+      tags: simCfnIamTags(resourceType, resource, properties),
     };
   }
 
