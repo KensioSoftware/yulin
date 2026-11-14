@@ -116,11 +116,11 @@ export class SimIamPolicyVariables {
     const comma = name.indexOf(",");
     const value =
       comma === -1
-        ? this.lookup(name.trim())
-        : (this.lookup(name.slice(0, comma).trim()) ??
+        ? this.scalar(name)
+        : (this.scalar(name.slice(0, comma)) ??
           defaultValue(name.slice(comma + 1)));
 
-    if (value === undefined || typeof value === "object") {
+    if (value === undefined) {
       return undefined;
     }
 
@@ -131,6 +131,16 @@ export class SimIamPolicyVariables {
           .replaceAll("*", () => simIamLiteralAsterisk)
           .replaceAll("?", () => simIamLiteralQuestionMark)
       : text;
+  }
+
+  /**
+   * The single value the request carries for a key, or undefined where it
+   * carries none or a list.
+   */
+  private scalar(key: string): string | number | boolean | undefined {
+    const value = this.lookup(key.trim());
+
+    return typeof value === "object" ? undefined : value;
   }
 }
 

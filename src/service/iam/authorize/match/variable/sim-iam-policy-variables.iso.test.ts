@@ -174,6 +174,22 @@ describe("sim IAM policy variables in Resource", () => {
     );
   });
 
+  it("uses the default for a list-valued key", () => {
+    // Given a variable naming a list-valued key, with a default
+    const statement = {
+      Resource: "arn:aws:s3:::reports/${aws:TagKeys, 'shared'}/*",
+    };
+
+    // When a request carrying the key as a list reads the shared prefix
+    // Then the key has no value, and the default stands in for it
+    assertTrue(
+      allowed(statement, {
+        context: { "aws:TagKeys": ["blue"] },
+        resource: "arn:aws:s3:::reports/shared/summary.csv",
+      }),
+    );
+  });
+
   it("leaves an unclosed variable as literal text", () => {
     // Given a pattern opening a variable it never closes
     const statement = { Resource: "arn:aws:s3:::reports/${blue/*" };
