@@ -11,7 +11,6 @@ import {
   GetPolicyCommand,
   GetPolicyVersionCommand,
   GetRoleCommand,
-  GetUserCommand,
   IAMClient,
   ListRoleTagsCommand,
   ListUserTagsCommand,
@@ -332,7 +331,7 @@ describe("Serving simulated IAM on an endpoint URL", () => {
     // a boolean and a timestamp as a date
     const read = answered.Policy;
     assertNonNullable(read, "GetPolicy answered with a Policy");
-    assertIdentical(read.AttachmentCount, 0);
+    assertIdentical(read.AttachmentCount, 1);
     assertTrue(read.IsAttachable ?? false);
     assertIdentical(read.Path, "/reporting/");
     assertNonNullable(read.UpdateDate, "an update date");
@@ -383,18 +382,5 @@ describe("Serving simulated IAM on an endpoint URL", () => {
       decodeURIComponent(version.PolicyVersion?.Document ?? ""),
       "logs:PutLogEvents",
     );
-  });
-
-  it("refuses an IAM operation it does not serve", async () => {
-    // When an operation simulated IAM has no answer for is asked for
-    const error = await assertThrowsErrorAsync(
-      async () =>
-        await client.send(new GetUserCommand({ UserName: "Widgets" })),
-    );
-
-    // Then it is refused by name, in the shape the Query protocol states an
-    // error, so an SDK raises it rather than failing to parse the response
-    assertIdentical(error.name, "NotImplemented");
-    assertStringIncludes(error.message, "GetUser");
   });
 });

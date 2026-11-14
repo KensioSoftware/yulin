@@ -5,6 +5,10 @@ import { simIamQueryPolicyOperations } from "./sim-iam-query-policy-operations.j
 import { simIamQueryRoleOperations } from "./sim-iam-query-role-operations.js";
 import { simIamQueryUserOperations } from "./sim-iam-query-user-operations.js";
 import { simIamQueryTagOperations } from "./sim-iam-query-tag-operations.js";
+import { simIamQueryEntityOperations } from "./sim-iam-query-entity-operations.js";
+import { simIamQueryUserEntityOperations } from "./sim-iam-query-user-entity-operations.js";
+import { simIamQueryGroupOperations } from "./sim-iam-query-group-operations.js";
+import { simIamQueryUpdateOperations } from "./sim-iam-query-update-operations.js";
 
 /**
  * The XML namespace real IAM stamps on every response it sends.
@@ -40,5 +44,9 @@ function simIamQueryOperations(): SimQueryOperations {
     ...simIamQueryRoleOperations(),
     ...simIamQueryPolicyOperations(),
     ...simIamQueryTagOperations(),
+    ...simIamQueryEntityOperations(),
+    ...simIamQueryUserEntityOperations(),
+    ...simIamQueryGroupOperations(),
+    ...simIamQueryUpdateOperations(),
   ]);
 }

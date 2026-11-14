@@ -1,6 +1,7 @@
 import { CreatePolicyCommand, ListPoliciesCommand } from "@aws-sdk/client-iam";
 import {
   assertArrayEmpty,
+  assertArrayIncludes,
   assertArrayLength,
   assertFalse,
   assertIdentical,
@@ -53,7 +54,7 @@ describe("IAM ListPoliciesCommand", () => {
     );
 
     const listPoliciesOutput = await simIam.listPolicies(
-      new ListPoliciesCommand(),
+      new ListPoliciesCommand({ Scope: "Local" }),
     );
 
     assertArrayLength(listPoliciesOutput.Policies, 2);
@@ -128,6 +129,7 @@ describe("IAM ListPoliciesCommand", () => {
 
     const listPoliciesOutput = await simIam.listPolicies(
       new ListPoliciesCommand({
+        Scope: "Local",
         PathPrefix: "/service-role/",
       }),
     );
@@ -142,7 +144,7 @@ describe("IAM ListPoliciesCommand", () => {
     assertUndefined(listPoliciesOutput.Marker);
   });
 
-  it("returns no policies for the AWS scope", async () => {
+  it("lists only the AWS-managed catalogue for the AWS scope", async () => {
     const simAws = new SimAws();
 
     const simIam = simAws.iam();
@@ -168,9 +170,9 @@ describe("IAM ListPoliciesCommand", () => {
       }),
     );
 
-    assertArrayEmpty(listPoliciesOutput.Policies);
-    assertFalse(listPoliciesOutput.IsTruncated);
-    assertUndefined(listPoliciesOutput.Marker);
+    const arns = listPoliciesOutput.Policies.map((policy) => policy.Arn);
+    assertArrayIncludes(arns, "arn:aws:iam::aws:policy/AdministratorAccess");
+    assertFalse(arns.some((arn) => arn.includes(":policy/LocalPolicy")));
   });
 
   it("paginates IAM Policies with markers", async () => {
@@ -223,6 +225,7 @@ describe("IAM ListPoliciesCommand", () => {
 
     const firstPage = await simIam.listPolicies(
       new ListPoliciesCommand({
+        Scope: "Local",
         MaxItems: 2,
       }),
     );
@@ -237,6 +240,7 @@ describe("IAM ListPoliciesCommand", () => {
 
     const secondPage = await simIam.listPolicies(
       new ListPoliciesCommand({
+        Scope: "Local",
         Marker: firstPage.Marker,
         MaxItems: 2,
       }),

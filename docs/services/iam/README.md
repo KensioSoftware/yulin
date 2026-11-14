@@ -216,7 +216,84 @@ Policy paths are normalised into the Policy ARN. A Policy named `ReadOnlyReports
 `/service-role/` gets the ARN `arn:aws:iam::123456789012:policy/service-role/ReadOnlyReports`.
 Creating a duplicate Policy name in the same path throws an error, while the same name in different
 paths is allowed. Stored Policies can be inspected with `GetPolicyCommand` and
-`ListPoliciesCommand`.
+`ListPoliciesCommand`. `AttachmentCount` counts the Roles, Users and groups a policy is attached
+to, and `PermissionsBoundaryUsageCount` the Roles and Users it is the boundary of.
+
+`ListPoliciesCommand` lists the Account's own policies and the [AWS-managed
+catalogue](#aws-managed-policies) together. `Scope: "Local"` lists only the Account's own, and
+`Scope: "AWS"` only the catalogue.
+
+### Policy versions
+
+A customer managed policy holds up to five versions. `CreatePolicyVersionCommand` adds one, and
+`SetAsDefault: true` makes it the default as it is created. `SetDefaultPolicyVersionCommand` makes an
+existing version the default. Authorization reads the default version only, so a change of default
+changes what every Role, User and group the policy is attached to may do, from the next request.
+
+```typescript sim-iam-policy-versions
+/**
+ * Rolling a managed policy forward to a new version.
+ */
+
+import {
+  AttachUserPolicyCommand,
+  CreatePolicyCommand,
+  CreatePolicyVersionCommand,
+  CreateUserCommand,
+  ListPolicyVersionsCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simIam = new SimAws().account("123456789012").iam();
+
+const { Policy } = await simIam.createPolicy(
+  new CreatePolicyCommand({
+    PolicyName: "Reports",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "s3:GetObject", Resource: "*" },
+    }),
+  }),
+);
+await simIam.createUser(new CreateUserCommand({ UserName: "analyst" }));
+await simIam.attachUserPolicy(
+  new AttachUserPolicyCommand({ UserName: "analyst", PolicyArn: Policy.Arn }),
+);
+
+// Version 2 allows writes as well, and becomes the default
+await simIam.createPolicyVersion(
+  new CreatePolicyVersionCommand({
+    PolicyArn: Policy.Arn,
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: ["s3:GetObject", "s3:PutObject"],
+        Resource: "*",
+      },
+    }),
+    SetAsDefault: true,
+  }),
+);
+
+const versions = await simIam.listPolicyVersions(
+  new ListPolicyVersionsCommand({ PolicyArn: Policy.Arn }),
+);
+const decision = simIam.authorize({
+  action: "s3:PutObject",
+  resource: "arn:aws:s3:::reports-bucket/summary.csv",
+  caller: { kind: "arn", arn: "arn:aws:iam::123456789012:user/analyst" },
+});
+
+console.log(versions.Versions.map((version) => version.VersionId)); // ["v2", "v1"]
+console.log(decision.isAllowed); // true
+```
+
+`ListPolicyVersionsCommand` lists the versions newest first, and `GetPolicyVersionCommand` reads any
+of them. `DeletePolicyVersionCommand` removes a version other than the default. Versions are numbered
+upwards and a deleted number is never reused, so the version after `v5` is `v6` whatever was deleted
+between. A sixth version is refused with `LimitExceeded`, and `DeletePolicyCommand` refuses a policy
+still holding versions other than its default with `DeleteConflict`.
 
 ## AWS-managed policies
 
@@ -323,11 +400,13 @@ reads the guide again and rewrites the snapshot.
 
 ## Policy document character limits
 
-IAM caps a policy document by where it is going. A managed policy takes 6,144 characters, an inline
-policy on a Role or a User takes 10,240, and a Role trust policy takes 2,048. `CreatePolicy`,
-`PutRolePolicy`, `PutUserPolicy` and `CreateRole` refuse a document past the cap with
-`LimitExceeded`, in IAM's own wording. An `AWS::IAM::ManagedPolicy` or an `AWS::IAM::Policy`
-carrying one fails its Resource.
+IAM caps a policy document by where it is going. A managed policy version takes 6,144 characters,
+and a Role trust policy takes 2,048. Inline policies are capped as a total for each entity, summed
+across every inline policy it holds: 10,240 characters for a Role, 5,120 for a group and 2,048 for a
+User. `CreatePolicy`, `CreatePolicyVersion`, `PutRolePolicy`, `PutUserPolicy`, `PutGroupPolicy`,
+`CreateRole` and `UpdateAssumeRolePolicy` refuse a document past the cap with `LimitExceeded`, in
+IAM's own wording. Replacing an inline policy measures the new document in place of the old one. An
+`AWS::IAM::ManagedPolicy` or an `AWS::IAM::Policy` carrying one fails its Resource.
 
 IAM leaves whitespace out of the count, and so does the check here. A document indented for a
 reader measures the same as the one line `JSON.stringify` writes.
@@ -335,6 +414,22 @@ reader measures the same as the one line `JSON.stringify` writes.
 A policy that has outgrown its cap cannot be deployed. The account keeps whichever version last
 fit, and the permission the policy was grown to grant goes missing weeks later, against a
 repository that still says it is there.
+
+## Quotas
+
+IAM refuses the following with `LimitExceeded`, at the defaults a new account carries:
+
+| Limit                                | Default | Message                                         |
+| ------------------------------------ | ------- | ----------------------------------------------- |
+| Managed policies attached to a Role  | 20      | `Cannot exceed quota for PoliciesPerRole: 20`   |
+| Managed policies attached to a User  | 10      | `Cannot exceed quota for PoliciesPerUser: 10`   |
+| Managed policies attached to a group | 10      | `Cannot exceed quota for PoliciesPerGroup: 10`  |
+| Access keys on a User, active or not | 2       | `Cannot exceed quota for AccessKeysPerUser: 2`  |
+| Groups a User is in                  | 10      | `Cannot exceed quota for GroupsPerUser: 10`     |
+| Versions of a managed policy         | 5       | `A managed policy can have up to 5 versions...` |
+
+Attaching a policy an entity already carries, or adding a User to a group it is already in, counts
+nothing. The Role quota can be raised in a real account. The simulation holds the default.
 
 ## Policy conditions
 
@@ -592,10 +687,9 @@ issue access keys with `CreateAccessKeyCommand`. Access keys are registered with
 credential registry. Credentials can then be supplied as the caller of an authorization attempt,
 and are authenticated before policy evaluation.
 
-`DeleteUserCommand` removes a User. IAM refuses it while the User still holds an inline policy or an
-attached managed policy, the way `DeleteRoleCommand` refuses a Role, and answers `NoSuchEntity` for
-a name the Account does not hold. Real IAM also refuses a User that still has access keys or a login
-profile. Sim IAM serves no way to remove either, and lets the User go.
+`DeleteUserCommand` removes a User. IAM refuses it with `DeleteConflict` while the User still holds
+an inline or attached policy, an access key, a login profile or a group membership, and answers
+`NoSuchEntity` for a name the Account does not hold. Take each off first with the commands below.
 
 ```typescript sim-iam-user-access-key
 /**
@@ -666,6 +760,74 @@ attached. An [AWS-managed policy](#aws-managed-policies) grants a User what it g
 `CreateLoginProfileCommand` gives a User a console password. The response describes the profile
 without the password, which is how real IAM behaves. See
 [CloudFormation Users](#users) for reading the password back out of the simulator.
+`GetLoginProfileCommand` describes the profile the same way, and `DeleteLoginProfileCommand` removes
+it.
+
+`GetUserCommand` describes a User, and `ListUsersCommand` lists the Account's Users in name order
+under an optional `PathPrefix`. `GetUserPolicyCommand` answers an inline policy's document
+URL-encoded, as IAM sends it. `ListUserPoliciesCommand` lists the inline policy names.
+`DeleteUserPolicyCommand` and `DetachUserPolicyCommand` take a policy off, and the grant goes with it
+from the next request.
+
+`ListAccessKeysCommand` lists a User's keys without their secrets. `UpdateAccessKeyCommand` makes a
+key `Inactive` or `Active` again, and an inactive key authenticates nothing.
+`DeleteAccessKeyCommand` removes a key, which fails authentication from then on. `GetUserCommand`,
+`ListAccessKeysCommand` and the access key commands act on the calling User when the command leaves
+`UserName` out. A caller that is no User of the Account, such as a Role session, gets
+`ValidationError` and has to name one.
+
+## Groups
+
+A group holds policies for the Users in it. A User gets the inline and managed policies of every
+group it is in as well as its own, from its next request. A group is never a principal, so a policy
+cannot name one and a group cannot make a request.
+
+```typescript sim-iam-groups
+/**
+ * Granting a User what its group allows.
+ */
+
+import {
+  AddUserToGroupCommand,
+  AttachGroupPolicyCommand,
+  CreateGroupCommand,
+  CreateUserCommand,
+  RemoveUserFromGroupCommand,
+} from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simIam = new SimAws().account("123456789012").iam();
+
+await simIam.createGroup(new CreateGroupCommand({ GroupName: "Readers" }));
+await simIam.attachGroupPolicy(
+  new AttachGroupPolicyCommand({
+    GroupName: "Readers",
+    PolicyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+  }),
+);
+await simIam.createUser(new CreateUserCommand({ UserName: "analyst" }));
+
+const mayRead = (): boolean =>
+  simIam.authorize({
+    action: "s3:GetObject",
+    resource: "arn:aws:s3:::reports-bucket/summary.csv",
+    caller: { kind: "arn", arn: "arn:aws:iam::123456789012:user/analyst" },
+  }).isAllowed;
+
+const membership = { GroupName: "Readers", UserName: "analyst" };
+await simIam.addUserToGroup(new AddUserToGroupCommand(membership));
+console.log(mayRead()); // true
+
+await simIam.removeUserFromGroup(new RemoveUserFromGroupCommand(membership));
+console.log(mayRead()); // false
+```
+
+`CreateGroupCommand`, `GetGroupCommand` (which lists the members), `ListGroupsCommand`,
+`ListGroupsForUserCommand` and `DeleteGroupCommand` manage the groups themselves. The inline and
+managed policy commands match the Role and User ones: `PutGroupPolicyCommand`,
+`GetGroupPolicyCommand`, `ListGroupPoliciesCommand`, `DeleteGroupPolicyCommand`,
+`AttachGroupPolicyCommand`, `DetachGroupPolicyCommand` and `ListAttachedGroupPoliciesCommand`.
+`DeleteGroupCommand` refuses a group that still has a member or a policy with `DeleteConflict`.
 
 ## Tags and principal keys
 
@@ -1562,7 +1724,11 @@ try {
 
 A permissions boundary caps what a User's or a Role's identity policies can grant. Set one with
 `PermissionsBoundary` on `CreateUserCommand` or `CreateRoleCommand`, or with the template property of
-the same name on `AWS::IAM::User` and `AWS::IAM::Role`. The boundary is a managed policy, either one
+the same name on `AWS::IAM::User` and `AWS::IAM::Role`. `PutUserPermissionsBoundaryCommand` and
+`PutRolePermissionsBoundaryCommand` set or replace one afterwards, and
+`DeleteUserPermissionsBoundaryCommand` and `DeleteRolePermissionsBoundaryCommand` take it off. A
+policy conditioned on `iam:PermissionsBoundary` is tested against the boundary being put. The
+boundary is a managed policy, either one
 the Account created or an AWS-managed one from the [catalogue](#aws-managed-policies). It grants
 nothing itself.
 
@@ -1728,22 +1894,27 @@ be allowed them, or the call wrapped in `simAws.runAs(...)`.
 ## CloudFormation IAM resources
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::User`,
-`AWS::IAM::ManagedPolicy`, and `AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each
-Role named in `Roles` and each User named in `Users` as an inline policy. That is the shape CDK
+`AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`, `AWS::IAM::ManagedPolicy` and
+`AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles`, each
+User named in `Users` and each group named in `Groups` as an inline policy. That is the shape CDK
 grants such as `bucket.grantRead(fn)` and `bucket.grantRead(user)` synthesize as a "DefaultPolicy"
-resource. Every entry names a Role or a User in the Stack's Account. An entry naming no simulated
-principal fails the resource, and so does a policy naming no principal at all. A `Groups` property
-still fails the resource.
+resource. Every entry names an entity in the Stack's Account. An entry naming no simulated entity
+fails the resource, and so does a policy naming none at all.
 
 A statement value of the wrong type fails the resource too. A `Ref` or an `Fn::GetAtt` naming a
 Resource the template leaves out survives resolution and reaches IAM as an object where `Action` or
 `Resource` takes a string. The put refuses it with `MalformedPolicyDocument`, naming the Role or
 User, the policy and the statement holding it.
 
-An `AWS::IAM::ManagedPolicy` also carries `Roles`, and attaches itself to each Role it names as it
-is created (the attachment `AttachRolePolicy` records). A name no simulated Role in the Account
-answers to fails the resource. Deleting the stack takes the policy back off the Roles still
-carrying it, and then deletes the policy.
+An `AWS::IAM::ManagedPolicy` also carries `Roles`, `Users` and `Groups`, and attaches itself to each
+entity they name as it is created. A name no simulated entity in the Account answers to fails the
+resource. Deleting the stack takes the policy back off whatever still carries it, and then deletes
+the policy.
+
+An `AWS::IAM::Group` creates a group from `GroupName` (generated like a Role name when left out),
+`Path`, `Policies` and `ManagedPolicyArns`. `Ref` returns the group name and `Fn::GetAtt` supports
+`Arn`. An `AWS::IAM::UserToGroupAddition` adds each User in `Users` to the group `GroupName` names,
+and deleting it takes them back out.
 
 A Role with no `RoleName`, a User with no `UserName` and a Managed Policy with no
 `ManagedPolicyName` are each named from the stack name, the logical ID and a tail derived from both.
@@ -1874,11 +2045,12 @@ test asserting on the password reads the User record from `SimIam.users`.
 A separate `AWS::IAM::Policy` naming the User in `Users` puts its document onto the User as another
 inline policy. That is what a CDK grant against a User synthesizes.
 
-Group membership is a gap. A `Groups` entry fails the Resource. An empty list still deploys, and CDK
-leaves `Groups` out of the template for a User that belongs to no group.
+`Groups` adds the User to each group it names as the User is created, and the User then gets the
+group's policies.
 
-Deleting the Stack deletes the User. Its inline policies and managed policy attachments come off
-first, as they do for a Role, and the User name is free for the same template to deploy again.
+Deleting the Stack deletes the User. Its inline policies, managed policy attachments, login profile
+and group memberships come off first, and the User name is free for the same template to deploy
+again. An access key created outside the Stack refuses the deletion, as it does in AWS.
 
 ```typescript sim-iam-cloudformation-user
 /**
@@ -2140,22 +2312,35 @@ Sim IAM currently supports:
 - `makeDeployRole(...)`, creating a Role for a CloudFormation deployment to run as
 - `CreateRoleCommand`, including trust-policy validation
 - `GetRoleCommand` and `ListRolesCommand`, with pagination
-- `PutRolePolicyCommand`, for inline Role policies
-- `CreatePolicyCommand`, `GetPolicyCommand`, `GetPolicyVersionCommand` and `ListPoliciesCommand`,
-  for managed Policies
+- `UpdateRoleCommand`, `UpdateAssumeRolePolicyCommand`, `PutRolePermissionsBoundaryCommand` and
+  `DeleteRolePermissionsBoundaryCommand`
+- `PutRolePolicyCommand`, `GetRolePolicyCommand`, `ListRolePoliciesCommand` and
+  `DeleteRolePolicyCommand`, for inline Role policies
+- `CreatePolicyCommand`, `GetPolicyCommand`, `ListPoliciesCommand` (including the AWS-managed
+  catalogue) and `DeletePolicyCommand`, for managed Policies
+- `CreatePolicyVersionCommand`, `GetPolicyVersionCommand`, `ListPolicyVersionsCommand`,
+  `SetDefaultPolicyVersionCommand` and `DeletePolicyVersionCommand`
 - A catalogue of [AWS-managed policies](#aws-managed-policies) that grant their published
   permissions when attached
-- Refusing a policy document over IAM's character limit, with `LimitExceeded`
-- `AttachRolePolicyCommand` and `ListAttachedRolePoliciesCommand`
-- `CreateUserCommand`, `DeleteUserCommand`, `PutUserPolicyCommand`, `AttachUserPolicyCommand` and
+- Refusing a policy document over IAM's character limit, and the [quotas](#quotas) on attachments,
+  access keys, group memberships and policy versions, with `LimitExceeded`
+- `AttachRolePolicyCommand`, `DetachRolePolicyCommand` and `ListAttachedRolePoliciesCommand`
+- `CreateUserCommand`, `GetUserCommand`, `ListUsersCommand` and `DeleteUserCommand`
+- `PutUserPolicyCommand`, `GetUserPolicyCommand`, `ListUserPoliciesCommand`,
+  `DeleteUserPolicyCommand`, `AttachUserPolicyCommand`, `DetachUserPolicyCommand` and
   `ListAttachedUserPoliciesCommand`
-- `CreateLoginProfileCommand`, for a User's console password
+- `PutUserPermissionsBoundaryCommand` and `DeleteUserPermissionsBoundaryCommand`
+- `CreateLoginProfileCommand`, `GetLoginProfileCommand` and `DeleteLoginProfileCommand`
+- [Groups](#groups): `CreateGroupCommand`, `GetGroupCommand`, `ListGroupsCommand`,
+  `ListGroupsForUserCommand`, `DeleteGroupCommand`, `AddUserToGroupCommand`,
+  `RemoveUserFromGroupCommand`, and the inline and managed group policy commands
 - `TagRoleCommand`, `UntagRoleCommand`, `ListRoleTagsCommand`, `TagUserCommand`, `UntagUserCommand`
   and `ListUserTagsCommand`, along with `Tags` on `CreateRoleCommand` and `CreateUserCommand`
 - `aws:PrincipalTag/`, `iam:ResourceTag/`, `aws:RequestTag/` and `aws:TagKeys`, and the principal
   keys `aws:PrincipalAccount`, `aws:PrincipalType`, `aws:userid`, `aws:username`,
   `aws:PrincipalIsAWSService` and `aws:PrincipalServiceName`
-- `CreateAccessKeyCommand`, registering access keys for credential authentication
+- `CreateAccessKeyCommand`, registering access keys for credential authentication, and
+  `ListAccessKeysCommand`, `UpdateAccessKeyCommand` and `DeleteAccessKeyCommand`
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and every documented condition operator with explicit-deny
   precedence
@@ -2166,14 +2351,15 @@ Sim IAM currently supports:
   `PermissionsBoundary` a request, an `AWS::IAM::Role` or an `AWS::IAM::User` declares
 - Permissions boundaries on Users and Roles, and session policies on assumed-role sessions,
   evaluated as caps on identity policies and on resource policies naming a Role
-- `MaxSessionDuration` on `CreateRoleCommand` and `AWS::IAM::Role`, reported by `GetRoleCommand`
+- `MaxSessionDuration` on `CreateRoleCommand`, `UpdateRoleCommand` and `AWS::IAM::Role`, reported by
+  `GetRoleCommand`
 - Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
   signature, defaulting to anonymous, and the resource it is made on behalf of from
   `x-sim-aws-source-arn` and `x-sim-aws-source-account`
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
-- The `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
-  CloudFormation resources
+- The `AWS::IAM::Role`, `AWS::IAM::User`, `AWS::IAM::Group`, `AWS::IAM::UserToGroupAddition`,
+  `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
 
 Unsupported IAM options may be ignored or may throw errors depending on whether the simulator needs
 them to model the requested behaviour.
@@ -2182,24 +2368,12 @@ them to model the requested behaviour.
 
 Sim IAM models the policy behaviour that multi-service tests most commonly need. Notable gaps:
 
-- Groups are absent. An `AWS::IAM::User` naming one fails, and an `AWS::IAM::Policy` naming one
-  fails too
-- A boundary is set when its User or Role is created. `PutRolePermissionsBoundary`,
-  `PutUserPermissionsBoundary` and the matching deletes are absent, and so is `UpdateRole`, which
-  leaves `MaxSessionDuration` fixed at creation. Service control policies are evaluated, and are
-  attached through
-  [simulated Organizations](https://yulinsim.dev/services/organizations/ "Simulated Organizations service control policies usage docs")
-- Managed Policies have a single version. `GetPolicyVersionCommand` answers for that version, and
-  the commands that create, list or delete versions are absent
-- `ListPoliciesCommand` lists the Account's own policies only. The AWS-managed catalogue is absent
-  from it whatever the `Scope`
+- An AWS-managed policy has the one version the catalogue holds, and the version commands act on
+  the Account's own policies only
 - AWS-managed policies outside the [catalogue](#aws-managed-policies) attach and grant nothing
-- A policy document is measured against IAM's character limit one document at a time. The
-  20,480-character cap on the sum of a User's inline policies is absent, and so is the cap on how
-  many managed policies a Role may carry
-- `DeleteUserPolicy` and `DetachUserPolicy` are absent, along with `DeleteAccessKey` and
-  `DeleteLoginProfile`. `DeleteUserCommand` refuses a User that still holds a policy, and
-  CloudFormation teardown clears a User's policies before deleting it
+- The account-wide counts (Roles, Users, groups and customer managed policies per Account) are not
+  enforced, and the quotas hold their defaults. `UpdateUser`, MFA devices, signing certificates,
+  SSH keys and instance profiles are absent
 - A condition keyword IAM does not define fails closed, matching no request.
   `decision.unevaluatedStatements` names the statements holding one
 - Condition operator keywords are matched case-sensitively. AWS does not document whether it reads

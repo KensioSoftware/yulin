@@ -20,7 +20,7 @@ import {
 import { jsonStringify } from "../../../../../util/type-guard/json.js";
 import { SimIamLimitExceeded } from "../../../error/sim-iam.error.js";
 import { simIamPolicyDocumentOfSize } from "../../../policy/sim-iam-policy-document-of-size.js";
-import { maxSimIamInlinePolicyCharacters } from "../../../validate/size/sim-iam-policy-document-size.js";
+import { simIamPolicyHolderQuotas } from "../../../policy/sim-iam-policy-holder.js";
 
 describe("IAM PutUserPolicyCommand", () => {
   it("adds an inline identity policy to a User", async () => {
@@ -64,7 +64,9 @@ describe("IAM PutUserPolicyCommand", () => {
     assertIdentical(decision.value, "Allow");
 
     // And the inline policy is not exposed as a managed policy.
-    const listOutput = await simIam.listPolicies(new ListPoliciesCommand({}));
+    const listOutput = await simIam.listPolicies(
+      new ListPoliciesCommand({ Scope: "Local" }),
+    );
     assertArrayEmpty(listOutput.Policies);
   });
 
@@ -184,10 +186,12 @@ describe("IAM PutUserPolicyCommand", () => {
 
     await simIam.createUser(new CreateUserCommand({ UserName: "Analyst" }));
 
-    // When an inline policy one character past the 10,240 IAM takes is put
-    // onto them.
+    // When an inline policy one character past the 2,048 IAM takes for a
+    // User is put onto them.
     const policyDocument = jsonStringify(
-      simIamPolicyDocumentOfSize(maxSimIamInlinePolicyCharacters + 1),
+      simIamPolicyDocumentOfSize(
+        simIamPolicyHolderQuotas.User.inlineCharacters + 1,
+      ),
     );
     const error = await assertThrowsErrorAsync(async () =>
       simIam.putUserPolicy(
@@ -203,7 +207,7 @@ describe("IAM PutUserPolicyCommand", () => {
     assertInstanceOf(error, SimIamLimitExceeded);
     assertIdentical(
       error.message,
-      "Maximum policy size of 10240 bytes exceeded for user Analyst",
+      "Maximum policy size of 2048 bytes exceeded for user Analyst",
     );
   });
 });

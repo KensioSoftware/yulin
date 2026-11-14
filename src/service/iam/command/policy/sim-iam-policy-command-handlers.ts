@@ -3,7 +3,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
-import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
+import type { SimIamPolicyUsage } from "../../policy/sim-iam-policy-usage.js";
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import { CreatePolicyCommandHandler } from "./create-policy/create-policy.handler.js";
@@ -40,8 +40,8 @@ import type {
 interface SimIamPolicyCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
-  readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly users: Map<SimIamUsername, SimIamUser>;
+  readonly usage: SimIamPolicyUsage;
   readonly background: BackgroundScheduler;
   readonly authorizer: SimIamActionAuthorizer;
 }
@@ -56,19 +56,19 @@ interface SimIamPolicyCommandHandlersProperties {
 export class SimIamPolicyCommandHandlers {
   private readonly accountId: SimAwsAccountId;
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
-  private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly users: Map<SimIamUsername, SimIamUser>;
+  private readonly usage: SimIamPolicyUsage;
   private readonly background: BackgroundScheduler;
   private readonly authorizer: SimIamActionAuthorizer;
 
   constructor(properties: SimIamPolicyCommandHandlersProperties) {
-    const { accountId, policies, roles, users, background, authorizer } =
+    const { accountId, policies, users, usage, background, authorizer } =
       properties;
 
     this.accountId = accountId;
     this.policies = policies;
-    this.roles = roles;
     this.users = users;
+    this.usage = usage;
     this.background = background;
     this.authorizer = authorizer;
   }
@@ -87,8 +87,7 @@ export class SimIamPolicyCommandHandlers {
     );
     const handler = new DeletePolicyCommandHandler({
       policies: this.policies,
-      roles: this.roles,
-      users: this.users,
+      usage: this.usage,
       background: this.background,
     });
     return await handler.handle(command);
@@ -128,6 +127,7 @@ export class SimIamPolicyCommandHandlers {
     );
     const handler = new GetPolicyCommandHandler({
       policies: this.policies,
+      usage: this.usage,
       background: this.background,
     });
     return await handler.handle(command);
@@ -162,6 +162,7 @@ export class SimIamPolicyCommandHandlers {
     this.authorizer.authorize("iam:ListPolicies", "*", options?.caller);
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
+      usage: this.usage,
       background: this.background,
     });
     return await handler.handle(command);

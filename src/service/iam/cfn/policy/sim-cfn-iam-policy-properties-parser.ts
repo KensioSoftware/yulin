@@ -6,9 +6,10 @@ export interface SimCfnIamPolicyProperties {
   readonly policyDocument: string;
   readonly roleNames: readonly string[];
   readonly usernames: readonly string[];
+  readonly groupNames: readonly string[];
 }
 
-type SimCfnIamPolicyPrincipalProperty = "Roles" | "Users";
+type SimCfnIamPolicyPrincipalProperty = "Roles" | "Users" | "Groups";
 
 const resourceType = "AWS::IAM::Policy";
 
@@ -27,15 +28,14 @@ export class SimCfnIamPolicyPropertiesParser {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): SimCfnIamPolicyProperties {
-    this.rejectGroups(resource, properties);
-
     const roleNames = this.principalNames(resource, properties, "Roles");
     const usernames = this.principalNames(resource, properties, "Users");
+    const groupNames = this.principalNames(resource, properties, "Groups");
 
-    if (roleNames.length === 0 && usernames.length === 0) {
+    if (roleNames.length + usernames.length + groupNames.length === 0) {
       throw this.invalid(
         resource,
-        "Roles or Users must name at least one principal",
+        "Roles, Users or Groups must name at least one entity",
       );
     }
 
@@ -44,6 +44,7 @@ export class SimCfnIamPolicyPropertiesParser {
       policyDocument: this.policyDocument(resource, properties),
       roleNames,
       usernames,
+      groupNames,
     };
   }
 
@@ -105,20 +106,6 @@ export class SimCfnIamPolicyPropertiesParser {
       }
       return name;
     });
-  }
-
-  /**
-   * IAM Groups are not simulated as CloudFormation policy principals, and
-   * silently dropping a grant would be misleading, so their presence fails
-   * creation.
-   */
-  private rejectGroups(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): void {
-    if (properties["Groups"] !== undefined) {
-      throw this.invalid(resource, "Groups are not simulated");
-    }
   }
 
   private invalid(resource: SimCfnResource, reason: string): TypeError {

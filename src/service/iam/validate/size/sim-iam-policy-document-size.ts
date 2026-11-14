@@ -8,11 +8,6 @@ import { SimIamLimitExceeded } from "../../error/sim-iam.error.js";
 export const maxSimIamManagedPolicyCharacters = 6144;
 
 /**
- * The longest inline policy document IAM will take on a Role or a User.
- */
-export const maxSimIamInlinePolicyCharacters = 10_240;
-
-/**
  * The longest trust policy document IAM will take on a Role.
  *
  * This one is adjustable, up to 8,192 characters. A simulation holds the
@@ -21,7 +16,7 @@ export const maxSimIamInlinePolicyCharacters = 10_240;
 export const maxSimIamTrustPolicyCharacters = 2048;
 
 /**
- * The Role or the User an inline policy is being put onto.
+ * The Role a trust policy is being put onto.
  */
 export interface SimIamPolicyDocumentHolder {
   /**
@@ -68,20 +63,6 @@ export function assertSimIamManagedPolicyWithinSizeLimit(
 
   throw new SimIamLimitExceeded(
     `Cannot exceed quota for PolicySize: ${String(maxSimIamManagedPolicyCharacters)}`,
-  );
-}
-
-/**
- * Refuse an inline policy document over the character limit.
- */
-export function assertSimIamInlinePolicyWithinSizeLimit(
-  policyDocument: string | undefined,
-  holder: SimIamPolicyDocumentHolder,
-): void {
-  assertWithinMaximumPolicySize(
-    policyDocument,
-    maxSimIamInlinePolicyCharacters,
-    holder,
   );
 }
 

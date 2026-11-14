@@ -8,7 +8,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamMalformedPolicyDocument } from "../../error/sim-iam.error.js";
 import { SimIamLimitExceeded } from "../../error/sim-iam.error.js";
-import { maxSimIamInlinePolicyCharacters } from "../../validate/size/sim-iam-policy-document-size.js";
+import { simIamPolicyHolderQuotas } from "../../policy/sim-iam-policy-holder.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
@@ -111,12 +111,13 @@ describe("IAM CloudFormation Policy validation", () => {
   });
 
   it("rejects a Policy naming no principal", async () => {
-    // Given Policy properties naming neither a Role nor a User, which leaves
-    // the policy with nothing to attach to.
-    // When creation is attempted, then each rejects naming both properties.
+    // Given Policy properties naming no Role, User or group, which leaves the
+    // policy with nothing to attach to.
+    // When creation is attempted, then each rejects naming all three
+    // properties.
     await assertRejectsPolicy(
       { PolicyName: "BadPolicy", PolicyDocument: validPolicyDocument },
-      "Roles or Users must name at least one principal",
+      "Roles, Users or Groups must name at least one entity",
     );
     await assertRejectsPolicy(
       {
@@ -125,7 +126,7 @@ describe("IAM CloudFormation Policy validation", () => {
         Roles: [],
         Users: [],
       },
-      "Roles or Users must name at least one principal",
+      "Roles, Users or Groups must name at least one entity",
     );
   });
 
@@ -181,37 +182,24 @@ describe("IAM CloudFormation Policy validation", () => {
         accountId: "111111111111" as SimAwsAccountId,
         regionName: "eu-west-2",
       },
-      logicalId: "ExampleGroup",
+      logicalId: "ExampleProfile",
       template: {
-        Type: "AWS::IAM::Group",
+        Type: "AWS::IAM::InstanceProfile",
       },
     });
 
     // When creation is attempted, then it rejects with an unsupported
     // Resource type error naming the type for diagnosis.
     const error = await assertThrowsErrorAsync(async () =>
-      factory.create("Group", resource, { simAws, resources: new Map() }),
+      factory.create("InstanceProfile", resource, {
+        simAws,
+        resources: new Map(),
+      }),
     );
 
     assertIdentical(
       error.message,
-      "Unsupported sim IAM CloudFormation Resource Group",
-    );
-  });
-
-  it("rejects an unsimulated Groups principal", async () => {
-    // Given Policy properties naming Groups, which sim IAM does not simulate
-    // as a CloudFormation policy principal.
-    // When creation is attempted, then it rejects rather than silently
-    // dropping the grant.
-    await assertRejectsPolicy(
-      {
-        PolicyName: "BadPolicy",
-        PolicyDocument: validPolicyDocument,
-        Roles: ["ReaderRole"],
-        Groups: ["SomeGroup"],
-      },
-      "Groups are not simulated",
+      "Unsupported sim IAM CloudFormation Resource InstanceProfile",
     );
   });
 
@@ -279,7 +267,7 @@ describe("IAM CloudFormation Policy validation", () => {
           Effect: "Allow",
           Action: "s3:GetObject",
           Resource: `arn:aws:s3:::reports-bucket/${"x".repeat(
-            maxSimIamInlinePolicyCharacters,
+            simIamPolicyHolderQuotas.Role.inlineCharacters,
           )}`,
         },
       ],

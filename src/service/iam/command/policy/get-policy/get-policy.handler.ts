@@ -1,3 +1,4 @@
+import type { SimIamPolicyUsage } from "../../../policy/sim-iam-policy-usage.js";
 import type { CommandHandler } from "../../../../../command/command-handler.js";
 import type { SimArn } from "../../../../aws/arn.js";
 import {
@@ -14,6 +15,7 @@ import type {
 
 interface GetPolicyCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
+  readonly usage: SimIamPolicyUsage;
   readonly background?: BackgroundScheduler;
 }
 
@@ -31,12 +33,14 @@ export class GetPolicyCommandHandler implements CommandHandler<
   SimGetPolicyCommandOutput
 > {
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
+  private readonly usage: SimIamPolicyUsage;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: GetPolicyCommandHandlerProperties) {
-    const { policies, background = new BackgroundTasks() } = properties;
+    const { policies, usage, background = new BackgroundTasks() } = properties;
 
     this.policies = policies;
+    this.usage = usage;
     this.background = background;
   }
 
@@ -68,8 +72,9 @@ export class GetPolicyCommandHandler implements CommandHandler<
         Arn: policy.arn,
         Path: policy.path,
         DefaultVersionId: policy.defaultVersionId,
-        AttachmentCount: policy.attachmentCount,
-        PermissionsBoundaryUsageCount: policy.permissionsBoundaryUsageCount,
+        AttachmentCount: this.usage(policy.arn).attachmentCount,
+        PermissionsBoundaryUsageCount: this.usage(policy.arn)
+          .permissionsBoundaryUsageCount,
         IsAttachable: policy.isAttachable,
         Description: policy.description,
         CreateDate: policy.creationDate,

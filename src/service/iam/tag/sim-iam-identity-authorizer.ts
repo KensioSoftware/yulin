@@ -12,11 +12,12 @@ import {
 } from "./sim-iam-tag-conditions.js";
 
 /**
- * A Role or a User, as far as authorizing a request on it goes.
+ * A Role, a User or a group, as far as authorizing a request on it goes. A
+ * group carries no tags.
  */
 export interface SimIamAuthorizedIdentity {
   readonly arn: string;
-  readonly tags: SimIamIdentityTags;
+  readonly tags?: SimIamIdentityTags | undefined;
 }
 
 interface SimIamIdentityAuthorizerProperties {
@@ -24,9 +25,9 @@ interface SimIamIdentityAuthorizerProperties {
   readonly authorizer: SimIamActionAuthorizer;
 
   /**
-   * `Role` or `User`, as IAM names the entity in its actions.
+   * `Role`, `User` or `Group`, as IAM names the entity in its actions.
    */
-  readonly entity: "Role" | "User";
+  readonly entity: "Role" | "User" | "Group";
 
   /**
    * Find an existing entity by name.

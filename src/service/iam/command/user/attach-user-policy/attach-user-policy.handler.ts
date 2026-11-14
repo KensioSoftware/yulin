@@ -1,3 +1,4 @@
+import { assertSimIamManagedPolicyQuota } from "../../entity/sim-iam-policy-holder-quota.js";
 import type { CommandHandler } from "../../../../../command/command-handler.js";
 import {
   type BackgroundScheduler,
@@ -67,6 +68,7 @@ export class AttachUserPolicyCommandHandler implements CommandHandler<
       throw new SimIamNoSuchEntity(`No IAM User with name ${username}`);
     }
 
+    assertSimIamManagedPolicyQuota(user, "User", policyArn);
     user.attachedPolicyArns.add(policyArn);
 
     return {};

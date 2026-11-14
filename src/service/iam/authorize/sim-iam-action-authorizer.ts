@@ -56,4 +56,20 @@ export class SimIamActionAuthorizer {
       });
     }
   }
+
+  /**
+   * The ARN the caller is attributed to, where it has one.
+   *
+   * A command whose entity defaults to the caller's own, such as GetUser with
+   * no UserName, reads it from here before authorizing anything.
+   */
+  callerArn(caller?: SimAwsCaller): string | undefined {
+    const { principal } = this.iam.authorize({
+      action: "iam:GetUser",
+      resource: "*",
+      caller,
+    }).caller;
+
+    return principal.kind === "arn" ? principal.arn : undefined;
+  }
 }

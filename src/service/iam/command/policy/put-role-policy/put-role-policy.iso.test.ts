@@ -75,7 +75,7 @@ describe("IAM PutRolePolicyCommand", () => {
 
     // When managed policies are listed.
     const listPoliciesOutput = await simIam.listPolicies(
-      new ListPoliciesCommand(),
+      new ListPoliciesCommand({ Scope: "Local" }),
     );
 
     // Then the inline policy is not included as a managed policy.

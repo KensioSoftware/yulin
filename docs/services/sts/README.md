@@ -298,7 +298,8 @@ the Role is held back by it, as AWS documents. A session's own policies also app
 ## Session duration
 
 `DurationSeconds` defaults to 3,600 seconds. STS accepts 900 to 43,200, and the Role's
-`MaxSessionDuration` caps it further. A Role left without one allows an hour. A session assuming
+`MaxSessionDuration` caps it further. A Role left without one allows an hour, and IAM's
+`UpdateRoleCommand` raises or lowers it. A session assuming
 another Role is role chaining, which AWS caps at one hour whatever the Role allows. Each of these
 is refused with a `ValidationError` carrying the message STS sends.
 

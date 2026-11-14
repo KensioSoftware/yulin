@@ -1,5 +1,6 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnIamUserGroups } from "./sim-cfn-iam-user-groups.js";
 import { simCfnIamPrincipalGeneratedName } from "../name/sim-cfn-iam-generated-name.js";
 import { simCfnIamOptionalString } from "../sim-cfn-iam-property.js";
 import {
@@ -18,6 +19,11 @@ export interface SimCfnIamUserProperties {
   readonly inlinePolicies: readonly SimCfnIamInlinePolicy[];
   readonly managedPolicyArns: readonly string[];
   readonly loginProfile: SimCfnIamUserLoginProfile | undefined;
+
+  /**
+   * The groups the User joins as it is created.
+   */
+  readonly groups: readonly string[];
 }
 
 const resourceType = "AWS::IAM::User";
@@ -41,8 +47,6 @@ export class SimCfnIamUserPropertiesParser {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): SimCfnIamUserProperties {
-    this.rejectGroups(resource, properties);
-
     return {
       userName:
         this.optionalString(resource, properties["UserName"], "UserName") ??
@@ -54,36 +58,8 @@ export class SimCfnIamUserPropertiesParser {
         properties,
       ),
       loginProfile: this.loginProfile(resource, properties),
+      groups: simCfnIamUserGroups(resource, properties),
     };
-  }
-
-  /**
-   * Group membership is not simulated, and silently dropping it would be
-   * misleading, so naming a Group fails the Resource. CDK leaves `Groups` out
-   * of the template altogether for a User in no group, so an empty list still
-   * deploys.
-   */
-  private rejectGroups(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): void {
-    const groups = properties["Groups"];
-
-    if (groups === undefined) {
-      return;
-    }
-
-    if (!Array.isArray(groups)) {
-      throw new TypeError(
-        `Invalid ${resourceType} ${resource.logicalId}: Groups must be an array`,
-      );
-    }
-
-    if (groups.length > 0) {
-      throw new TypeError(
-        `Invalid ${resourceType} ${resource.logicalId}: Groups are not simulated`,
-      );
-    }
   }
 
   private loginProfile(

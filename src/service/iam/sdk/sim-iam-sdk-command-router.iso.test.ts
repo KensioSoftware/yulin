@@ -3,11 +3,12 @@ import {
   AttachRolePolicyCommand,
   AttachUserPolicyCommand,
   CreateAccessKeyCommand,
+  CreateGroupCommand,
+  CreateInstanceProfileCommand,
   CreateLoginProfileCommand,
   CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
-  DeleteAccessKeyCommand,
   DeletePolicyCommand,
   DeleteRoleCommand,
   DeleteRolePolicyCommand,
@@ -16,6 +17,7 @@ import {
   GetPolicyCommand,
   GetRoleCommand,
   IAMClient,
+  ListGroupsCommand,
   ListRoleTagsCommand,
   ListUserTagsCommand,
   ListPoliciesCommand,
@@ -330,6 +332,17 @@ describe("simulated IAM SDK Command routing", () => {
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
+  it("routes every Command simulated IAM serves by its SDK name", async () => {
+    using simSdk = new SimSdk();
+    const client = new IAMClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateGroupCommand({ GroupName: "InterceptGroup" }));
+    const listed = await client.send(new ListGroupsCommand({}));
+
+    assertIdentical(listed.Groups?.[0]?.GroupName, "InterceptGroup");
+  });
+
   it("rejects a Command simulated IAM does not support", async () => {
     using simSdk = new SimSdk();
     const client = new IAMClient({ region: "us-east-1" });
@@ -337,14 +350,13 @@ describe("simulated IAM SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new DeleteAccessKeyCommand({
-          UserName: "InterceptUser",
-          AccessKeyId: "AKIAINTERCEPTKEY",
+        new CreateInstanceProfileCommand({
+          InstanceProfileName: "InterceptProfile",
         }),
       );
     });
 
-    assertStringIncludes(error.message, "DeleteAccessKeyCommand");
+    assertStringIncludes(error.message, "CreateInstanceProfileCommand");
     assertStringIncludes(error.message, "CreateRoleCommand");
   });
 });

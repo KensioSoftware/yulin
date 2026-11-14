@@ -26,6 +26,7 @@ import type { SimIamAccountResolver } from "./registry/sim-iam-account-resolver.
 import type { SimIamServiceControlPolicyResolver } from "./authorize/scp/sim-iam-scp-resolver.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
+import type { SimIamGroup, SimIamGroupName } from "./group/sim-iam-group.js";
 
 export interface SimIamProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -88,6 +89,7 @@ export class SimIamAccountParts {
   readonly policies = new Map<SimArn, SimIamManagedPolicy>();
   readonly roles = new Map<SimIamRoleName, SimIamRole>();
   readonly users = new Map<SimIamUsername, SimIamUser>();
+  readonly groups = new Map<SimIamGroupName, SimIamGroup>();
 
   private readonly userCredentialGenerator: SimIamUserCredentialGenerator;
 
@@ -141,6 +143,7 @@ export class SimIamAccountParts {
       policies: this.policies,
       roles: this.roles,
       users: this.users,
+      groups: this.groups,
       credentialRegistry: this.credentials,
       userCredentialGenerator: this.userCredentialGenerator,
       background: this.background,

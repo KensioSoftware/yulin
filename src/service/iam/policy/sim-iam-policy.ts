@@ -65,6 +65,27 @@ export interface SimIamManagedPolicy {
   readonly creationDate: Date;
   readonly updateDate: Date;
   readonly policyDocument?: JSONString<SimIamPolicyDocument> | undefined;
+
+  /**
+   * Every version the policy holds, the default among them. Undefined means
+   * the one version a policy is created with, which is its default.
+   */
+  readonly versions?: readonly SimIamPolicyVersion[] | undefined;
+
+  /**
+   * The number of the newest version ever created. IAM numbers versions
+   * upwards and never reuses a deleted version's number.
+   */
+  readonly latestVersionNumber?: number | undefined;
+}
+
+/**
+ * One version of a managed policy.
+ */
+export interface SimIamPolicyVersion {
+  readonly versionId: string;
+  readonly document?: JSONString<SimIamPolicyDocument> | undefined;
+  readonly createDate: Date;
 }
 
 /**

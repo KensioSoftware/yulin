@@ -33,15 +33,6 @@ async function deployUser(
 }
 
 describe("IAM CloudFormation User validation", () => {
-  it("fails the Resource for a Group membership", async () => {
-    const error = await assertThrowsErrorAsync(async () =>
-      deployUser({ UserName: "GroupedUser", Groups: ["Administrators"] }),
-    );
-
-    assertInstanceOf(error, TypeError);
-    assertStringIncludes(error.message, "Groups are not simulated");
-  });
-
   it("creates a User declaring no Group membership", async () => {
     // CDK leaves Groups out of the template for a User in no group, but an
     // empty list gives up nothing, so it still deploys.

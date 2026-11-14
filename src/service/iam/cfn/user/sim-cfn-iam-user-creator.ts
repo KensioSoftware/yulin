@@ -59,6 +59,12 @@ export class SimCfnIamUserCreator {
       this.putInlinePolicies(userProperties, options),
       this.attachManagedPolicies(userProperties, options),
       this.createLoginProfile(userProperties, options),
+      ...userProperties.groups.map(async (GroupName) =>
+        this.iam.addUserToGroup(
+          { input: { GroupName, UserName: userProperties.userName } },
+          options,
+        ),
+      ),
     ]);
 
     const user = this.iam.users.get(userProperties.userName as SimIamUsername);

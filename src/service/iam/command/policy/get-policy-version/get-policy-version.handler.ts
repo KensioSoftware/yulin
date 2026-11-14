@@ -6,6 +6,7 @@ import {
 } from "../../../../../util/background/background.js";
 import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
+import { simIamPolicyVersions } from "../../../policy/sim-iam-policy-versions.js";
 import { simIamManagedPolicyLookup } from "../../../policy/sim-iam-managed-policy-lookup.js";
 import type {
   SimGetPolicyVersionCommand,
@@ -20,9 +21,8 @@ interface GetPolicyVersionCommandHandlerProperties {
 /**
  * IAM GetPolicyVersionCommand handler.
  *
- * The simulation holds one version of each managed policy, its default, so
- * that is the only version this answers for. IAM returns the document
- * URL-encoded, and callers decode it with `decodeURIComponent`.
+ * Any version the policy holds can be read, the default or not. IAM returns
+ * the document URL-encoded, and callers decode it with `decodeURIComponent`.
  *
  * An AWS-managed policy answers with the version the catalogue holds, which
  * is the version AWS published when the catalogue was last written.
@@ -67,7 +67,14 @@ export class GetPolicyVersionCommandHandler implements CommandHandler<
       PolicyArn as SimArn,
     );
 
-    if (policy?.defaultVersionId !== VersionId) {
+    const version =
+      policy === undefined
+        ? undefined
+        : simIamPolicyVersions(policy).find(
+            (each) => each.versionId === VersionId,
+          );
+
+    if (policy === undefined || version === undefined) {
       throw new SimIamNoSuchEntity(
         `Policy ${PolicyArn} version ${VersionId} does not exist or is not attachable.`,
       );
@@ -76,12 +83,12 @@ export class GetPolicyVersionCommandHandler implements CommandHandler<
     return {
       PolicyVersion: {
         Document:
-          policy.policyDocument === undefined
+          version.document === undefined
             ? undefined
-            : encodeURIComponent(policy.policyDocument),
+            : encodeURIComponent(version.document),
         VersionId,
-        IsDefaultVersion: true,
-        CreateDate: policy.updateDate,
+        IsDefaultVersion: VersionId === policy.defaultVersionId,
+        CreateDate: version.createDate,
       },
     };
   }
