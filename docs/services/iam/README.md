@@ -771,6 +771,72 @@ passes in its `conditionContext`. A caller named by a Role's own ARN stands for 
 as an `AssumedRole` carrying the Role's tags, without an `aws:userid`, because it has no session
 name.
 
+## Policy variables
+
+A policy written in the `2012-10-17` language can name request values as variables, such as
+`${aws:username}` or `${aws:PrincipalTag/team}`. Sim IAM replaces them from the request's condition
+context in the places AWS does:
+
+- The resource part of a `Resource` or `NotResource` ARN, after its fifth colon. A variable in the
+  service, Region or Account stays literal text
+- The values of the String and ARN condition operators. Under a Numeric, Date, Bool, Binary or IP
+  address operator, `${...}` is literal text
+
+A policy with no `Version`, or with `2008-10-17`, reads every `${...}` as literal text.
+
+```typescript sim-iam-policy-variables
+/**
+ * Confining each User to its own prefix with one shared policy.
+ */
+
+import { CreateUserCommand, PutUserPolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+const simIam = simAws.iam();
+
+await simIam.createUser(new CreateUserCommand({ UserName: "analyst" }));
+
+await simIam.putUserPolicy(
+  new PutUserPolicyCommand({
+    UserName: "analyst",
+    PolicyName: "OwnHomePrefix",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:GetObject",
+        // eslint-disable-next-line no-template-curly-in-string
+        Resource: "arn:aws:s3:::homes-bucket/${aws:username}/*",
+      },
+    }),
+  }),
+);
+
+const read = (key: string): boolean =>
+  simIam.authorize({
+    action: "s3:GetObject",
+    resource: `arn:aws:s3:::homes-bucket/${key}`,
+    caller: { kind: "arn", arn: "arn:aws:iam::123456789012:user/analyst" },
+  }).isAllowed;
+
+console.log(read("analyst/notes.txt")); // true
+console.log(read("auditor/notes.txt")); // false
+```
+
+A variable names a context key without regard to case. It can give a default in single quotes after
+a comma (`${aws:PrincipalTag/team, 'shared'}`), which stands in where the request carries no value
+for the key. A list-valued key such as `aws:TagKeys` has no value as a variable.
+
+A variable with no value and no default leaves its policy value with none. A `Resource` or
+`NotResource` entry holding one matches no resource. Under a positive operator such as
+`StringEquals` the value matches nothing, and under a negated one such as `StringNotEquals` it
+matches every request value.
+
+`${*}`, `${?}` and `${$}` stand for an asterisk, a question mark and a dollar sign. In a wildcard
+pattern (`StringLike`, the ARN operators and `Resource`), the asterisk and question mark they give
+match only themselves. So do any a replaced value carries.
+
 ## STS AssumeRole sessions
 
 Simulated STS issues temporary credentials for IAM Roles with `AssumeRoleCommand`. The assume

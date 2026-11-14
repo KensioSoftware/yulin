@@ -17,6 +17,7 @@ import type {
   SimIamComparisonKeyword,
   SimIamValueComparison,
 } from "./sim-iam-value-comparison.js";
+import type { SimIamVariableMode } from "../../variable/sim-iam-policy-variables.js";
 
 /**
  * A positive keyword and its negated sibling, both over one comparison.
@@ -25,10 +26,11 @@ function pair(
   positive: string,
   negated: string,
   comparison: SimIamValueComparison,
+  substitution?: SimIamVariableMode,
 ): readonly [string, SimIamComparisonKeyword][] {
   return [
-    [positive, { comparison, negated: false }],
-    [negated, { comparison, negated: true }],
+    [positive, { comparison, negated: false, substitution }],
+    [negated, { comparison, negated: true, substitution }],
   ];
 }
 
@@ -59,18 +61,24 @@ export const simIamComparisonKeywords: ReadonlyMap<
   string,
   SimIamComparisonKeyword
 > = new Map([
-  ...pair("StringEquals", "StringNotEquals", simIamStringEqualsComparison),
+  ...pair(
+    "StringEquals",
+    "StringNotEquals",
+    simIamStringEqualsComparison,
+    "text",
+  ),
   ...pair(
     "StringEqualsIgnoreCase",
     "StringNotEqualsIgnoreCase",
     simIamStringEqualsIgnoreCaseComparison,
+    "text",
   ),
-  ...pair("StringLike", "StringNotLike", simIamStringLikeComparison),
+  ...pair("StringLike", "StringNotLike", simIamStringLikeComparison, "pattern"),
   ...orderedFamily("Numeric", simIamNumberOf),
   ...orderedFamily("Date", simIamInstantOf),
   ["Bool", { comparison: simIamBoolComparison, negated: false }],
   ["BinaryEquals", { comparison: simIamBinaryComparison, negated: false }],
   ...pair("IpAddress", "NotIpAddress", simIamIpAddressComparison),
-  ...pair("ArnEquals", "ArnNotEquals", simIamArnComparison),
-  ...pair("ArnLike", "ArnNotLike", simIamArnComparison),
+  ...pair("ArnEquals", "ArnNotEquals", simIamArnComparison, "pattern"),
+  ...pair("ArnLike", "ArnNotLike", simIamArnComparison, "pattern"),
 ]);

@@ -1,4 +1,5 @@
 import type { SimIamConditionValue } from "../../../policy/sim-iam-policy.js";
+import type { SimIamPolicyVariables } from "../variable/sim-iam-policy-variables.js";
 import type { SimIamConditionOperator } from "./sim-iam-condition-operator.js";
 
 /**
@@ -24,7 +25,8 @@ export class SimIamIfExistsOperator implements SimIamConditionOperator {
   matches(
     actual: SimIamConditionValue,
     expected: SimIamConditionValue,
+    variables?: SimIamPolicyVariables,
   ): boolean {
-    return this.operator.matches(actual, expected);
+    return this.operator.matches(actual, expected, variables);
   }
 }

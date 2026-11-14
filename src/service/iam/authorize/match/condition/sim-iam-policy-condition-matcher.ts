@@ -5,6 +5,7 @@ import type {
 import type { SimIamConditionMatch } from "./sim-iam-condition-match.js";
 import type { SimIamConditionOperator } from "./sim-iam-condition-operator.js";
 import { SimIamConditionOperatorParser } from "./sim-iam-condition-operator-parser.js";
+import { SimIamPolicyVariables } from "../variable/sim-iam-policy-variables.js";
 
 /**
  * Matches IAM policy conditions against request condition-context values.
@@ -24,6 +25,11 @@ export class SimIamPolicyConditionMatcher {
     unsupportedOperators: [],
   };
 
+  /**
+   * Replaces policy variables with this request's condition context values.
+   */
+  readonly variables: SimIamPolicyVariables;
+
   private readonly conditionContext: ReadonlyMap<string, SimIamConditionValue>;
 
   constructor(
@@ -36,6 +42,9 @@ export class SimIamPolicyConditionMatcher {
         value,
       ]),
     );
+    this.variables = new SimIamPolicyVariables((key) =>
+      this.conditionContext.get(this.normalizeContextKey(key)),
+    );
   }
 
   /**
@@ -43,12 +52,16 @@ export class SimIamPolicyConditionMatcher {
    *
    * Separate operators and separate keys use logical AND semantics.
    *
+   * `variables` is absent for a policy whose `Version` predates policy
+   * variables, and its `${...}` are then literal text.
+   *
    * Every operator in the block is read. Stopping at the first that fails
    * would leave the operators the simulator could not evaluate depending on
    * the order the policy happens to list them in.
    */
   matches(
     condition: SimIamPolicyDocumentCondition | undefined,
+    variables?: SimIamPolicyVariables,
   ): SimIamConditionMatch {
     if (condition === undefined) {
       return SimIamPolicyConditionMatcher.noCondition;
@@ -65,7 +78,7 @@ export class SimIamPolicyConditionMatcher {
         continue;
       }
 
-      matched = this.operatorMatches(operator, keyValues) && matched;
+      matched = this.operatorMatches(operator, keyValues, variables) && matched;
     }
 
     return {
@@ -77,9 +90,10 @@ export class SimIamPolicyConditionMatcher {
   private operatorMatches(
     operator: SimIamConditionOperator,
     keyValues: Readonly<Record<string, SimIamConditionValue>>,
+    variables: SimIamPolicyVariables | undefined,
   ): boolean {
     return Object.entries(keyValues).every(([key, expected]) =>
-      this.entryMatches(operator, key, expected),
+      this.entryMatches(operator, key, expected, variables),
     );
   }
 
@@ -87,6 +101,7 @@ export class SimIamPolicyConditionMatcher {
     operator: SimIamConditionOperator,
     key: string,
     expected: SimIamConditionValue,
+    variables: SimIamPolicyVariables | undefined,
   ): boolean {
     const actual = this.conditionContext.get(this.normalizeContextKey(key));
 
@@ -94,7 +109,7 @@ export class SimIamPolicyConditionMatcher {
       return operator.matchesAbsentKey(expected);
     }
 
-    return operator.matches(actual, expected);
+    return operator.matches(actual, expected, variables);
   }
 
   private normalizeContextKey(key: string): string {

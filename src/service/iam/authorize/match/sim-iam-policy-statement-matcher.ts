@@ -8,6 +8,13 @@ import { SimIamPolicyConditionMatcher } from "./condition/sim-iam-policy-conditi
 import { SimIamPolicyPrincipalMatcher } from "./sim-iam-policy-principal-matcher.js";
 import { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
 import { SimIamUnevaluatedStatements } from "../unevaluated/sim-iam-unevaluated-statements.js";
+import type { SimIamPolicyVariables } from "./variable/sim-iam-policy-variables.js";
+
+/**
+ * The policy language version that introduced policy variables. A policy
+ * naming any other `Version`, or none, reads `${...}` as literal text.
+ */
+const variablesVersion = "2012-10-17";
 
 /**
  * Matches one parsed IAM policy statement against one authorization request.
@@ -26,6 +33,9 @@ import { SimIamUnevaluatedStatements } from "../unevaluated/sim-iam-unevaluated-
  * - Action and NotAction;
  * - Resource and NotResource;
  * - supported IAM string conditions.
+ *
+ * Policy variables are replaced in `Resource`, `NotResource` and String and
+ * ARN condition values, for a policy whose `Version` is `2012-10-17`.
  *
  * One matcher reads every policy of one request, and it is also where the
  * statements the simulator could not evaluate are collected. A statement is
@@ -84,7 +94,10 @@ export class SimIamPolicyStatementMatcher {
     policy: SimIamAuthZPolicySource,
     statement: SimIamParsedPolicyStatement,
   ): boolean {
-    const condition = this.conditionMatcher.matches(statement.condition);
+    const condition = this.conditionMatcher.matches(
+      statement.condition,
+      this.variablesFor(policy),
+    );
 
     for (const operator of condition.unsupportedOperators) {
       this.unevaluated.record(
@@ -139,23 +152,52 @@ export class SimIamPolicyStatementMatcher {
     policy: SimIamAuthZPolicySource,
     statement: SimIamParsedPolicyStatement,
   ): boolean {
+    const variables = this.variablesFor(policy);
+
     if (statement.resources !== undefined) {
       return statement.resources.some((pattern) =>
-        simIamWildcardMatch(pattern, this.context.resource, {
-          caseSensitive: true,
-        }),
+        this.resourcePatternMatches(pattern, variables),
       );
     }
 
     if (statement.notResources !== undefined) {
       return statement.notResources.every(
-        (pattern) =>
-          !simIamWildcardMatch(pattern, this.context.resource, {
-            caseSensitive: true,
-          }),
+        (pattern) => !this.resourcePatternMatches(pattern, variables),
       );
     }
 
     return policy.sourceType === "trust";
+  }
+
+  /**
+   * Match one Resource or NotResource pattern against the requested ARN.
+   *
+   * A pattern holding a variable with no value matches no resource.
+   */
+  private resourcePatternMatches(
+    pattern: string,
+    variables: SimIamPolicyVariables | undefined,
+  ): boolean {
+    const resolved =
+      variables === undefined ? pattern : variables.resolveResource(pattern);
+
+    return (
+      resolved !== undefined &&
+      simIamWildcardMatch(resolved, this.context.resource, {
+        caseSensitive: true,
+      })
+    );
+  }
+
+  /**
+   * The variables to replace in a policy, or undefined where its `Version`
+   * predates them.
+   */
+  private variablesFor(
+    policy: SimIamAuthZPolicySource,
+  ): SimIamPolicyVariables | undefined {
+    return policy.document.Version === variablesVersion
+      ? this.conditionMatcher.variables
+      : undefined;
   }
 }
