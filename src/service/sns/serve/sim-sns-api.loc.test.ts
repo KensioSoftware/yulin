@@ -7,6 +7,7 @@ import {
   CheckIfPhoneNumberIsOptedOutCommand,
   CreateTopicCommand,
   DeleteTopicCommand,
+  GetDataProtectionPolicyCommand,
   GetSubscriptionAttributesCommand,
   GetTopicAttributesCommand,
   ListPhoneNumbersOptedOutCommand,
@@ -21,7 +22,9 @@ import {
   SetTopicAttributesCommand,
   SNSClient,
   SubscribeCommand,
+  TagResourceCommand,
   UnsubscribeCommand,
+  UntagResourceCommand,
 } from "@aws-sdk/client-sns";
 import {
   CreateQueueCommand,
@@ -347,12 +350,43 @@ describe("Serving simulated SNS on an endpoint URL", () => {
     assertIdentical(error.name, "NotFoundException");
   });
 
+  it("tags a topic, and lists and removes the tags", async () => {
+    // Given a topic created with a tag
+    const created = await client.send(
+      new CreateTopicCommand({
+        Name: "tagged",
+        Tags: [{ Key: "team", Value: "orders" }],
+      }),
+    );
+    const topicArn = created.TopicArn;
+
+    // When a tag is added and the first removed over the endpoint
+    await client.send(
+      new TagResourceCommand({
+        ResourceArn: topicArn,
+        Tags: [{ Key: "stage", Value: "test" }],
+      }),
+    );
+    await client.send(
+      new UntagResourceCommand({ ResourceArn: topicArn, TagKeys: ["team"] }),
+    );
+    const listed = await client.send(
+      new ListTagsForResourceCommand({ ResourceArn: topicArn }),
+    );
+
+    // Then the topic holds the tag added
+    assertIdentical(
+      JSON.stringify(listed.Tags),
+      '[{"Key":"stage","Value":"test"}]',
+    );
+  });
+
   it("refuses an SNS operation it does not serve", async () => {
     // When an operation simulated SNS has no answer for is asked for
     const error = await assertThrowsErrorAsync(
       async () =>
         await client.send(
-          new ListTagsForResourceCommand({
+          new GetDataProtectionPolicyCommand({
             ResourceArn: `arn:aws:sns:${simAws.defaultRegionName}:${accountId}:orders`,
           }),
         ),
@@ -361,6 +395,6 @@ describe("Serving simulated SNS on an endpoint URL", () => {
     // Then it is refused by name, in the shape the Query protocol states an
     // error, so the SDK raises it rather than failing to parse the response
     assertIdentical(error.name, "NotImplemented");
-    assertStringIncludes(error.message, "ListTagsForResource");
+    assertStringIncludes(error.message, "GetDataProtectionPolicy");
   });
 });

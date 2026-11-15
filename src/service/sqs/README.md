@@ -304,7 +304,7 @@ here, it does not make another Account's queues reachable through this one.
 - FIFO throughput is unlimited, and `FifoThroughputLimit` is held and validated only. `ReceiveRequestAttemptId`
   is refused on a standard queue.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
-- Tags, `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored when a
+- `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored when a
   request sets them, and recorded against the Resource when a CloudFormation template declares them.
 - A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
   which are shorthands for writing one statement of it, are not implemented.

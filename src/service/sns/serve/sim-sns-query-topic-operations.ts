@@ -56,6 +56,41 @@ export function simSnsQueryTopicOperations(): SimQueryOperations {
       },
     ],
     [
+      "TagResource",
+      {
+        input: (fields): Record<string, unknown> => ({
+          ResourceArn: fields.text("ResourceArn"),
+          Tags: fields.list("Tags", (tag) => ({
+            Key: tag.text("Key"),
+            Value: tag.text("Value"),
+          })),
+        }),
+        result: (): string => "",
+      },
+    ],
+    [
+      "UntagResource",
+      {
+        input: (fields): Record<string, unknown> => ({
+          ResourceArn: fields.text("ResourceArn"),
+          TagKeys: fields.texts("TagKeys"),
+        }),
+        result: (): string => "",
+      },
+    ],
+    [
+      "ListTagsForResource",
+      {
+        input: (fields): Record<string, unknown> => ({
+          ResourceArn: fields.text("ResourceArn"),
+        }),
+        result: (output): string =>
+          queryList(output, "Tags", (tag) =>
+            queryMembers(tag, ["Key", "Value"]),
+          ),
+      },
+    ],
+    [
       "SetTopicAttributes",
       {
         input: (fields): Record<string, unknown> => ({

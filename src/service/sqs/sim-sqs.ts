@@ -6,8 +6,10 @@ import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-route
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
 import { SimSqsAuthorizer } from "./command/authorize/sim-sqs-authorizer.js";
+import { SimSqsQueueTagCommands } from "./command/queue/sim-sqs-queue-tag-commands.js";
+import { simSqsIam } from "./queue/sim-sqs-resource-tags.js";
+import { SimSqsTagging } from "./sim-sqs-tagging.js";
 import { SimSqsChangeMessageVisibility } from "./command/message/sim-sqs-change-message-visibility.js";
 import { SimSqsDeleteMessageCommands } from "./command/message/sim-sqs-delete-message-commands.js";
 import { SimSqsReceiveMessage } from "./command/message/sim-sqs-receive-message.js";
@@ -42,7 +44,9 @@ interface SimSqsProperties {
  * Both standard and FIFO queues are simulated. A queue whose name ends
  * `.fifo` is a FIFO queue, created with the `FifoQueue` attribute.
  */
-export class SimSqs {
+export class SimSqs extends SimSqsTagging {
+  protected readonly background: BackgroundScheduler;
+  protected readonly tagCommands: SimSqsQueueTagCommands;
   private readonly queues = new SimSqsQueueStore();
   private readonly queueCreation: SimSqsCreateQueue;
   private readonly queueCommands: SimSqsQueueCommands;
@@ -51,7 +55,6 @@ export class SimSqs {
   private readonly receiveCommand: SimSqsReceiveMessage;
   private readonly deletionCommands: SimSqsDeleteMessageCommands;
   private readonly visibilityCommand: SimSqsChangeMessageVisibility;
-  private readonly background: BackgroundScheduler;
   private readonly activity: SimSqsQueueActivity;
   private readonly sdkRouter = new SimSqsSdkCommandRouter(this);
   private readonly cfnFactory = new SimSqsCfnResourceFactory({ sqs: this });
@@ -62,7 +65,9 @@ export class SimSqs {
       background = new BackgroundTasks(),
     } = properties;
 
-    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
+    super();
+
+    const iam = simSqsIam(properties.iam, accountRegionScope, this.queues);
 
     const access = new SimSqsQueueAccess({
       queues: this.queues,
@@ -90,6 +95,7 @@ export class SimSqs {
       accountRegionScope,
       clock: background,
     });
+    this.tagCommands = new SimSqsQueueTagCommands(access);
     this.attributeCommands = new SimSqsQueueAttributeCommands({
       access,
       clock: background,

@@ -2,9 +2,14 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import { SimSnsTopicAttributes } from "../../topic/sim-sns-topic-attributes.js";
 import { SimSnsTopicName } from "../../topic/sim-sns-topic-name.js";
+import { SimSnsTopicTags } from "../../topic/sim-sns-topic-tags.js";
 import type { SimSnsTopicStore } from "../../topic/sim-sns-topic-store.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
 import type { SimSnsTopicAccess } from "./sim-sns-topic-access.js";
+import {
+  assertSimSnsSameTopicTags,
+  simSnsAuthorizeCreateTopic,
+} from "./sim-sns-create-topic-tags.js";
 import { refuseUnsimulatedTopicInput } from "./sim-sns-unsimulated-topic-input.js";
 import type {
   SimCreateTopicCommand,
@@ -24,7 +29,9 @@ interface SimSnsCreateTopicProperties {
  * request for a name already taken answers with that topic's ARN without
  * applying the attributes it carries. That differs from SQS, which compares the
  * attributes and fails when they differ, and it is what makes a deployment
- * which creates its own topic safe to run twice.
+ * which creates its own topic safe to run twice. The one exception is tags. A
+ * repeated request carrying tags the topic does not hold is refused, which is
+ * how real SNS answers one.
  */
 export class SimSnsCreateTopic {
   private readonly topics: SimSnsTopicStore;
@@ -58,11 +65,17 @@ export class SimSnsCreateTopic {
     const attributes = SimSnsTopicAttributes.defaults().with(
       input.Attributes ?? {},
     );
+    const tags = SimSnsTopicTags.fromInput(input.Tags);
 
-    this.access.authorizeName("sns:CreateTopic", name.value, options);
+    simSnsAuthorizeCreateTopic(this.access, name.value, input.Tags, options);
 
-    const topic =
-      this.topics.find(name.value) ?? this.created(name, attributes);
+    const existing = this.topics.find(name.value);
+
+    if (existing !== undefined) {
+      assertSimSnsSameTopicTags(existing, input.Tags, tags);
+    }
+
+    const topic = existing ?? this.created(name, attributes, tags);
 
     return { $metadata: {}, TopicArn: topic.arn.value };
   }
@@ -73,11 +86,13 @@ export class SimSnsCreateTopic {
   private created(
     name: SimSnsTopicName,
     attributes: SimSnsTopicAttributes,
+    tags: SimSnsTopicTags,
   ): SimSnsTopic {
     const topic = new SimSnsTopic({
       name,
       accountRegionScope: this.accountRegionScope,
       attributes,
+      tags,
     });
 
     this.topics.add(topic);

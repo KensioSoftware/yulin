@@ -61,24 +61,6 @@ describe("SNS topic validation", () => {
     assertInstanceOf(error, SimSnsInvalidParameterException);
   });
 
-  it("refuses topic tags rather than dropping them", async () => {
-    // Given a simulated AWS.
-    const simAws = new SimAws();
-
-    // When a topic is created with tags.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.sns().createTopic(
-        new CreateTopicCommand({
-          Name: "orders",
-          Tags: [{ Key: "Team", Value: "payments" }],
-        }),
-      );
-    });
-
-    // Then it is refused, since tags are not simulated.
-    assertInstanceOf(error, SimSnsUnsimulatedInputException);
-  });
-
   it("refuses a data protection policy rather than ignoring it", async () => {
     // Given a simulated AWS.
     const simAws = new SimAws();

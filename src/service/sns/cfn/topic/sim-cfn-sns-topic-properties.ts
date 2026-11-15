@@ -14,9 +14,9 @@ import {
 import { SimCfnSnsTopicName } from "./sim-cfn-sns-topic-name.js";
 import {
   attributePropertyNames,
-  ignoredPropertyReasons,
   topicNamePropertyName,
   topicSubscriptionPropertyName,
+  topicTagsPropertyName,
   unsimulatedPropertyReasons,
 } from "./sim-cfn-sns-topic-property-names.js";
 
@@ -98,30 +98,20 @@ export class SimCfnSnsTopicProperties {
   }
 
   /**
-   * Record the properties the topic is created without acting on.
-   */
-  recordIgnoredProperties(): void {
-    for (const [property, reason] of ignoredPropertyReasons) {
-      if (this.properties.has(property)) {
-        this.resource.ignoreProperty(property, reason);
-      }
-    }
-  }
-
-  /**
    * Whether a property is handed to CreateTopic as an attribute.
    *
-   * The two properties the CloudFormation layer reads itself are not, and
-   * neither are the ones recorded as ignored. The rest are refused as they are
-   * reached: the ones with a reason of their own with that reason, and
+   * The three properties the CloudFormation layer reads itself are not. The
+   * rest are refused as they are reached: the ones with a reason of their own with that reason, and
    * anything else as a property AWS::SNS::Topic does not have, which is how
    * real CloudFormation answers one too.
    */
   private isAttributeProperty(name: string): boolean {
     if (
-      name === topicNamePropertyName ||
-      name === topicSubscriptionPropertyName ||
-      ignoredPropertyReasons.has(name)
+      [
+        topicNamePropertyName,
+        topicSubscriptionPropertyName,
+        topicTagsPropertyName,
+      ].includes(name)
     ) {
       return false;
     }

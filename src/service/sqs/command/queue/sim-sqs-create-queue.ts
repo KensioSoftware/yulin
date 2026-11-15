@@ -8,7 +8,8 @@ import type { SimSqsQueueActivity } from "../../queue/sim-sqs-queue-activity.js"
 import { SimSqsQueueName } from "../../queue/sim-sqs-queue-name.js";
 import type { SimSqsQueueStore } from "../../queue/sim-sqs-queue-store.js";
 import type { SimSqsQueueAccess } from "./sim-sqs-queue-access.js";
-import { refuseUnsimulatedQueueInput } from "./sim-sqs-unsimulated-queue-input.js";
+import { simSqsAuthorizeCreateQueue } from "./sim-sqs-create-queue-authorization.js";
+import { SimSqsQueueTags } from "../../queue/sim-sqs-queue-tags.js";
 import {
   type SimSqsRequestedQueueType,
   simSqsRequestedQueueType,
@@ -33,7 +34,8 @@ interface SimSqsCreateQueueProperties {
  * Real SQS treats it as idempotent: a request for a name that is already taken
  * returns the existing queue's URL when the attributes it names match, and fails
  * when they differ. That is what makes a deployment which creates its own queue
- * safe to run twice.
+ * safe to run twice. A queue already there keeps the tags it holds, whatever
+ * tags the repeated request carries.
  */
 export class SimSqsCreateQueue {
   private readonly queues: SimSqsQueueStore;
@@ -61,13 +63,12 @@ export class SimSqsCreateQueue {
   ): SimCreateQueueCommandOutput {
     const input = command.input;
 
-    refuseUnsimulatedQueueInput(input);
-
     const name = SimSqsQueueName.required(input.QueueName);
     const requested = simSqsRequestedQueueType(input.Attributes ?? {});
+    const tags = SimSqsQueueTags.fromInput(input.tags);
 
     name.assertMatchesType(requested.fifo);
-    this.access.authorizeName("sqs:CreateQueue", name.value, options);
+    simSqsAuthorizeCreateQueue(this.access, name.value, input.tags, options);
 
     const existing = this.queues.find(name.value);
 
@@ -80,7 +81,10 @@ export class SimSqsCreateQueue {
       };
     }
 
-    return { $metadata: {}, QueueUrl: this.created(name, requested).url };
+    return {
+      $metadata: {},
+      QueueUrl: this.created(name, requested, tags).url,
+    };
   }
 
   /**
@@ -94,6 +98,7 @@ export class SimSqsCreateQueue {
   private created(
     name: SimSqsQueueName,
     requested: SimSqsRequestedQueueType,
+    tags: SimSqsQueueTags,
   ): SimSqsQueue {
     const createdAt = this.clock.now();
 
@@ -106,6 +111,7 @@ export class SimSqsCreateQueue {
       createdAt,
       deadLetterTargets: this.deadLetterTargets,
       activity: this.activity,
+      tags,
     });
 
     queue.applyAttributes(requested.attributes, createdAt);

@@ -19,6 +19,15 @@ export type {
   SimSetTopicAttributesCommandOutput,
   SimSnsListedTopic,
   SimSnsTag,
+  SimListTagsForResourceCommand,
+  SimListTagsForResourceCommandInput,
+  SimListTagsForResourceCommandOutput,
+  SimTagResourceCommand,
+  SimTagResourceCommandInput,
+  SimTagResourceCommandOutput,
+  SimUntagResourceCommand,
+  SimUntagResourceCommandInput,
+  SimUntagResourceCommandOutput,
 } from "./topic/topic.command.js";
 export type {
   SimGetSubscriptionAttributesCommand,

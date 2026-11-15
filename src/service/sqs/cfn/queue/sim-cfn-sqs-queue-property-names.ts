@@ -58,7 +58,6 @@ export const unsimulatedPropertyReasons: SimCfnSkippedPropertyRules = new Map<
       "queue, and setting the attribute through the SQS API is refused",
   ],
   ["SqsManagedSseEnabled", "simulated SQS does not encrypt message bodies"],
-  ["Tags", "no simulated service reads a queue tag"],
 ]);
 
 /**

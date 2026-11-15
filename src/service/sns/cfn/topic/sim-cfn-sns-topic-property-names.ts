@@ -1,3 +1,6 @@
+import { simCfnTagRecord } from "../../../cloudformation/template/value/sim-cfn-tag-record.js";
+import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+
 /**
  * The name the template gives the topic.
  */
@@ -8,6 +11,12 @@ export const topicNamePropertyName = "TopicName";
  * own.
  */
 export const topicSubscriptionPropertyName = "Subscription";
+
+/**
+ * The tags the topic is created with, as the list CDK writes for
+ * `Tags.of(...).add(...)`.
+ */
+export const topicTagsPropertyName = "Tags";
 
 /**
  * The AWS::SNS::Topic properties carrying a topic attribute of the same name.
@@ -53,18 +62,14 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * The real AWS::SNS::Topic properties this simulation has nothing to act on
- * and no reason to fail a stack over.
- *
- * `Tags` is the whole list. The topic is created without them and the omission
- * is recorded against the Resource. A topic behaves the same way with a tag
- * and without one, and a CDK app calling `Tags.of(app).add(...)` tags every
- * topic in it.
+ * The tags a template declares on a topic, in the list CreateTopic takes.
  */
-export const ignoredPropertyReasons: ReadonlyMap<string, string> = new Map([
-  [
-    "Tags",
-    "AWS::SNS::Topic property Tags is not simulated, so the topic is created " +
-      "without them. No simulated service reads a topic tag.",
-  ],
-]);
+export function simCfnSnsTopicTags(
+  properties: SimCfnTemplateValueRecord,
+): { Key: string; Value: string }[] | undefined {
+  const tags = simCfnTagRecord(properties["Tags"]);
+
+  return tags === undefined
+    ? undefined
+    : Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
+}

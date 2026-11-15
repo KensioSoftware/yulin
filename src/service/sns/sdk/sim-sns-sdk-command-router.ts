@@ -27,6 +27,11 @@ import type {
   SimListTopicsCommand,
   SimSetTopicAttributesCommand,
 } from "../command/topic/topic.command.js";
+import type {
+  SimListTagsForResourceCommand,
+  SimTagResourceCommand,
+  SimUntagResourceCommand,
+} from "../command/topic/topic.command.js";
 import type { SimSns } from "../sim-sns.js";
 
 /**
@@ -122,6 +127,30 @@ export class SimSnsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSns.setSubscriptionAttributes(
             command as SimSetSubscriptionAttributesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.tagResource(
+            command as SimTagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.untagResource(
+            command as SimUntagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTagsForResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.listTagsForResource(
+            command as SimListTagsForResourceCommand,
             simSdkCallerOptions(context),
           ),
       ],

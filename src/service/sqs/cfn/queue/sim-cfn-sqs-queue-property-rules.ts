@@ -114,6 +114,7 @@ export class SimCfnSqsQueuePropertyRules {
     if (
       name !== "QueueName" &&
       name !== "FifoQueue" &&
+      name !== "Tags" &&
       !this.isAttributeProperty(name)
     ) {
       this.ignorer.ignoreProperty(

@@ -27,6 +27,7 @@ import { SimSnsCreateTopic } from "./topic/sim-sns-create-topic.js";
 import { SimSnsTopicAccess } from "./topic/sim-sns-topic-access.js";
 import { SimSnsTopicAttributeCommands } from "./topic/sim-sns-topic-attribute-commands.js";
 import { SimSnsTopicCommands } from "./topic/sim-sns-topic-commands.js";
+import { SimSnsTopicTagCommands } from "./topic/sim-sns-topic-tag-commands.js";
 
 interface SimSnsCommandsProperties {
   readonly topics: SimSnsTopicStore;
@@ -50,6 +51,7 @@ export class SimSnsCommands {
   public readonly topicCreation: SimSnsCreateTopic;
   public readonly topics: SimSnsTopicCommands;
   public readonly topicAttributes: SimSnsTopicAttributeCommands;
+  public readonly topicTags: SimSnsTopicTagCommands;
   public readonly subscriptions: SimSnsSubscriptionCommands;
   public readonly subscriptionListings: SimSnsSubscriptionListings;
   public readonly subscriptionAttributes: SimSnsSubscriptionAttributeCommands;
@@ -109,6 +111,7 @@ export class SimSnsCommands {
       accountRegionScope,
     });
     this.topics = new SimSnsTopicCommands({ topics, subscriptions, access });
+    this.topicTags = new SimSnsTopicTagCommands(access);
     this.topicAttributes = new SimSnsTopicAttributeCommands({
       access,
       subscriptions,

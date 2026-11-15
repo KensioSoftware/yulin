@@ -47,6 +47,34 @@ export class SimSnsNotFoundException extends SimSnsError {
 }
 
 /**
+ * Simulated SNS ResourceNotFoundException.
+ *
+ * The tag commands report a topic ARN naming no topic this way, where the
+ * other topic commands report `NotFound`.
+ */
+export class SimSnsResourceNotFoundException extends SimSnsError {
+  public override readonly name = "ResourceNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated SNS TagLimitExceededException.
+ *
+ * Real SNS holds at most 50 tags on a topic, and refuses a request that would
+ * leave one holding more.
+ */
+export class SimSnsTagLimitExceededException extends SimSnsError {
+  public override readonly name = "TagLimitExceededException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated SNS InvalidParameterException.
  *
  * Real SNS reports a request input it will not take this way, such as a

@@ -1,18 +1,16 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
-import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnTemplateValue } from "./sim-cfn-template-value.js";
 
 /**
- * Parse the AWS::Lambda::Function Tags property into the map CreateFunction
- * takes.
+ * Read a resource's `Tags` property into a map of value by key, the shape
+ * Lambda's `CreateFunction` and SQS's `CreateQueue` take tags in.
  *
  * A template writes tags as a list of `Key`/`Value` pairs, which is also what
  * CDK synthesises for `Tags.of(...).add(...)`. A number or boolean value is
  * read as its string, as CloudFormation reads one, and a missing value is
- * empty. An entry that is not a pair
- * at all is dropped rather than failing the stack, since a tag changes nothing
- * a function does.
+ * empty. An entry that is not a pair at all is dropped, and the stack goes on.
  */
-export function simCfnLambdaTags(
+export function simCfnTagRecord(
   tags: SimCfnTemplateValue | undefined,
 ): Record<string, string> | undefined {
   if (!Array.isArray(tags)) {
