@@ -1662,8 +1662,9 @@ logs, which Yulin leaves out. `OnSourceDDoSProtectionConfig` responds to
 traffic volume, and `ApplicationConfig` configures the WAF-hosted sign-in pages. An
 `AssociationConfig` limit for a resource type no simulated request passes through is held too.
 
-Tags on a web ACL, an IP set or a regex pattern set are held, and `unsimulatedParts` lists them.
-`ListTagsForResource` is the operation that would read them back, and Yulin leaves it out. Logging, sampled requests and CloudWatch metrics for a
+Tags on a web ACL, an IP set or a regex pattern set are held, and an IAM policy reads them as
+`aws:ResourceTag/<key>`. `unsimulatedParts` still lists them, as Yulin leaves out
+`ListTagsForResource`, the operation that would read them back. Logging, sampled requests and CloudWatch metrics for a
 web ACL are not simulated.
 
 `DescribeManagedRuleGroup` refuses a group outside the six, and a `VersionName`. Its only possible

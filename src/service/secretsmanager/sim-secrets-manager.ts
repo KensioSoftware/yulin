@@ -21,6 +21,7 @@ import type { SimSecretsManagerSecret } from "./secret/sim-secrets-manager-secre
 import { SimSecretsManagerSecretExpiry } from "./secret/sim-secrets-manager-secret-expiry.js";
 import { SimSecretsManagerSecretFactory } from "./secret/sim-secrets-manager-secret-factory.js";
 import { SimSecretsManagerSecretStore } from "./secret/sim-secrets-manager-secret-store.js";
+import { simSecretsManagerTagConditionIam } from "./secret/sim-secrets-manager-resource-tags.js";
 import type { SimSecretsManagerKmsCrypto } from "./secret/sim-secrets-manager-kms-crypto.js";
 import { SimSecretsManagerValueEncryption } from "./secret/sim-secrets-manager-value-encryption.js";
 import { SimSecretsManagerVersionWriter } from "./secret/sim-secrets-manager-version-writer.js";
@@ -74,7 +75,10 @@ export class SimSecretsManager {
     const { kms = new SimKms({ accountRegionScope, iam, background }) } =
       properties;
 
-    const authorizer = new SimSecretsManagerAuthorizer({ iam });
+    this.secrets = new SimSecretsManagerSecretStore({ accountRegionScope });
+    const authorizer = new SimSecretsManagerAuthorizer({
+      iam: simSecretsManagerTagConditionIam(iam, this.secrets),
+    });
     const encryption = new SimSecretsManagerValueEncryption({ kms });
     const versionWriter = new SimSecretsManagerVersionWriter({
       clock: background,
@@ -82,7 +86,6 @@ export class SimSecretsManager {
     });
 
     this.background = background;
-    this.secrets = new SimSecretsManagerSecretStore({ accountRegionScope });
     this.secretCommands = new SimSecretsManagerSecretCommands({
       secrets: this.secrets,
       secretFactory: new SimSecretsManagerSecretFactory({

@@ -2,6 +2,7 @@ import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { simEcsTagConditionIam } from "./cluster/sim-ecs-resource-tags.js";
 import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 import { SimEcsUnreachableConsumerQueues } from "./service/consume/sim-ecs-consumer-queues.js";
 import { SimEcsUnreachableTargetGroups } from "./service/load-balancer/sim-ecs-target-groups.js";
@@ -97,7 +98,10 @@ export class SimEcsCommands {
       targetGroups = new SimEcsUnreachableTargetGroups(),
     } = properties;
 
-    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
+    const iam = simEcsTagConditionIam(
+      simIamInRegion(properties.iam, accountRegionScope.regionName),
+      this.clusters,
+    );
 
     const contexts = new SimEcsCommandContexts({
       accountRegionScope,

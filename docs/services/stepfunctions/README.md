@@ -624,8 +624,8 @@ policies and the resource the request names. The action is the one AWS documents
 so `dynamodb:PutItem` for a `putItem` and `sns:Publish` for a `publish`. A role that has not been
 granted it fails the task with an access denied error, naming the action and the resource.
 
-`states:startExecution` is the exception. Simulated Step Functions authorizes none of its own
-operations yet. A task starting another state machine runs whatever the role allows.
+`states:startExecution` follows the same rule. A task starting another state machine needs a role
+allowed `states:StartExecution` on it.
 
 ### When a service refuses a call
 
@@ -1119,6 +1119,11 @@ that prefix. A request outside any of those limits leaves the tags exactly as th
 `TagResource` requires `tags` and `UntagResource` requires `tagKeys`, as the API does. Either list
 may be empty. A request that omits one is refused before the state machine is looked up, along with
 a request carrying a tag Step Functions will not take.
+
+Every Step Functions operation is authorized against the IAM action of its own name, and a policy
+reads a state machine's tags as `aws:ResourceTag/<key>`. A caller allowed `states:StartExecution`
+only where `aws:ResourceTag/team` is `enrolment` starts that team's state machines and no others. An
+execution carries no tags, so a request naming one supplies none.
 
 ## Deploying one from CloudFormation
 

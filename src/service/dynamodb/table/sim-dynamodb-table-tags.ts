@@ -76,6 +76,15 @@ export class SimDynamoDbTableTags {
   }
 
   /**
+   * The tags as an IAM policy reads them, value by key.
+   */
+  record(): Readonly<Record<string, string>> {
+    return Object.fromEntries(
+      this.tags.values().map((tag) => [tag.key, tag.value]),
+    );
+  }
+
+  /**
    * Every tag this resource holds, ordered by key.
    *
    * DynamoDB says nothing about the order it lists tags in. Ordering them by

@@ -671,8 +671,8 @@ code into the simulation, served in process. See
   including one whose offset is past the end of the list, is refused rather than answered with an
   empty page.
 - Tags are stored and reported by `DescribeSecret` and `ListSecrets`, but `TagResource` and
-  `UntagResource` are absent, and the `secretsmanager:ResourceTag` and `aws:ResourceTag` condition
-  keys are left underived. A stack update applies the tags its template declares to the deployed
+  `UntagResource` are absent. A request on a secret carries its tags as both
+  `secretsmanager:ResourceTag/<key>` and `aws:ResourceTag/<key>`. A stack update applies the tags its template declares to the deployed
   secret, since there is no command to ask for it with.
 - A stack update authorizes the whole change as `secretsmanager:UpdateSecret`. Real CloudFormation
   needs `secretsmanager:TagResource` as well for a change to the tags.

@@ -75,6 +75,15 @@ export class SimStateMachineTags {
   }
 
   /**
+   * The tags as an IAM policy reads them, value by key.
+   */
+  record(): Readonly<Record<string, string>> {
+    return Object.fromEntries(
+      this.#tags.values().map((tag) => [tag.key, tag.value]),
+    );
+  }
+
+  /**
    * Every tag this state machine holds, ordered by key.
    *
    * Step Functions says nothing about the order it lists tags in. Ordering

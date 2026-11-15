@@ -6,6 +6,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { simWafTagConditionIam } from "./resource/sim-waf-resource-tags.js";
 import { SimWafAssociations } from "./association/sim-waf-associations.js";
 import {
   SimWafNoProtectedResources,
@@ -77,7 +78,13 @@ export class SimWafCommands {
 
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
-    const authorizer = new SimWafAuthorizer({ iam });
+    const authorizer = new SimWafAuthorizer({
+      iam: simWafTagConditionIam(iam, [
+        this.webAcls,
+        this.ipSets,
+        this.regexPatternSets,
+      ]),
+    });
 
     this.background = background;
     this.webAclCommands = new SimWafWebAclCommands({

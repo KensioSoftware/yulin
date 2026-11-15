@@ -7,6 +7,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { simKinesisTagConditionIam } from "./stream/sim-kinesis-resource-tags.js";
 import type * as simKinesisCommands from "./command/sim-kinesis-command.types.js";
 import { SimKinesisCommands } from "./command/sim-kinesis-commands.js";
 import type { SimKinesisRequestOptions } from "./command/sim-kinesis-request-options.js";
@@ -54,7 +55,10 @@ export class SimKinesis {
       background = new BackgroundTasks(),
     } = properties;
 
-    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
+    const iam = simKinesisTagConditionIam(
+      simIamInRegion(properties.iam, accountRegionScope.regionName),
+      this.streams,
+    );
 
     this.background = background;
     this.commands = new SimKinesisCommands({
