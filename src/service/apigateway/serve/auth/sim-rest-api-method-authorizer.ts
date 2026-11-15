@@ -14,6 +14,7 @@ import {
 import { SimRestApiCognitoMethodAuthorizer } from "./sim-rest-api-cognito-method-authorizer.js";
 import { SimRestApiIamMethodAuthorizer } from "./sim-rest-api-iam-method-authorizer.js";
 import type { SimRestApiMethodAuthorizeInput } from "./sim-rest-api-method-authorize-input.js";
+import { SimRestApiResourcePolicyGate } from "./sim-rest-api-resource-policy-gate.js";
 
 interface SimRestApiMethodAuthorizerProperties {
   /**
@@ -53,11 +54,19 @@ interface SimRestApiMethodAuthorizerProperties {
  *
  * An authorizer with no `authorizerResultTtlInSeconds` holds nothing, so its
  * function is invoked once per request reaching the method.
+ *
+ * An API with a resource policy has it evaluated too, combined with the
+ * method's own authorization as the API Gateway developer guide tabulates. A
+ * `NONE` or `COGNITO_USER_POOLS` method needs the policy to allow the request.
+ * A Deny in it refuses a `CUSTOM` method's request before the authorizer is
+ * invoked. An `AWS_IAM` method evaluates it alongside the caller's identity
+ * policies.
  */
 export class SimRestApiMethodAuthorizer {
   private readonly invocation: SimRestApiAuthorizerInvocation;
   private readonly decisions: SimRestApiAuthorizerDecisions;
   private readonly iamAuthorizer = new SimRestApiIamMethodAuthorizer();
+  private readonly policyGate = new SimRestApiResourcePolicyGate();
   private readonly cognito: SimRestApiCognitoMethodAuthorizer;
 
   constructor(properties: SimRestApiMethodAuthorizerProperties) {
@@ -83,16 +92,24 @@ export class SimRestApiMethodAuthorizer {
       case "NONE": {
         // Nobody was authorized, so there is no caller to describe, which is
         // what leaves requestContext.authorizer out of the event entirely.
-        return new SimRestApiAdmitted();
+        return this.policyGate.admit(input, new SimRestApiAdmitted(), true);
       }
       case "AWS_IAM": {
         return this.iamAuthorizer.authorize(input);
       }
       case "COGNITO_USER_POOLS": {
-        return this.cognito.authorize(input);
+        const verified = this.cognito.authorize(input);
+
+        return verified.admitted
+          ? this.policyGate.admit(input, verified, true)
+          : verified;
       }
       case "CUSTOM": {
-        return await this.custom(input);
+        const verdict = this.policyGate.verdict(input);
+
+        return verdict === "explicit-deny"
+          ? this.policyGate.refusal(input, verdict)
+          : await this.custom(input);
       }
     }
   }

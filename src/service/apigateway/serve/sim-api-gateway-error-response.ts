@@ -1,3 +1,5 @@
+import type { SimRestApiPolicyDenial } from "../api/authorizer/sim-rest-api-authorization.js";
+
 /**
  * The error responses a REST API endpoint returns itself, before or instead of
  * an integration producing one.
@@ -55,6 +57,28 @@ export class SimApiGatewayErrorResponse {
     return this.messageResponse(
       403,
       "User is not authorized to access this resource",
+    );
+  }
+
+  /**
+   * IAM refused the request, by the caller's policies or the API's resource
+   * policy.
+   *
+   * The body names the caller and the request's ARN, with the Account in the
+   * ARN masked down to its last four digits, as real API Gateway masks it.
+   */
+  policyDeny(denial: SimRestApiPolicyDenial, explicit: boolean): Response {
+    const resource = denial.resource.replace(
+      /^(arn:[^:]+:execute-api:[^:]*:)\d{8}(\d{4}:)/u,
+      "$1********$2",
+    );
+
+    return this.messageResponse(
+      403,
+      `User: ${denial.principal} is not authorized to perform: ` +
+        `execute-api:Invoke on resource: ${resource}${
+          explicit ? " with an explicit deny" : ""
+        }`,
     );
   }
 

@@ -188,12 +188,17 @@ describe("Authorizing a sim REST API method with AWS_IAM", () => {
     // When that Role calls the method
     const response = await get(simAws, restApi, "/orders/42", reporterArn);
 
-    // Then being a known principal is not enough, and the body is the one API
-    // Gateway answers a caller its policies left short
+    // Then being a known principal is not enough, and the body names the
+    // caller and the request, with the Account masked as API Gateway masks it
     assertResponseStatus(response, 403, await describeResponse(response));
     assertIdentical(
       await response.text(),
-      '{"Message":"User is not authorized to access this resource"}',
+      JSON.stringify({
+        Message:
+          `User: ${reporterArn} is not authorized to perform: ` +
+          `execute-api:Invoke on resource: arn:aws:execute-api:us-east-1:` +
+          `********8888:${restApi.apiId}/prod/GET/orders/42`,
+      }),
     );
   });
 

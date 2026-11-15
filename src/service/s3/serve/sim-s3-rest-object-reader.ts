@@ -1,3 +1,4 @@
+import { simS3ServedOptions } from "./sim-s3-served-options.js";
 import type { SimS3 } from "../sim-s3.js";
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
 import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
@@ -42,7 +43,7 @@ export class SimS3RestObjectReader {
           Range: head ? undefined : (request.headers.get("range") ?? undefined),
         },
       },
-      { caller: serviceRequest.caller.toCaller() },
+      simS3ServedOptions(serviceRequest),
     );
 
     const body = await bodyBytes(output.Body);

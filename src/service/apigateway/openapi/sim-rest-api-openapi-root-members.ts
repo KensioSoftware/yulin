@@ -16,11 +16,6 @@ export const simRestApiOpenApiRefusedRootMembers: readonly (readonly [
       "Declare the requirement on each operation instead.",
   ],
   [
-    "x-amazon-apigateway-policy",
-    "a resource policy on the API is not simulated, so every request that " +
-      "reaches a method here is served",
-  ],
-  [
     "x-amazon-apigateway-binary-media-types",
     "binary media types negotiated by Accept are not simulated",
   ],

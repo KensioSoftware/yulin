@@ -10,6 +10,7 @@ export interface SimRestApiView {
   rootResourceId: string;
   disableExecuteApiEndpoint: boolean;
   description?: string;
+  policy?: string;
 }
 
 /**
@@ -28,6 +29,7 @@ export function simRestApiView(restApi: SimRestApi): SimRestApiView {
     ...(restApi.description !== undefined && {
       description: restApi.description,
     }),
+    ...(restApi.policy !== undefined && { policy: restApi.policy.value() }),
   };
 
   return view;

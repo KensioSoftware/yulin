@@ -129,6 +129,7 @@ export class SimApiGatewayServiceController implements SimAwsServiceController {
       match,
       request,
       caller: serviceRequest.caller,
+      sourceIp: serviceRequest.sourceIp,
       iam: this.router.iamFor(restApi),
     });
 

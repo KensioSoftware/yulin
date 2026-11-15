@@ -20,6 +20,11 @@ export interface SimRestApiMethodAuthorizeInput {
    */
   readonly caller: SimAwsRequestCaller;
   /**
+   * The client address the request came from, which a policy reads as
+   * `aws:SourceIp`.
+   */
+  readonly sourceIp?: string | undefined;
+  /**
    * IAM of the Account that owns the API, which is what decides an `AWS_IAM`
    * method. It is the API's own rather than the caller's, and rather than the
    * integrated function's.

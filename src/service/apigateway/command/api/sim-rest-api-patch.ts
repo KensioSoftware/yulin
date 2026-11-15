@@ -1,10 +1,12 @@
+import { simRestApiReplacePolicy } from "../../api/policy/sim-rest-api-policy.js";
+import type { SimRestApi } from "../../api/sim-rest-api.js";
 import { SimApiGatewayBadRequest } from "../../error/sim-api-gateway.error.js";
 import type { SimRestApiPatchOperation } from "./rest-api.command.js";
 
 /**
  * The paths of a REST API an update can replace.
  */
-const replaceablePaths = ["/name", "/description"] as const;
+const replaceablePaths = ["/name", "/description", "/policy"] as const;
 
 type ReplaceablePath = (typeof replaceablePaths)[number];
 
@@ -14,6 +16,8 @@ type ReplaceablePath = (typeof replaceablePaths)[number];
 export interface SimRestApiPatch {
   readonly name?: string | undefined;
   readonly description?: string | undefined;
+  /** The resource policy, which an empty value removes. */
+  readonly policy?: string | undefined;
 }
 
 /**
@@ -21,14 +25,14 @@ export interface SimRestApiPatch {
  *
  * Every API Gateway v1 update is written this way, as a list of JSON-Patch
  * style operations against the resource being changed, rather than as the
- * fields to set. Only replacing the name and the description is simulated, and
- * anything else is refused so an update cannot look applied here and change
- * something on real AWS.
+ * fields to set. Only replacing the name, the description and the resource
+ * policy is simulated. Anything else is refused, so an update cannot look
+ * applied here and change something on real AWS.
  */
 export function simRestApiPatchOf(
   operations: readonly SimRestApiPatchOperation[],
 ): SimRestApiPatch {
-  const patch: { name?: string; description?: string } = {};
+  const patch: { name?: string; description?: string; policy?: string } = {};
 
   for (const operation of operations) {
     assertReplace(operation);
@@ -36,12 +40,30 @@ export function simRestApiPatchOf(
 
     if (path === "/name") {
       patch.name = requireValue(operation);
-    } else {
+    } else if (path === "/description") {
       patch.description = operation.value ?? "";
+    } else {
+      patch.policy = operation.value ?? "";
     }
   }
 
   return patch;
+}
+
+/**
+ * Apply the patch operations of an `UpdateRestApi` request to an API.
+ */
+export function simRestApiApplyPatch(
+  restApi: SimRestApi,
+  operations: readonly SimRestApiPatchOperation[],
+): void {
+  const patch = simRestApiPatchOf(operations);
+
+  restApi.name = patch.name ?? restApi.name;
+  restApi.description = patch.description ?? restApi.description;
+  if (patch.policy !== undefined) {
+    simRestApiReplacePolicy(restApi, patch.policy);
+  }
 }
 
 function assertReplace(operation: SimRestApiPatchOperation): void {
@@ -63,7 +85,7 @@ function assertReplaceablePath(
   if (!isReplaceablePath(path)) {
     throw new SimApiGatewayBadRequest(
       `UpdateRestApi path '${path}' is not simulated: only ` +
-        `${replaceablePaths.map((one) => `'${one}'`).join(" and ")} can be ` +
+        `${replaceablePaths.map((one) => `'${one}'`).join(", ")} can be ` +
         `replaced`,
     );
   }

@@ -26,6 +26,8 @@ export interface SimCreateRestApiCommandInput {
   readonly name?: string | undefined;
   readonly description?: string | undefined;
   readonly disableExecuteApiEndpoint?: boolean | undefined;
+  /** The resource policy, as a JSON IAM policy document. */
+  readonly policy?: string | undefined;
 }
 
 export interface SimCreateRestApiCommandOutput extends SimRestApiView {

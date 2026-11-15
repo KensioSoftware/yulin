@@ -52,6 +52,7 @@ export class SimLambdaUrlAdmission {
     const target = {
       resource: route.resource,
       functionUrl: route.functionUrl,
+      sourceIp: serviceRequest.sourceIp,
     };
 
     if (route.functionUrl.authType === "NONE") {

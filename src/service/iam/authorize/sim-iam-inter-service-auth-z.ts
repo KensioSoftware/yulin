@@ -19,6 +19,13 @@ export interface SimIamAuthorizationDecision {
   readonly isDenied: boolean;
 
   /**
+   * Whether a Deny statement refused the request, where nothing allowing it
+   * is an implicit deny. Absent where the decision does not tell the two
+   * apart.
+   */
+  readonly isExplicitDeny?: boolean | undefined;
+
+  /**
    * How an AccessDenied error should explain this denial, where the action and
    * the resource leave something out.
    *

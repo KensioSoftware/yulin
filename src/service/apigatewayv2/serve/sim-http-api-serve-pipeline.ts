@@ -69,6 +69,7 @@ export class SimHttpApiServePipeline {
     const authorization = await this.#routeAuthorizer.authorize({
       ...asked,
       caller: serviceRequest.caller,
+      sourceIp: serviceRequest.sourceIp,
       iam: this.#router.iamFor(api),
     });
 

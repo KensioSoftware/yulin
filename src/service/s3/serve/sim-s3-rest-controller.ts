@@ -1,3 +1,4 @@
+import { simS3ServedOptions } from "./sim-s3-served-options.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
@@ -73,7 +74,7 @@ export class SimS3RestController {
   ): Promise<Response> {
     await this.s3For(route).deleteObject(
       { input: { Bucket: route.bucket.bucketName, Key: route.objectKey } },
-      { caller: serviceRequest.caller.toCaller() },
+      simS3ServedOptions(serviceRequest),
     );
 
     return new Response(undefined, { status: 204 });
@@ -88,7 +89,7 @@ export class SimS3RestController {
   ): Promise<Response> {
     await this.s3For(route).putObject(
       { input: simS3RestUploadInput(route, serviceRequest) },
-      { caller: serviceRequest.caller.toCaller() },
+      simS3ServedOptions(serviceRequest),
     );
 
     return new Response(undefined, { status: 200 });

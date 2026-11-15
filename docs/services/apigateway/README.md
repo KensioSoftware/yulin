@@ -939,14 +939,21 @@ console.log(await reporter.text());
 await srv.close();
 ```
 
-A caller IAM does not allow gets 403 with `User is not authorized to access this resource`. An
-explicit Deny gets that same body, where a Lambda authorizer's Deny gets one of its own.
+A caller IAM does not allow gets 403, with a body naming the caller and the request. The Account in
+the ARN is masked to its last four digits, as API Gateway masks it.
 
-Only the caller's identity policies are read. A REST API also has a resource policy on real AWS, and
-`Policy` on an `AWS::ApiGateway::RestApi` is recorded against the Resource with the API deployed
-without it. A caller from another Account is therefore always refused, because a cross-Account
-request needs an Allow from each side. The way through, here as on AWS, is to assume a Role in the
-API's Account.
+```json
+{
+  "Message": "User: arn:aws:iam::888888888888:role/Reporter is not authorized to perform: execute-api:Invoke on resource: arn:aws:execute-api:us-east-1:********8888:a1b2c3d4e5/prod/GET/orders/42"
+}
+```
+
+An explicit Deny adds ` with an explicit deny` to the end of the message.
+
+The caller's identity policies are evaluated together with the API's
+[resource policy](#limiting-an-api-with-a-resource-policy), when it has one. Without a resource
+policy, a caller from another Account is refused, because a cross-Account request needs an Allow
+from each side. The other way in is to assume a Role in the API's Account.
 
 ### The identity the handler receives
 
@@ -971,6 +978,102 @@ A method of any other authorization type leaves those six `null`, and so does an
 called by a principal with no ARN behind it. `apiKey`, `apiKeyId` and the two Cognito identity pool
 fields are `null` throughout. `sourceIp` and `userAgent` describe the
 request itself and are filled for every method.
+
+## Limiting an API with a resource policy
+
+A REST API can hold a resource policy, an IAM policy document granting or denying
+`execute-api:Invoke`. It is the usual way to limit an API to an address range, or to open it to
+another Account. An API holding none is served as the sections above describe.
+
+The policy is set by `CreateRestApi` (`policy`), by `UpdateRestApi` (a `replace` of `/policy`, with
+an empty value removing it), by `x-amazon-apigateway-policy` in an imported OpenAPI document, and by
+`Policy` on an `AWS::ApiGateway::RestApi`. A document that is not an IAM policy is refused with
+`BadRequestException`. A `Resource` written as `execute-api:/<stage>/<METHOD>/<path>` names the API
+holding the policy, and is expanded to its ARN when the policy is set. `GetRestApi` returns the
+policy with its quotes escaped, as API Gateway does, so a client unescapes it before parsing it.
+
+How the policy combines with a method's own authorization follows the tables in the API Gateway
+developer guide:
+
+| Method               | With a resource policy                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `NONE`               | The policy has to allow the request                                                                        |
+| `AWS_IAM`            | In the API's Account, the identity policies or the resource policy allow it. From another Account, both do |
+| `CUSTOM`             | A Deny in the policy refuses the request before the authorizer is invoked. Then the authorizer decides     |
+| `COGNITO_USER_POOLS` | The token is verified first. Then the policy has to allow the request                                      |
+
+A Deny anywhere refuses the request. For any method other than `AWS_IAM`, API Gateway authenticates
+no IAM principal, so the policy is evaluated for an anonymous caller. A statement granting
+`"Principal": "*"` admits it, and one naming a Role or an Account does not, whatever
+`x-sim-aws-caller` says. A refusal gets the 403 body an `AWS_IAM` method gives, naming `anonymous`.
+
+The request's client address reaches the policy as `aws:SourceIp`. It comes from the
+`x-sim-aws-source-ip` header, and is `127.0.0.1` for a request naming none. See
+[Callers of HTTP requests](https://yulinsim.dev/services/iam/#callers-of-http-requests) in the IAM
+docs.
+
+```typescript sim-apigateway-resource-policy
+/**
+ * Limiting a simulated REST API to one address range with a resource policy.
+ */
+
+import { UpdateRestApiCommand } from "@aws-sdk/client-api-gateway";
+
+import { SimAws } from "@kensio/yulin";
+import { simRestApiLambdaProxyFactory } from "@kensio/yulin/apigateway";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const restApi = await simRestApiLambdaProxyFactory.make(
+  {
+    resourcePaths: ["/orders"],
+    handler: () => ({ statusCode: 200, body: "orders" }),
+  },
+  simAws,
+);
+
+await simAws.apiGateway().updateRestApi(
+  new UpdateRestApiCommand({
+    restApiId: restApi.apiId,
+    patchOperations: [
+      {
+        op: "replace",
+        path: "/policy",
+        value: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: "*",
+              Action: "execute-api:Invoke",
+              Resource: "execute-api:/*",
+              Condition: { IpAddress: { "aws:SourceIp": "192.0.2.0/24" } },
+            },
+          ],
+        }),
+      },
+    ],
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${restApi.invokeUrl("prod")}/orders`);
+
+const office = await fetch(url, {
+  headers: { "x-sim-aws-source-ip": "192.0.2.10" },
+});
+
+console.log(office.status);
+// 200
+
+const elsewhere = await fetch(url);
+
+console.log(elsewhere.status);
+// 403
+
+await srv.close();
+```
 
 ## Authorizing a method with a user pool
 
@@ -1723,7 +1826,8 @@ naming the Resource type, the logical id and the ones this can act on. The API, 
 deployment or stage is created either way. The stack deploys, and the record says which of its parts
 behaves differently to the template. The simulated properties are:
 
-- `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`, `Body`, `FailOnWarnings`
+- `RestApi`: `Name`, `Description`, `DisableExecuteApiEndpoint`, `Body`, `FailOnWarnings`,
+  `Policy`
 - `Resource`: `RestApiId`, `ParentId`, `PathPart`
 - `Method`: `RestApiId`, `ResourceId`, `HttpMethod`, `AuthorizationType`, `AuthorizerId`,
   `AuthorizationScopes`, `ApiKeyRequired`, `OperationName`, `Integration`
@@ -1760,8 +1864,9 @@ Api:
 otherwise. `Description` and `DisableExecuteApiEndpoint` beside a `Body` are recorded and left off
 the API, because `ImportRestApi` takes neither and AWS applies them in a second step. A
 `Resource`, `Method` or other entry adding to an API a `Body` already declared fails the stack
-naming both, since the template would then declare the API two ways at once. `BodyS3Location` and
-`Mode` are recorded like any other unsimulated property.
+naming both, since the template would then declare the API two ways at once. `Policy` beside a
+`Body` is attached once the import is done, as AWS attaches it, and replaces a policy the document
+declared. `BodyS3Location` and `Mode` are recorded like any other unsimulated property.
 
 A `Body` holding a Swagger 2.0 document is the one document that is recorded instead of refused. The
 API deploys with an empty path tree and the record says why. SAM writes Swagger 2.0 for an
@@ -1853,10 +1958,12 @@ and behave differently deployed. The refusals worth knowing about:
   named is recorded on `stack.ignoredProperties`.
 - **Paging.** Every list command answers in full, and `limit` or `position` is refused.
 - **Endpoint types, request validators, models, mapping templates and WAF.** All refused.
-- **Updates.** `UpdateRestApi` replaces `/name` and `/description`. Any other patch path is refused.
+- **Updates.** `UpdateRestApi` replaces `/name`, `/description` and `/policy`. Any other patch path
+  is refused.
 - **OpenAPI extensions.** An import reads `x-amazon-apigateway-integration`,
   `x-amazon-apigateway-any-method`, `x-amazon-apigateway-authtype`,
-  `x-amazon-apigateway-authorizer` and `x-amazon-apigateway-auth`. Every other
+  `x-amazon-apigateway-authorizer`, `x-amazon-apigateway-auth` and `x-amazon-apigateway-policy`.
+  Every other
   `x-amazon-apigateway-*` extension is refused, and so is any integration member beyond `type`,
   `httpMethod` and `uri`. Each refusal names the JSON pointer of the member.
 
@@ -1903,5 +2010,12 @@ and `Stage`, including the template CDK synthesizes from a `RestApi` or a `Lambd
 - A security scheme declares a Lambda authorizer, a Cognito one or IAM authorization. An `apiKey`
   scheme carrying no `x-amazon-apigateway-authtype` is an API key and is refused, and so are the
   `http`, `oauth2` and `openIdConnect` scheme types. See [Security schemes](#security-schemes).
+- A resource policy takes effect as soon as it is set, as the rest of an API does here. Real API
+  Gateway applies it at the next deployment.
+- A `CUSTOM` method needs its authorizer to allow the request. In the API's own Account, real API
+  Gateway also admits a request the authorizer's policy says nothing about when the resource policy
+  allows it.
+- `aws:SourceVpc` and `aws:SourceVpce` are absent from every request, since private APIs are outside
+  this.
 - `PutRestApi` replaces a definition and never merges one. `BodyS3Location` on the Resource, and a
   document held anywhere but inline, are outside this.

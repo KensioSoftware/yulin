@@ -8,7 +8,8 @@ import type { SimRestApiRegistry } from "../../registry/sim-rest-api-registry.js
 import type { SimApiGatewayRequestOptions } from "../sim-api-gateway-request-options.js";
 import { SimApiGatewayUnsimulatedInput } from "../sim-api-gateway-unsimulated-input.js";
 import type { SimRestApiAccess } from "../sim-rest-api-access.js";
-import { simRestApiPatchOf } from "./sim-rest-api-patch.js";
+import { simRestApiApplyPatch } from "./sim-rest-api-patch.js";
+import { simRestApiReplacePolicy } from "../../api/policy/sim-rest-api-policy.js";
 import type {
   SimCreateRestApiCommand,
   SimCreateRestApiCommandOutput,
@@ -26,6 +27,7 @@ const acceptedCreateOptions = [
   "name",
   "description",
   "disableExecuteApiEndpoint",
+  "policy",
 ];
 
 interface SimRestApiCommandsProperties {
@@ -87,6 +89,7 @@ export class SimRestApiCommands {
       description: input.description,
       disableExecuteApiEndpoint: input.disableExecuteApiEndpoint,
     });
+    simRestApiReplacePolicy(restApi, input.policy);
     this.apis.add(restApi);
 
     return { ...restApi.view(), $metadata: {} };
@@ -148,10 +151,7 @@ export class SimRestApiCommands {
       restApiId,
       caller: options?.caller,
     });
-    const patch = simRestApiPatchOf(input.patchOperations ?? []);
-
-    restApi.name = patch.name ?? restApi.name;
-    restApi.description = patch.description ?? restApi.description;
+    simRestApiApplyPatch(restApi, input.patchOperations ?? []);
 
     return { ...restApi.view(), $metadata: {} };
   }
