@@ -10,9 +10,9 @@ export const simAwsSourceIpConditionKey = "aws:SourceIp";
  * client address.
  *
  * A request served over HTTP always has one, from `x-sim-aws-source-ip` or the
- * loopback address. An in-process SDK call has none, and leaves the key out. A
- * statement conditioned on it then fails to match, as it would for a request
- * AWS receives through a VPC endpoint.
+ * loopback address. An in-process SDK call has none, and leaves the key out.
+ * An `IpAddress` condition on it then fails to match, as it would for a
+ * request AWS receives through a VPC endpoint, and a `Null` condition matches.
  */
 export function simAwsSourceIpCondition(
   sourceIp: string | undefined,

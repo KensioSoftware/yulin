@@ -56,6 +56,18 @@ export class SimRestApiPolicy {
 }
 
 /**
+ * The resource policy a value sets on an API, or none for an empty value.
+ */
+export function simRestApiParsedPolicy(
+  restApi: SimRestApi,
+  value: string | undefined,
+): SimRestApiPolicy | undefined {
+  return value === undefined || value === ""
+    ? undefined
+    : SimRestApiPolicy.parse(value, restApi.arn);
+}
+
+/**
  * Attach a resource policy to an API, or remove the one it holds with an
  * empty value.
  */
@@ -63,23 +75,40 @@ export function simRestApiReplacePolicy(
   restApi: SimRestApi,
   value: string | undefined,
 ): void {
-  restApi.policy =
-    value === undefined || value === ""
-      ? undefined
-      : SimRestApiPolicy.parse(value, restApi.arn);
+  restApi.policy = simRestApiParsedPolicy(restApi, value);
 }
 
+const invalidPolicy = (): SimApiGatewayBadRequest =>
+  new SimApiGatewayBadRequest(
+    "Invalid policy document. Please check the policy syntax and ensure " +
+      "that Principals are valid.",
+  );
+
+/**
+ * Read a policy document, refusing one IAM refuses and one with a statement
+ * naming no principal, which every resource policy statement has to name.
+ */
 function parsedDocument(value: string): SimIamPolicyDocument {
+  let document: SimIamPolicyDocument;
+
   try {
     validator.validateRequired(value);
-
-    return jsonParse(value);
+    document = jsonParse(value);
   } catch {
-    throw new SimApiGatewayBadRequest(
-      "Invalid policy document. Please check the policy syntax and ensure " +
-        "that Principals are valid.",
-    );
+    throw invalidPolicy();
   }
+
+  if (
+    statementsOf(document).some(
+      (statement) =>
+        statement.Principal === undefined &&
+        statement.NotPrincipal === undefined,
+    )
+  ) {
+    throw invalidPolicy();
+  }
+
+  return document;
 }
 
 function statementsOf(

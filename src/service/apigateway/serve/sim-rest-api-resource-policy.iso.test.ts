@@ -137,6 +137,32 @@ describe("A sim REST API's resource policy", () => {
     );
   });
 
+  it("evaluates the policy in the API's own Region", async () => {
+    // Given an open method behind a policy allowing requests made in the
+    // API's Region
+    const simAws = new SimAws();
+    const restApi = await simRestApiLambdaProxyFactory.make(
+      { resourcePaths: ["/orders"] },
+      simAws,
+    );
+    await attachPolicy(simAws, restApi, [
+      {
+        ...allowEveryone,
+        Condition: {
+          StringEquals: {
+            "aws:RequestedRegion": restApi.accountRegionScope.regionName,
+          },
+        },
+      },
+    ]);
+
+    // When it is called
+    const response = await get(simAws, restApi, "/orders");
+
+    // Then the Region condition matches
+    assertResponseStatus(response, 200, await describeResponse(response));
+  });
+
   it("refuses an open method a Deny statement covers", async () => {
     // Given an open API whose policy allows everything and denies one path
     const simAws = new SimAws();

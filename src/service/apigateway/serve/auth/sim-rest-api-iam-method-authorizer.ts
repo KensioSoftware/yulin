@@ -37,6 +37,7 @@ export class SimRestApiIamMethodAuthorizer {
     const resource = simRestApiRequestArn(input);
     const decision = iam.authorize({
       action: simExecuteApiInvokeAction,
+      region: input.restApi.accountRegionScope.regionName,
       resource,
       caller: caller.toCaller(),
       resourcePolicies: simRestApiResourcePolicies(restApi),

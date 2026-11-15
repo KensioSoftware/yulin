@@ -1,4 +1,4 @@
-import { simRestApiReplacePolicy } from "../../api/policy/sim-rest-api-policy.js";
+import { simRestApiParsedPolicy } from "../../api/policy/sim-rest-api-policy.js";
 import type { SimRestApi } from "../../api/sim-rest-api.js";
 import { SimApiGatewayBadRequest } from "../../error/sim-api-gateway.error.js";
 import type { SimRestApiPatchOperation } from "./rest-api.command.js";
@@ -52,18 +52,23 @@ export function simRestApiPatchOf(
 
 /**
  * Apply the patch operations of an `UpdateRestApi` request to an API.
+ *
+ * The policy is read before anything changes, so a request with a policy that
+ * is refused leaves the API as it was.
  */
 export function simRestApiApplyPatch(
   restApi: SimRestApi,
   operations: readonly SimRestApiPatchOperation[],
 ): void {
   const patch = simRestApiPatchOf(operations);
+  const policy =
+    patch.policy === undefined
+      ? restApi.policy
+      : simRestApiParsedPolicy(restApi, patch.policy);
 
   restApi.name = patch.name ?? restApi.name;
   restApi.description = patch.description ?? restApi.description;
-  if (patch.policy !== undefined) {
-    simRestApiReplacePolicy(restApi, patch.policy);
-  }
+  restApi.policy = policy;
 }
 
 function assertReplace(operation: SimRestApiPatchOperation): void {

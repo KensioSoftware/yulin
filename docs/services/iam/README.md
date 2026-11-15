@@ -1387,8 +1387,9 @@ reads it (see
 so does IAM, as `aws:SourceIp`. A policy limiting a Bucket, a Function URL or a REST API to an
 address range is tested by naming an address inside it and one outside. The key reaches policy
 evaluation for the S3 REST and website endpoints, Lambda Function URLs and API Gateway REST APIs. An
-in-process SDK call has no client address and leaves the key out, so a condition on it fails to
-match there.
+in-process SDK call has no client address and leaves the key out. An `IpAddress` or `NotIpAddress`
+condition on it then fails to match there, while `Null` and the `...IfExists` operators match an
+absent key as they do on AWS.
 
 ```typescript sim-iam-served-request-caller
 /**
@@ -2497,7 +2498,7 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
 - The resolved caller is evaluated by Lambda Function URLs, the S3 REST and website endpoints, and API
   Gateway REST and HTTP APIs. CloudFront and Application Load Balancers serve viewers without IAM,
   as they do on AWS. A served request carries `aws:SourceIp` and none of `aws:SecureTransport`,
-  `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`, so a condition on one of
-  those fails to match
+  `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`. An ordinary condition on one
+  of those fails to match, and `Null` or an `...IfExists` operator treats it as absent
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
   instance. A caller whose Account is absent from the simulation is denied

@@ -79,6 +79,7 @@ export class SimRestApiResourcePolicyGate {
 
     const decision = input.iam.authorize({
       action: simExecuteApiInvokeAction,
+      region: input.restApi.accountRegionScope.regionName,
       resource: simRestApiRequestArn(input),
       caller: { kind: "anonymous" },
       resourcePolicies,

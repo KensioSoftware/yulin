@@ -103,6 +103,49 @@ describe("A sim REST API's resource policy commands", () => {
     await expect(creating).rejects.toThrow(/Invalid policy document/u);
   });
 
+  it("refuses a policy statement naming no principal", async () => {
+    // Given a simulated AWS
+    const simAws = new SimAws();
+    const { Principal: _principal, ...unaddressed } = statement;
+
+    // When an API is created with a statement granting nobody in particular
+    const creating = simAws.apiGateway().createRestApi(
+      new CreateRestApiCommand({
+        name: "orders",
+        policy: simIamPolicyDocumentFactory.make({ Statement: unaddressed }),
+      }),
+    );
+
+    // Then it is refused, as a resource policy has to name who it grants
+    await expect(creating).rejects.toThrow(/Invalid policy document/u);
+  });
+
+  it("leaves an API unchanged by an update whose policy is refused", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const created = await simAws
+      .apiGateway()
+      .createRestApi(new CreateRestApiCommand({ name: "orders" }));
+
+    // When one update renames it and sets a policy that is not JSON
+    const updating = simAws.apiGateway().updateRestApi(
+      new UpdateRestApiCommand({
+        restApiId: created.id,
+        patchOperations: [
+          { op: "replace", path: "/name", value: "renamed" },
+          { op: "replace", path: "/policy", value: "allow all" },
+        ],
+      }),
+    );
+
+    // Then the update is refused and the name is the one it had
+    await expect(updating).rejects.toThrow(SimApiGatewayBadRequest);
+    const described = await simAws
+      .apiGateway()
+      .getRestApi(new GetRestApiCommand({ restApiId: created.id }));
+    assertIdentical(described.name, "orders");
+  });
+
   it("takes a policy from the document an API is imported from", async () => {
     // Given a document declaring a resource policy
     const simAws = new SimAws();
