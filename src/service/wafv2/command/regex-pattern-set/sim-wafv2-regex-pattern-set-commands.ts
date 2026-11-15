@@ -1,3 +1,4 @@
+import { simWafAuthorizeCreate } from "../authorize/sim-wafv2-authorize-create.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimWafRegexPatternSet } from "../../regex-pattern-set/sim-waf-regex-pattern-set.js";
 import type { SimWafResourceStore } from "../../resource/sim-waf-resource-store.js";
@@ -68,9 +69,11 @@ export class SimWafRegexPatternSetCommands {
       regularExpressions: input.RegularExpressionList ?? [],
     });
 
-    this.#authorizer.authorizeResource(
+    simWafAuthorizeCreate(
+      this.#authorizer,
       "wafv2:CreateRegexPatternSet",
       patternSet.arn,
+      input.Tags,
       options?.caller,
     );
 

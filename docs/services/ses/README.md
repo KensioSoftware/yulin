@@ -1078,6 +1078,9 @@ time forward past the window sees the count fall the way an account's would.
 
 Anything else refuses on send with `SimSdkUnsupportedCommandError`.
 
+A `CreateEmailIdentity` carrying tags needs `ses:TagResource` as well as `ses:CreateEmailIdentity`.
+Both actions see the tags as `aws:RequestTag/<key>` and their keys as `aws:TagKeys`.
+
 ## Divergences and limitations
 
 - **Verification is a simulator call.** `verifyIdentity` has no counterpart on AWS. It is the only

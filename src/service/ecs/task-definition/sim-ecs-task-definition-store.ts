@@ -34,6 +34,14 @@ export class SimEcsTaskDefinitionStore {
   }
 
   /**
+   * The revision number a family's next registration takes, without starting
+   * the family.
+   */
+  nextRevisionNumber(family: string): number {
+    return this.familiesByName.get(family)?.nextRevisionNumber() ?? 1;
+  }
+
+  /**
    * The families that have ever been registered, oldest first.
    */
   families(): readonly SimEcsTaskDefinitionFamily[] {

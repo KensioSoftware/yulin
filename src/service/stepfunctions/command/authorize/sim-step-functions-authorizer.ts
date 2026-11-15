@@ -6,6 +6,7 @@ import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-int
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simStateMachineArn } from "../../machine/sim-state-machine-arn.js";
 import { simStatesServicePrincipal } from "../../task/sim-states-execution-role.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 
 interface SimStepFunctionsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -52,11 +53,13 @@ export class SimStepFunctionsAuthorizer {
     action: string,
     name: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
     return this.authorizeStateMachineArn(
       action,
       simStateMachineArn(this.#accountRegionScope, name),
       caller,
+      conditions,
     );
   }
 
@@ -66,16 +69,20 @@ export class SimStepFunctionsAuthorizer {
    * The state machine need not be there. Real IAM evaluates a request before
    * the service handles it, so a caller with no permission is refused whether
    * or not the ARN names anything.
+   *
+   * A request setting or removing tags carries them as conditions.
    */
   authorizeStateMachineArn(
     action: string,
     stateMachineArn: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
     const decision = this.#iam.authorize({
       action,
       resource: stateMachineArn,
       caller,
+      conditionContext: conditions,
     });
 
     if (decision.isDenied) {

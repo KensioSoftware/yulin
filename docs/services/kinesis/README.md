@@ -411,6 +411,8 @@ Any other command raises `SimSdkUnsupportedCommandError`.
   within a shard only.
 - Server-side encryption is absent. Responses contain no `EncryptionType`.
 - Stream tags are stored and available through `findStream`, and a request on a stream carries them
-  as `aws:ResourceTag/<key>`. Tagging commands are unsupported.
+  as `aws:ResourceTag/<key>`. Tagging commands are unsupported. Creating a stream with tags needs
+  `kinesis:AddTagsToStream` as well as `kinesis:CreateStream`, and `kinesis:TagResource` does not
+  stand in for it.
 - Kinesis Video Streams is absent.
 - The DynamoDB `KinesisStreamSpecification` integration is absent.

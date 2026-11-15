@@ -1,4 +1,6 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simEcsAuthorizeTaggedCreate } from "../authorize/sim-ecs-tag-on-create.js";
+import type { SimEcsClusterArn } from "../../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterCommandContext } from "../sim-ecs-command-context.js";
 import { SimEcsCommandHandler } from "../sim-ecs-command-handler.js";
 import type { SimEcsRequestOptions } from "../sim-ecs-request-options.js";
@@ -38,10 +40,12 @@ export class CreateClusterCommandHandler
     CommandHandler<SimCreateClusterCommand, SimCreateClusterCommandOutput>
 {
   private readonly clusterFactory: CreateClusterFactory;
+  private readonly clusterArn: SimEcsClusterArn;
 
   constructor(context: SimEcsClusterCommandContext) {
     super(context, "CreateCluster", acceptedInput);
     this.clusterFactory = new CreateClusterFactory(context);
+    this.clusterArn = context.clusterArn;
   }
 
   /**
@@ -49,7 +53,8 @@ export class CreateClusterCommandHandler
    *
    * The name is read before authorization because a malformed request is
    * malformed whoever made it, and nothing is held until the caller has been
-   * authorized.
+   * authorized. A request carrying tags needs `ecs:TagResource` on the
+   * cluster as well.
    */
   async handle(
     command: SimCreateClusterCommand,
@@ -61,7 +66,13 @@ export class CreateClusterCommandHandler
 
     await this.sequence();
 
-    this.authorizer.authorizeAnyResource("ecs:CreateCluster", options);
+    simEcsAuthorizeTaggedCreate(
+      this.authorizer,
+      "CreateCluster",
+      this.clusterArn.make(clusterName),
+      command.input.tags,
+      options,
+    );
 
     const cluster = this.clusterFactory.make(command.input, clusterName);
 

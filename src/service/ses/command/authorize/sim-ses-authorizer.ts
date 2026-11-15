@@ -3,6 +3,7 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import {
   simSesConfigurationSetArn,
   simSesIdentityArn,
@@ -52,17 +53,20 @@ export class SimSesAuthorizer {
    * The identity need not exist. Real IAM evaluates a request before the
    * service handles it, so a caller with no permission is refused whether or
    * not the identity is there, and CreateEmailIdentity authorizes against the
-   * ARN the identity is about to have.
+   * ARN the identity is about to have. A request setting tags carries them as
+   * conditions.
    */
   authorizeIdentity(
     action: string,
     emailIdentity: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
     return this.authorizeResource(
       action,
       simSesIdentityArn(this.#accountRegionScope, emailIdentity),
       caller,
+      conditions,
     );
   }
 
@@ -146,7 +150,7 @@ export class SimSesAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
-    conditionContext?: Readonly<Record<string, string>>,
+    conditionContext?: SimIamConditions,
   ): SimAwsResolvedCaller {
     const decision = this.#iam.authorize({
       action,

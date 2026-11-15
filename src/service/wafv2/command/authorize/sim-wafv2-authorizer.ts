@@ -2,6 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 
 /**
  * The resource an action with no resource type authorizes against.
@@ -44,8 +45,14 @@ export class SimWafAuthorizer {
     action: string,
     resource: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
-    const decision = this.#iam.authorize({ action, resource, caller });
+    const decision = this.#iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext: conditions,
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({

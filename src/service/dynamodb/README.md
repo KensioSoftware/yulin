@@ -308,6 +308,11 @@ change.
 `SimDynamoDbResourceNotFoundException` and an unauthorized caller is refused before the lookup. Each
 authorizes the `dynamodb:` action of its own name.
 
+The tags a request sets reach IAM through `requestConditions` on the table reach, which
+`simDynamoDbConditionContextOf` merges with the keys the request reaches. CreateTable takes its
+actions from the shared `simIamTagOnCreate`, which adds `dynamodb:TagResource` when the request
+carries a tag.
+
 Unlike the table commands, a tag command takes an ARN only. A bare table name is refused rather than
 resolved, since real DynamoDB would refuse it too, and finding the table anyway would let a test pass
 on a request AWS rejects.

@@ -1,4 +1,8 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import {
+  simIamRequestTagConditions,
+  simIamTagKeyConditions,
+} from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import { SimDynamoDbTagPage } from "./sim-dynamodb-tag-page.js";
 import {
@@ -29,7 +33,9 @@ interface SimDynamoDbTagCommandsOptions {
  * All three name their resource by ARN, and all three reach it the same way, so
  * an ARN naming no table gives ResourceNotFoundException and an unauthorized
  * caller is refused before the lookup. Each authorizes the `dynamodb:` action of
- * its own name.
+ * its own name. TagResource gives IAM the tags it sets as
+ * `aws:RequestTag/<key>` and `aws:TagKeys`, and UntagResource the keys it
+ * removes as `aws:TagKeys`.
  */
 export class SimDynamoDbTagCommands {
   private readonly access: SimDynamoDbTableAccess;
@@ -56,6 +62,7 @@ export class SimDynamoDbTagCommands {
       action: "dynamodb:TagResource",
       resourceArn: command.input.ResourceArn,
       caller: options?.caller,
+      requestConditions: simIamRequestTagConditions(tags),
     });
 
     table.tags.apply(tags);
@@ -79,6 +86,7 @@ export class SimDynamoDbTagCommands {
       action: "dynamodb:UntagResource",
       resourceArn: command.input.ResourceArn,
       caller: options?.caller,
+      requestConditions: simIamTagKeyConditions(keys),
     });
 
     table.tags.remove(keys);

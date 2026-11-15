@@ -1957,7 +1957,9 @@ Current documented limitations:
 - `DescribeClusters` reports zero services and zero tasks whatever the cluster holds.
   `DescribeServices` and `ListTasks` are what report those.
 - Task definition and cluster tags are stored and reported, but `TagResource`, `UntagResource` and
-  `ListTagsForResource` are absent.
+  `ListTagsForResource` are absent. Creating a cluster or registering a task definition with tags
+  needs `ecs:TagResource` on the new resource as well, with the create action's name as
+  `ecs:CreateAction`. Both actions see the tags as `aws:RequestTag/<key>` and `aws:TagKeys`.
 - An unnamed cluster, task definition or service gets a name composed from the stack name, the
   logical ID and a tail derived from both, in place of the random characters real CloudFormation
   ends one with. The same stack redeployed gets the same names, and a stack deployed twice under

@@ -466,6 +466,9 @@ console.log(listOutput.CertificateSummaryList?.map((cert) => cert.DomainName));
 Pass `Tags` when requesting a certificate. Simulated ACM accepts up to 50 tags, matching the ACM
 request limit. Requests with more than 50 tags throw `TooManyTagsException`.
 
+A request carrying tags needs `acm:AddTagsToCertificate` as well as `acm:RequestCertificate`. Both
+actions see the tags as `aws:RequestTag/<key>` and their keys as `aws:TagKeys`.
+
 ```typescript sim-acm-tags
 /**
  * Requesting a simulated ACM certificate with tags.

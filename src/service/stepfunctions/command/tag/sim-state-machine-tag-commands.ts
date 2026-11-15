@@ -14,6 +14,17 @@ import type {
   SimUntagResourceCommand,
   SimUntagResourceCommandOutput,
 } from "./tag.command.js";
+import type { SimStepFunctionsAuthorizer } from "../authorize/sim-step-functions-authorizer.js";
+import type { SimStepFunctionsRequestOptions } from "../sim-step-functions-request-options.js";
+import {
+  simStatesAuthorizeTagResource,
+  simStatesAuthorizeUntagResource,
+} from "./sim-states-request-tags.js";
+
+interface SimStateMachineTagCommandsProperties {
+  readonly stateMachines: SimStateMachineStore;
+  readonly authorizer: SimStepFunctionsAuthorizer;
+}
 
 /**
  * The commands that tag, untag and list the tags of a resource.
@@ -23,18 +34,31 @@ import type {
  * asked. A tag request is read before the resource is reached, so a request
  * Step Functions would refuse is refused whether or not the state machine is
  * there.
+ *
+ * TagResource and UntagResource authorize their own actions, since the
+ * condition values come from the request. TagResource gives IAM the tags it
+ * sets as `aws:RequestTag/<key>` and `aws:TagKeys`, and UntagResource the
+ * keys it removes as `aws:TagKeys`. ListTagsForResource is authorized by the
+ * service, as every other read is.
  */
 export class SimStateMachineTagCommands {
   readonly #stateMachines: SimStateMachineStore;
+  readonly #authorizer: SimStepFunctionsAuthorizer;
 
-  constructor(stateMachines: SimStateMachineStore) {
-    this.#stateMachines = stateMachines;
+  constructor(properties: SimStateMachineTagCommandsProperties) {
+    this.#stateMachines = properties.stateMachines;
+    this.#authorizer = properties.authorizer;
   }
 
   /**
    * Add tags to a resource, replacing the value of any key already there.
    */
-  tagResource(command: SimTagResourceCommand): SimTagResourceCommandOutput {
+  tagResource(
+    command: SimTagResourceCommand,
+    options?: SimStepFunctionsRequestOptions,
+  ): SimTagResourceCommandOutput {
+    simStatesAuthorizeTagResource(this.#authorizer, command.input, options);
+
     const { resourceArn, tags } = command.input;
 
     if (tags === undefined) {
@@ -56,7 +80,10 @@ export class SimStateMachineTagCommands {
    */
   untagResource(
     command: SimUntagResourceCommand,
+    options?: SimStepFunctionsRequestOptions,
   ): SimUntagResourceCommandOutput {
+    simStatesAuthorizeUntagResource(this.#authorizer, command.input, options);
+
     const { resourceArn, tagKeys } = command.input;
 
     if (tagKeys === undefined) {

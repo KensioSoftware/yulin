@@ -77,7 +77,7 @@ export class SimStepFunctions {
   readonly #machineCreate: SimStateMachineCreate;
   readonly #executionStart: SimStatesExecutionStart;
   readonly #executionDescribe: SimStatesExecutionDescribe;
-  readonly #tagCommands = new SimStateMachineTagCommands(this.#stateMachines);
+  readonly #tagCommands: SimStateMachineTagCommands;
   readonly #background: BackgroundScheduler;
   readonly #sdkRouter = new SimStepFunctionsSdkCommandRouter(this);
   readonly #cfnFactory: SimStepFunctionsCfnResourceFactory;
@@ -101,6 +101,10 @@ export class SimStepFunctions {
     });
 
     this.#authorizer = authorizer;
+    this.#tagCommands = new SimStateMachineTagCommands({
+      stateMachines: this.#stateMachines,
+      authorizer,
+    });
 
     this.#background = background;
     this.#cfnFactory = new SimStepFunctionsCfnResourceFactory({
@@ -204,8 +208,7 @@ export class SimStepFunctions {
     options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimTagResourceCommandOutput> {
     await this.#background.sequence();
-    this.#allow("TagResource", command.input.resourceArn, options);
-    return this.#tagCommands.tagResource(command);
+    return this.#tagCommands.tagResource(command, options);
   }
 
   /** Handle an UntagResource Command from the SDK. */
@@ -214,8 +217,7 @@ export class SimStepFunctions {
     options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimUntagResourceCommandOutput> {
     await this.#background.sequence();
-    this.#allow("UntagResource", command.input.resourceArn, options);
-    return this.#tagCommands.untagResource(command);
+    return this.#tagCommands.untagResource(command, options);
   }
 
   /** Handle a ListTagsForResource Command from the SDK. */

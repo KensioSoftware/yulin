@@ -5,6 +5,7 @@ import {
 } from "../../../iam/authorize/pass-role/sim-iam-pass-role-authorizer.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { SimEcsAccessDeniedException } from "../../error/sim-ecs.error.js";
 import { simEcsTasksServicePrincipal } from "../../sim-ecs-service-principal.js";
 import type { SimEcsRequestOptions } from "../sim-ecs-request-options.js";
@@ -140,15 +141,21 @@ export class SimEcsAuthorizer {
     return this.authorizeResource(action, noResource, options);
   }
 
-  private authorizeResource(
+  /**
+   * Ensure the caller may perform an action on the resource given, with the
+   * condition values given.
+   */
+  authorizeResource(
     action: string,
     resource: string,
     options: SimEcsRequestOptions | undefined,
+    conditionContext?: SimIamConditions,
   ): SimAwsResolvedCaller {
     const decision = this.iam.authorize({
       action,
       resource,
       caller: options?.caller,
+      conditionContext,
     });
 
     if (decision.isDenied) {
