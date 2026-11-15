@@ -52,4 +52,35 @@ describe("a sim SES identity's tags in IAM", () => {
     assertIdentical(read.IdentityType, "DOMAIN");
     assertInstanceOf(error, SimIamAccessDenied);
   });
+
+  it("supplies the tags of a domain named in another case", async () => {
+    // Given a domain identity tagged for one team, and a caller allowed to
+    // read that team's identities only
+    const simAws = new SimAws();
+    await simAws.sesV2().createEmailIdentity({
+      input: {
+        EmailIdentity: "orders.example.com",
+        Tags: [{ Key: "team", Value: "orders" }],
+      },
+    });
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        actions: ["ses:GetEmailIdentity"],
+        condition: { StringEquals: { "aws:ResourceTag/team": "orders" } },
+      },
+      simAws,
+    );
+    const caller = { kind: "arn", arn: role.Arn } as const;
+
+    // When it reads the identity with its domain in upper case
+    const read = await simAws
+      .sesV2()
+      .getEmailIdentity(
+        { input: { EmailIdentity: "ORDERS.EXAMPLE.COM" } },
+        { caller },
+      );
+
+    // Then the identity's tags admit it
+    assertIdentical(read.IdentityType, "DOMAIN");
+  });
 });
