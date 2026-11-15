@@ -7,8 +7,10 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { simStatesTagConditionIam } from "./machine/sim-state-machine-resource-tags.js";
 import type * as simStatesCommands from "./command/sim-step-functions-command.types.js";
 import { SimStepFunctionsAuthorizer } from "./command/authorize/sim-step-functions-authorizer.js";
+import { simStatesAuthorizeRequest } from "./command/authorize/sim-step-functions-authorize-request.js";
 import { SimStatesExecutionDescribe } from "./command/execution/sim-states-execution-describe.js";
 import { SimStatesExecutionStart } from "./command/execution/sim-states-execution-start.js";
 import { SimStateMachineCreate } from "./command/machine/sim-state-machine-create.js";
@@ -57,9 +59,8 @@ interface SimStepFunctionsProperties {
  * `Task`, `Choice`, `Wait`, `Succeed` and `Fail`, and a definition using any
  * other is refused by name.
  *
- * Creating and deleting a state machine are decided by simulated IAM. The
- * other operations here are not. A caller an account would refuse still
- * reaches those.
+ * Every operation here is decided by simulated IAM, and a policy reads a
+ * state machine's tags as `aws:ResourceTag/<key>`.
  *
  * An execution runs on the simulation's background scheduler rather than in
  * the `StartExecution` call. An execution with nothing to wait for settles
@@ -81,6 +82,7 @@ export class SimStepFunctions {
   readonly #sdkRouter = new SimStepFunctionsSdkCommandRouter(this);
   readonly #cfnFactory: SimStepFunctionsCfnResourceFactory;
   readonly #inspection = new SimStepFunctionsInspection(this.#executions);
+  readonly #authorizer: SimStepFunctionsAuthorizer;
 
   constructor(properties: SimStepFunctionsProperties = {}) {
     const {
@@ -91,9 +93,14 @@ export class SimStepFunctions {
     } = properties;
 
     const authorizer = new SimStepFunctionsAuthorizer({
-      iam: simIamInRegion(properties.iam, accountRegionScope.regionName),
+      iam: simStatesTagConditionIam(
+        simIamInRegion(properties.iam, accountRegionScope.regionName),
+        this.#stateMachines,
+      ),
       accountRegionScope,
     });
+
+    this.#authorizer = authorizer;
 
     this.#background = background;
     this.#cfnFactory = new SimStepFunctionsCfnResourceFactory({
@@ -155,18 +162,20 @@ export class SimStepFunctions {
   /** Handle a DescribeStateMachine Command from the SDK. */
   async describeStateMachine(
     command: simStatesCommands.SimDescribeStateMachineCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimDescribeStateMachineCommandOutput> {
     await this.#background.sequence();
+    this.#allow("DescribeStateMachine", command.input.stateMachineArn, options);
     return this.#machineReads.describe(command);
   }
 
   /** Handle an UpdateStateMachine Command from the SDK. */
   async updateStateMachine(
     command: simStatesCommands.SimUpdateStateMachineCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimUpdateStateMachineCommandOutput> {
     await this.#background.sequence();
+    this.#allow("UpdateStateMachine", command.input.stateMachineArn, options);
     return this.#machineUpdate.handle(command);
   }
 
@@ -182,45 +191,50 @@ export class SimStepFunctions {
   /** Handle a ListStateMachines Command from the SDK. */
   async listStateMachines(
     command: simStatesCommands.SimListStateMachinesCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimListStateMachinesCommandOutput> {
     await this.#background.sequence();
+    this.#allow("ListStateMachines", "*", options);
     return this.#machineReads.list(command);
   }
 
   /** Handle a TagResource Command from the SDK. */
   async tagResource(
     command: simStatesCommands.SimTagResourceCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimTagResourceCommandOutput> {
     await this.#background.sequence();
+    this.#allow("TagResource", command.input.resourceArn, options);
     return this.#tagCommands.tagResource(command);
   }
 
   /** Handle an UntagResource Command from the SDK. */
   async untagResource(
     command: simStatesCommands.SimUntagResourceCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimUntagResourceCommandOutput> {
     await this.#background.sequence();
+    this.#allow("UntagResource", command.input.resourceArn, options);
     return this.#tagCommands.untagResource(command);
   }
 
   /** Handle a ListTagsForResource Command from the SDK. */
   async listTagsForResource(
     command: simStatesCommands.SimListTagsForResourceCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimListTagsForResourceCommandOutput> {
     await this.#background.sequence();
+    this.#allow("ListTagsForResource", command.input.resourceArn, options);
     return this.#tagCommands.listTagsForResource(command);
   }
 
   /** Handle a StartExecution Command from the SDK. */
   async startExecution(
     command: simStatesCommands.SimStartExecutionCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimStartExecutionCommandOutput> {
     await this.#background.sequence();
+    this.#allow("StartExecution", command.input.stateMachineArn, options);
 
     const started = this.#executionStart.handle(command);
 
@@ -235,9 +249,10 @@ export class SimStepFunctions {
   /** Handle a DescribeExecution Command from the SDK. */
   async describeExecution(
     command: simStatesCommands.SimDescribeExecutionCommand,
-    _options?: SimStepFunctionsRequestOptions,
+    options?: SimStepFunctionsRequestOptions,
   ): Promise<simStatesCommands.SimDescribeExecutionCommandOutput> {
     await this.#background.sequence();
+    this.#allow("DescribeExecution", command.input.executionArn, options);
     return this.#executionDescribe.handle(command);
   }
 
@@ -253,5 +268,22 @@ export class SimStepFunctions {
    */
   cfnResourceFactory(): SimStepFunctionsCfnResourceFactory {
     return this.#cfnFactory;
+  }
+
+  /**
+   * Ensure the caller may perform a Step Functions operation on the resource
+   * a request names.
+   */
+  #allow(
+    operation: string,
+    resource: string | undefined,
+    options: SimStepFunctionsRequestOptions | undefined,
+  ): void {
+    simStatesAuthorizeRequest(
+      this.#authorizer,
+      `states:${operation}`,
+      resource,
+      options,
+    );
   }
 }

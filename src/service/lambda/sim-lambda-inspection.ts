@@ -13,7 +13,7 @@ import type { SimLambdaFunctionAlias } from "./function/version/sim-lambda-funct
 import type { SimLambdaFunctionTarget } from "./function/version/sim-lambda-function-target.js";
 import type { SimLambdaCommands } from "./sim-lambda-commands.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimLambdaTagConditionIam } from "./function/tags/sim-lambda-tag-conditions.js";
+import { simLambdaTagConditionIam } from "./function/tags/sim-lambda-tag-conditions.js";
 
 /**
  * What a test or another simulated service can ask a simulated Lambda about
@@ -114,6 +114,6 @@ export abstract class SimLambdaInspection {
    * the function's tags as `aws:ResourceTag/<key>`, as it does for a command.
    */
   withTagConditions(iam: SimIamInterServiceAuthZ): SimIamInterServiceAuthZ {
-    return new SimLambdaTagConditionIam(iam, this.commands.functionLookup);
+    return simLambdaTagConditionIam(iam, this.commands.functionLookup);
   }
 }

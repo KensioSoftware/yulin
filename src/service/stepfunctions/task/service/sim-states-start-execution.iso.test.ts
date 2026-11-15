@@ -14,9 +14,17 @@ import type { JSONObject } from "../../../../util/type-guard/json.js";
 
 describe("A Task state starting another state machine", () => {
   it("answers with the execution it started", async () => {
-    // Given a state machine that records what it was started with.
+    // Given a state machine that records what it was started with, and a
+    // role allowed to start it.
     const simAws = new SimAws();
-    const roleArn = await statesExecutionRoleFactory.make({}, simAws);
+    const roleArn = await statesExecutionRoleFactory.make(
+      {
+        statements: [
+          { Effect: "Allow", Action: "states:StartExecution", Resource: "*" },
+        ],
+      },
+      simAws,
+    );
     const recording = await statesMachineFactory.make(
       {
         name: "Recording",

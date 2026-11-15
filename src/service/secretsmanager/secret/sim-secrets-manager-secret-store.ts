@@ -88,6 +88,13 @@ export class SimSecretsManagerSecretStore {
   }
 
   /**
+   * Find a secret by its full ARN, random suffix included.
+   */
+  findByArn(arn: string): SimSecretsManagerSecret | undefined {
+    return this.secrets.values().find((secret) => secret.arn.value === arn);
+  }
+
+  /**
    * Resolve a SecretId in any of the forms real Secrets Manager accepts.
    */
   find(secretId: string): SimSecretsManagerSecret | undefined {

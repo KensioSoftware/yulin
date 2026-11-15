@@ -4021,8 +4021,9 @@ is written.
 - Exceeding the 50 tag limit is a `ValidationException`. Real DynamoDB documents
   `LimitExceededException` for `TagResource`, but describes it entirely in terms of how many table
   operations are running at once, which is a different thing from how many tags a table carries.
-- Tag based IAM condition keys are absent. `aws:RequestTag`, `aws:ResourceTag` and `aws:TagKeys` go
-  unevaluated, and a policy that allows tagging only under a particular key allows all of it here.
+- A request carries a table's tags as `aws:ResourceTag/<key>`, and a request naming an index or a
+  stream carries the tags of its table. `aws:RequestTag` and `aws:TagKeys` are absent, and a policy
+  that allows tagging only under a particular key allows all of it here.
 - Tables are the only taggable DynamoDB resource here. Backups and global table replicas are absent.
   An ARN naming one of those resolves to no resource. Real DynamoDB also copies a table's tags onto
   its secondary indexes, which have no target to copy to yet.

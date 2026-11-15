@@ -410,6 +410,7 @@ Any other command raises `SimSdkUnsupportedCommandError`.
   shard, as real Kinesis promises. Yulin also increments them across shards. AWS promises ordering
   within a shard only.
 - Server-side encryption is absent. Responses contain no `EncryptionType`.
-- Stream tags are stored and available through `findStream`. Tagging commands are unsupported.
+- Stream tags are stored and available through `findStream`, and a request on a stream carries them
+  as `aws:ResourceTag/<key>`. Tagging commands are unsupported.
 - Kinesis Video Streams is absent.
 - The DynamoDB `KinesisStreamSpecification` integration is absent.

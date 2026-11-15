@@ -1023,6 +1023,29 @@ passes in its `conditionContext`. A caller named by a Role's own ARN stands for 
 as an `AssumedRole` carrying the Role's tags, without an `aws:userid`, because it has no session
 name.
 
+### Tags on other services' resources
+
+A request to another simulated service carries the tags of the resource it names as
+`aws:ResourceTag/` and the tag key, where that service holds tags on the resource. A policy allowing
+`dynamodb:GetItem` only where `aws:ResourceTag/team` matches `${aws:PrincipalTag/team}` then reads
+the tables of the caller's own team and no others. A value the request already supplies under the
+same key is the one evaluated.
+
+| Service         | Resource                                | Also supplied as              |
+| --------------- | --------------------------------------- | ----------------------------- |
+| Lambda          | function, with its versions and aliases |                               |
+| DynamoDB        | table, with its indexes and streams     |                               |
+| Step Functions  | state machine                           |                               |
+| Secrets Manager | secret                                  | `secretsmanager:ResourceTag/` |
+| Kinesis         | stream, with its consumers              |                               |
+| ECS             | cluster                                 | `ecs:ResourceTag/`            |
+| ACM             | certificate                             |                               |
+| SES             | email identity                          |                               |
+| WAFv2           | web ACL, IP set and regex pattern set   |                               |
+
+A resource the request names before it exists, such as the table a `CreateTable` makes, carries no
+tags.
+
 ## Policy variables
 
 A policy written in the `2012-10-17` language can name request values as variables, such as
@@ -2444,7 +2467,8 @@ Sim IAM currently supports:
   `DeleteInstanceProfileCommand`
 - `TagRoleCommand`, `UntagRoleCommand`, `ListRoleTagsCommand`, `TagUserCommand`, `UntagUserCommand`
   and `ListUserTagsCommand`, along with `Tags` on `CreateRoleCommand` and `CreateUserCommand`
-- `aws:PrincipalTag/`, `iam:ResourceTag/`, `aws:RequestTag/` and `aws:TagKeys`, and the principal
+- `aws:PrincipalTag/`, `iam:ResourceTag/`, `aws:RequestTag/` and `aws:TagKeys`, `aws:ResourceTag/`
+  from the [services that hold tags](#tags-on-other-services-resources), and the principal
   keys `aws:PrincipalAccount`, `aws:PrincipalType`, `aws:userid`, `aws:username`,
   `aws:PrincipalIsAWSService` and `aws:PrincipalServiceName`
 - `CreateAccessKeyCommand`, registering access keys for credential authentication, and
@@ -2500,5 +2524,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   as they do on AWS. A served request carries `aws:SourceIp` and none of `aws:SecureTransport`,
   `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`. An ordinary condition on one
   of those fails to match, and `Null` or an `...IfExists` operator treats it as absent
+- SQS, SNS, SSM, CloudWatch Logs, EventBridge and KMS hold no tags on their resources, so a request
+  to them carries no `aws:ResourceTag/` key. S3 supplies bucket tags only once ABAC is enabled on the
+  bucket, which is absent, and reads object tags as `s3:ExistingObjectTag/`. The other services
+  carry `aws:RequestTag/` and `aws:TagKeys` on no create or tag command, where IAM and Lambda do
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
   instance. A caller whose Account is absent from the simulation is denied

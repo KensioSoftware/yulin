@@ -64,11 +64,11 @@ interface SimEcsClusterProperties {
 export class SimEcsCluster {
   public readonly clusterArn: SimArn;
   public readonly clusterName: string;
+  public readonly tags: readonly SimEcsTag[];
 
   private status: SimEcsClusterStatus = "ACTIVE";
   private readonly settings: readonly SimEcsClusterSetting[];
   private readonly configuration: object | undefined;
-  private readonly tags: readonly SimEcsTag[];
 
   constructor(properties: SimEcsClusterProperties) {
     this.clusterArn = properties.clusterArn;

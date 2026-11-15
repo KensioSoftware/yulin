@@ -3,6 +3,7 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimCreateRoleCommandOutput } from "../command/role/create-role/create-role.command.js";
 import { simIamPolicyDocumentFactory } from "../policy/sim-iam-policy-document.factory.js";
+import type { SimIamPolicyDocumentCondition } from "../policy/sim-iam-policy.js";
 
 /**
  * What a test asks for when it wants a Role that may do something.
@@ -16,6 +17,11 @@ export interface SimIamRoleWithPolicyInput {
   readonly policyName: string;
   readonly actions: readonly string[];
   readonly resource: string;
+
+  /**
+   * The condition the policy's one statement carries, if any.
+   */
+  readonly condition?: SimIamPolicyDocumentCondition | undefined;
 
   /**
    * The principal creating the Role.
@@ -63,6 +69,7 @@ export const simIamRoleWithPolicyFactory = new AsyncMappedFactory<
     policyName: "ApplicationPolicy",
     actions: [],
     resource: "*",
+    condition: undefined,
     caller: undefined,
   }),
   async (input, simAws) => {
@@ -93,7 +100,11 @@ export const simIamRoleWithPolicyFactory = new AsyncMappedFactory<
           RoleName: input.roleName,
           PolicyName: input.policyName,
           PolicyDocument: simIamPolicyDocumentFactory.make({
-            Statement: { Action: input.actions, Resource: input.resource },
+            Statement: {
+              Action: input.actions,
+              Resource: input.resource,
+              Condition: input.condition,
+            },
           }),
         },
       },

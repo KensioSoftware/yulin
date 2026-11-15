@@ -21,8 +21,8 @@ export interface SimWafUnsimulatedPart {
 }
 
 const tagsReason =
-  "the tags are held and nothing reads them, since ListTagsForResource is " +
-  "not simulated";
+  "the tags are held and IAM reads them as aws:ResourceTag, but " +
+  "ListTagsForResource is not simulated";
 
 /**
  * What a resource's tags leave out, which is nothing when it has none.
