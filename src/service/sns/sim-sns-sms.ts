@@ -1,14 +1,8 @@
-import type { BackgroundScheduler } from "../../util/background/background.js";
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
-import type { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
+import { SimSnsTagging } from "./sim-sns-tagging.js";
 import { SimSnsPhoneNumber } from "./sms/sim-sns-phone-number.js";
 import type { SimSnsSentSmsMessage } from "./sms/sim-sns-sent-sms-message.js";
-
-interface SimSnsSmsProperties {
-  readonly commands: SimSnsCommands;
-  readonly background: BackgroundScheduler;
-}
 
 /**
  * The SMS half of simulated SNS: publishing to a phone number, and the opt-out
@@ -18,15 +12,7 @@ interface SimSnsSmsProperties {
  * alongside the topic operations. They are here because they are the operations
  * that touch no topic at all.
  */
-export abstract class SimSnsSms {
-  protected readonly commands: SimSnsCommands;
-  protected readonly background: BackgroundScheduler;
-
-  protected constructor(properties: SimSnsSmsProperties) {
-    this.commands = properties.commands;
-    this.background = properties.background;
-  }
-
+export abstract class SimSnsSms extends SimSnsTagging {
   /**
    * Every SMS this simulated SNS would have sent, oldest first.
    *

@@ -7,7 +7,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimAwsMessageLog } from "../aws/message/sim-aws-message-log.js";
 import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { simIamInRegion } from "../iam/authorize/sim-iam-region-auth-z.js";
+import { simSnsIam } from "./topic/sim-sns-resource-tags.js";
 import type { SimSnsDeliveryFailure } from "./delivery/sim-sns-delivery-failures.js";
 import { simSnsNoDeliveryEndpoints } from "./delivery/sim-sns-no-delivery-endpoints.js";
 import type { SimSnsOutwardDeliveryEndpoints } from "./delivery/sim-sns-protocol-delivery-endpoints.js";
@@ -67,8 +67,8 @@ export class SimSns extends SimSnsSms {
       messageLog = new SimAwsMessageLog(),
     } = properties;
 
-    const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
     const topics = new SimSnsTopicStore();
+    const iam = simSnsIam(properties.iam, accountRegionScope, topics);
     const subscriptions = new SimSnsSubscriptionStore();
 
     super({

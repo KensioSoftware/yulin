@@ -109,3 +109,51 @@ export interface SimSetTopicAttributesCommandInput {
 export interface SimSetTopicAttributesCommandOutput {
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim SNS TagResource command.
+ */
+export interface SimTagResourceCommand {
+  readonly input: SimTagResourceCommandInput;
+}
+
+export interface SimTagResourceCommandInput {
+  readonly ResourceArn?: string | undefined;
+  readonly Tags?: readonly SimSnsTag[] | undefined;
+}
+
+export interface SimTagResourceCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim SNS UntagResource command.
+ */
+export interface SimUntagResourceCommand {
+  readonly input: SimUntagResourceCommandInput;
+}
+
+export interface SimUntagResourceCommandInput {
+  readonly ResourceArn?: string | undefined;
+  readonly TagKeys?: readonly string[] | undefined;
+}
+
+export interface SimUntagResourceCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim SNS ListTagsForResource command.
+ */
+export interface SimListTagsForResourceCommand {
+  readonly input: SimListTagsForResourceCommandInput;
+}
+
+export interface SimListTagsForResourceCommandInput {
+  readonly ResourceArn?: string | undefined;
+}
+
+export interface SimListTagsForResourceCommandOutput {
+  readonly Tags: { Key: string; Value: string }[];
+  readonly $metadata: SimResponseMetadata;
+}

@@ -3,6 +3,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimSqs } from "../../sim-sqs.js";
 import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
+import { simCfnTagRecord } from "../../../cloudformation/template/value/sim-cfn-tag-record.js";
 import { SimCfnSqsQueueProperties } from "./sim-cfn-sqs-queue-properties.js";
 import type { SimCfnResourceCallerOptions } from "../../../cloudformation/resource/caller/sim-cfn-resource-caller-options.js";
 
@@ -40,7 +41,13 @@ export class SimCfnSqsQueueCreator {
     const name = queueProperties.name();
 
     await this.sqs.createQueue(
-      { input: { QueueName: name, Attributes: queueProperties.attributes() } },
+      {
+        input: {
+          QueueName: name,
+          Attributes: queueProperties.attributes(),
+          tags: simCfnTagRecord(properties["Tags"]),
+        },
+      },
       options,
     );
 

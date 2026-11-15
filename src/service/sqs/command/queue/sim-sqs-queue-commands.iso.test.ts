@@ -337,24 +337,6 @@ describe("SQS queue commands", () => {
     assertInstanceOf(error, SimSqsValidationException);
   });
 
-  it("refuses queue tags rather than dropping them", async () => {
-    // Given a simulated AWS.
-    const simAws = new SimAws();
-
-    // When a queue is created with tags.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.sqs().createQueue(
-        new CreateQueueCommand({
-          QueueName: "orders",
-          tags: { Team: "payments" },
-        }),
-      );
-    });
-
-    // Then it is refused, since tags are not simulated.
-    assertInstanceOf(error, SimSqsUnsupportedOperation);
-  });
-
   it("refuses a get with no queue name", async () => {
     // Given a simulated AWS.
     const simAws = new SimAws();

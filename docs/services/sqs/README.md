@@ -452,6 +452,107 @@ on AWS.
 
 `PurgeQueue` deletes everything on a queue, hidden messages included.
 
+## Tagging a queue
+
+`CreateQueue` takes `tags`, and `TagQueue`, `UntagQueue` and `ListQueueTags` change and read them
+afterwards. A tag is a key and a value, both case-sensitive, held as a map of value by key.
+`TagQueue` replaces the value of a key already held. `UntagQueue` passes over a key the queue does
+not hold. `ListQueueTags` answers without `Tags` for a queue holding none.
+
+The rules on the SQS quotas page apply. A key runs from 1 to 128 characters and a value to 256
+(Unicode letters and digits, whitespace and `_ . : / = + - @`), and neither may begin with the
+reserved `aws:` prefix. A request breaking one is `InvalidParameterValue`, and the queue keeps the
+tags it had. The page recommends no more than 50 tags on a queue and sets no limit, so none is
+enforced.
+
+A request on a queue carries its tags to IAM as `aws:ResourceTag/<key>`. `CreateQueue` and
+`TagQueue` carry the tags they set as `aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and
+`UntagQueue` carries the keys it removes as `aws:TagKeys`. Creating a queue with tags needs
+`sqs:TagQueue` as well as `sqs:CreateQueue`, as the API reference says.
+
+```typescript sim-sqs-tags
+/**
+ * Tagging a queue and deciding a send on its tags.
+ */
+
+import {
+  CreateQueueCommand,
+  ListQueueTagsCommand,
+  SendMessageCommand,
+  TagQueueCommand,
+} from "@aws-sdk/client-sqs";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const created = await simAws.sqs().createQueue(
+  new CreateQueueCommand({
+    QueueName: "orders",
+    tags: { team: "orders" },
+  }),
+);
+
+await simAws.sqs().tagQueue(
+  new TagQueueCommand({
+    QueueUrl: created.QueueUrl,
+    Tags: { stage: "test" },
+  }),
+);
+
+const listed = await simAws
+  .sqs()
+  .listQueueTags(new ListQueueTagsCommand({ QueueUrl: created.QueueUrl }));
+
+console.log(listed.Tags); // { team: 'orders', stage: 'test' }
+
+await simAws.iam().createRole({
+  input: {
+    RoleName: "OrdersSender",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "OrdersSender",
+    PolicyName: "SendToOwnTeam",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sqs:SendMessage",
+        Resource: "*",
+        Condition: { StringEquals: { "aws:ResourceTag/team": "orders" } },
+      },
+    }),
+  },
+});
+
+const sent = await simAws
+  .sqs()
+  .sendMessage(
+    new SendMessageCommand({ QueueUrl: created.QueueUrl, MessageBody: "hi" }),
+    {
+      caller: {
+        kind: "arn",
+        arn: "arn:aws:iam::123456789012:role/OrdersSender",
+      },
+    },
+  );
+
+console.log(typeof sent.MessageId); // "string"
+```
+
+A `CreateQueue` for a queue that already exists answers with its URL and leaves its tags as they
+are, whatever tags the request carries.
+
 ## IAM permissions
 
 Every operation is authorized against the queue's ARN, which carries the queue name with no resource
@@ -1229,7 +1330,8 @@ The properties this simulation has no behaviour for are a different case. The qu
 them and each one is recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 A stack full of queues still deploys. Those properties are `RedriveAllowPolicy`, `KmsMasterKeyId`,
-`KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled` and `Tags`. A property outside the `AWS::SQS::Queue`
+`KmsDataKeyReusePeriodSeconds` and `SqsManagedSseEnabled`. `Tags` is simulated, and the queue is
+created with them. A property outside the `AWS::SQS::Queue`
 schema is recorded the same way.
 
 `KmsDataKeyReusePeriodSeconds` is read for one thing before being recorded. Real SQS takes a period
@@ -1275,6 +1377,8 @@ Sim SQS currently supports:
 - `CreateQueueCommand`, idempotent for a matching name and attributes, and `DeleteQueueCommand`
 - `GetQueueUrlCommand` and `ListQueuesCommand`, with a name prefix and paging
 - `GetQueueAttributesCommand`, `SetQueueAttributesCommand` and `PurgeQueueCommand`
+- `TagQueueCommand`, `UntagQueueCommand` and `ListQueueTagsCommand`, along with `tags` on
+  `CreateQueueCommand`
 - `SendMessageCommand` and `SendMessageBatchCommand`, with per-message or per-queue delays
 - FIFO queues, with ordered message groups, five-minute deduplication by id or by content,
   sequence numbers and `ReceiveRequestAttemptId`
@@ -1340,8 +1444,6 @@ Current documented limitations:
   bodies are held in process memory as they were sent. Anything sharing the process can read them.
   The one thing read off them is the range on `KmsDataKeyReusePeriodSeconds`, so a template real
   SQS refuses does not deploy here.
-- Tags are left out. `TagQueue`, `UntagQueue` and `ListQueueTags` are absent, and `CreateQueue`
-  refuses a `tags` parameter rather than dropping it.
 - `SenderId` is left out, because a simulated caller has no user or role id to report it as. Asking
   for it is accepted, as real SQS accepts a request for an attribute a message has no value for, and
   it is absent from the response. `AWSTraceHeader` is kept, from a send's `MessageSystemAttributes`

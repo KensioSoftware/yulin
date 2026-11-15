@@ -12,7 +12,7 @@ import { SimCfnLambdaDeadLetterParser } from "./sim-cfn-lambda-dead-letter-parse
 import { SimCfnLambdaEnvironmentParser } from "./sim-cfn-lambda-environment-parser.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
-import { simCfnLambdaTags } from "./sim-cfn-lambda-tags-parser.js";
+import { simCfnTagRecord } from "../../../cloudformation/template/value/sim-cfn-tag-record.js";
 import { simCfnLambdaGeneratedFunctionName } from "./sim-cfn-lambda-generated-function-name.js";
 
 export interface SimCfnLambdaFunctionProperties {
@@ -121,7 +121,7 @@ export class SimCfnLambdaFunctionPropertiesParser {
         resource,
         properties["DeadLetterConfig"],
       ),
-      tags: simCfnLambdaTags(properties["Tags"]),
+      tags: simCfnTagRecord(properties["Tags"]),
       reservedConcurrentExecutions: this.propertyParser.optionalNumber(
         resource,
         properties["ReservedConcurrentExecutions"],

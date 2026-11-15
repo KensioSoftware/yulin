@@ -1,7 +1,7 @@
 import {
-  assertArrayLength,
-  assertIdentical,
+  assertArrayEmpty,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -94,7 +94,7 @@ describe("AWS::SNS::Topic validation", () => {
     );
   });
 
-  it("records topic tags rather than failing the stack over them", async () => {
+  it("creates the topic with the tags it declares", async () => {
     // Given a tagged topic, as a CDK app tagging its whole app deploys.
     const simAws = new SimAws();
 
@@ -116,14 +116,12 @@ describe("AWS::SNS::Topic validation", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the topic is there, and the tags it lost are recorded against it.
-    assertNonNullable(simAws.sns().findTopic("orders"));
+    // Then the topic holds the tags, and nothing is recorded as skipped.
+    const topic = simAws.sns().findTopic("orders");
 
-    const ignored = stack.getResource("OrdersTopic")?.ignoredProperties ?? [];
-
-    assertArrayLength(ignored, 1);
-    assertIdentical(ignored[0].path, "Tags");
-    assertStringIncludes(ignored[0].reason, "not simulated");
+    assertNonNullable(topic);
+    assertObjectEquals(topic.tags.record(), { team: "orders" });
+    assertArrayEmpty(stack.getResource("OrdersTopic")?.ignoredProperties ?? []);
   });
 
   it("fails a topic asking for delivery status logging", async () => {

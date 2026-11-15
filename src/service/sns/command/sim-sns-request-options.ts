@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIamConditions } from "../../iam/tag/sim-iam-tag-conditions.js";
 
 /**
  * The condition key naming what a simulated service is reaching the topic for,
@@ -48,4 +49,11 @@ export interface SimSnsRequestOptions {
    * Left out the same way when the caller has no value for it.
    */
   readonly sourceAccount?: string;
+
+  /**
+   * What the request says about itself to IAM beyond its caller, such as the
+   * tags a create or tag command sets as `aws:RequestTag/<key>`. The commands
+   * that carry such keys set this themselves.
+   */
+  readonly requestConditions?: SimIamConditions | undefined;
 }

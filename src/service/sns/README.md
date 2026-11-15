@@ -367,9 +367,8 @@ That is why `sim-cfn-sns-topic-property-names.ts` is short. Most AWS::SNS::Topic
 attributes of the same name, so they are handed to `CreateTopic` and SNS decides. Three of them have
 no single attribute behind them, so the CloudFormation layer answers for those. `DataProtectionPolicy`
 is an input of its own on a `CreateTopic` request and `DeliveryStatusLogging` is a list that would
-become fifteen separate attributes, and both are refused. `Tags` is recorded as an ignored property
-instead, since a topic delivers the same messages whether it carries them or not and a CDK app tags
-every topic in it. `AWS::SNS::Subscription` works the same way against `Subscribe`, with only
+become fifteen separate attributes, and both are refused. `Tags` is handed to `CreateTopic` as its
+`Tags` input. `AWS::SNS::Subscription` works the same way against `Subscribe`, with only
 `Region` refused here.
 
 `sim-cfn-sns-resource-error.ts` is where a refusal gets its wording, and the wording is the point.
@@ -481,9 +480,8 @@ here, it does not make another Account's topics reachable through this one.
   `Policy` when one is set. `EffectiveDeliveryPolicy` and `DeliveryPolicy` are left out, since
   delivery retry policies are not simulated. `SubscriptionsPending` is always zero, because no
   protocol simulated needs a confirmation.
-- Tags, data protection policies and encryption are refused rather than ignored, whether by
-  `CreateTopic` or by `SetTopicAttributes`. An `AWS::SNS::Topic` carrying `Tags` is the exception,
-  and records them as an ignored property.
+- Data protection policies and encryption are refused rather than ignored, whether by
+  `CreateTopic` or by `SetTopicAttributes`.
 - `MessageStructure` is refused, because a `json` structure picks a different body per protocol and
   picking one is not simulated.
 - Publishing to a `TargetArn` is refused, since mobile application endpoints are not simulated. A

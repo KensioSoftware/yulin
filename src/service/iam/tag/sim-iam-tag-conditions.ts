@@ -31,6 +31,20 @@ export function simIamRequestTagConditions(
 }
 
 /**
+ * What a request setting tags held as a value by key says about them to IAM,
+ * the shape SQS and Lambda take tags in.
+ */
+export function simIamRequestTagRecordConditions(
+  tags: Readonly<Record<string, string>> | undefined,
+): SimIamConditions {
+  return simIamRequestTagConditions(
+    tags === undefined
+      ? undefined
+      : Object.entries(tags).map(([Key, Value]) => ({ Key, Value })),
+  );
+}
+
+/**
  * What a request removing tags says about them to IAM, which is the keys it
  * removes as `aws:TagKeys`.
  */

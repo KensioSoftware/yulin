@@ -22,6 +22,11 @@ import type {
   SimPurgeQueueCommand,
   SimSetQueueAttributesCommand,
 } from "../command/queue/queue.command.js";
+import type {
+  SimListQueueTagsCommand,
+  SimTagQueueCommand,
+  SimUntagQueueCommand,
+} from "../command/queue/tag.command.js";
 import type { SimSqs } from "../sim-sqs.js";
 
 /**
@@ -85,6 +90,30 @@ export class SimSqsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSqs.purgeQueue(
             command as SimPurgeQueueCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagQueueCommand",
+        async (command, context): Promise<unknown> =>
+          await simSqs.tagQueue(
+            command as SimTagQueueCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagQueueCommand",
+        async (command, context): Promise<unknown> =>
+          await simSqs.untagQueue(
+            command as SimUntagQueueCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListQueueTagsCommand",
+        async (command, context): Promise<unknown> =>
+          await simSqs.listQueueTags(
+            command as SimListQueueTagsCommand,
             simSdkCallerOptions(context),
           ),
       ],

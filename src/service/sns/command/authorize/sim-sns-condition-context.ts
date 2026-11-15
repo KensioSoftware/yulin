@@ -18,6 +18,7 @@ export function simSnsConditionContext(
   options: SimSnsRequestOptions | undefined,
 ): Readonly<Record<string, SimIamConditionValue>> {
   return {
+    ...options?.requestConditions,
     ...(options?.sourceArn !== undefined && {
       [simSnsSourceArnConditionKey]: options.sourceArn,
     }),

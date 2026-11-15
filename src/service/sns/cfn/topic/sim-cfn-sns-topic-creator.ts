@@ -7,6 +7,7 @@ import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import { simCfnSnsResourceCreation } from "../sim-cfn-sns-resource-error.js";
 import { snsTopicResourceType } from "../sim-cfn-sns-resource-types.js";
 import type { SimCfnSnsInlineSubscription } from "./sim-cfn-sns-inline-subscriptions.js";
+import { simCfnSnsTopicTags } from "./sim-cfn-sns-topic-property-names.js";
 import { SimCfnSnsTopicProperties } from "./sim-cfn-sns-topic-properties.js";
 
 interface SimCfnSnsTopicCreatorProperties {
@@ -40,10 +41,10 @@ export class SimCfnSnsTopicCreator {
       resource,
       properties,
     });
-    topicProperties.recordIgnoredProperties();
 
     const name = topicProperties.name();
     const attributes = topicProperties.attributes();
+    const tags = simCfnSnsTopicTags(properties);
     const inline = topicProperties.inlineSubscriptions();
 
     return simCfnSnsResourceCreation(
@@ -51,7 +52,7 @@ export class SimCfnSnsTopicCreator {
       resource.logicalId,
       async () => {
         await this.sns.createTopic(
-          { input: { Name: name, Attributes: attributes } },
+          { input: { Name: name, Attributes: attributes, Tags: tags } },
           options,
         );
 

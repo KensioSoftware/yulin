@@ -105,6 +105,71 @@ Unsupported topic attributes are rejected instead of being stored without effect
 `ContentBasedDeduplication` and delivery status logging attributes such as
 `SQSSuccessFeedbackRoleArn`.
 
+## Tagging a topic
+
+`CreateTopic` takes `Tags`, and `TagResource`, `UntagResource` and `ListTagsForResource` change and
+read them afterwards. A tag is a `Key` and a `Value`, both case-sensitive. `TagResource` replaces the
+value of a key already held, and `UntagResource` passes over a key the topic does not hold.
+
+A key runs from 1 to 128 characters and a value to 256. A request breaking either is
+`InvalidParameter`, and one that would leave a topic holding more than 50 tags is
+`TagLimitExceeded`. Either way the topic keeps the tags it had. The tag commands answer an ARN naming
+no topic with `ResourceNotFound`, where the other topic commands answer `NotFound`.
+
+`CreateTopic` for a topic that already exists answers with its ARN when the request carries no tags,
+or the tags the topic holds. A request carrying other tags is refused with `InvalidParameter`
+(`Topic already exists with different tags`), as AWS refuses one.
+
+A request on a topic carries its tags to IAM as `aws:ResourceTag/<key>`. `CreateTopic` and
+`TagResource` carry the tags they set as `aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and
+`UntagResource` carries the keys it removes as `aws:TagKeys`. Creating a topic with tags needs
+`sns:TagResource` as well as `sns:CreateTopic`, as the API reference says.
+
+```typescript sim-sns-tags
+/**
+ * Tagging a topic and reading its tags back.
+ */
+
+import {
+  CreateTopicCommand,
+  ListTagsForResourceCommand,
+  TagResourceCommand,
+  UntagResourceCommand,
+} from "@aws-sdk/client-sns";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const created = await simAws.sns().createTopic(
+  new CreateTopicCommand({
+    Name: "orders",
+    Tags: [{ Key: "team", Value: "orders" }],
+  }),
+);
+
+await simAws.sns().tagResource(
+  new TagResourceCommand({
+    ResourceArn: created.TopicArn,
+    Tags: [{ Key: "stage", Value: "test" }],
+  }),
+);
+
+await simAws.sns().untagResource(
+  new UntagResourceCommand({
+    ResourceArn: created.TopicArn,
+    TagKeys: ["team"],
+  }),
+);
+
+const listed = await simAws
+  .sns()
+  .listTagsForResource(
+    new ListTagsForResourceCommand({ ResourceArn: created.TopicArn }),
+  );
+
+console.log(listed.Tags); // [ { Key: 'stage', Value: 'test' } ]
+```
+
 ## Publishing
 
 `Publish` takes a `Message`, an optional `Subject`, and message attributes. A message and its
@@ -1746,10 +1811,8 @@ as an invalid resource, which fails the resource where an unsupported one would 
 as the template asked for it would otherwise leave a stack that looks deployed with no publisher
 behind it.
 
-`Tags` is the one difference from `CreateTopic`, which refuses it outright. A template's tags are
-usually the whole stack's (a CDK app calling `Tags.of(app).add(...)` tags every topic in it), and a
-topic delivers the same messages whether it carries them or not. They are recorded as an ignored
-property and the deploy stands. Nothing reads them back either.
+`Tags` is simulated, and the topic is created with them. That is the list a CDK app calling
+`Tags.of(app).add(...)` puts on every topic in it.
 
 CDK works without hand-editing. `topic.addSubscription(new subscriptions.SqsSubscription(queue))`
 synthesises an `AWS::SNS::Subscription` alongside the `AWS::SQS::QueuePolicy` that authorizes the
@@ -1763,6 +1826,8 @@ Simulated SNS supports:
 - `CreateTopicCommand`, idempotent for a name already taken, and `DeleteTopicCommand`
 - `ListTopicsCommand`, paged at a hundred topics with a `NextToken`
 - `GetTopicAttributesCommand` and `SetTopicAttributesCommand`, for `DisplayName` and `Policy`
+- `TagResourceCommand`, `UntagResourceCommand` and `ListTagsForResourceCommand`, along with `Tags` on
+  `CreateTopicCommand`
 - `PublishCommand` and `PublishBatchCommand`, with message attributes, a subject and the 256 KB size
   limit
 - `PublishCommand` to a `PhoneNumber`, recorded as an SMS that `sentSmsMessages()` reads back, with
@@ -1876,9 +1941,6 @@ Simulated SNS supports:
   shorthands for writing one statement of it, are absent.
 - Encryption is left out. `KmsMasterKeyId` is refused, and message bodies are held in process memory
   as they were published. Anything sharing the process can read them.
-- Tags are left out. `TagResource`, `UntagResource` and `ListTagsForResource` are absent, and
-  `CreateTopic` refuses a `Tags` parameter rather than dropping it. An `AWS::SNS::Topic` carrying
-  `Tags` deploys with the tags dropped and the property recorded.
 - Data protection policies are left out. `PutDataProtectionPolicy` and `GetDataProtectionPolicy` are
   absent, and `CreateTopic` refuses a `DataProtectionPolicy` rather than creating a topic that
   redacts nothing.

@@ -25,6 +25,17 @@ export type {
   SimSetQueueAttributesCommandOutput,
 } from "./queue/queue.command.js";
 export type {
+  SimListQueueTagsCommand,
+  SimListQueueTagsCommandInput,
+  SimListQueueTagsCommandOutput,
+  SimTagQueueCommand,
+  SimTagQueueCommandInput,
+  SimTagQueueCommandOutput,
+  SimUntagQueueCommand,
+  SimUntagQueueCommandInput,
+  SimUntagQueueCommandOutput,
+} from "./queue/tag.command.js";
+export type {
   SimSendMessageBatchCommand,
   SimSendMessageBatchCommandInput,
   SimSendMessageBatchCommandOutput,

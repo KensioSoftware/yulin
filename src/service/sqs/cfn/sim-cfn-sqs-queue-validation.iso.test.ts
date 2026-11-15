@@ -158,15 +158,6 @@ describe("SQS CloudFormation Queue validation", () => {
       encryption[0]?.reason ?? "",
       "KmsMasterKeyId is a real AWS::SQS::Queue property",
     );
-
-    const tags = await createdQueueResource({
-      QueueName: "orders",
-      Tags: [{ Key: "component", Value: "orders" }],
-    });
-    assertStringIncludes(
-      tags[0]?.reason ?? "",
-      "Tags is a real AWS::SQS::Queue property",
-    );
   });
 
   it("records a property AWS::SQS::Queue does not have", async () => {

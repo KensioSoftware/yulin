@@ -6,6 +6,7 @@ import type {
   SimSnsTopicAttributes,
 } from "./sim-sns-topic-attributes.js";
 import type { SimSnsTopicName } from "./sim-sns-topic-name.js";
+import { SimSnsTopicTags } from "./sim-sns-topic-tags.js";
 
 /**
  * The attribute naming the topic itself, which is the ARN a request reaches it
@@ -38,6 +39,7 @@ interface SimSnsTopicProperties {
   readonly name: SimSnsTopicName;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly attributes: SimSnsTopicAttributes;
+  readonly tags?: SimSnsTopicTags | undefined;
 }
 
 /**
@@ -59,6 +61,11 @@ export class SimSnsTopic {
    */
   public readonly owner: string;
 
+  /**
+   * The tags this topic holds, which the tag commands read and write.
+   */
+  public readonly tags: SimSnsTopicTags;
+
   private held: SimSnsTopicAttributes;
 
   constructor(properties: SimSnsTopicProperties) {
@@ -68,6 +75,7 @@ export class SimSnsTopic {
       accountRegionScope: properties.accountRegionScope,
     });
     this.owner = properties.accountRegionScope.accountId;
+    this.tags = properties.tags ?? SimSnsTopicTags.fromInput(undefined);
     this.held = properties.attributes;
   }
 

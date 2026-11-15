@@ -105,15 +105,20 @@ describe("A Task state calling a simulated service through the SDK", () => {
       roleArn,
       task: {
         Type: "Task",
-        Resource: "arn:aws:states:::aws-sdk:sqs:listQueueTags",
-        Parameters: { QueueUrl: queueUrl },
+        Resource: "arn:aws:states:::aws-sdk:sqs:addPermission",
+        Parameters: {
+          QueueUrl: queueUrl,
+          Label: "ops",
+          AwsAccountIds: ["123456789012"],
+          Actions: ["SendMessage"],
+        },
         End: true,
       },
     });
 
     // Then the task failed, naming the operation and what SQS does run.
     assertIdentical(described.error, "States.TaskFailed");
-    assertStringIncludes(described.cause ?? "", "listQueueTags");
+    assertStringIncludes(described.cause ?? "", "addPermission");
     assertStringIncludes(described.cause ?? "", "sendMessage");
   });
 });

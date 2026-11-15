@@ -11,6 +11,7 @@ import type {
   SimSqsQueueAttributes,
 } from "./sim-sqs-queue-attributes.js";
 import { SimSqsQueueIntake } from "./sim-sqs-queue-intake.js";
+import { SimSqsQueueTags } from "./sim-sqs-queue-tags.js";
 import { simSqsReportedQueueAttributes } from "./sim-sqs-queue-report.js";
 
 interface SimSqsQueueProperties {
@@ -20,6 +21,7 @@ interface SimSqsQueueProperties {
   readonly createdAt: Date;
   readonly deadLetterTargets: SimSqsDeadLetterTargets;
   readonly activity: SimSqsQueueActivity;
+  readonly tags?: SimSqsQueueTags | undefined;
 }
 
 /**
@@ -40,6 +42,11 @@ export class SimSqsQueue {
   /** How this queue takes in what is sent to it. */
   public readonly intake: SimSqsQueueIntake;
 
+  /**
+   * The tags this queue holds, which the tag commands read and write.
+   */
+  public readonly tags: SimSqsQueueTags;
+
   private readonly messages: SimSqsMessageStore;
   private readonly deadLetterTargets: SimSqsDeadLetterTargets;
   private readonly activity: SimSqsQueueActivity;
@@ -53,6 +60,7 @@ export class SimSqsQueue {
       accountRegionScope: properties.accountRegionScope,
     });
     this.createdAt = properties.createdAt;
+    this.tags = properties.tags ?? SimSqsQueueTags.fromInput(undefined);
     this.messages = new SimSqsMessageStore(properties.name.isFifo);
     this.intake = new SimSqsQueueIntake({
       fifo: properties.name.isFifo,

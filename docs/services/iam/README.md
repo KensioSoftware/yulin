@@ -1037,6 +1037,8 @@ same key is the one evaluated.
 | DynamoDB        | table, with its indexes and streams     |                               |
 | Step Functions  | state machine                           |                               |
 | Secrets Manager | secret                                  | `secretsmanager:ResourceTag/` |
+| SQS             | queue                                   |                               |
+| SNS             | topic                                   |                               |
 | Kinesis         | stream, with its consumers              |                               |
 | ECS             | cluster                                 | `ecs:ResourceTag/`            |
 | ACM             | certificate                             |                               |
@@ -2524,9 +2526,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   as they do on AWS. A served request carries `aws:SourceIp` and none of `aws:SecureTransport`,
   `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`. An ordinary condition on one
   of those fails to match, and `Null` or an `...IfExists` operator treats it as absent
-- SQS, SNS, SSM, CloudWatch Logs, EventBridge and KMS hold no tags on their resources, so a request
-  to them carries no `aws:ResourceTag/` key. S3 supplies bucket tags only once ABAC is enabled on the
-  bucket, which is absent, and reads object tags as `s3:ExistingObjectTag/`. The other services
-  carry `aws:RequestTag/` and `aws:TagKeys` on no create or tag command, where IAM and Lambda do
+- SSM, CloudWatch Logs, EventBridge and KMS hold no tags on their resources, so a request to them
+  carries no `aws:ResourceTag/` key. S3 supplies bucket tags only once ABAC is enabled on the bucket,
+  which is absent, and reads object tags as `s3:ExistingObjectTag/`. Outside IAM, Lambda, SQS and
+  SNS, no create or tag command carries `aws:RequestTag/` or `aws:TagKeys`
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
   instance. A caller whose Account is absent from the simulation is denied

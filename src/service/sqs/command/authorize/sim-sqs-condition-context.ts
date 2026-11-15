@@ -18,6 +18,7 @@ export function simSqsConditionContext(
   options: SimSqsRequestOptions | undefined,
 ): Readonly<Record<string, SimIamConditionValue>> {
   return {
+    ...options?.requestConditions,
     ...(options?.sourceArn !== undefined && {
       [simSqsSourceArnConditionKey]: options.sourceArn,
     }),
