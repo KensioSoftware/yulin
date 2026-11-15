@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimEventBridgeEvent } from "../event/sim-event-bridge-event.js";
 import { SimEventBusArn } from "./sim-event-bus-arn.js";
@@ -21,7 +22,7 @@ interface SimEventBusProperties {
   /**
    * The tags the bus is created with.
    */
-  readonly tags?: Readonly<Record<string, string>> | undefined;
+  readonly tags?: SimAwsTagInput | undefined;
 }
 
 /**

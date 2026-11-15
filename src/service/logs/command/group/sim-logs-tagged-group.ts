@@ -41,7 +41,7 @@ export function simLogsTaggedGroup(
     );
   }
 
-  scope.authorizer.authorizeLogGroup(
+  scope.authorizer.authorizeLogGroupTagging(
     action,
     parsed.logGroupName,
     options?.caller,

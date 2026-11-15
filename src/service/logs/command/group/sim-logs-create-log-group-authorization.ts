@@ -10,6 +10,8 @@ import type { SimLogsAuthorizer } from "../authorize/sim-logs-authorizer.js";
  * `aws:TagKeys`. A request carrying tags needs `logs:TagResource` as well,
  * or the older `logs:TagLogGroup`, which CloudWatch Logs still accepts in its
  * place. Where both are denied, the refusal names `logs:TagResource`.
+ * `logs:TagResource` is authorized against the group's ARN without the
+ * trailing `:*`, and `logs:TagLogGroup` against the ARN with it.
  */
 export function simLogsAuthorizeCreateLogGroup(
   authorizer: SimLogsAuthorizer,
@@ -31,7 +33,7 @@ export function simLogsAuthorizeCreateLogGroup(
   }
 
   try {
-    authorizer.authorizeLogGroup(
+    authorizer.authorizeLogGroupTagging(
       "logs:TagResource",
       logGroupName,
       caller,

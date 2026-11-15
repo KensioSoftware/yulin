@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimSsmParameterVersionNotFound } from "../error/sim-ssm.error.js";
 import { SimSsmParameterArn } from "./sim-ssm-parameter-arn.js";
@@ -18,7 +19,7 @@ interface SimSsmParameterProperties {
   /**
    * The tags the parameter is created with.
    */
-  readonly tags?: Readonly<Record<string, string>> | undefined;
+  readonly tags?: SimAwsTagInput | undefined;
 }
 
 /**

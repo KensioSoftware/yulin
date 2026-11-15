@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../../aws/tag/sim-aws-resource-tags.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimEventBus } from "../../bus/sim-event-bus.js";
@@ -94,7 +95,7 @@ export class SimEventBridgeCreateEventBus {
   private created(
     name: SimEventBusName,
     description: string | undefined,
-    tags: Readonly<Record<string, string>>,
+    tags: SimAwsTagInput,
   ): SimEventBus {
     const bus = new SimEventBus({
       name,

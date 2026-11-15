@@ -3,6 +3,15 @@ const greatestValueLength = 256;
 const reservedPrefix = "aws:";
 
 /**
+ * Tags as a request carries them, either a value by key or a list of key and
+ * value pairs. A list may name one key more than once, and every pair in it
+ * is checked.
+ */
+export type SimAwsTagInput =
+  | Readonly<Record<string, string>>
+  | readonly (readonly [string, string])[];
+
+/**
  * The rules one service applies to the tags its resources hold.
  */
 export interface SimAwsTagRules {
@@ -46,10 +55,11 @@ export class SimAwsResourceTags {
 
   /**
    * Add the tags a request carries, replacing the value of any key already
-   * held. A request carrying a tag the service refuses changes nothing.
+   * held. A request carrying a tag the service refuses changes nothing,
+   * wherever the tag comes in the request.
    */
-  apply(tags: Readonly<Record<string, string>>): void {
-    const entries = Object.entries(tags);
+  apply(tags: SimAwsTagInput): void {
+    const entries = isTagList(tags) ? tags : Object.entries(tags);
 
     for (const [key, value] of entries) {
       this.#assertTag(key, value);
@@ -132,12 +142,19 @@ export class SimAwsResourceTags {
 
 /**
  * Tags held as a list of key and value pairs, the shape most AWS APIs take
- * them in, as a value by key. A later pair for the same key wins.
+ * them in, with a missing key or value read as empty. Every pair is kept, so
+ * a key named twice is checked twice.
  */
 export function simAwsTagPairs(
   tags: readonly (readonly [string | undefined, string | undefined])[],
-): Readonly<Record<string, string>> {
-  return Object.fromEntries(tags.map(([key = "", value = ""]) => [key, value]));
+): readonly (readonly [string, string])[] {
+  return tags.map(([key = "", value = ""]) => [key, value]);
+}
+
+function isTagList(
+  tags: SimAwsTagInput,
+): tags is readonly (readonly [string, string])[] {
+  return Array.isArray(tags);
 }
 
 /**

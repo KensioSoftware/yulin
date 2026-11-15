@@ -1104,7 +1104,9 @@ A request on a log group, or on a stream inside one, carries the group's tags to
 `aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and `UntagResource` carries the keys it
 removes as `aws:TagKeys`. Creating a group with tags needs `logs:TagResource` as well as
 `logs:CreateLogGroup`, or the older `logs:TagLogGroup`, which CloudWatch Logs still accepts in its
-place. The older `TagLogGroup`, `UntagLogGroup` and `ListTagsLogGroup` operations themselves are
+place. `logs:TagResource`, `logs:UntagResource` and `logs:ListTagsForResource` authorize against the
+group's ARN without the trailing `:*`, as the CloudWatch Logs reference says a policy names them.
+Every other log group action authorizes against the ARN with it. The older `TagLogGroup`, `UntagLogGroup` and `ListTagsLogGroup` operations themselves are
 absent.
 
 ```typescript sim-logs-tags

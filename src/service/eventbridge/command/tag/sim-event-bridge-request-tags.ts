@@ -1,4 +1,7 @@
-import { simAwsTagPairs } from "../../../aws/tag/sim-aws-resource-tags.js";
+import {
+  type SimAwsTagInput,
+  simAwsTagPairs,
+} from "../../../aws/tag/sim-aws-resource-tags.js";
 import { simIamRequestTagRecordConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimEventBridgeTag } from "../bus/bus.command.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
@@ -7,7 +10,7 @@ import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-o
  * The tags a request sets, and its options carrying them to IAM.
  */
 export interface SimEventBridgeRequestTags {
-  readonly tags: Readonly<Record<string, string>>;
+  readonly tags: SimAwsTagInput;
 
   /**
    * The actions the request is authorized for. Creating a rule or bus with
@@ -40,12 +43,12 @@ export function simEventBridgeRequestTags(
   return {
     tags,
     actions:
-      creating && Object.keys(tags).length > 0
-        ? [action, "events:TagResource"]
-        : [action],
+      creating && tags.length > 0 ? [action, "events:TagResource"] : [action],
     options: {
       ...options,
-      requestConditions: simIamRequestTagRecordConditions(tags),
+      requestConditions: simIamRequestTagRecordConditions(
+        Object.fromEntries(tags),
+      ),
     },
   };
 }

@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimSchedule } from "../../../util/schedule/sim-schedule.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimEventBusName } from "../bus/sim-event-bus-name.js";
@@ -20,7 +21,7 @@ interface SimEventRuleProperties {
   /**
    * The tags the rule is created with.
    */
-  readonly tags?: Readonly<Record<string, string>> | undefined;
+  readonly tags?: SimAwsTagInput | undefined;
 }
 
 /**

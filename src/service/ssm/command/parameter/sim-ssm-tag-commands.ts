@@ -50,7 +50,7 @@ export class SimSsmTagCommands {
       "ssm:AddTagsToResource",
       command.input,
       options?.caller,
-      simIamRequestTagRecordConditions(tags),
+      simIamRequestTagRecordConditions(Object.fromEntries(tags)),
     ).tags.apply(tags);
 
     return { $metadata: {} };

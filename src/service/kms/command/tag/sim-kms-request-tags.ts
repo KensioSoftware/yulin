@@ -1,4 +1,7 @@
-import { simAwsTagPairs } from "../../../aws/tag/sim-aws-resource-tags.js";
+import {
+  type SimAwsTagInput,
+  simAwsTagPairs,
+} from "../../../aws/tag/sim-aws-resource-tags.js";
 import { simIamRequestTagRecordConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimKmsTag } from "../../key/sim-kms-key-tags.js";
 import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
@@ -7,7 +10,7 @@ import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
  * The tags a request sets, and its options carrying them to IAM.
  */
 export interface SimKmsRequestTags {
-  readonly tags: Readonly<Record<string, string>>;
+  readonly tags: SimAwsTagInput;
 
   /**
    * Whether the request sets any tag at all. Creating a key with tags needs
@@ -35,10 +38,12 @@ export function simKmsRequestTags(
 
   return {
     tags,
-    tagged: Object.keys(tags).length > 0,
+    tagged: tags.length > 0,
     options: {
       ...options,
-      requestConditions: simIamRequestTagRecordConditions(tags),
+      requestConditions: simIamRequestTagRecordConditions(
+        Object.fromEntries(tags),
+      ),
     },
   };
 }

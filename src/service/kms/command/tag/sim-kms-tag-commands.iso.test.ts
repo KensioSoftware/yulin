@@ -112,6 +112,30 @@ describe("sim KMS key tags", () => {
     assertArrayEquals(await tagsOf(simAws, KeyId), ["team=orders"]);
   });
 
+  it("checks every pair a request lists, including a key named twice", async () => {
+    // Given a key
+    const simAws = new SimAws();
+    const KeyId = await teamKey(simAws, "orders");
+
+    // When a request sets one key to an overlong value and then to a short
+    // one
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().tagResource(
+        new TagResourceCommand({
+          KeyId,
+          Tags: [
+            { TagKey: "stage", TagValue: "x".repeat(257) },
+            { TagKey: "stage", TagValue: "ok" },
+          ],
+        }),
+      ),
+    );
+
+    // Then the overlong value is refused, and the key keeps its tags
+    assertInstanceOf(error, SimKmsTagException);
+    assertArrayEquals(await tagsOf(simAws, KeyId), ["team=orders"]);
+  });
+
   it("refuses an alias, and a key pending deletion", async () => {
     // Given a key with an alias, and another pending deletion
     const simAws = new SimAws();

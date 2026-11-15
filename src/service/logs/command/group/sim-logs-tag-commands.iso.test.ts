@@ -205,6 +205,36 @@ describe("sim CloudWatch Logs log group tags", () => {
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
+  it("authorizes the tag commands against the ARN without the trailing wildcard", async () => {
+    // Given a tagged log group, a caller allowed the tag commands on its ARN
+    // without the trailing :*, and one allowed them on the ARN with it
+    const simAws = new SimAws();
+    const resourceArn = await teamGroup(simAws, "orders");
+    const actions = ["logs:TagResource", "logs:ListTagsForResource"];
+    const plain = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Plain", actions, resource: resourceArn },
+      simAws,
+    );
+    const wildcard = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Wildcard", actions, resource: `${resourceArn}:*` },
+      simAws,
+    );
+    const tag = async (arn: string): Promise<unknown> =>
+      simAws
+        .logs()
+        .tagResource(
+          new TagResourceCommand({ resourceArn, tags: { cost: "42" } }),
+          { caller: { kind: "arn", arn } },
+        );
+
+    // When each tags the group
+    await tag(plain.Arn);
+    const error = await assertThrowsErrorAsync(async () => tag(wildcard.Arn));
+
+    // Then only the caller allowed on the plain ARN may
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
   it("gives IAM the keys TagResource and UntagResource name", async () => {
     // Given a tagged log group, and a caller allowed to tag and untag only
     // the cost key

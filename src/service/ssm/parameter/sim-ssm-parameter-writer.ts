@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -31,7 +32,7 @@ export interface SimSsmParameterWrite {
    * The tags a new parameter is created with. PutParameter refuses tags on
    * an overwrite, so an existing parameter never meets them.
    */
-  readonly tags: Readonly<Record<string, string>>;
+  readonly tags: SimAwsTagInput;
 
   /**
    * The key the request asked to encrypt with, in any form KMS accepts: an

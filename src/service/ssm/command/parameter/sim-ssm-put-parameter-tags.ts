@@ -1,6 +1,9 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import { simAwsTagPairs } from "../../../aws/tag/sim-aws-resource-tags.js";
+import {
+  type SimAwsTagInput,
+  simAwsTagPairs,
+} from "../../../aws/tag/sim-aws-resource-tags.js";
 import { simIamRequestTagRecordConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { SimSsmValidationException } from "../../error/sim-ssm.error.js";
 import type { SimSsmAuthorizer } from "../authorize/sim-ssm-authorizer.js";
@@ -11,7 +14,7 @@ import type { SimPutParameterCommandInput } from "./parameter.command.js";
  */
 interface SimSsmAuthorizedPut {
   readonly caller: SimAwsResolvedCaller;
-  readonly tags: Readonly<Record<string, string>>;
+  readonly tags: SimAwsTagInput;
 }
 
 /**
@@ -32,7 +35,7 @@ export function simSsmAuthorizePutParameter(
   const tags = simAwsTagPairs(
     (input.Tags ?? []).map((tag) => [tag.Key, tag.Value]),
   );
-  const tagged = Object.keys(tags).length > 0;
+  const tagged = tags.length > 0;
 
   if (tagged && input.Overwrite === true) {
     throw new SimSsmValidationException(
@@ -43,7 +46,7 @@ export function simSsmAuthorizePutParameter(
     );
   }
 
-  const conditions = simIamRequestTagRecordConditions(tags);
+  const conditions = simIamRequestTagRecordConditions(Object.fromEntries(tags));
 
   const resolved = authorizer.authorizeParameterResource(
     "ssm:PutParameter",

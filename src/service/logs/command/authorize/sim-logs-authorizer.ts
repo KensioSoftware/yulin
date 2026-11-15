@@ -6,6 +6,7 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import {
   simLogsAnyLogGroupArn,
+  simLogsLogGroupArn,
   simLogsLogGroupWildcardArn,
 } from "../../group/sim-logs-arn.js";
 
@@ -51,6 +52,27 @@ export class SimLogsAuthorizer {
     return this.authorizeResource(
       action,
       simLogsLogGroupWildcardArn(this.#accountRegionScope, logGroupName),
+      caller,
+      conditions,
+    );
+  }
+
+  /**
+   * Ensure the caller may tag a log group, untag it or list its tags.
+   *
+   * These three actions authorize against the group's ARN without the
+   * trailing `:*`, which is the form the CloudWatch Logs reference says a
+   * policy names for them.
+   */
+  authorizeLogGroupTagging(
+    action: string,
+    logGroupName: string,
+    caller: SimAwsCaller | undefined,
+    conditions: SimIamConditions,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(
+      action,
+      simLogsLogGroupArn(this.#accountRegionScope, logGroupName),
       caller,
       conditions,
     );
