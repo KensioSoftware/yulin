@@ -51,3 +51,14 @@ export type {
   SimVerifyCommand,
   SimVerifyCommandOutput,
 } from "./sign/sign.command.js";
+export type {
+  SimKmsTagResourceCommand,
+  SimKmsTagResourceCommandInput,
+  SimKmsTagResourceCommandOutput,
+  SimKmsUntagResourceCommand,
+  SimKmsUntagResourceCommandInput,
+  SimKmsUntagResourceCommandOutput,
+  SimListResourceTagsCommand,
+  SimListResourceTagsCommandInput,
+  SimListResourceTagsCommandOutput,
+} from "./tag/tag.command.js";

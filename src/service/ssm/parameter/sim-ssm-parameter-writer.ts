@@ -1,3 +1,4 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -26,6 +27,12 @@ export interface SimSsmParameterWrite {
   readonly description: string | undefined;
   readonly dataType: string | undefined;
   readonly lastModifiedUser: string | undefined;
+
+  /**
+   * The tags a new parameter is created with. PutParameter refuses tags on
+   * an overwrite, so an existing parameter never meets them.
+   */
+  readonly tags: SimAwsTagInput;
 
   /**
    * The key the request asked to encrypt with, in any form KMS accepts: an
@@ -87,7 +94,7 @@ export class SimSsmParameterWriter {
       request.keyId,
       request.caller,
     );
-    const parameter = existing ?? this.created(request.name, type);
+    const parameter = existing ?? this.created(request, type);
 
     return parameter.addVersion(stored.value, this.clock.now(), {
       description: request.description,
@@ -111,13 +118,14 @@ export class SimSsmParameterWriter {
   }
 
   private created(
-    name: SimSsmParameterName,
+    request: SimSsmParameterWrite,
     type: SimSsmParameterType,
   ): SimSsmParameter {
     const parameter = new SimSsmParameter({
-      name,
+      name: request.name,
       type,
       accountRegionScope: this.accountRegionScope,
+      tags: request.tags,
     });
 
     this.parameters.add(parameter);

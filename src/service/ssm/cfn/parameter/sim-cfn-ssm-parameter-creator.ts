@@ -45,8 +45,6 @@ export class SimCfnSsmParameterCreator {
     });
     const name = parameterProperties.name();
 
-    parameterProperties.recordIgnoredTags();
-
     await this.ssm.putParameter(
       {
         input: {
@@ -58,6 +56,7 @@ export class SimCfnSsmParameterCreator {
           AllowedPattern: parameterProperties.allowedPattern(),
           DataType: parameterProperties.dataType(),
           Policies: parameterProperties.policies(),
+          Tags: parameterProperties.tags(),
         },
       },
       options,

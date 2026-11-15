@@ -22,6 +22,8 @@ import { SimEventBridgeRuleCommands } from "./rule/sim-event-bridge-rule-command
 import { SimEventBridgeTestEventPattern } from "./rule/sim-event-bridge-test-event-pattern.js";
 import { SimEventBridgeDescribeEventSource } from "./source/sim-event-bridge-describe-event-source.js";
 import { SimEventBridgePutPartnerEvents } from "./source/sim-event-bridge-put-partner-events.js";
+import { simEventBridgeTagConditionIam } from "./tag/sim-event-bridge-resource-tags.js";
+import { SimEventBridgeTagCommands } from "./tag/sim-event-bridge-tag-commands.js";
 import { SimEventBridgePutTargets } from "./target/sim-event-bridge-put-targets.js";
 import { SimEventBridgeTargetCommands } from "./target/sim-event-bridge-target-commands.js";
 
@@ -58,6 +60,7 @@ export class SimEventBridgeCommands {
   public readonly targets: SimEventBridgeTargetCommands;
   public readonly router: SimEventBridgeRouter;
   public readonly schedules: SimEventBridgeRuleSchedules;
+  public readonly tags: SimEventBridgeTagCommands;
 
   constructor(properties: SimEventBridgeCommandsProperties) {
     const {
@@ -68,7 +71,9 @@ export class SimEventBridgeCommands {
       accountRegionScope,
       background,
     } = properties;
-    const authorizer = new SimEventBridgeAuthorizer({ iam: properties.iam });
+    const authorizer = new SimEventBridgeAuthorizer({
+      iam: simEventBridgeTagConditionIam(properties.iam, buses, rules),
+    });
     const access = new SimEventBridgeBusAccess({
       buses,
       authorizer,
@@ -140,6 +145,7 @@ export class SimEventBridgeCommands {
       access: ruleAccess,
     });
     this.patternTest = new SimEventBridgeTestEventPattern({ authorizer });
+    this.tags = new SimEventBridgeTagCommands({ buses, rules, authorizer });
     this.targetCreation = new SimEventBridgePutTargets({
       targets,
       access: ruleAccess,

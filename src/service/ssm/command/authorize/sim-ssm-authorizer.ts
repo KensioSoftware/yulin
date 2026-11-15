@@ -3,6 +3,7 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { ssmParameterArnPrefix } from "../../parameter/sim-ssm-parameter-arn.js";
 
 /**
@@ -45,16 +46,20 @@ export class SimSsmAuthorizer {
    * service handles it, so a caller with no permission is refused whether or
    * not the parameter is there, and PutParameter authorizes against the ARN
    * the parameter is about to have.
+   *
+   * A request setting or removing tags names them in its conditions.
    */
   authorizeParameterResource(
     action: string,
     resource: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
     return this.authorizeResource(
       action,
       ssmParameterArnPrefix(this.accountRegionScope) + resource,
       caller,
+      conditions,
     );
   }
 
@@ -82,8 +87,14 @@ export class SimSsmAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
+    conditionContext?: SimIamConditions,
   ): SimAwsResolvedCaller {
-    const decision = this.iam.authorize({ action, resource, caller });
+    const decision = this.iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext,
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({

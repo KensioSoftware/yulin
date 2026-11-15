@@ -95,8 +95,8 @@ separate because `GetLogEvents` pages in both directions and answers with two to
 either end gives the same token back rather than nothing, which is how a caller polling a stream
 knows to keep it and ask again.
 
-`refuseUnsimulatedLogGroupInput` refuses tags, `kmsKeyId` and a non-standard log group class rather
-than dropping them, following the same rule as the rest of the simulator: something accepted and
+`refuseUnsimulatedLogGroupInput` refuses `kmsKeyId` and a non-standard log group class rather than
+dropping them, following the same rule as the rest of the simulator: something accepted and
 ignored here would be applied in an account.
 
 ## CloudFormation
@@ -214,8 +214,10 @@ shares.
 
 ## What is not simulated
 
-Nothing expires, as above. Logs Insights queries, export tasks, tagging, encryption and data
-protection policies are all absent. A stream's `storedBytes` is always zero too, which matches
+Nothing expires, as above. Logs Insights queries, export tasks, encryption and data protection
+policies are all absent. Log groups hold tags, through the shared `SimAwsResourceTags`, and
+`simLogsTagConditionIam` gives a group's tags to a request naming the group or a stream in it.
+Nothing else here holds tags. A stream's `storedBytes` is always zero too, which matches
 real CloudWatch Logs: it stopped reporting the figure per stream in 2019.
 
 Metric filters are here, in `metric/`, and publish into the simulated CloudWatch of the log

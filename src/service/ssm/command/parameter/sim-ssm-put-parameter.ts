@@ -8,6 +8,7 @@ import type {
   SimPutParameterCommandOutput,
 } from "./parameter.command.js";
 import { standardTier } from "./sim-ssm-parameter-view.js";
+import { simSsmAuthorizePutParameter } from "./sim-ssm-put-parameter-tags.js";
 import { SimSsmUnsimulatedPutOptions } from "./sim-ssm-unsimulated-put-options.js";
 
 interface SimSsmPutParameterProperties {
@@ -55,8 +56,9 @@ export class SimSsmPutParameter {
       name: input.Name,
       accountRegionScope: this.accountRegionScope,
     });
-    const caller = this.authorizer.authorizeParameterResource(
-      "ssm:PutParameter",
+    const { caller, tags } = simSsmAuthorizePutParameter(
+      this.authorizer,
+      input,
       name.resource,
       options?.caller,
     );
@@ -70,6 +72,7 @@ export class SimSsmPutParameter {
       dataType: input.DataType,
       keyId: input.KeyId,
       lastModifiedUser: caller.arn,
+      tags,
       caller: options?.caller,
     });
 

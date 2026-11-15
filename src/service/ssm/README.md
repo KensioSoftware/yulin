@@ -148,8 +148,11 @@ There is no resource policy support, so cross-account access to a parameter cann
 - Parameter labels are refused rather than looked up. `LabelParameterVersion` is not implemented, so
   nothing could create one, and a label selector says that instead of reporting the parameter as
   missing.
-- The advanced tier, parameter policies, tags, `AllowedPattern`, `KeyId` and non-text data types are
+- The advanced tier, parameter policies, `AllowedPattern`, `KeyId` and non-text data types are
   refused rather than ignored.
+- Tags live on the parameter, through the shared `SimAwsResourceTags`.
+  `simSsmTagConditionIam` gives them to IAM as `aws:ResourceTag/` and `ssm:ResourceTag/`, and
+  `simSsmAuthorizePutParameter` asks for `ssm:AddTagsToResource` when `PutParameter` carries any.
 - `GetParametersByPath` and `DescribeParameters` refuse filters rather than ignoring them.
 - Every version is kept. Real Parameter Store keeps the hundred most recent and deletes the oldest
   as new ones are made.

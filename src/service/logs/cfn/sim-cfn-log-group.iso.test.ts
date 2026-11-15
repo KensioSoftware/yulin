@@ -270,7 +270,7 @@ describe("AWS::Logs::LogGroup", () => {
     const { stack } = await deployLogGroup({
       LogGroupName: logGroupName,
       KmsKeyId: "alias/logs",
-      Tags: [{ Key: "team", Value: "platform" }],
+      FieldIndexPolicies: [],
     });
 
     // Then the group is deployed and a reader can see what it is not doing,
@@ -283,7 +283,7 @@ describe("AWS::Logs::LogGroup", () => {
       resource.ignoredProperties
         .map((ignored) => ignored.path)
         .toSorted((left, right) => left.localeCompare(right)),
-      ["KmsKeyId", "Tags"],
+      ["FieldIndexPolicies", "KmsKeyId"],
     );
   });
 

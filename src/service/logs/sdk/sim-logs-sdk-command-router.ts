@@ -45,6 +45,7 @@ import type {
   SimPutSubscriptionFilterCommand,
 } from "../command/subscription/subscription.command.js";
 import type { SimLogs } from "../sim-logs.js";
+import { simLogsSdkTagRoutes } from "./sim-logs-sdk-tag-routes.js";
 
 /**
  * Routes intercepted SDK Commands to one scoped simulated CloudWatch Logs.
@@ -150,6 +151,7 @@ export class SimLogsSdkCommandRouter implements SimSdkCommandRouter {
             simSdkCallerOptions(context),
           ),
       ],
+      ...simLogsSdkTagRoutes(simLogs),
       [
         "PutMetricFilterCommand",
         async (command, context): Promise<unknown> =>

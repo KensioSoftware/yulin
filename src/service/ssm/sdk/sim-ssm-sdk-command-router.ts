@@ -14,6 +14,11 @@ import type {
   SimGetParametersByPathCommand,
   SimGetParametersCommand,
 } from "../command/parameter/query.command.js";
+import type {
+  SimAddTagsToResourceCommand,
+  SimRemoveTagsFromResourceCommand,
+  SimSsmListTagsForResourceCommand,
+} from "../command/parameter/tag.command.js";
 import type { SimSsm } from "../sim-ssm.js";
 
 /**
@@ -77,6 +82,30 @@ export class SimSsmSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSsm.describeParameters(
             command as SimDescribeParametersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AddTagsToResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSsm.addTagsToResource(
+            command as SimAddTagsToResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "RemoveTagsFromResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSsm.removeTagsFromResource(
+            command as SimRemoveTagsFromResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTagsForResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simSsm.listTagsForResource(
+            command as SimSsmListTagsForResourceCommand,
             simSdkCallerOptions(context),
           ),
       ],

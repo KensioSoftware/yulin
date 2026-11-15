@@ -24,7 +24,9 @@ interface SimCfnLogGroupCreatorProperties {
  *
  * The commands are still the ones an SDK caller would have used. The
  * deployment's caller is authorized for `logs:CreateLogGroup` and
- * `logs:PutRetentionPolicy`, as it is on a real deploy. A group that is
+ * `logs:PutRetentionPolicy`, and `logs:TagResource` for a template declaring
+ * tags, as it is on a real deploy. A group that was already there is given
+ * the template's tags through `TagResource`. A group that is
  * already there changes what happens after that decision (the refusal is
  * caught) and never whether one is made.
  */
@@ -52,7 +54,7 @@ export class SimCfnLogGroupCreator {
 
     logGroupProperties.recordIgnoredProperties();
 
-    await this.#createOrAdopt(logGroupName, options);
+    await this.#createOrAdopt(logGroupName, logGroupProperties.tags(), options);
 
     if (retentionInDays !== undefined) {
       await this.#logs.putRetentionPolicy(
@@ -94,14 +96,41 @@ export class SimCfnLogGroupCreator {
    */
   async #createOrAdopt(
     logGroupName: string,
+    tags: Record<string, string> | undefined,
     options: SimCfnResourceCallerOptions,
   ): Promise<void> {
     try {
-      await this.#logs.createLogGroup({ input: { logGroupName } }, options);
+      await this.#logs.createLogGroup(
+        { input: { logGroupName, tags } },
+        options,
+      );
     } catch (error) {
       if (!(error instanceof SimLogsResourceAlreadyExistsException)) {
         throw error;
       }
+
+      await this.#adoptTags(logGroupName, tags, options);
     }
+  }
+
+  /**
+   * Put a template's tags on a group that was already there, through
+   * `TagResource` as the deployment's caller.
+   */
+  async #adoptTags(
+    logGroupName: string,
+    tags: Record<string, string> | undefined,
+    options: SimCfnResourceCallerOptions,
+  ): Promise<void> {
+    const group = this.#logs.findLogGroup(logGroupName);
+
+    if (group === undefined || Object.keys(tags ?? {}).length === 0) {
+      return;
+    }
+
+    await this.#logs.tagResource(
+      { input: { resourceArn: group.logGroupArn, tags } },
+      options,
+    );
   }
 }

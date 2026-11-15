@@ -1,7 +1,9 @@
+import type { SimAwsTagInput } from "../../aws/tag/sim-aws-resource-tags.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimEventBridgeEvent } from "../event/sim-event-bridge-event.js";
 import { SimEventBusArn } from "./sim-event-bus-arn.js";
 import { SimEventBusName } from "./sim-event-bus-name.js";
+import { simEventBridgeTags } from "../rule/sim-event-bridge-tags.js";
 
 /**
  * One event a bus took, and the rules on that bus it matched.
@@ -16,6 +18,11 @@ interface SimEventBusProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly createdAt: Date;
   readonly description?: string | undefined;
+
+  /**
+   * The tags the bus is created with.
+   */
+  readonly tags?: SimAwsTagInput | undefined;
 }
 
 /**
@@ -32,6 +39,7 @@ export class SimEventBus {
   public readonly arn: SimEventBusArn;
   public readonly creationTime: Date;
   public readonly description: string | undefined;
+  public readonly tags = simEventBridgeTags();
 
   private readonly received: SimEventBusReceipt[] = [];
 
@@ -43,6 +51,7 @@ export class SimEventBus {
     });
     this.creationTime = properties.createdAt;
     this.description = properties.description;
+    this.tags.apply(properties.tags ?? {});
   }
 
   /**

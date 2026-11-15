@@ -2,6 +2,7 @@ import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import type { SimKmsKeyFactory } from "../../key/sim-kms-key-factory.js";
 import { SimKmsPolicyDocument } from "../../key/sim-kms-policy-document.js";
 import { SimKmsKeyType } from "./sim-kms-key-type.js";
+import { simKmsRequestTags } from "../tag/sim-kms-request-tags.js";
 import type { SimKmsKeyMetadataView } from "../../key/sim-kms-key-metadata.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
 import type { SimKmsAuthorizer } from "../authorize/sim-kms-authorizer.js";
@@ -42,7 +43,8 @@ export class SimKmsKeyCommands {
    *
    * There is no key to hold a policy yet, so this authorizes against the
    * Region's keys rather than a key policy. Real KMS gives kms:CreateKey no
-   * resource-level permissions for the same reason.
+   * resource-level permissions for the same reason. A request carrying tags
+   * needs `kms:TagResource` as well.
    */
   create(
     command: SimCreateKeyCommand,
@@ -53,7 +55,13 @@ export class SimKmsKeyCommands {
       command.input.KeySpec,
       command.input.Origin,
     );
-    this.authorizer.authorizeAccount("kms:CreateKey", options);
+    const request = simKmsRequestTags(command.input.Tags, options);
+
+    this.authorizer.authorizeAccount("kms:CreateKey", request.options);
+
+    if (request.tagged) {
+      this.authorizer.authorizeAccount("kms:TagResource", request.options);
+    }
 
     const key = this.keyFactory.make({
       description: command.input.Description,
@@ -61,6 +69,7 @@ export class SimKmsKeyCommands {
       keySpec,
     });
 
+    key.tags.apply(request.tags);
     this.keys.add(key);
 
     return { $metadata: {}, KeyMetadata: this.metadata.describe(key) };

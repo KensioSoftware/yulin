@@ -15,9 +15,11 @@ import { SimKmsKeyLifecycleCommands } from "./command/key/sim-kms-key-lifecycle-
 import { SimKmsKeyPolicyCommands } from "./command/key/sim-kms-key-policy-commands.js";
 import { SimKmsListKeys } from "./command/key/sim-kms-list-keys.js";
 import { SimKmsSignCommands } from "./command/sign/sim-kms-sign-commands.js";
+import { SimKmsTagCommands } from "./command/tag/sim-kms-tag-commands.js";
 import { SimKmsKeyFactory } from "./key/sim-kms-key-factory.js";
 import { SimKmsKeyMetadataView } from "./key/sim-kms-key-metadata.js";
 import { SimKmsKeyStore } from "./key/sim-kms-key-store.js";
+import { simKmsTagConditionIam } from "./key/sim-kms-resource-tags.js";
 
 /**
  * How one simulated KMS is put together.
@@ -46,6 +48,7 @@ export class SimKmsCommands {
   public readonly crypto: SimKmsCryptoCommands;
   public readonly signing: SimKmsSignCommands;
   public readonly generateDataKey: SimKmsGenerateDataKey;
+  public readonly tags: SimKmsTagCommands;
   public readonly background: BackgroundScheduler;
 
   constructor(properties: SimKmsProperties = {}) {
@@ -60,10 +63,14 @@ export class SimKmsCommands {
       accountRegionScope,
       clock: background,
     });
-    const authorizer = new SimKmsAuthorizer({ iam, accountRegionScope });
+    this.keys = new SimKmsKeyStore({ accountRegionScope, keyFactory });
+
+    const authorizer = new SimKmsAuthorizer({
+      iam: simKmsTagConditionIam(iam, this.keys),
+      accountRegionScope,
+    });
 
     this.background = background;
-    this.keys = new SimKmsKeyStore({ accountRegionScope, keyFactory });
     this.key = new SimKmsKeyCommands({
       keys: this.keys,
       keyFactory,
@@ -87,5 +94,6 @@ export class SimKmsCommands {
       keys: this.keys,
       authorizer,
     });
+    this.tags = new SimKmsTagCommands({ keys: this.keys, authorizer });
   }
 }

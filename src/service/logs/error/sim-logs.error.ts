@@ -124,3 +124,17 @@ export class SimLogsConflictException extends SimLogsError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated CloudWatch Logs TooManyTagsException error.
+ *
+ * A log group holds at most 50 tags, and a request that would leave it
+ * holding more fails this way.
+ */
+export class SimLogsTooManyTagsException extends SimLogsError {
+  public override readonly name = "TooManyTagsException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

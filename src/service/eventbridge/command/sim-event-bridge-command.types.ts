@@ -73,3 +73,14 @@ export type {
   SimPutPartnerEventsRequestEntry,
   SimPutPartnerEventsResultEntry,
 } from "./source/source.command.js";
+export type {
+  SimEventBridgeListTagsForResourceCommand,
+  SimEventBridgeListTagsForResourceCommandInput,
+  SimEventBridgeListTagsForResourceCommandOutput,
+  SimEventBridgeTagResourceCommand,
+  SimEventBridgeTagResourceCommandInput,
+  SimEventBridgeTagResourceCommandOutput,
+  SimEventBridgeUntagResourceCommand,
+  SimEventBridgeUntagResourceCommandInput,
+  SimEventBridgeUntagResourceCommandOutput,
+} from "./tag/tag.command.js";

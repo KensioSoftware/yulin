@@ -118,39 +118,25 @@ export class SimCfnSsmParameterProperties {
   }
 
   /**
-   * Record the tags the parameter is written without.
-   *
-   * `Tags` is the one difference from `PutParameter`, which refuses it
-   * outright. A template's tags are usually the whole stack's, and a CDK app
-   * calling `Tags.of(app).add(...)` tags every parameter in it. The parameter
-   * holds the same value either way, so the deploy stands and the omission is
-   * recorded.
-   *
-   * The shape is still read, because CloudFormation carries these as a map of
-   * names to values for this Resource type and a template AWS refuses should
-   * not deploy here.
+   * The parameter Tags, which this Resource type carries as a map of names
+   * to values. A CDK app calling `Tags.of(app).add(...)` tags every parameter
+   * in it.
    */
-  recordIgnoredTags(): void {
+  tags(): { Key: string; Value: string }[] | undefined {
     const tags = this.properties["Tags"];
 
     if (tags === undefined) {
-      return;
+      return undefined;
     }
 
     if (typeof tags !== "object" || tags === null || Array.isArray(tags)) {
       throw this.propertyError("Tags must be an object");
     }
 
-    for (const [key, value] of Object.entries(tags)) {
-      this.stringValue(value, `Tags.${key}`);
-    }
-
-    this.resource.ignoreProperty(
-      "Tags",
-      "AWS::SSM::Parameter property Tags is not simulated, so the parameter " +
-        "is written without them. Nothing reads them back and no " +
-        "aws:ResourceTag condition key matches them.",
-    );
+    return Object.entries(tags).map(([Key, value]) => ({
+      Key,
+      Value: this.stringValue(value, `Tags.${Key}`),
+    }));
   }
 
   private string(

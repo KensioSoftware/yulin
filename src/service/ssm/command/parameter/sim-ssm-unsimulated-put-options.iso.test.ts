@@ -99,15 +99,4 @@ describe("SSM PutParameter options that are not simulated", () => {
     assertInstanceOf(error, SimSsmValidationException);
     assertStringIncludes(error.message, "Policies");
   });
-
-  it("refuses tags", async () => {
-    // When a request tags the parameter.
-    const error = await refusedOption({
-      Tags: [{ Key: "Environment", Value: "prod" }],
-    });
-
-    // Then it is refused.
-    assertInstanceOf(error, SimSsmValidationException);
-    assertStringIncludes(error.message, "Tags");
-  });
 });

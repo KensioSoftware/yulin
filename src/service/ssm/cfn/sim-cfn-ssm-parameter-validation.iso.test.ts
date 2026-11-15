@@ -1,8 +1,10 @@
 import {
+  assertArrayEmpty,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsError,
   assertTrue,
@@ -171,7 +173,7 @@ describe("SSM CloudFormation Parameter validation", () => {
     );
   });
 
-  it("records parameter tags rather than failing the stack over them", async () => {
+  it("creates a parameter with the tags the template declares", async () => {
     // Given a tagged parameter, as a CDK app tagging its whole app deploys.
     const simAws = new SimAws();
 
@@ -195,18 +197,12 @@ describe("SSM CloudFormation Parameter validation", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the parameter holds its value, and the tags it lost are recorded.
-    assertIdentical(
-      simAws.ssm().findParameter("/myapp/prod/db-host")?.currentVersion.value
-        .value,
-      "db.internal",
+    // Then the parameter holds its tags, and nothing is recorded as skipped.
+    assertObjectEquals(
+      simAws.ssm().findParameter("/myapp/prod/db-host")?.tags.record() ?? {},
+      { component: "database" },
     );
-
-    const ignored = stack.getResource("DbHost")?.ignoredProperties ?? [];
-
-    assertArrayLength(ignored, 1);
-    assertIdentical(ignored[0].path, "Tags");
-    assertStringIncludes(ignored[0].reason, "not simulated");
+    assertArrayEmpty(stack.getResource("DbHost")?.ignoredProperties ?? []);
   });
 
   it("refuses a name another stack already used", async () => {

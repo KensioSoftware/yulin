@@ -467,6 +467,107 @@ const managed = await kms.describeKey(
 console.log(managed.KeyMetadata?.KeyManager); // "AWS"
 ```
 
+## Tagging a key
+
+`CreateKey` takes `Tags`, and `TagResource`, `UntagResource` and `ListResourceTags` change and read
+them afterwards. A KMS tag is a `TagKey` and a `TagValue`. The tag commands name the key by its ID or
+ARN, and an alias is refused as `NotFoundException`. A key pending deletion keeps its tags and still
+lists them, and tagging or untagging it is `KMSInvalidStateException`. An AWS managed key's policy
+grants nobody tagging, so tagging one is refused as access denied.
+
+A tag key runs from 1 to 128 characters and a value to 256. A key under the reserved `aws:` prefix
+is `TagException`. A key holds at most 50 tags, and a request that would leave it holding more is
+`LimitExceededException`. A refused request leaves the tags as they were. `ListResourceTags` answers
+with every tag on one page.
+
+A request on a key carries its tags to IAM as `aws:ResourceTag/<key>`. `CreateKey` and
+`TagResource` carry the tags they set as `aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and
+`UntagResource` carries the keys it removes as `aws:TagKeys`. Creating a key with tags needs
+`kms:TagResource` as well as `kms:CreateKey`.
+
+```typescript sim-kms-tags
+/**
+ * Tagging a key and deciding an encryption on its tags.
+ */
+
+import {
+  CreateKeyCommand,
+  EncryptCommand,
+  ListResourceTagsCommand,
+  TagResourceCommand,
+} from "@aws-sdk/client-kms";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const created = await simAws
+  .kms()
+  .createKey(
+    new CreateKeyCommand({ Tags: [{ TagKey: "team", TagValue: "orders" }] }),
+  );
+const KeyId = created.KeyMetadata?.KeyId;
+
+await simAws.kms().tagResource(
+  new TagResourceCommand({
+    KeyId,
+    Tags: [{ TagKey: "stage", TagValue: "test" }],
+  }),
+);
+
+const listed = await simAws
+  .kms()
+  .listResourceTags(new ListResourceTagsCommand({ KeyId }));
+
+console.log(listed.Tags);
+// [ { TagKey: 'team', TagValue: 'orders' }, { TagKey: 'stage', TagValue: 'test' } ]
+
+await simAws.iam().createRole({
+  input: {
+    RoleName: "OrdersEncrypter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  },
+});
+
+// The key's default policy delegates to IAM, so this identity policy is
+// what decides.
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "OrdersEncrypter",
+    PolicyName: "EncryptWithOwnTeam",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "kms:Encrypt",
+        Resource: "*",
+        Condition: { StringEquals: { "aws:ResourceTag/team": "orders" } },
+      },
+    }),
+  },
+});
+
+const encrypted = await simAws
+  .kms()
+  .encrypt(
+    new EncryptCommand({ KeyId, Plaintext: new TextEncoder().encode("hi") }),
+    {
+      caller: {
+        kind: "arn",
+        arn: "arn:aws:iam::123456789012:role/OrdersEncrypter",
+      },
+    },
+  );
+
+console.log(encrypted.KeyId === created.KeyMetadata?.Arn); // true
+```
+
 ## Key state and deletion
 
 A key can be disabled and re-enabled later. A disabled key stays present, and refuses to be used.
@@ -583,8 +684,9 @@ A property asking for behaviour Yulin leaves out still deploys. The key is creat
 the property is recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 The template deploys, and the record says what the key leaves out. `EnableKeyRotation`,
-`RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way. The key encrypts and
-decrypts, its material stays as it was, it exists in one region, and its tags go unread.
+`RotationPeriodInDays` and `MultiRegion` are all recorded that way. The key encrypts and decrypts,
+its material stays as it was, and it exists in one region. A key declaring `Tags` is created with
+them.
 
 A `KeySpec` or `KeyUsage` pair simulated KMS has no model for, or an `Origin` other than `AWS_KMS`,
 is refused by `CreateKey` in the same terms it refuses an SDK caller, since there is no key to
@@ -608,6 +710,8 @@ allowed to, by both the key policy and the role's identity policy, the same as o
 - `SignCommand`, `VerifyCommand` and `GetPublicKeyCommand`, for asymmetric signing keys
 - `CreateAliasCommand` and `ListAliasesCommand`, including AWS managed key aliases
 - `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand`, `CancelKeyDeletionCommand`
+- `TagResourceCommand`, `UntagResourceCommand` and `ListResourceTagsCommand`, with tags reaching IAM
+  as `aws:ResourceTag/<key>`
 - Key policy evaluation by simulated IAM
 - Key ARNs, key IDs, alias names and alias ARNs as interchangeable ways to name a key
 - The `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources
@@ -643,9 +747,10 @@ allowed to, by both the key policy and the role's identity policy, the same as o
 - A key pending deletion stays in that state indefinitely. Advancing the simulated clock past the
   recovery window leaves it there, and the key ID stays taken.
 - `UpdateAlias` is absent. An alias is retargeted by deleting it and creating it again.
-- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are left out. An
-  `AWS::KMS::Key` declaring `Tags` deploys with the tags dropped and the property recorded. A policy
-  condition written around one fails to match here, where on AWS it would match.
+- A key's tags reach a key policy as well as an IAM policy. Real KMS supports `aws:ResourceTag` in
+  IAM policies only, so a key policy statement conditioned on one matches here and fails to match
+  on AWS. A tag change also takes effect at once, where AWS documents up to five minutes before it
+  affects authorization.
 - `kms:ViaService` and `kms:CallerAccount` are the KMS-specific condition keys derived. A policy
   relying on `kms:EncryptionContext:*` or any other one fails to match. Ordinary condition operators
   on values sim IAM does supply work as usual.

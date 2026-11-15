@@ -17,7 +17,7 @@ import { SimEventTargetStore } from "./target/sim-event-target-store.js";
 import type { SimEventBridgeDeliveryTargets } from "./delivery/sim-event-bridge-delivery.js";
 import { SimEventBridgeCfnResourceFactory } from "./cfn/sim-event-bridge-cfn-resource-factory.js";
 import { SimEventBridgeSdkCommandRouter } from "./sdk/sim-event-bridge-sdk-command-router.js";
-import { SimEventBridgePartners } from "./sim-event-bridge-partners.js";
+import { SimEventBridgeTagging } from "./sim-event-bridge-tagging.js";
 import { SimPartnerEventSourceStore } from "./source/sim-partner-event-source-store.js";
 
 interface SimEventBridgeProperties {
@@ -47,7 +47,7 @@ interface SimEventBridgeProperties {
  * matches nothing is gone. A rule carrying a schedule instead fires on the
  * simulation's own clock, so advancing time is what sends its event.
  */
-export class SimEventBridge extends SimEventBridgePartners {
+export class SimEventBridge extends SimEventBridgeTagging {
   protected readonly buses: SimEventBusStore;
   protected readonly rules = new SimEventRuleStore();
   protected readonly targets = new SimEventTargetStore();

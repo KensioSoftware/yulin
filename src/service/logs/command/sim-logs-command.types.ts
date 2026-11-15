@@ -105,3 +105,14 @@ export type {
   SimLogsDeliveryDetail,
   SimLogsS3DeliveryConfiguration,
 } from "./delivery/delivery.command.js";
+export type {
+  SimLogsListTagsForResourceCommand,
+  SimLogsListTagsForResourceCommandInput,
+  SimLogsListTagsForResourceCommandOutput,
+  SimLogsTagResourceCommand,
+  SimLogsTagResourceCommandInput,
+  SimLogsTagResourceCommandOutput,
+  SimLogsUntagResourceCommand,
+  SimLogsUntagResourceCommandInput,
+  SimLogsUntagResourceCommandOutput,
+} from "./group/tag.command.js";

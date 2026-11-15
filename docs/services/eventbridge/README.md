@@ -921,11 +921,8 @@ at deploy time naming the property and the Resource. The alternative is a rule t
 event where one field was asked for. Tearing the stack down removes the buses, rules and targets it
 created.
 
-`Tags` is the one difference from the commands, which refuse it outright. A template's tags are
-usually the whole stack's (a CDK app calling `Tags.of(app).add(...)` tags every rule and bus in it),
-and a rule routes the same events whether it carries them or not. They are recorded as an ignored
-property and the deploy stands. Nothing reads them back. A rule or a bus deployed with tags behaves
-as though the template had never named them.
+A rule or bus declaring `Tags` is created with them, so the tags a CDK app puts on every resource
+with `Tags.of(app).add(...)` reach its rules and buses.
 
 ## Receiving events from a SaaS partner
 
@@ -1224,6 +1221,116 @@ An ECS target carries a `RoleArn`, which the rule runs the task as. Adding one h
 Role, and `PutTargets` authorizes `iam:PassRole` against it. See
 [passing a Role to a service](https://yulinsim.dev/services/iam/#passing-a-role-to-a-service) in the IAM docs.
 
+## Tagging rules and buses
+
+`PutRule` and `CreateEventBus` take `Tags`, and `TagResource`, `UntagResource` and
+`ListTagsForResource` change and read them afterwards. Each names the rule or bus by its ARN, and an
+ARN naming neither is `ResourceNotFoundException`. The `default` bus can be tagged too.
+
+A `PutRule` replacing an existing rule keeps the tags that rule holds and ignores any it carries, as
+the PutRule reference says. Tags on an existing rule change through `TagResource` and
+`UntagResource`.
+
+A tag key runs from 1 to 128 characters and a value to 256. A key under the reserved `aws:` prefix
+is refused as `ValidationException`. A rule or bus holds at most 50 tags. The API reference
+documents no error of its own for a request over that, so it is refused as `ValidationException`
+too. A refused request leaves the tags as they were.
+
+A request on a rule or bus carries its tags to IAM as `aws:ResourceTag/<key>`. `PutRule`,
+`CreateEventBus` and `TagResource` carry the tags they set as `aws:RequestTag/<key>` and their keys
+as `aws:TagKeys`, and `UntagResource` carries the keys it removes as `aws:TagKeys`. Creating a rule
+or bus with tags needs `events:TagResource` as well.
+
+```typescript sim-event-bridge-tags
+/**
+ * Tagging an event bus and deciding PutEvents on its tags.
+ */
+
+import {
+  CreateEventBusCommand,
+  ListTagsForResourceCommand,
+  PutEventsCommand,
+  TagResourceCommand,
+} from "@aws-sdk/client-eventbridge";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+const created = await simAws.eventBridge().createEventBus(
+  new CreateEventBusCommand({
+    Name: "orders",
+    Tags: [{ Key: "team", Value: "orders" }],
+  }),
+);
+
+await simAws.eventBridge().tagResource(
+  new TagResourceCommand({
+    ResourceARN: created.EventBusArn,
+    Tags: [{ Key: "stage", Value: "test" }],
+  }),
+);
+
+const listed = await simAws
+  .eventBridge()
+  .listTagsForResource(
+    new ListTagsForResourceCommand({ ResourceARN: created.EventBusArn }),
+  );
+
+console.log(listed.Tags);
+// [ { Key: 'team', Value: 'orders' }, { Key: 'stage', Value: 'test' } ]
+
+await simAws.iam().createRole({
+  input: {
+    RoleName: "OrdersPublisher",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "OrdersPublisher",
+    PolicyName: "PublishToOwnTeam",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "events:PutEvents",
+        Resource: "*",
+        Condition: { StringEquals: { "aws:ResourceTag/team": "orders" } },
+      },
+    }),
+  },
+});
+
+const put = await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        EventBusName: "orders",
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: "{}",
+      },
+    ],
+  }),
+  {
+    caller: {
+      kind: "arn",
+      arn: "arn:aws:iam::123456789012:role/OrdersPublisher",
+    },
+  },
+);
+
+console.log(put.FailedEntryCount); // 0
+```
+
 ## Scoping
 
 Buses belong to one account and region, as they do on real AWS:
@@ -1262,6 +1369,8 @@ no permission for.
   partner through `addPartnerEventSource(...)` and `putPartnerEvents(...)`.
 - `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
   `TestEventPattern`.
+- `TagResource`, `UntagResource` and `ListTagsForResource` on rules and buses, with tags reaching
+  IAM as `aws:ResourceTag/<key>`.
 - Scheduled rules, with a `rate(...)` or six-field `cron(...)` `ScheduleExpression`, fired by
   advancing the simulation's clock.
 - Event pattern matching on exact values, nested fields, lists, `prefix`, `suffix`, `anything-but`,
@@ -1320,9 +1429,8 @@ no permission for.
   late, and may deliver it more than once.
 - EventBridge Scheduler is a separate service, simulated separately. See
   [simulated Scheduler](https://yulinsim.dev/services/scheduler/).
-- Rule tags, a rule `RoleArn`, managed rules and the `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`
-  state are all refused at `PutRule`. An `AWS::Events::Rule` carrying `Tags` deploys with the tags
-  dropped and the property recorded.
+- A rule `RoleArn`, managed rules and the `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are
+  all refused at `PutRule`.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge
   refuses to delete either while it still has what hangs off it.
 - `AWS::Events::EventBusPolicy`, `AWS::Events::Archive`, `AWS::Events::Connection` and
@@ -1333,9 +1441,8 @@ no permission for.
   attribute are all missing, and a caller from another account cannot be admitted to a bus. That is
   stricter than real AWS.
 - Putting an event onto another account's or region's bus is refused.
-- Event bus tags, encryption with a customer managed key, dead letter queues, logging configuration
-  and global endpoints are refused. An `AWS::Events::EventBus` carrying `Tags` deploys with the tags
-  dropped and the property recorded.
+- Event bus encryption with a customer managed key, dead letter queues, logging configuration and
+  global endpoints are refused.
 - A pending partner event source never expires, and `DescribeEventSource` leaves out
   `ExpirationTime`. Its `CreatedBy` is the segment after `aws.partner/`, such as `stripe.com`.
   `ListEventSources`, `ActivateEventSource` and `DeactivateEventSource` are absent, as are the

@@ -1,7 +1,9 @@
 import {
+  assertArrayEmpty,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsError,
 } from "@kensio/smartass";
@@ -129,19 +131,24 @@ describe("KMS CloudFormation Resource validation", () => {
     );
   });
 
-  it("records Tags", async () => {
-    // Given a template tagging the key, which simulated KMS neither stores nor
-    // matches in a policy condition.
-    // When the Resource is created, then the tags are recorded rather than
-    // dropped with nothing said about them.
-    const ignored = await createdKmsResource({
+  it("creates a key with the tags the template declares", async () => {
+    // Given a template tagging the key
+    const simAws = new SimAws({ defaultAccountId: accountIdOneOnes });
+    const factory = new SimKmsCfnResourceFactory({ kms: simAws.kms() });
+    const resource = kmsResource("AWS::KMS::Key", {
       Tags: [{ Key: "component", Value: "database" }],
     });
 
-    assertStringIncludes(
-      ignored[0]?.reason ?? "",
-      "Tags are not simulated on KMS keys",
-    );
+    // When the Resource is created
+    const created = await factory.create("Key", resource, {
+      simAws,
+      resources: new Map(),
+    });
+
+    // Then the key holds the tags, and nothing is recorded as skipped
+    assertInstanceOf(created, SimKmsKey);
+    assertObjectEquals(created.tags.record(), { component: "database" });
+    assertArrayEmpty(resource.ignoredProperties);
   });
 
   it("refuses an asymmetric KeySpec used for encryption", async () => {

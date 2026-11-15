@@ -39,20 +39,13 @@ const refusals: readonly SimEventBridgeBusRefusal[] = [
     "Event bus logging is not simulated, so CreateEventBus refuses a " +
       "LogConfig rather than creating a bus that logs nothing",
   ],
-  [
-    (input): unknown => input.Tags,
-    "Event bus tags are not simulated, so CreateEventBus refuses them rather " +
-      "than dropping them",
-  ],
 ];
 
 /**
  * Refuse the event bus request inputs this simulation does not model.
  *
- * Each is refused rather than ignored. A dropped tag would leave a bus looking
- * tagged to the request that sent it and untagged to everything else, and a
- * dead letter queue that received nothing would be one a test believed was
- * catching undelivered events.
+ * Each is refused rather than ignored. A dead letter queue that received
+ * nothing would be one a test believed was catching undelivered events.
  */
 export function refuseUnsimulatedBusInput(
   input: SimCreateEventBusCommandInput,

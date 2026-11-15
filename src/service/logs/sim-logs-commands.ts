@@ -22,11 +22,13 @@ import { SimLogsGetLogEvents } from "./command/event/sim-logs-get-log-events.js"
 import { SimLogsPutLogEvents } from "./command/event/sim-logs-put-log-events.js";
 import { SimLogsLogGroupCommands } from "./command/group/sim-logs-log-group-commands.js";
 import { SimLogsRetentionCommands } from "./command/group/sim-logs-retention-commands.js";
+import { SimLogsTagCommands } from "./command/group/sim-logs-tag-commands.js";
 import { SimLogsMetricFilterCommands } from "./command/metric/sim-logs-metric-filter-commands.js";
 import { SimLogsLogStreamCommands } from "./command/stream/sim-logs-log-stream-commands.js";
 import { SimLogsSubscriptionCommands } from "./command/subscription/sim-logs-subscription-commands.js";
 import { SimLogsEventIds } from "./event/sim-logs-event-ids.js";
 import { SimLogsLogGroupStore } from "./group/sim-logs-log-group-store.js";
+import { simLogsTagConditionIam } from "./group/sim-logs-resource-tags.js";
 import {
   SimLogsNoSubscriptionDestinations,
   type SimLogsSubscriptionDestinations,
@@ -77,6 +79,7 @@ export class SimLogsCommands {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly groups: SimLogsLogGroupStore;
   readonly logGroups: SimLogsLogGroupCommands;
+  readonly tags: SimLogsTagCommands;
   readonly retention: SimLogsRetentionCommands;
   readonly streams: SimLogsLogStreamCommands;
   readonly putLogEvents: SimLogsPutLogEvents;
@@ -105,8 +108,11 @@ export class SimLogsCommands {
 
     const iam = simIamInRegion(properties.iam, accountRegionScope.regionName);
 
-    const authorizer = new SimLogsAuthorizer({ iam, accountRegionScope });
     const groups = new SimLogsLogGroupStore({ accountRegionScope });
+    const authorizer = new SimLogsAuthorizer({
+      iam: simLogsTagConditionIam(iam, accountRegionScope, groups),
+      accountRegionScope,
+    });
     const eventIds = new SimLogsEventIds();
     const fanOut = new SimLogsSubscriptionFanOut({
       destinations: subscriptionDestinations,
@@ -128,6 +134,11 @@ export class SimLogsCommands {
       groups,
       authorizer,
       clock: background,
+    });
+    this.tags = new SimLogsTagCommands({
+      groups,
+      authorizer,
+      accountRegionScope,
     });
     this.retention = new SimLogsRetentionCommands({ groups, authorizer });
     this.streams = new SimLogsLogStreamCommands({

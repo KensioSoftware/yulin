@@ -137,3 +137,44 @@ export class SimSsmValidationException extends SimSsmError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated SSM TooManyTagsError error.
+ *
+ * A parameter holds at most 50 tags, and a request that would leave it
+ * holding more fails this way.
+ */
+export class SimSsmTooManyTagsError extends SimSsmError {
+  public override readonly name = "TooManyTagsError";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated SSM InvalidResourceId error.
+ *
+ * The tag commands report a parameter that does not exist this way.
+ */
+export class SimSsmInvalidResourceId extends SimSsmError {
+  public override readonly name = "InvalidResourceId";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated SSM InvalidResourceType error.
+ *
+ * The tag commands report a resource type they cannot tag this way. Only
+ * parameters are simulated, so every other type fails like this here.
+ */
+export class SimSsmInvalidResourceType extends SimSsmError {
+  public override readonly name = "InvalidResourceType";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

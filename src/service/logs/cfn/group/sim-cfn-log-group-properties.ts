@@ -1,6 +1,7 @@
 import { SimCfnGeneratedResourceName } from "../../../cloudformation/resource/name/sim-cfn-generated-resource-name.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnTagRecord } from "../../../cloudformation/template/value/sim-cfn-tag-record.js";
 import { requiredSimLogsRetentionDays } from "../../group/sim-logs-retention.js";
 import { SimCfnLogGroupPropertyRules } from "./sim-cfn-log-group-property-rules.js";
 
@@ -92,6 +93,14 @@ export class SimCfnLogGroupProperties {
     }
 
     return requiredSimLogsRetentionDays(retention);
+  }
+
+  /**
+   * The tags the log group is created with, or undefined where the template
+   * declares none.
+   */
+  tags(): Record<string, string> | undefined {
+    return simCfnTagRecord(this.#properties["Tags"]);
   }
 
   /**

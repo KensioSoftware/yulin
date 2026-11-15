@@ -243,6 +243,39 @@ export class SimKms {
   }
 
   /**
+   * Handle a TagResource Command from the SDK.
+   */
+  async tagResource(
+    command: simKmsCommands.SimKmsTagResourceCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimKmsTagResourceCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.tags.tagResource(command, options);
+  }
+
+  /**
+   * Handle an UntagResource Command from the SDK.
+   */
+  async untagResource(
+    command: simKmsCommands.SimKmsUntagResourceCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimKmsUntagResourceCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.tags.untagResource(command, options);
+  }
+
+  /**
+   * Handle a ListResourceTags Command from the SDK.
+   */
+  async listResourceTags(
+    command: simKmsCommands.SimListResourceTagsCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimListResourceTagsCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.tags.listResourceTags(command, options);
+  }
+
+  /**
    * Get this service's CloudFormation Resource factory, which creates
    * simulated keys and aliases from AWS::KMS::* Resources.
    */

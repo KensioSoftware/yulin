@@ -69,21 +69,16 @@ describe("EventBridge rule validation", () => {
     assertStringIncludes(error.message, "ScheduleExpression");
   });
 
-  it("refuses rule inputs it does not model rather than dropping them", async () => {
-    // Given a rule asked for with each unmodelled property in turn.
+  it("refuses a rule role it does not model rather than dropping it", async () => {
+    // Given a rule asked for with a role.
     const withRole = await refusedRule({
       Name: "watcher",
       EventPattern: anyOrder,
       RoleArn: "arn:aws:iam::888888888888:role/EventsRole",
     });
-    const withTags = await refusedRule({
-      Name: "watcher",
-      EventPattern: anyOrder,
-      Tags: [{ Key: "team", Value: "orders" }],
-    });
 
+    // Then it is refused.
     assertInstanceOf(withRole, SimEventBridgeUnsimulatedInputException);
-    assertInstanceOf(withTags, SimEventBridgeUnsimulatedInputException);
   });
 
   it("refuses a description longer than real EventBridge takes", async () => {
