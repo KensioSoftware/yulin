@@ -1,4 +1,5 @@
 import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
+import { simAwsSourceIpCondition } from "../../../iam/request/sim-aws-source-ip-condition.js";
 import {
   simS3SourceAccountConditionKey,
   simS3SourceArnConditionKey,
@@ -25,5 +26,6 @@ export function simS3ConditionContext(
     ...(options?.sourceAccount !== undefined && {
       [simS3SourceAccountConditionKey]: options.sourceAccount,
     }),
+    ...simAwsSourceIpCondition(options?.sourceIp),
   };
 }

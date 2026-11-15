@@ -1,3 +1,4 @@
+import { simRestApiReplacePolicy } from "../api/policy/sim-rest-api-policy.js";
 import type { SimRestApi } from "../api/sim-rest-api.js";
 import type { SimRestApiAuthorizerCommands } from "../command/authorizer/sim-rest-api-authorizer-commands.js";
 import type { SimRestApiIntegrationCommands } from "../command/integration/sim-rest-api-integration-commands.js";
@@ -44,8 +45,12 @@ export class SimRestApiOpenApiImport {
 
   /**
    * Create everything the document declares on an API.
+   *
+   * The resource policy is the document's too. A document declaring none
+   * leaves the API without one, which is what replacing a definition does.
    */
   into(restApi: SimRestApi, document: SimRestApiOpenApiDocument): void {
+    simRestApiReplacePolicy(restApi, document.policy());
     const tree = new SimRestApiOpenApiPathTree({
       restApiId: restApi.apiId,
       rootResourceId: restApi.rootResource.resourceId,

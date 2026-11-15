@@ -16,6 +16,7 @@ import {
 import type { SimRestApiRequest } from "./match/sim-rest-api-request.js";
 import { simRestApiHost } from "./sim-rest-api-host.js";
 import type { SimRestApiId } from "./sim-rest-api-id.js";
+import type { SimRestApiPolicy } from "./policy/sim-rest-api-policy.js";
 import { simRestApiView, type SimRestApiView } from "./sim-rest-api-view.js";
 
 interface SimRestApiProperties {
@@ -69,6 +70,13 @@ export class SimRestApi {
   public name: string;
   public description?: string | undefined;
 
+  /**
+   * The API's resource policy, which every request reaching a method is
+   * evaluated against as well as the method's own authorization. An API
+   * without one leaves the decision to the method.
+   */
+  public policy?: SimRestApiPolicy | undefined;
+
   public readonly resources = new SimRestApiResourceStore();
   public readonly authorizers = new SimRestApiAuthorizerStore();
   public readonly deployments = new SimRestApiDeploymentStore();
@@ -86,6 +94,16 @@ export class SimRestApi {
     this.description = properties.description;
     this.disableExecuteApiEndpoint =
       properties.disableExecuteApiEndpoint ?? false;
+  }
+
+  /**
+   * The ARN of the API itself, which a resource policy's `execute-api:/`
+   * shorthand stands for.
+   */
+  get arn(): string {
+    const { accountId, regionName } = this.accountRegionScope;
+
+    return `arn:aws:execute-api:${regionName}:${accountId}:${this.apiId}`;
   }
 
   /**

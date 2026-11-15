@@ -36,6 +36,14 @@ export class SimRestApiOpenApiValue {
   }
 
   /**
+   * This value written out as JSON, or nothing when the document leaves it
+   * out.
+   */
+  optionalJson(): string | undefined {
+    return this.value === undefined ? undefined : JSON.stringify(this.value);
+  }
+
+  /**
    * Refuse this member, naming where it is in the document.
    */
   refusal(reason: string): SimApiGatewayBadRequest {

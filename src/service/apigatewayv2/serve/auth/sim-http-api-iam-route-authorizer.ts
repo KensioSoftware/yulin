@@ -4,6 +4,7 @@ import {
   SimHttpApiRefused,
 } from "../../api/authorizer/sim-http-api-authorization.js";
 import { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
+import { simAwsSourceIpCondition } from "../../../iam/request/sim-aws-source-ip-condition.js";
 import type { SimHttpApiRouteAuthorizeInput } from "./sim-http-api-route-authorize-input.js";
 
 /**
@@ -37,6 +38,7 @@ export class SimHttpApiIamRouteAuthorizer {
       action: simExecuteApiInvokeAction,
       resource: this.routeArn(input).toString(),
       caller: input.caller.toCaller(),
+      conditionContext: simAwsSourceIpCondition(input.sourceIp),
     });
 
     if (decision.isDenied) {

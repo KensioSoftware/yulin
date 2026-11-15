@@ -1,5 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simRestApiReplacePolicy } from "../../api/policy/sim-rest-api-policy.js";
+import type { SimRestApi } from "../../api/sim-rest-api.js";
 import type { SimCreateRestApiCommandInput } from "../../command/api/rest-api.command.js";
 import { SimCfnApiGatewayPropertyParser } from "../sim-cfn-api-gateway-property-parser.js";
 import { simCfnRestApiSimulatedProperties } from "./sim-cfn-rest-api-property-names.js";
@@ -48,6 +50,32 @@ export class SimCfnRestApiProperties {
   }
 
   /**
+   * The resource policy this Resource declares, as the JSON a command takes.
+   *
+   * A template writes it as an object, and a string holding the JSON is
+   * accepted as CloudFormation accepts it.
+   */
+  policy(): string | undefined {
+    const policy = this.properties["Policy"];
+
+    return policy === undefined || typeof policy === "string"
+      ? policy
+      : JSON.stringify(policy);
+  }
+
+  /**
+   * Attach the `Policy` of an API declared as a `Body`, as AWS attaches it
+   * once the import is done. It replaces a policy the document declared.
+   */
+  attachImportedPolicy(restApi: SimRestApi): void {
+    const policy = this.policy();
+
+    if (policy !== undefined && this.importable) {
+      simRestApiReplacePolicy(restApi, policy);
+    }
+  }
+
+  /**
    * The CreateRestApi input this Resource asks for.
    */
   createRestApiInput(): SimCreateRestApiCommandInput {
@@ -69,6 +97,7 @@ export class SimCfnRestApiProperties {
         this.properties["DisableExecuteApiEndpoint"],
         "DisableExecuteApiEndpoint",
       ),
+      policy: this.policy(),
     };
   }
 }

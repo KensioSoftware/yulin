@@ -52,4 +52,13 @@ export interface SimS3RequestOptions {
    * Left out the same way when the caller has no value for it.
    */
   readonly sourceAccount?: string;
+
+  /**
+   * The client address the request came from, supplied to IAM as
+   * `aws:SourceIp`.
+   *
+   * A request served over HTTP has one. An in-process call has none, and a
+   * statement conditioned on the key then fails to match.
+   */
+  readonly sourceIp?: string;
 }

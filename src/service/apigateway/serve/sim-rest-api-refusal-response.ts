@@ -17,6 +17,13 @@ export class SimRestApiRefusalResponse {
    * Build the response for one refusal.
    */
   build(refused: SimRestApiRefused): Response {
+    if (refused.denial !== undefined) {
+      return this.errorResponse.policyDeny(
+        refused.denial,
+        refused.kind === "explicit-deny",
+      );
+    }
+
     switch (refused.kind) {
       case "unauthorized": {
         return this.errorResponse.unauthorized();

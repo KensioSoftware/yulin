@@ -58,14 +58,48 @@ export class SimRestApiAdmitted {
 }
 
 /**
+ * Who IAM refused and what for, which a refusal by IAM policy names in its
+ * body.
+ */
+export interface SimRestApiPolicyDenial {
+  /** The caller's ARN, or `anonymous`. */
+  readonly principal: string;
+  /** The `execute-api` ARN of the request. */
+  readonly resource: string;
+}
+
+/**
  * A request the method refused, before any integration was invoked.
  */
 export class SimRestApiRefused {
   public readonly admitted = false as const;
   public readonly kind: SimRestApiRefusalKind;
+  /**
+   * Present on a refusal by an IAM policy or the API's resource policy, and
+   * absent on one by a Lambda authorizer's policy.
+   */
+  public readonly denial: SimRestApiPolicyDenial | undefined;
 
-  private constructor(kind: SimRestApiRefusalKind) {
+  private constructor(
+    kind: SimRestApiRefusalKind,
+    denial?: SimRestApiPolicyDenial,
+  ) {
     this.kind = kind;
+    this.denial = denial;
+  }
+
+  /**
+   * IAM refused the request, with the caller's own policies, the API's
+   * resource policy, or both.
+   */
+  static byPolicy(
+    explicit: boolean,
+    denial: SimRestApiPolicyDenial,
+  ): SimRestApiRefused {
+    return new SimRestApiRefused(
+      explicit ? "explicit-deny" : "implicit-deny",
+      denial,
+    );
   }
 
   /**

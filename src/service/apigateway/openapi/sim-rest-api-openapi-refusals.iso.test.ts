@@ -72,7 +72,6 @@ describe("Refusing an OpenAPI document a sim REST API cannot serve", () => {
     const refused: readonly (readonly [string, JSONValue])[] = [
       ["servers", [{ url: "https://pets.example.com/v1" }]],
       ["security", [{ "pet-authorizer": [] }]],
-      ["x-amazon-apigateway-policy", { Statement: [] }],
       ["x-amazon-apigateway-binary-media-types", ["image/png"]],
       ["x-amazon-apigateway-gateway-responses", {}],
       ["x-amazon-apigateway-request-validators", {}],

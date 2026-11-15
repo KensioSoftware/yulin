@@ -60,6 +60,7 @@ export class SimCfnRestApiCreator {
       restApi,
       `sim REST API ${created.id} after CloudFormation creation`,
     );
+    apiProperties.attachImportedPolicy(restApi);
 
     return restApi;
   }

@@ -167,7 +167,7 @@ describe("API Gateway REST API CloudFormation properties left out", () => {
       "Api AWS::ApiGateway::RestApi property BodyS3Location is not " +
         "simulated, so the Resource is created without it and behaves " +
         "differently here than on AWS. The simulated properties are Name, " +
-        "Description, DisableExecuteApiEndpoint, Body, FailOnWarnings.",
+        "Description, DisableExecuteApiEndpoint, Body, FailOnWarnings, Policy.",
     ]);
   });
 

@@ -1,19 +1,20 @@
 import type { SimAwsServiceRequest } from "../../../../serve/controller/sim-service-controller.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3WebsiteRoute } from "../sim-s3-route.js";
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
 import { simS3SystemMetadataHeadersFrom } from "../../object/s3-system-metadata-read.js";
+import type { SimS3RequestOptions } from "../../command/sim-s3-request-options.js";
 import type { SimS3 } from "../../sim-s3.js";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
+import { simS3ServedOptions } from "../sim-s3-served-options.js";
 import { SimS3WebsiteObject } from "./sim-s3-website-object.js";
 
 interface SimS3WebsiteObjectLoaderProperties {
   readonly simS3: SimS3;
   readonly bucketName: SimS3BucketName;
-  readonly caller: SimAwsCaller;
+  readonly options: SimS3RequestOptions;
 }
 
 /**
@@ -28,12 +29,12 @@ interface SimS3WebsiteObjectLoaderProperties {
 export class SimS3WebsiteObjectLoader {
   private readonly simS3: SimS3;
   private readonly bucketName: SimS3BucketName;
-  private readonly caller: SimAwsCaller;
+  private readonly options: SimS3RequestOptions;
 
   constructor(properties: SimS3WebsiteObjectLoaderProperties) {
     this.simS3 = properties.simS3;
     this.bucketName = properties.bucketName;
-    this.caller = properties.caller;
+    this.options = properties.options;
   }
 
   /**
@@ -53,7 +54,7 @@ export class SimS3WebsiteObjectLoader {
         )
         .s3(),
       bucketName: route.bucket.bucketName,
-      caller: serviceRequest.caller.toCaller(),
+      options: simS3ServedOptions(serviceRequest),
     });
   }
 
@@ -67,7 +68,7 @@ export class SimS3WebsiteObjectLoader {
     try {
       const output = await this.simS3.getObject(
         { input: { Bucket: this.bucketName, Key: objectKey } },
-        { caller: this.caller },
+        this.options,
       );
 
       return new SimS3WebsiteObject({

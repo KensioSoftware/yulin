@@ -15,6 +15,7 @@ import {
   simLambdaInvokeFunctionUrlAction,
 } from "./sim-lambda-url-invoke-actions.js";
 import type { SimAwsRequestSource } from "../../../iam/request/sim-aws-request-source.js";
+import { simAwsSourceIpCondition } from "../../../iam/request/sim-aws-source-ip-condition.js";
 import type { SimLambdaPolicyResource } from "../../function/policy/sim-lambda-policy-resource.js";
 import type { SimLambdaFunctionUrl } from "../../function/url/sim-lambda-function-url.js";
 
@@ -35,6 +36,10 @@ interface SimLambdaUrlAuthorizationInput {
    * CloudFront Distribution reaching a Function URL Origin.
    */
   readonly source?: SimAwsRequestSource | undefined;
+  /**
+   * The client address the request came from, supplied as `aws:SourceIp`.
+   */
+  readonly sourceIp?: string | undefined;
 }
 
 /**
@@ -99,7 +104,8 @@ export class SimLambdaUrlAuthorizer {
    * `AWS:SourceAccount` with it, which is what the permission granting
    * `cloudfront.amazonaws.com` names its Distribution in. A request that states
    * no source supplies neither, so a permission conditioned on one does not
-   * match rather than matching anything.
+   * match rather than matching anything. The client address is supplied as
+   * `aws:SourceIp` whatever the auth type.
    */
   private decide(
     action: string,
@@ -121,6 +127,7 @@ export class SimLambdaUrlAuthorizer {
         ...(source?.accountId !== undefined && {
           [simLambdaSourceAccountConditionKey]: source.accountId,
         }),
+        ...simAwsSourceIpCondition(input.sourceIp),
       },
     });
   }

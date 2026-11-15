@@ -31,6 +31,11 @@ export interface SimHttpApiRouteAuthorizeInput {
    */
   readonly caller: SimAwsRequestCaller;
   /**
+   * The client address the request came from, which an identity policy reads
+   * as `aws:SourceIp`.
+   */
+  readonly sourceIp?: string | undefined;
+  /**
    * IAM of the Account that owns the API, which is what decides an `AWS_IAM`
    * route. It is the API's own rather than the caller's, and rather than the
    * integrated function's.

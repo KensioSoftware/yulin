@@ -53,6 +53,13 @@ export class SimRestApiOpenApiDocument {
   }
 
   /**
+   * The API's resource policy, as JSON, when the document declares one.
+   */
+  policy(): string | undefined {
+    return this.root.member("x-amazon-apigateway-policy").optionalJson();
+  }
+
+  /**
    * The security schemes an operation's security requirement can name.
    */
   securitySchemes(): SimRestApiOpenApiValue {
