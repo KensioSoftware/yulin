@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIamConditions } from "../../iam/tag/sim-iam-tag-conditions.js";
 
 /**
  * The request context a simulated KMS operation is made in.
@@ -38,4 +39,10 @@ export interface SimKmsRequestOptions {
    * wildcard principal outright.
    */
   readonly withCallerPermissions?: boolean | undefined;
+
+  /**
+   * The condition values the request itself supplies to IAM, such as the
+   * tags a create or tag request sets.
+   */
+  readonly requestConditions?: SimIamConditions | undefined;
 }

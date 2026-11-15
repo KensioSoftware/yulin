@@ -14,6 +14,7 @@ import type {
   SimDescribeLogGroupsCommandOutput,
   SimLogsLogGroupDetail,
 } from "./group.command.js";
+import { simLogsAuthorizeCreateLogGroup } from "./sim-logs-create-log-group-authorization.js";
 import { refuseUnsimulatedLogGroupInput } from "./sim-logs-unsimulated-group-input.js";
 
 const maximumDescribeLimit = 50;
@@ -53,13 +54,18 @@ export class SimLogsLogGroupCommands {
     );
 
     refuseUnsimulatedLogGroupInput(command.input);
-    this.#authorizer.authorizeLogGroup(
-      "logs:CreateLogGroup",
+    simLogsAuthorizeCreateLogGroup(
+      this.#authorizer,
       logGroupName,
+      command.input.tags,
       options?.caller,
     );
 
-    this.#groups.create(logGroupName, this.#clock.now().getTime());
+    this.#groups.create(
+      logGroupName,
+      this.#clock.now().getTime(),
+      command.input.tags,
+    );
 
     return { $metadata: {} };
   }

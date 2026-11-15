@@ -37,7 +37,7 @@ export interface SimSsmParameterMetadata {
 }
 
 /**
- * A tag on a parameter, which sim SSM refuses rather than stores.
+ * A tag on a parameter.
  */
 export interface SimSsmTag {
   readonly Key?: string | undefined;

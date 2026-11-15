@@ -5,6 +5,8 @@ import type {
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { simCfnEventBridgeResourceError } from "../sim-cfn-event-bridge-resource-error.js";
 import { eventBusResourceType } from "../sim-cfn-event-bridge-resource-types.js";
+import { simCfnEventBridgeTags } from "../sim-cfn-event-bridge-tags.js";
+import type { SimEventBridgeTag } from "../../command/bus/bus.command.js";
 
 /**
  * What a template can say about an event bus that this simulation does not
@@ -25,23 +27,6 @@ const unsimulatedProperties: readonly (readonly [string, string])[] = [
   ["KmsKeyIdentifier", "events are not encrypted with a customer managed key"],
   ["LogConfig", "event bus logging is not simulated"],
 ];
-
-/**
- * What a template can say about an event bus that this simulation has nothing
- * to act on, and why.
- *
- * `Tags` is the whole list, and it is recorded rather than refused. A bus
- * behaves the same way with a tag and without one, and a CDK app calling
- * `Tags.of(app).add(...)` tags every bus in it.
- */
-const ignoredPropertyReasons: ReadonlyMap<string, string> = new Map([
-  [
-    "Tags",
-    `${eventBusResourceType} property Tags is not simulated, so the bus is ` +
-      "created without them. Nothing reads them back and nothing is grouped " +
-      "or billed by them.",
-  ],
-]);
 
 interface SimCfnEventBusPropertiesProperties {
   readonly resource: SimCfnResource;
@@ -129,14 +114,10 @@ export class SimCfnEventBusProperties {
   }
 
   /**
-   * Record the properties the bus is created without acting on.
+   * The tags the bus is created with.
    */
-  recordIgnoredProperties(): void {
-    for (const [property, reason] of ignoredPropertyReasons) {
-      if (this.properties.has(property)) {
-        this.resource.ignoreProperty(property, reason);
-      }
-    }
+  tags(): SimEventBridgeTag[] | undefined {
+    return simCfnEventBridgeTags(this.properties.get("Tags"));
   }
 
   private propertyError(reason: string): Error {

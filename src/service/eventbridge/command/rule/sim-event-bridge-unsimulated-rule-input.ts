@@ -12,9 +12,9 @@ const maximumDescriptionLength = 512;
 /**
  * Refuse the rule request inputs this simulation does not model.
  *
- * A role and tags are refused because dropping either would leave a rule
- * looking configured to the request that sent it and unconfigured to
- * everything else.
+ * A role is refused because dropping it would leave a rule looking
+ * configured to the request that sent it and unconfigured to everything
+ * else.
  */
 export function refuseUnsimulatedRuleInput(
   input: SimPutRuleCommandInput,
@@ -23,13 +23,6 @@ export function refuseUnsimulatedRuleInput(
     throw new SimEventBridgeUnsimulatedInputException(
       "A rule RoleArn is not simulated, so PutRule refuses one rather than " +
         "creating a rule that reaches its targets as somebody else",
-    );
-  }
-
-  if (input.Tags !== undefined) {
-    throw new SimEventBridgeUnsimulatedInputException(
-      "Rule tags are not simulated, so PutRule refuses them rather than " +
-        "dropping them",
     );
   }
 

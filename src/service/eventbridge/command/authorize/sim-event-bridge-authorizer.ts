@@ -119,6 +119,7 @@ export class SimEventBridgeAuthorizer {
       action,
       resource,
       caller: options?.caller,
+      conditionContext: options?.requestConditions,
     });
 
     if (decision.isDenied) {

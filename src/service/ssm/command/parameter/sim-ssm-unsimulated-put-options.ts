@@ -20,7 +20,6 @@ export class SimSsmUnsimulatedPutOptions {
     this.refuseDataType(input.DataType);
     this.refuse("AllowedPattern", input.AllowedPattern, "value validation");
     this.refuse("Policies", input.Policies, "parameter policies");
-    this.refuse("Tags", input.Tags, "parameter tags");
   }
 
   private refuseTier(tier: string | undefined): void {

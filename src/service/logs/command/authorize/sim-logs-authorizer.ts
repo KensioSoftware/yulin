@@ -3,6 +3,7 @@ import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-re
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import {
   simLogsAnyLogGroupArn,
   simLogsLogGroupWildcardArn,
@@ -38,17 +39,20 @@ export class SimLogsAuthorizer {
    * The group need not exist. Real IAM evaluates a request before the service
    * handles it, so a caller with no permission is refused whether or not the
    * group is there, and CreateLogGroup authorizes against the ARN the group is
-   * about to have.
+   * about to have. A request setting or removing tags names them in its
+   * conditions.
    */
   authorizeLogGroup(
     action: string,
     logGroupName: string,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): SimAwsResolvedCaller {
     return this.authorizeResource(
       action,
       simLogsLogGroupWildcardArn(this.#accountRegionScope, logGroupName),
       caller,
+      conditions,
     );
   }
 
@@ -83,8 +87,14 @@ export class SimLogsAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
+    conditionContext?: SimIamConditions,
   ): SimAwsResolvedCaller {
-    const decision = this.#iam.authorize({ action, resource, caller });
+    const decision = this.#iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext,
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({

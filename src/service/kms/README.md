@@ -104,9 +104,8 @@ creation, as real CloudFormation does.
 
 `SimCfnKmsUnsimulatedKeyProperties` is the counterweight to that reuse. Passing a property through
 to `CreateKey` only fails closed for the properties `CreateKey` knows about, and `AWS::KMS::Key` has
-several the API does not take at all: rotation, multi-Region and tags. Each of those changes what
-the key is, so the Resource is refused before the key exists rather than deploying a key that
-behaves differently here than on AWS.
+several the API does not take at all: rotation and multi-Region. Each of those changes what the key
+is, and each is recorded against the Resource. `Tags` goes through to `CreateKey`, which takes it.
 
 `Ref` and `Fn::GetAtt` behaviour lives with the other CloudFormation value adapters, in
 `cloudformation/resource/cfn/kms/`. A key's `Ref` is its key ID rather than its ARN, and an alias

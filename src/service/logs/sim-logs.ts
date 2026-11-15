@@ -8,7 +8,7 @@ import {
   SimLogsCommands,
   type SimLogsProperties,
 } from "./sim-logs-commands.js";
-import { SimLogsMetricOperations } from "./sim-logs-metric-operations.js";
+import { SimLogsTagOperations } from "./sim-logs-tag-operations.js";
 import type { SimLogsSubscriptionFailure } from "./subscription/sim-logs-subscription-fan-out.js";
 import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
 
@@ -25,12 +25,12 @@ import type { SimLogsServiceWriter } from "./write/sim-logs-service-writer.js";
  * an event expire, and what teams get wrong about retention is the value they
  * deployed rather than the deletion that eventually follows from it.
  *
- * The delivery and metric operations are held apart in
- * `SimLogsDeliveryOperations` and `SimLogsMetricOperations`, which
- * this extends, because this file grows by one delegating method per simulated
+ * The delivery, metric and tag operations are held apart in
+ * `SimLogsDeliveryOperations`, `SimLogsMetricOperations` and
+ * `SimLogsTagOperations`, which this extends, because this file grows by one delegating method per simulated
  * operation and is at the length this codebase allows.
  */
-export class SimLogs extends SimLogsMetricOperations {
+export class SimLogs extends SimLogsTagOperations {
   protected readonly commands: SimLogsCommands;
 
   readonly #sdkRouter = new SimLogsSdkCommandRouter(this);

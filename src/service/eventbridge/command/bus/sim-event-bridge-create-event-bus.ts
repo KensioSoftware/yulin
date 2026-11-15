@@ -7,6 +7,7 @@ import { SimEventBridgeResourceAlreadyExistsException } from "../../error/sim-ev
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimEventBridgeBusAccess } from "./sim-event-bridge-bus-access.js";
 import type { SimEventBridgePartnerBus } from "./sim-event-bridge-partner-bus.js";
+import { simEventBridgeRequestTags } from "../tag/sim-event-bridge-request-tags.js";
 import { refuseUnsimulatedBusInput } from "./sim-event-bridge-unsimulated-bus-input.js";
 import type {
   SimCreateEventBusCommand,
@@ -29,7 +30,8 @@ interface SimEventBridgeCreateEventBusProperties {
  * names, since that bus is always there.
  *
  * A request carrying an `EventSourceName` creates a partner event bus, which
- * activates the partner event source of the same name.
+ * activates the partner event source of the same name. A request carrying
+ * tags needs `events:TagResource` as well as `events:CreateEventBus`.
  */
 export class SimEventBridgeCreateEventBus {
   private readonly buses: SimEventBusStore;
@@ -61,8 +63,13 @@ export class SimEventBridgeCreateEventBus {
     refuseUnsimulatedBusInput(input);
 
     const name = SimEventBusName.required(input.Name, "Name");
+    const request = simEventBridgeRequestTags(
+      input.Tags,
+      options,
+      "events:CreateEventBus",
+    );
 
-    this.access.authorizeName("events:CreateEventBus", name, options);
+    this.access.authorizeNameForEach(request.actions, name, request.options);
 
     if (this.buses.find(name.value) !== undefined) {
       throw new SimEventBridgeResourceAlreadyExistsException(
@@ -72,7 +79,7 @@ export class SimEventBridgeCreateEventBus {
 
     this.partnerBus.check(name, input.EventSourceName);
 
-    const bus = this.created(name, input.Description);
+    const bus = this.created(name, input.Description, request.tags);
 
     return {
       $metadata: {},
@@ -87,12 +94,14 @@ export class SimEventBridgeCreateEventBus {
   private created(
     name: SimEventBusName,
     description: string | undefined,
+    tags: Readonly<Record<string, string>>,
   ): SimEventBus {
     const bus = new SimEventBus({
       name,
       accountRegionScope: this.accountRegionScope,
       createdAt: this.clock.now(),
       description,
+      tags,
     });
 
     this.buses.add(bus);

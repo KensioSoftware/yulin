@@ -289,6 +289,112 @@ const origins = read.Parameter?.Value?.split(",") ?? [];
 console.log(origins.length); // 2
 ```
 
+## Tagging a parameter
+
+`PutParameter` takes `Tags` when it creates a parameter, and `AddTagsToResource`,
+`RemoveTagsFromResource` and `ListTagsForResource` change and read them afterwards. Each names the
+parameter with `ResourceType: "Parameter"` and its name as `ResourceId` (with or without the leading
+slash). Only parameters are simulated, so any other resource type is `InvalidResourceType`, and a
+name no parameter answers to is `InvalidResourceId`.
+
+A tag key runs from 1 to 128 characters and a value to 256 (Unicode letters, digits and spaces, and
+`_ . : / = + - @`). A key under the reserved `aws:` prefix is refused as `ValidationException`. A
+parameter holds at most 50 tags, and a request that would leave it holding more is
+`TooManyTagsError`. A refused request leaves the tags as they were.
+
+`PutParameter` refuses `Tags` together with `Overwrite`, as Parameter Store does. Tags on an
+existing parameter change through `AddTagsToResource` and `RemoveTagsFromResource`.
+
+A request on a parameter carries its tags to IAM as both `aws:ResourceTag/<key>` and
+`ssm:ResourceTag/<key>`. `PutParameter` and `AddTagsToResource` carry the tags they set as
+`aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and `RemoveTagsFromResource` carries the keys
+it removes as `aws:TagKeys`. Creating a parameter with tags needs `ssm:AddTagsToResource` as well as
+`ssm:PutParameter`.
+
+```typescript sim-ssm-tags
+/**
+ * Tagging a parameter and deciding a read on its tags.
+ */
+
+import {
+  AddTagsToResourceCommand,
+  GetParameterCommand,
+  ListTagsForResourceCommand,
+  PutParameterCommand,
+} from "@aws-sdk/client-ssm";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultAccountId: "123456789012" });
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/orders/db-host",
+    Type: "String",
+    Value: "db.internal",
+    Tags: [{ Key: "team", Value: "orders" }],
+  }),
+);
+
+await simAws.ssm().addTagsToResource(
+  new AddTagsToResourceCommand({
+    ResourceType: "Parameter",
+    ResourceId: "/orders/db-host",
+    Tags: [{ Key: "stage", Value: "test" }],
+  }),
+);
+
+const listed = await simAws.ssm().listTagsForResource(
+  new ListTagsForResourceCommand({
+    ResourceType: "Parameter",
+    ResourceId: "/orders/db-host",
+  }),
+);
+
+console.log(listed.TagList);
+// [ { Key: 'team', Value: 'orders' }, { Key: 'stage', Value: 'test' } ]
+
+await simAws.iam().createRole({
+  input: {
+    RoleName: "OrdersReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "OrdersReader",
+    PolicyName: "ReadOwnTeam",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "ssm:GetParameter",
+        Resource: "*",
+        Condition: { StringEquals: { "ssm:ResourceTag/team": "orders" } },
+      },
+    }),
+  },
+});
+
+const read = await simAws
+  .ssm()
+  .getParameter(new GetParameterCommand({ Name: "/orders/db-host" }), {
+    caller: {
+      kind: "arn",
+      arn: "arn:aws:iam::123456789012:role/OrdersReader",
+    },
+  });
+
+console.log(read.Parameter?.Value); // "db.internal"
+```
+
 ## Parameter names
 
 Parameter names use the same validation rules as AWS. A name:
@@ -1006,6 +1112,8 @@ Simulated Parameter Store supports:
 - `GetParametersByPathCommand`, with and without `Recursive`
 - `DeleteParameterCommand` and `DeleteParametersCommand`
 - `DescribeParametersCommand`
+- `AddTagsToResourceCommand`, `RemoveTagsFromResourceCommand` and `ListTagsForResourceCommand` on
+  parameters, with tags reaching IAM as `aws:ResourceTag/<key>`
 - `String`, `StringList` and `SecureString` parameter types
 - `SecureString` values encrypted through simulated KMS, decrypted only with `WithDecryption`
 - The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
@@ -1034,9 +1142,6 @@ Simulated Parameter Store supports:
   every parameter reports `Tier: Standard` with the 4KB standard tier value limit.
 - Parameter policies (expiration and notification) are left out. `Policies` is refused, and
   `DescribeParameters` always reports an empty `Policies` list.
-- Tags are left out. `Tags` on `PutParameter` is refused, and `AddTagsToResource`,
-  `RemoveTagsFromResource` and `ListTagsForResource` are absent. An `AWS::SSM::Parameter` carrying
-  `Tags` deploys with the tags dropped and the property recorded.
 - `AllowedPattern` is refused outright. Ignoring it would store a value it was meant to reject,
   without complaint.
 - `KeyId` on a `String` or `StringList` parameter is refused, since nothing would encrypt a value
@@ -1056,11 +1161,10 @@ Simulated Parameter Store supports:
 - There is no per-account parameter count limit, so `ParameterLimitExceeded` never happens.
 - Deletion is immediate. Real Parameter Store asks for thirty seconds before a deleted name is
   reused, where here the name is free straight away.
-- `AWS::SSM::Parameter` supports `Name`, `Type`, `Value`, `Description` and `Tier`. `AllowedPattern`,
-  `DataType` and `Policies` reach `PutParameter`, which refuses them for the reasons above. `Tags`
-  is the one difference from the command, and is recorded as an ignored property so a stack that
-  tags every Resource in it still deploys. `Type: SecureString` is refused, as real CloudFormation
-  refuses it for this resource type. The plaintext value would sit in the template.
+- `AWS::SSM::Parameter` supports `Name`, `Type`, `Value`, `Description`, `Tier` and `Tags`.
+  `AllowedPattern`, `DataType` and `Policies` reach `PutParameter`, which refuses them for the
+  reasons above. `Type: SecureString` is refused, as real CloudFormation refuses it for this
+  resource type. The plaintext value would sit in the template.
 - The other `AWS::SSM::*` resource types (`Document`, `Association`, `MaintenanceWindow`,
   `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped.
 - Every deployment of an `AWS::SSM::Parameter` is a create. A name another stack already used is

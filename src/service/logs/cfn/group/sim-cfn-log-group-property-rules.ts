@@ -3,7 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import { unsimulatedPropertyReasons } from "./sim-cfn-log-group-unsimulated-properties.js";
 
 /** The properties a log group Resource is actually created from. */
-const actedOnProperties = new Set(["LogGroupName", "RetentionInDays"]);
+const actedOnProperties = new Set(["LogGroupName", "RetentionInDays", "Tags"]);
 
 interface SimCfnLogGroupPropertyRulesProperties {
   readonly properties: SimCfnTemplateValueRecord;
@@ -13,8 +13,8 @@ interface SimCfnLogGroupPropertyRulesProperties {
 /**
  * What a log group Resource is created without acting on.
  *
- * The name and the retention are the two properties this simulation reads,
- * because they are the two a test asserts on. Everything else, whether
+ * The name, the retention and the tags are the properties this simulation
+ * reads, because they are the ones a test asserts on or a policy reads. Everything else, whether
  * CloudWatch Logs has it or not, is recorded so a reader can see what a
  * deployed log group is not doing.
  */

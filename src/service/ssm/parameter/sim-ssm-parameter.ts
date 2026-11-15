@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimSsmParameterVersionNotFound } from "../error/sim-ssm.error.js";
 import { SimSsmParameterArn } from "./sim-ssm-parameter-arn.js";
+import { simSsmParameterTags } from "./sim-ssm-parameter-tags.js";
 import type { SimSsmParameterName } from "./sim-ssm-parameter-name.js";
 import type { SimSsmParameterType } from "./sim-ssm-parameter-type.js";
 import type { SimSsmParameterValue } from "./sim-ssm-parameter-value.js";
@@ -13,6 +14,11 @@ interface SimSsmParameterProperties {
   readonly name: SimSsmParameterName;
   readonly type: SimSsmParameterType;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+
+  /**
+   * The tags the parameter is created with.
+   */
+  readonly tags?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -27,6 +33,7 @@ export class SimSsmParameter {
   public readonly name: SimSsmParameterName;
   public readonly type: SimSsmParameterType;
   public readonly arn: SimSsmParameterArn;
+  public readonly tags = simSsmParameterTags();
 
   private readonly versions = new Map<number, SimSsmParameterVersion>();
   private latest = 0;
@@ -38,6 +45,7 @@ export class SimSsmParameter {
       resource: properties.name.resource,
       accountRegionScope: properties.accountRegionScope,
     });
+    this.tags.apply(properties.tags ?? {});
   }
 
   /**

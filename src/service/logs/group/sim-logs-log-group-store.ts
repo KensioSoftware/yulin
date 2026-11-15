@@ -33,7 +33,11 @@ export class SimLogsLogGroupStore {
   /**
    * Make a log group, refusing a name that is taken.
    */
-  create(logGroupName: string, creationTime: number): SimLogsLogGroup {
+  create(
+    logGroupName: string,
+    creationTime: number,
+    tags?: Readonly<Record<string, string>>,
+  ): SimLogsLogGroup {
     if (this.#groups.has(logGroupName)) {
       throw new SimLogsResourceAlreadyExistsException(
         "The specified log group already exists",
@@ -44,6 +48,7 @@ export class SimLogsLogGroupStore {
       logGroupName,
       accountRegionScope: this.#accountRegionScope,
       creationTime,
+      tags,
     });
 
     this.#groups.set(logGroupName, group);

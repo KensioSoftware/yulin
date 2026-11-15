@@ -88,14 +88,7 @@ describe("SimLogs DescribeLogGroups", () => {
     // Given a simulated CloudWatch Logs.
     const logs = new SimAws().logs();
 
-    // When a group is created with tags, a key, or a non-standard class.
-    const tagged = await assertThrowsErrorAsync(
-      async () =>
-        await createGroup(logs, {
-          logGroupName: "orders",
-          tags: { team: "platform" },
-        }),
-    );
+    // When a group is created with a key, or a non-standard class.
     const encrypted = await assertThrowsErrorAsync(
       async () =>
         await createGroup(logs, {
@@ -113,7 +106,6 @@ describe("SimLogs DescribeLogGroups", () => {
 
     // Then each is refused, so nothing looks set here and behaves differently
     // in an account.
-    assertInstanceOf(tagged, SimLogsUnsupportedOperationException);
     assertInstanceOf(encrypted, SimLogsUnsupportedOperationException);
     assertInstanceOf(infrequent, SimLogsUnsupportedOperationException);
   });

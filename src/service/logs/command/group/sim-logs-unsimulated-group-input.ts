@@ -14,19 +14,12 @@ export const simLogsStandardLogGroupClass = "STANDARD";
  *
  * Each of these changes what the log group does on real AWS, so accepting one
  * and dropping it would let a request succeed here and behave differently in
- * an account. A tag is the clearest case: the group would look tagged to the
- * request that made it and untagged to everything else.
+ * an account. A key is the clearest case: events a key was meant to protect
+ * would be stored here without one.
  */
 export function refuseUnsimulatedLogGroupInput(
   input: SimCreateLogGroupCommandInput,
 ): void {
-  if (input.tags !== undefined) {
-    throw new SimLogsUnsupportedOperationException(
-      "Log group tags are not simulated, so CreateLogGroup refuses them " +
-        "rather than dropping them",
-    );
-  }
-
   if (input.kmsKeyId !== undefined) {
     throw new SimLogsUnsupportedOperationException(
       "Log group encryption is not simulated, so CreateLogGroup refuses " +

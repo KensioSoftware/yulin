@@ -1039,6 +1039,10 @@ same key is the one evaluated.
 | Secrets Manager | secret                                  | `secretsmanager:ResourceTag/` |
 | SQS             | queue                                   |                               |
 | SNS             | topic                                   |                               |
+| SSM             | parameter                               | `ssm:ResourceTag/`            |
+| CloudWatch Logs | log group, with its streams             |                               |
+| EventBridge     | rule and event bus                      |                               |
+| KMS             | key                                     |                               |
 | Kinesis         | stream, with its consumers              |                               |
 | ECS             | cluster                                 | `ecs:ResourceTag/`            |
 | ACM             | certificate                             |                               |
@@ -2526,9 +2530,10 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   as they do on AWS. A served request carries `aws:SourceIp` and none of `aws:SecureTransport`,
   `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`. An ordinary condition on one
   of those fails to match, and `Null` or an `...IfExists` operator treats it as absent
-- SSM, CloudWatch Logs, EventBridge and KMS hold no tags on their resources, so a request to them
-  carries no `aws:ResourceTag/` key. S3 supplies bucket tags only once ABAC is enabled on the bucket,
-  which is absent, and reads object tags as `s3:ExistingObjectTag/`. Outside IAM, Lambda, SQS and
-  SNS, no create or tag command carries `aws:RequestTag/` or `aws:TagKeys`
+- S3 supplies bucket tags only once ABAC is enabled on the bucket, which is absent, and reads object
+  tags as `s3:ExistingObjectTag/`. Outside IAM, Lambda, SQS, SNS, SSM, CloudWatch Logs, EventBridge
+  and KMS, no create or tag command carries `aws:RequestTag/` or `aws:TagKeys`
+- A KMS key's tags reach its key policy as well as IAM policies. Real KMS supplies
+  `aws:ResourceTag/` to IAM policies only
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
   instance. A caller whose Account is absent from the simulation is denied

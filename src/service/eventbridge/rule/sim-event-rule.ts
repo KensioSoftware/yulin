@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEventBusName } from "../bus/sim-event-bus-name.js";
 import type { SimEventBridgeEnvelope } from "../event/sim-event-bridge-event.js";
 import type { SimEventPattern } from "../pattern/sim-event-pattern.js";
+import { simEventBridgeTags } from "./sim-event-bridge-tags.js";
 import { eventRuleArn } from "./sim-event-rule-arn.js";
 import type { SimEventRuleName } from "./sim-event-rule-name.js";
 import type { SimEventRuleState } from "./sim-event-rule-state.js";
@@ -15,6 +16,11 @@ interface SimEventRuleProperties {
   readonly schedule?: SimSchedule | undefined;
   readonly state: SimEventRuleState;
   readonly description?: string | undefined;
+
+  /**
+   * The tags the rule is created with.
+   */
+  readonly tags?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -41,6 +47,7 @@ export class SimEventRule {
   public readonly schedule: SimSchedule | undefined;
 
   public readonly description: string | undefined;
+  public readonly tags = simEventBridgeTags();
 
   private held: SimEventRuleState;
 
@@ -56,6 +63,7 @@ export class SimEventRule {
     this.schedule = properties.schedule;
     this.description = properties.description;
     this.held = properties.state;
+    this.tags.apply(properties.tags ?? {});
   }
 
   /**

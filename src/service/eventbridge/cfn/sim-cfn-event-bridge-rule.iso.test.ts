@@ -4,6 +4,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -246,7 +247,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     assertStringIncludes(error.message, "OrdersRule");
   });
 
-  it("records rule tags rather than failing the stack over them", async () => {
+  it("creates a rule with the tags the template declares", async () => {
     // Given a tagged rule, as a CDK app tagging its whole app deploys.
     const simAws = new SimAws();
 
@@ -269,14 +270,12 @@ describe("EventBridge CloudFormation Rule deployment", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the rule is there, and the tags it lost are recorded against it.
-    assertNonNullable(simAws.eventBridge().findRule("orders"));
-
-    const ignored = stack.getResource("OrdersRule")?.ignoredProperties ?? [];
-
-    assertArrayLength(ignored, 1);
-    assertIdentical(ignored[0].path, "Tags");
-    assertStringIncludes(ignored[0].reason, "not simulated");
+    // Then the rule holds them, and nothing is recorded as skipped.
+    assertObjectEquals(
+      simAws.eventBridge().findRule("orders")?.tags.record() ?? {},
+      { team: "orders" },
+    );
+    assertArrayEmpty(stack.getResource("OrdersRule")?.ignoredProperties ?? []);
   });
 
   it("refuses a bus property written as null", async () => {
@@ -304,7 +303,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     assertStringIncludes(error.message, "Policy");
   });
 
-  it("records bus tags rather than failing the stack over them", async () => {
+  it("creates a bus with the tags the template declares", async () => {
     // Given a tagged bus, as a CDK app tagging its whole app deploys.
     const simAws = new SimAws();
 
@@ -326,14 +325,12 @@ describe("EventBridge CloudFormation Rule deployment", () => {
 
     await stack.waitForDeployComplete();
 
-    // Then the bus is there, and the tags it lost are recorded against it.
-    assertNonNullable(simAws.eventBridge().findEventBus("orders"));
-
-    const ignored = stack.getResource("OrdersBus")?.ignoredProperties ?? [];
-
-    assertArrayLength(ignored, 1);
-    assertIdentical(ignored[0].path, "Tags");
-    assertStringIncludes(ignored[0].reason, "not simulated");
+    // Then the bus holds them, and nothing is recorded as skipped.
+    assertObjectEquals(
+      simAws.eventBridge().findEventBus("orders")?.tags.record() ?? {},
+      { team: "orders" },
+    );
+    assertArrayEmpty(stack.getResource("OrdersBus")?.ignoredProperties ?? []);
   });
 
   it("removes the rules and targets a stack created", async () => {

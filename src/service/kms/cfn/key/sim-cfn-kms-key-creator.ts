@@ -1,4 +1,5 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { simCfnKmsTags } from "./sim-cfn-kms-key-tags.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimKmsKey } from "../../key/sim-kms-key.js";
@@ -43,6 +44,7 @@ export class SimCfnKmsKeyCreator {
           KeySpec: keyProperties.keySpec(),
           KeyUsage: keyProperties.keyUsage(),
           Origin: keyProperties.origin(),
+          Tags: simCfnKmsTags(properties["Tags"]),
         },
       },
       options,

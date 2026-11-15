@@ -65,6 +65,20 @@ export class SimEventBridgeBusAccess {
   }
 
   /**
+   * Ensure the caller may perform each of several actions on a bus, as a
+   * request creating a tagged bus has to.
+   */
+  authorizeNameForEach(
+    actions: readonly string[],
+    name: SimEventBusName,
+    options?: SimEventBridgeRequestOptions,
+  ): void {
+    for (const action of actions) {
+      this.authorizeName(action, name, options);
+    }
+  }
+
+  /**
    * Ensure the caller may perform an action naming no particular bus.
    */
   authorizeAnyBus(

@@ -30,3 +30,14 @@ export type {
   SimGetParametersCommandOutput,
   SimSsmParameterFilter,
 } from "./parameter/query.command.js";
+export type {
+  SimAddTagsToResourceCommand,
+  SimAddTagsToResourceCommandInput,
+  SimAddTagsToResourceCommandOutput,
+  SimRemoveTagsFromResourceCommand,
+  SimRemoveTagsFromResourceCommandInput,
+  SimRemoveTagsFromResourceCommandOutput,
+  SimSsmListTagsForResourceCommand,
+  SimSsmListTagsForResourceCommandInput,
+  SimSsmListTagsForResourceCommandOutput,
+} from "./parameter/tag.command.js";

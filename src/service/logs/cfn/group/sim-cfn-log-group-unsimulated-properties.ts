@@ -25,11 +25,6 @@ export const unsimulatedPropertyReasons: ReadonlyMap<string, string> = new Map([
       "there are no Logs Insights queries here",
   ],
   [
-    "Tags",
-    "log group tags are not simulated, so nothing reads them back and " +
-      "nothing is billed or grouped by them",
-  ],
-  [
     "LogGroupClass",
     "only the standard class is simulated, which is what every operation " +
       "here behaves as",

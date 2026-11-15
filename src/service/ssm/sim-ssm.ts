@@ -15,6 +15,7 @@ import { SimSsmDescribeParameters } from "./command/parameter/sim-ssm-describe-p
 import { SimSsmGetParameterCommands } from "./command/parameter/sim-ssm-get-parameter-commands.js";
 import { SimSsmGetParametersByPath } from "./command/parameter/sim-ssm-get-parameters-by-path.js";
 import { SimSsmPutParameter } from "./command/parameter/sim-ssm-put-parameter.js";
+import { SimSsmTagCommands } from "./command/parameter/sim-ssm-tag-commands.js";
 import type * as simSsmCommands from "./command/sim-ssm-command.types.js";
 import { SimSsmCfnResourceFactory } from "./cfn/sim-cfn-ssm-resource-factory.js";
 import { SimCfnSsmDynamicReferenceResolver } from "./cfn/dynamic/sim-cfn-ssm-dynamic-reference-resolver.js";
@@ -24,6 +25,7 @@ import type { SimSsmParameter } from "./parameter/sim-ssm-parameter.js";
 import { SimSsmParameterEncryption } from "./parameter/sim-ssm-parameter-encryption.js";
 import type { SimSsmKmsCrypto } from "./parameter/sim-ssm-kms-crypto.js";
 import { SimSsmParameterStore } from "./parameter/sim-ssm-parameter-store.js";
+import { simSsmTagConditionIam } from "./parameter/sim-ssm-resource-tags.js";
 import { SimSsmParameterWriter } from "./parameter/sim-ssm-parameter-writer.js";
 import { SimSsmSdkCommandRouter } from "./sdk/sim-ssm-sdk-command-router.js";
 
@@ -61,6 +63,7 @@ export class SimSsm {
   private readonly pathCommand: SimSsmGetParametersByPath;
   private readonly deletionCommands: SimSsmDeleteParameterCommands;
   private readonly describeParametersCommand: SimSsmDescribeParameters;
+  private readonly tagCommands: SimSsmTagCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSsmSdkCommandRouter(this);
   private readonly cfnFactory = new SimSsmCfnResourceFactory({ ssm: this });
@@ -76,11 +79,15 @@ export class SimSsm {
     const { kms = new SimKms({ accountRegionScope, iam, background }) } =
       properties;
 
-    const authorizer = new SimSsmAuthorizer({ iam, accountRegionScope });
+    this.parameters = new SimSsmParameterStore();
+
+    const authorizer = new SimSsmAuthorizer({
+      iam: simSsmTagConditionIam(iam, this.parameters),
+      accountRegionScope,
+    });
     const encryption = new SimSsmParameterEncryption({ kms });
 
     this.background = background;
-    this.parameters = new SimSsmParameterStore();
     this.putParameterCommand = new SimSsmPutParameter({
       writer: new SimSsmParameterWriter({
         parameters: this.parameters,
@@ -107,6 +114,10 @@ export class SimSsm {
       authorizer,
     });
     this.describeParametersCommand = new SimSsmDescribeParameters({
+      parameters: this.parameters,
+      authorizer,
+    });
+    this.tagCommands = new SimSsmTagCommands({
       parameters: this.parameters,
       authorizer,
     });
@@ -197,6 +208,39 @@ export class SimSsm {
   ): Promise<simSsmCommands.SimDescribeParametersCommandOutput> {
     await this.background.sequence();
     return this.describeParametersCommand.handle(command, options);
+  }
+
+  /**
+   * Handle an AddTagsToResource Command from the SDK.
+   */
+  async addTagsToResource(
+    command: simSsmCommands.SimAddTagsToResourceCommand,
+    options?: SimSsmRequestOptions,
+  ): Promise<simSsmCommands.SimAddTagsToResourceCommandOutput> {
+    await this.background.sequence();
+    return this.tagCommands.add(command, options);
+  }
+
+  /**
+   * Handle a RemoveTagsFromResource Command from the SDK.
+   */
+  async removeTagsFromResource(
+    command: simSsmCommands.SimRemoveTagsFromResourceCommand,
+    options?: SimSsmRequestOptions,
+  ): Promise<simSsmCommands.SimRemoveTagsFromResourceCommandOutput> {
+    await this.background.sequence();
+    return this.tagCommands.remove(command, options);
+  }
+
+  /**
+   * Handle a ListTagsForResource Command from the SDK.
+   */
+  async listTagsForResource(
+    command: simSsmCommands.SimSsmListTagsForResourceCommand,
+    options?: SimSsmRequestOptions,
+  ): Promise<simSsmCommands.SimSsmListTagsForResourceCommandOutput> {
+    await this.background.sequence();
+    return this.tagCommands.list(command, options);
   }
 
   /**

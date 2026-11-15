@@ -10,7 +10,7 @@ describe("EventBridge SDK Command router", () => {
     // When its router is asked what it supports.
     const supported = simEventBridge.sdkCommandRouter().supportedCommandNames();
 
-    // Then it names the bus, event, rule and target commands.
+    // Then it names the bus, event, tag, rule and target commands.
     assertArrayEquals(supported, [
       "CreateEventBusCommand",
       "DeleteEventBusCommand",
@@ -18,6 +18,9 @@ describe("EventBridge SDK Command router", () => {
       "ListEventBusesCommand",
       "DescribeEventSourceCommand",
       "PutEventsCommand",
+      "TagResourceCommand",
+      "UntagResourceCommand",
+      "ListTagsForResourceCommand",
       "PutRuleCommand",
       "DeleteRuleCommand",
       "DescribeRuleCommand",

@@ -280,9 +280,9 @@ OrdersLogs:
 the form a policy has to name. A template granting a function permission on its own log group gets a
 resource that reaches the streams inside it.
 
-`LogGroupName` and `RetentionInDays` are the two properties acted on. A `RetentionInDays` outside the
-set AWS accepts fails the deploy, where otherwise it would only be found on a real one. Everything
-else is recorded as an ignored property. A reader can see what a deployed group leaves out, and the
+`LogGroupName`, `RetentionInDays` and `Tags` are the properties acted on. A `RetentionInDays`
+outside the set AWS accepts fails the deploy, where otherwise it would only be found on a real one.
+Everything else is recorded as an ignored property. A reader can see what a deployed group leaves out, and the
 stack still deploys.
 
 Two divergences to know about:
@@ -290,6 +290,7 @@ Two divergences to know about:
 - **A group that already exists is taken over.** Real CloudFormation fails a deploy that declares a
   log group already in the account. That is a genuine misconfiguration there and pure noise here,
   where a Lambda function that logged during test setup has already created `/aws/lambda/orders`.
+  The template's `Tags` are put on the group it takes over through `TagResource`.
 - **An update replaces the group.** Simulated CloudFormation has no in-place update at all. Any
   resource whose template entry changed is deleted and created again. The retention ends up correct,
   but the events the group held are gone, where a real update to `RetentionInDays` keeps them.
@@ -1085,6 +1086,111 @@ await simAws.logs().createLogStream(
 console.log(simAws.logs().findLogGroup(logGroupName)?.logGroupArn);
 ```
 
+## Tagging a log group
+
+`CreateLogGroup` takes `tags`, and `TagResource`, `UntagResource` and `ListTagsForResource` change
+and read them afterwards. Each names the group by its ARN, with or without the trailing `:*`. Log
+groups are the only CloudWatch Logs resources whose tags are simulated, so an ARN naming anything
+else is refused as `InvalidParameterException`, and a group that is not there is
+`ResourceNotFoundException`.
+
+A tag key runs from 1 to 128 characters and a value to 256 (Unicode letters, digits and spaces, and
+`_ . : / = + - @`). A key under the reserved `aws:` prefix is refused as
+`InvalidParameterException`. A group holds at most 50 tags, and a request that would leave it
+holding more is `TooManyTagsException`. A refused request leaves the tags as they were.
+
+A request on a log group, or on a stream inside one, carries the group's tags to IAM as
+`aws:ResourceTag/<key>`. `CreateLogGroup` and `TagResource` carry the tags they set as
+`aws:RequestTag/<key>` and their keys as `aws:TagKeys`, and `UntagResource` carries the keys it
+removes as `aws:TagKeys`. Creating a group with tags needs `logs:TagResource` as well as
+`logs:CreateLogGroup`, or the older `logs:TagLogGroup`, which CloudWatch Logs still accepts in its
+place. The older `TagLogGroup`, `UntagLogGroup` and `ListTagsLogGroup` operations themselves are
+absent.
+
+```typescript sim-logs-tags
+/**
+ * Tagging a log group and deciding a request on its tags.
+ */
+
+import {
+  CreateLogGroupCommand,
+  CreateLogStreamCommand,
+  ListTagsForResourceCommand,
+  TagResourceCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "123456789012",
+  defaultRegionName: "eu-west-2",
+});
+const resourceArn = "arn:aws:logs:eu-west-2:123456789012:log-group:/orders/app";
+
+await simAws.logs().createLogGroup(
+  new CreateLogGroupCommand({
+    logGroupName: "/orders/app",
+    tags: { team: "orders" },
+  }),
+);
+
+await simAws
+  .logs()
+  .tagResource(
+    new TagResourceCommand({ resourceArn, tags: { stage: "test" } }),
+  );
+
+const listed = await simAws
+  .logs()
+  .listTagsForResource(new ListTagsForResourceCommand({ resourceArn }));
+
+console.log(listed.tags); // { team: 'orders', stage: 'test' }
+
+await simAws.iam().createRole({
+  input: {
+    RoleName: "OrdersLogger",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::123456789012:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  },
+});
+
+await simAws.iam().putRolePolicy({
+  input: {
+    RoleName: "OrdersLogger",
+    PolicyName: "LogToOwnTeam",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "logs:CreateLogStream",
+        Resource: "*",
+        Condition: { StringEquals: { "aws:ResourceTag/team": "orders" } },
+      },
+    }),
+  },
+});
+
+await simAws.logs().createLogStream(
+  new CreateLogStreamCommand({
+    logGroupName: "/orders/app",
+    logStreamName: "one",
+  }),
+  {
+    caller: {
+      kind: "arn",
+      arn: "arn:aws:iam::123456789012:role/OrdersLogger",
+    },
+  },
+);
+
+console.log(simAws.logs().findLogGroup("/orders/app")?.streams.length); // 1
+```
+
 ## Through an intercepted SDK client
 
 Application code that constructs its own `CloudWatchLogsClient` reaches the simulator through SDK
@@ -1149,9 +1255,11 @@ console.log(described.logGroups?.[0]?.logGroupArn);
   alone here, and refused with the option on.
 - **Log types for services other than CloudFront.** Yulin accepts any `logType` for resources other
   than distributions because the valid set varies by service.
-- **Logs Insights, export tasks, tags, encryption and data protection policies.** Absent. Tags and
-  `kmsKeyId` on `CreateLogGroup` are refused outright. A property cannot look set here and behave
-  differently in an account.
+- **Logs Insights, export tasks, encryption and data protection policies.** Absent. `kmsKeyId` on
+  `CreateLogGroup` is refused outright. A property cannot look set here and behave differently in an
+  account.
+- **Tags on anything but a log group.** Destinations, deliveries and the rest hold none, and the
+  older `TagLogGroup`, `UntagLogGroup` and `ListTagsLogGroup` operations are absent.
 - **Per-stream `storedBytes`.** Always zero, matching real CloudWatch Logs, which stopped reporting
   the figure per stream in 2019. `DescribeLogGroups` reports the bytes a group holds.
 - **Log capture from a handler function reference.** Recorded through the process console and the

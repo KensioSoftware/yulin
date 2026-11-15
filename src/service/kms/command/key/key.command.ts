@@ -2,6 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type { SimIamPolicyDocument } from "../../../iam/policy/sim-iam-policy.js";
 import type { SimKmsKeyMetadata } from "../../key/sim-kms-key-metadata.js";
 import type { SimKmsKeyState } from "../../key/sim-kms-key.js";
+import type { SimKmsTag } from "../../key/sim-kms-key-tags.js";
 
 /**
  * Minimal structural sim KMS CreateKey command.
@@ -25,6 +26,7 @@ export interface SimCreateKeyCommandInput {
   readonly KeyUsage?: string | undefined;
   readonly KeySpec?: string | undefined;
   readonly Origin?: string | undefined;
+  readonly Tags?: readonly SimKmsTag[] | undefined;
 }
 
 export interface SimCreateKeyCommandOutput {

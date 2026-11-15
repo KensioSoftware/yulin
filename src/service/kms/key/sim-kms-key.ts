@@ -8,6 +8,7 @@ import {
 } from "./sim-kms-key-lifecycle.js";
 import type { SimKmsKeyMaterial } from "./sim-kms-key-material.js";
 import type { SimKmsKeyPolicy } from "./sim-kms-key-policy.js";
+import { simKmsKeyTags } from "./sim-kms-key-tags.js";
 import type { SimKmsKeySpec } from "./spec/sim-kms-key-spec.js";
 import type { SimKmsSigningAlgorithm } from "./spec/sim-kms-signing-algorithm.js";
 
@@ -51,6 +52,7 @@ export class SimKmsKey {
   public readonly keyManager: SimKmsKeyManager;
   public readonly policy: SimKmsKeyPolicy;
   public readonly description: string;
+  public readonly tags = simKmsKeyTags();
 
   private readonly material: SimKmsKeyMaterial;
   private readonly lifecycle: SimKmsKeyLifecycle;

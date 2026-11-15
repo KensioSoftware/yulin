@@ -190,3 +190,31 @@ export class SimKmsAccessDeniedException extends SimKmsError {
     this.resource = input.resource;
   }
 }
+
+/**
+ * Simulated KMS TagException error.
+ *
+ * Real KMS refuses a tag it will not take this way, such as a key longer
+ * than 128 characters or one under the reserved `aws:` prefix.
+ */
+export class SimKmsTagException extends SimKmsError {
+  public override readonly name = "TagException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated KMS LimitExceededException error.
+ *
+ * A key holds at most 50 tags, and a request that would leave it holding
+ * more fails this way.
+ */
+export class SimKmsLimitExceededException extends SimKmsError {
+  public override readonly name = "LimitExceededException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

@@ -4,6 +4,7 @@ import { SimEventRuleState } from "../../rule/sim-event-rule-state.js";
 import type { SimEventRuleStore } from "../../rule/sim-event-rule-store.js";
 import type { SimEventBridgeRuleSchedules } from "../../schedule/sim-event-bridge-rule-schedules.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
+import { simEventBridgeRequestTags } from "../tag/sim-event-bridge-request-tags.js";
 import { refuseUnsimulatedRuleInput } from "./sim-event-bridge-unsimulated-rule-input.js";
 import type { SimEventBridgeRuleAccess } from "./sim-event-bridge-rule-access.js";
 import { eventBridgeRuleTrigger } from "./sim-event-bridge-rule-trigger.js";
@@ -32,6 +33,11 @@ interface SimEventBridgePutRuleProperties {
  * soon as it is created, so a test advancing time past a due instant fires it.
  * Replacing a scheduled rule restarts its schedule, since the rule the old one
  * was counting for is no longer the rule of that name.
+ *
+ * Tags are the exception to replacement. A rule created with tags needs
+ * `events:TagResource` as well as `events:PutRule`. A request replacing an
+ * existing rule keeps the tags that rule holds and ignores any it carries,
+ * as the PutRule reference says.
  */
 export class SimEventBridgePutRule {
   private readonly rules: SimEventRuleStore;
@@ -58,8 +64,20 @@ export class SimEventBridgePutRule {
     refuseUnsimulatedRuleInput(input);
 
     const requested = this.access.requested(input);
+    const existing = this.rules.find(
+      requested.busName.value,
+      requested.name.value,
+    );
+    const request = simEventBridgeRequestTags(
+      input.Tags,
+      options,
+      "events:PutRule",
+      existing === undefined,
+    );
 
-    this.access.authorize("events:PutRule", requested, options);
+    for (const action of request.actions) {
+      this.access.authorize(action, requested, request.options);
+    }
 
     const trigger = eventBridgeRuleTrigger(input, requested.busName.value);
 
@@ -71,6 +89,7 @@ export class SimEventBridgePutRule {
       schedule: trigger.schedule,
       state: SimEventRuleState.of(input.State),
       description: input.Description,
+      tags: existing?.tags.record() ?? request.tags,
     });
 
     this.rules.put(rule);

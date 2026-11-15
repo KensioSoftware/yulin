@@ -28,6 +28,12 @@ export interface SimSsmParameterWrite {
   readonly lastModifiedUser: string | undefined;
 
   /**
+   * The tags a new parameter is created with. PutParameter refuses tags on
+   * an overwrite, so an existing parameter never meets them.
+   */
+  readonly tags: Readonly<Record<string, string>>;
+
+  /**
    * The key the request asked to encrypt with, in any form KMS accepts: an
    * alias such as `alias/aws/ssm`, a key ID, or a key ARN. Undefined leaves
    * Parameter Store to pick its own AWS managed key.
@@ -87,7 +93,7 @@ export class SimSsmParameterWriter {
       request.keyId,
       request.caller,
     );
-    const parameter = existing ?? this.created(request.name, type);
+    const parameter = existing ?? this.created(request, type);
 
     return parameter.addVersion(stored.value, this.clock.now(), {
       description: request.description,
@@ -111,13 +117,14 @@ export class SimSsmParameterWriter {
   }
 
   private created(
-    name: SimSsmParameterName,
+    request: SimSsmParameterWrite,
     type: SimSsmParameterType,
   ): SimSsmParameter {
     const parameter = new SimSsmParameter({
-      name,
+      name: request.name,
       type,
       accountRegionScope: this.accountRegionScope,
+      tags: request.tags,
     });
 
     this.parameters.add(parameter);

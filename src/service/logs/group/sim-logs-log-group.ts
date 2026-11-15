@@ -8,11 +8,17 @@ import {
   simLogsLogGroupWildcardArn,
   simLogsLogStreamArn,
 } from "./sim-logs-arn.js";
+import { simLogsLogGroupTags } from "./sim-logs-log-group-tags.js";
 
 interface SimLogsLogGroupProperties {
   readonly logGroupName: string;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly creationTime: number;
+
+  /**
+   * The tags the group is created with.
+   */
+  readonly tags?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -41,6 +47,11 @@ export class SimLogsLogGroup {
    */
   readonly metricFilters = new SimLogsMetricFilterStore();
 
+  /**
+   * The tags this group holds.
+   */
+  readonly tags = simLogsLogGroupTags();
+
   readonly #streams: SimLogsLogStreamStore;
   #retentionInDays: number | undefined;
 
@@ -49,6 +60,7 @@ export class SimLogsLogGroup {
 
     this.logGroupName = logGroupName;
     this.creationTime = properties.creationTime;
+    this.tags.apply(properties.tags ?? {});
     this.logGroupArn = simLogsLogGroupArn(accountRegionScope, logGroupName);
     this.arn = simLogsLogGroupWildcardArn(accountRegionScope, logGroupName);
     this.#streams = new SimLogsLogStreamStore({

@@ -26,6 +26,11 @@ import type {
   SimPutTargetsCommand,
   SimRemoveTargetsCommand,
 } from "../command/target/target.command.js";
+import type {
+  SimEventBridgeListTagsForResourceCommand,
+  SimEventBridgeTagResourceCommand,
+  SimEventBridgeUntagResourceCommand,
+} from "../command/tag/tag.command.js";
 import type { SimEventBridge } from "../sim-event-bridge.js";
 
 /**
@@ -81,6 +86,30 @@ export class SimEventBridgeSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simEventBridge.putEvents(
             command as SimPutEventsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.tagResource(
+            command as SimEventBridgeTagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.untagResource(
+            command as SimEventBridgeUntagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTagsForResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listTagsForResource(
+            command as SimEventBridgeListTagsForResourceCommand,
             simSdkCallerOptions(context),
           ),
       ],

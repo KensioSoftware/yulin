@@ -90,7 +90,6 @@ describe("EventBridge event bus validation", () => {
 
     // When a bus is asked for with each unmodelled property in turn.
     const inputs: CreateEventBusCommandInput[] = [
-      { Name: "orders", Tags: [{ Key: "team", Value: "orders" }] },
       { Name: "orders", KmsKeyIdentifier: "alias/events" },
       {
         Name: "orders",

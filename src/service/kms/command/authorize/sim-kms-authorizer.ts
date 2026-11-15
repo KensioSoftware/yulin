@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { SimKmsAccessDeniedException } from "../../error/sim-kms.error.js";
 import { SimKmsCallerAccountCondition } from "../../key/sim-kms-caller-account.js";
 import type { SimKmsKey } from "../../key/sim-kms-key.js";
@@ -102,16 +103,19 @@ export class SimKmsAuthorizer {
    * A request the caller made itself supplies no `kms:ViaService`, so a policy
    * conditioned on it fails to match rather than matching anything.
    */
-  private conditionContext(
-    options: SimKmsRequestOptions,
-  ): Readonly<Record<string, string>> {
+  private conditionContext(options: SimKmsRequestOptions): SimIamConditions {
+    const requested = options.requestConditions ?? {};
+
     if (options.viaService === undefined) {
-      return {};
+      return requested;
     }
 
-    return new SimKmsViaService(
-      options.viaService,
-      this.accountRegionScope.regionName,
-    ).asConditionContext();
+    return {
+      ...requested,
+      ...new SimKmsViaService(
+        options.viaService,
+        this.accountRegionScope.regionName,
+      ).asConditionContext(),
+    };
   }
 }

@@ -29,6 +29,11 @@ import type {
   SimSignCommand,
   SimVerifyCommand,
 } from "../command/sign/sign.command.js";
+import type {
+  SimKmsTagResourceCommand,
+  SimKmsUntagResourceCommand,
+  SimListResourceTagsCommand,
+} from "../command/tag/tag.command.js";
 import type { SimKms } from "../sim-kms.js";
 
 /**
@@ -180,6 +185,30 @@ export class SimKmsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simKms.getPublicKey(
             command as SimGetPublicKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.tagResource(
+            command as SimKmsTagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.untagResource(
+            command as SimKmsUntagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListResourceTagsCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.listResourceTags(
+            command as SimListResourceTagsCommand,
             simSdkCallerOptions(context),
           ),
       ],
