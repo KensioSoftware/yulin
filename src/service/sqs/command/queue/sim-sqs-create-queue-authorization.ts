@@ -4,7 +4,7 @@ import type { SimSqsQueueAccess } from "./sim-sqs-queue-access.js";
 
 /**
  * Ensure the caller may create a queue, and tag it where the request carries
- * tags, which takes `sqs:TagQueue` as well.
+ * at least one tag, which takes `sqs:TagQueue` as well.
  *
  * Both actions see the tags as `aws:RequestTag/<key>` and their keys as
  * `aws:TagKeys`, as the Service Authorization Reference lists for them.
@@ -22,7 +22,7 @@ export function simSqsAuthorizeCreateQueue(
 
   access.authorizeName("sqs:CreateQueue", name, tagged);
 
-  if (tags !== undefined) {
+  if (tags !== undefined && Object.keys(tags).length > 0) {
     access.authorizeName("sqs:TagQueue", name, tagged);
   }
 }

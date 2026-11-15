@@ -99,6 +99,32 @@ describe("sim SQS queue tags", () => {
     assertObjectEquals(listed.Tags, { team: "orders" });
   });
 
+  it("counts a tag's length in characters", async () => {
+    // Given a queue
+    const simAws = new SimAws();
+    const QueueUrl = await teamQueue(simAws, "orders");
+    const letter = "\u{10400}";
+
+    // When it is tagged with a key of 128 letters from outside the Basic
+    // Multilingual Plane, each two UTF-16 code units, and then one of 129
+    await simAws
+      .sqs()
+      .tagQueue(
+        new TagQueueCommand({ QueueUrl, Tags: { [letter.repeat(128)]: "x" } }),
+      );
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.sqs().tagQueue(
+        new TagQueueCommand({
+          QueueUrl,
+          Tags: { [letter.repeat(129)]: "x" },
+        }),
+      ),
+    );
+
+    // Then only the key over 128 characters is refused
+    assertInstanceOf(error, SimSqsInvalidParameterValue);
+  });
+
   it("needs sqs:TagQueue to create a queue with tags", async () => {
     // Given a caller allowed to create queues and nothing else
     const simAws = new SimAws();
@@ -108,10 +134,16 @@ describe("sim SQS queue tags", () => {
     );
     const caller = { kind: "arn", arn: role.Arn } as const;
 
-    // When it creates one queue without tags and one with
+    // When it creates one queue without tags, one with an empty tag map,
+    // and one with a tag
     const untagged = await simAws
       .sqs()
       .createQueue(new CreateQueueCommand({ QueueName: "plain" }), {
+        caller,
+      });
+    await simAws
+      .sqs()
+      .createQueue(new CreateQueueCommand({ QueueName: "empty", tags: {} }), {
         caller,
       });
     const error = await assertThrowsErrorAsync(async () =>
@@ -123,7 +155,7 @@ describe("sim SQS queue tags", () => {
         ),
     );
 
-    // Then only the untagged queue is created
+    // Then only the queue carrying a tag is refused
     assertInstanceOf(error, SimIamAccessDenied);
     assertUndefined(simAws.sqs().findQueue("tagged"));
     assertStringEndsWith(untagged.QueueUrl ?? "", "/plain");

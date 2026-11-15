@@ -66,14 +66,14 @@ export class SimSqsQueueTags {
 }
 
 function assertTag(key: string, value: string): void {
-  if (key.length === 0 || key.length > greatestKeyLength) {
+  if (key.length === 0 || characters(key) > greatestKeyLength) {
     throw new SimSqsInvalidParameterValue(
       `Tag key ${JSON.stringify(key)} must be between 1 and ` +
         `${String(greatestKeyLength)} characters long`,
     );
   }
 
-  if (value.length > greatestValueLength) {
+  if (characters(value) > greatestValueLength) {
     throw new SimSqsInvalidParameterValue(
       `The value of tag ${JSON.stringify(key)} must be at most ` +
         `${String(greatestValueLength)} characters long`,
@@ -94,4 +94,20 @@ function assertTag(key: string, value: string): void {
       );
     }
   }
+}
+
+/**
+ * How many Unicode characters a tag key or value holds, which is what the
+ * quotas page counts. A letter outside the Basic Multilingual Plane is one
+ * character and two UTF-16 code units.
+ */
+function characters(text: string): number {
+  let count = 0;
+
+  // A string iterates by code point, where its length counts code units.
+  for (const _character of text) {
+    count += 1;
+  }
+
+  return count;
 }

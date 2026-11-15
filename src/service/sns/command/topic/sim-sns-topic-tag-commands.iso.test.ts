@@ -168,10 +168,16 @@ describe("sim SNS topic tags", () => {
     );
     const caller = { kind: "arn", arn: role.Arn } as const;
 
-    // When it creates one topic without tags and one with
+    // When it creates one topic without tags, one with an empty tag list,
+    // and one with a tag
     const untagged = await simAws
       .sns()
       .createTopic(new CreateTopicCommand({ Name: "plain" }), { caller });
+    await simAws
+      .sns()
+      .createTopic(new CreateTopicCommand({ Name: "empty", Tags: [] }), {
+        caller,
+      });
     const error = await assertThrowsErrorAsync(async () =>
       simAws.sns().createTopic(
         new CreateTopicCommand({
@@ -182,7 +188,7 @@ describe("sim SNS topic tags", () => {
       ),
     );
 
-    // Then only the untagged topic is created
+    // Then only the topic carrying a tag is refused
     assertTypeString(untagged.TopicArn);
     assertInstanceOf(error, SimSnsAuthorizationErrorException);
     assertUndefined(simAws.sns().findTopic("tagged"));

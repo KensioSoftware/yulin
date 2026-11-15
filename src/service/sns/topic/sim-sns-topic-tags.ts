@@ -103,7 +103,7 @@ export class SimSnsTopicTags {
 function readTag(tag: SimSnsTagInput): [string, string] {
   const key = tag.Key ?? "";
 
-  if (key.length === 0 || key.length > greatestKeyLength) {
+  if (key.length === 0 || characters(key) > greatestKeyLength) {
     throw new SimSnsInvalidParameterException(
       `Invalid parameter: Tags Reason: a tag key must be between 1 and ` +
         `${String(greatestKeyLength)} characters long, and ` +
@@ -113,7 +113,7 @@ function readTag(tag: SimSnsTagInput): [string, string] {
 
   const value = tag.Value ?? "";
 
-  if (value.length > greatestValueLength) {
+  if (characters(value) > greatestValueLength) {
     throw new SimSnsInvalidParameterException(
       `Invalid parameter: Tags Reason: the value of tag ` +
         `${JSON.stringify(key)} is longer than ` +
@@ -122,4 +122,19 @@ function readTag(tag: SimSnsTagInput): [string, string] {
   }
 
   return [key, value];
+}
+
+/**
+ * How many Unicode characters a tag key or value holds. A letter outside the
+ * Basic Multilingual Plane is one character and two UTF-16 code units.
+ */
+function characters(text: string): number {
+  let count = 0;
+
+  // A string iterates by code point, where its length counts code units.
+  for (const _character of text) {
+    count += 1;
+  }
+
+  return count;
 }

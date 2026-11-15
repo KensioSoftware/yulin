@@ -10,7 +10,7 @@ import type { SimSnsTopicAccess } from "./sim-sns-topic-access.js";
 
 /**
  * Ensure the caller may create a topic, and tag it where the request carries
- * tags, which takes `sns:TagResource` as well.
+ * at least one tag, which takes `sns:TagResource` as well.
  *
  * Both actions see the tags as `aws:RequestTag/<key>` and their keys as
  * `aws:TagKeys`, as the Service Authorization Reference lists for them.
@@ -28,7 +28,7 @@ export function simSnsAuthorizeCreateTopic(
 
   access.authorizeName("sns:CreateTopic", name, tagged);
 
-  if (tags !== undefined) {
+  if (tags !== undefined && tags.length > 0) {
     access.authorizeName("sns:TagResource", name, tagged);
   }
 }
