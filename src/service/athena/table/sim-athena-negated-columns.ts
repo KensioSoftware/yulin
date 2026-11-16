@@ -52,8 +52,9 @@ const boundary = new Set([
  *
  * `NOT` binds tighter than `AND`, so its reach ends at the next of the words
  * above, outside any brackets, and at the bracket the `NOT` itself sits in.
- * `OR` is absent from that list because a query carrying one is left
- * unfiltered before this runs.
+ * `OR` is absent from that list. A `NOT` and an `OR` in one group leave the
+ * whole group unread anyway, so how far the `NOT` reaches past the `OR`
+ * changes nothing.
  *
  * Nothing here parses, so a name a `NOT` could not really have reached is
  * dropped anyway. That direction only ever leaves a column unfiltered, which
