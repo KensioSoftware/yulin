@@ -1427,9 +1427,15 @@ do {
 console.log(read); // [ "1", "2", "3" ]
 ```
 
-`LastEvaluatedKey` is left out only when the key range ran out inside the `Limit`. Reaching the
-limit on the last matching item still hands out a token, and the next call answers with an empty
-page and no token. That is what real DynamoDB does, since it cannot know the range is exhausted
+A page also ends once it has read more than 1 MB of items, whether or not the request set a `Limit`.
+The 1 MB is counted before any filter runs, from each item as the table or index holds it (an index
+counts the attributes it projects). A read of a local secondary index that fetches an unprojected
+attribute from the table counts the whole item. The item that would take the total past 1 MB starts
+the next page. A collection of large items therefore pages even when a test asks for all of it.
+
+`LastEvaluatedKey` is left out only when the key range ran out inside the `Limit` and the 1 MB.
+Reaching the limit on the last matching item still hands out a token, and the next call answers with
+an empty page and no token. That is what real DynamoDB does, since it cannot know the range is exhausted
 without looking past it. A loop like the one above is the way to read a whole collection.
 
 A token still works when the item it names has since been deleted. It says where to resume. A token
@@ -2171,8 +2177,14 @@ More than 100 keys in one call, counted across every table the request names, is
 by its name and once by its ARN.
 
 Both commands answer with the map of what they could not get to, `UnprocessedItems` for a write and
-`UnprocessedKeys` for a read. Both are always empty here, since no request is throttled, but they
-are there all the same. The retry loop real code is written around still terminates:
+`UnprocessedKeys` for a read. A batch read answers with at most 16 MB of items. The key whose item
+would take it past that, and every key named after it, come back in `UnprocessedKeys` in the shape
+the request sent them (with the table's `ProjectionExpression`, `ExpressionAttributeNames` and
+`ConsistentRead`). Sending that map back as `RequestItems` reads the rest. The 16 MB counts each
+item after its projection, so 100 keys whose items are projected down to a few attributes always fit.
+
+`UnprocessedItems` is always empty, since no write is throttled. The retry loop real code is written
+around still terminates:
 
 ```typescript
 let unprocessed = {
@@ -3911,7 +3923,8 @@ is written.
 - `BatchWriteItem`, putting and deleting items across tables in one call, with the 25 request cap,
   the whole batch refusals, and an empty `UnprocessedItems`.
 - `BatchGetItem`, reading items across tables in one call, with `ConsistentRead` and
-  `ProjectionExpression` per table, the 100 key cap, and an empty `UnprocessedKeys`.
+  `ProjectionExpression` per table, the 100 key cap, and `UnprocessedKeys` for what would take the
+  response past 16 MB.
 - `TransactWriteItems`, applying up to 100 `Put`, `Update`, `Delete` and `ConditionCheck` actions in
   one step, with `TransactionCanceledException` carrying a cancellation reason per action, and
   `ClientRequestToken` making a retry idempotent for ten simulated minutes.
@@ -4025,9 +4038,6 @@ is written.
 - Exceeding the 50 tag limit is a `ValidationException`. Real DynamoDB documents
   `LimitExceededException` for `TagResource`, but describes it entirely in terms of how many table
   operations are running at once, which is a different thing from how many tags a table carries.
-- A request carries a table's tags as `aws:ResourceTag/<key>`, and a request naming an index or a
-  stream carries the tags of its table. `aws:RequestTag` and `aws:TagKeys` are absent, and a policy
-  that allows tagging only under a particular key allows all of it here.
 - Tables are the only taggable DynamoDB resource here. Backups and global table replicas are absent.
   An ARN naming one of those resolves to no resource. Real DynamoDB also copies a table's tags onto
   its secondary indexes, which have no target to copy to yet.
@@ -4113,19 +4123,18 @@ is written.
   since a table has to be `ACTIVE` before either.
 - No check enforces capacity. A provisioned table's throughput is stored and reported, and no
   request is ever throttled with `ProvisionedThroughputExceededException`.
-- A query or scan page is never cut short by size. Real DynamoDB stops a page at 1 MB and hands out
-  a `LastEvaluatedKey`, which is left out here. A page breaks only on a `Limit`. A test reading a
-  large collection or a large table with no `Limit` gets all of it in one page where a real one
-  would page.
+- The 1 MB that ends a query or scan page is counted with the item sizes used for the 400 KB item
+  limit. AWS documents those as approximate, so a page near 1 MB here may hold one item more or one
+  fewer than the same page on AWS. A test asserting exactly how many large items fit on a page is
+  asserting something about this simulator.
+- A local secondary index read whose `FilterExpression` names an unprojected attribute fetches the
+  item from the table on AWS. Here that item still counts toward the 1 MB at its projected size.
 - No part of this throttles or measures a query or a scan, so `ReturnConsumedCapacity` is refused
-  unless it names `NONE`, and a `Limit` is the only thing that ends a page early.
-- A key condition takes no brackets. `(customerId = :c) AND orderId > :o` is refused here, where
-  real DynamoDB accepts it. The shape of a key condition is fixed. There is no sub-expression for
-  brackets to group, and being stricter is the direction that fails safely. It is a puzzling refusal
-  here rather than a query that means something different on AWS.
-- `UnprocessedItems` and `UnprocessedKeys` are always empty. No request here is throttled and no
-  response stops at a size, and the branch of a batch retry loop that resends what did not go
-  through is never taken against the simulator.
+  unless it names `NONE`.
+- `UnprocessedItems` is always empty, and `UnprocessedKeys` is filled only by the 16 MB response
+  limit. No request here is throttled. Which keys a full batch read leaves unread is this
+  simulator's choice (the ones named last), where AWS reads a batch in parallel and leaves no order
+  to rely on.
 - The 16 MB limit on a batch request goes unenforced. Real DynamoDB counts the request as the JSON
   it arrived as, and the JSON is larger than the items it carries. That inflation is left out. A
   batch of 25 items under 400 KB each is under 10 MB by the sizes counted here. No measurement this

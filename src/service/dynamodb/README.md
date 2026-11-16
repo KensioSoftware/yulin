@@ -607,10 +607,12 @@ The parts a query is made of split by what they know:
   all, so a collection is gathered and ordered when it is read. `SimDynamoDbSortKeyOrder` is the
   order itself, and is where a table with no sort key stops mattering: such a table holds at most one
   item under a partition key, so every question about ordering has a trivial answer.
-- `SimDynamoDbItemPage` under `command/item/` is `Limit` and `LastEvaluatedKey`. It takes items and a
-  key schema rather than a query, which is what lets `Scan` use it unchanged.
+- `SimDynamoDbItemPage` under `command/item/` is `Limit`, the 1 MB page limit and
+  `LastEvaluatedKey`. It takes items, a read view and a sizing function, so `Scan` uses it unchanged.
+  `simDynamoDbReadSize` under `command/read/` sizes an item as the view projects it, or whole when a
+  local secondary index read fetches it from the table.
 - `command/read/` is what a query and a scan answer with, since both answer the same way.
-  `SimDynamoDbReadAnswer` holds the order the counts depend on: a page cut at the `Limit`, then
+  `SimDynamoDbReadAnswer` holds the order the counts depend on: a page cut at the `Limit` or 1 MB, then
   filtered, so `ScannedCount` is what was evaluated and `Count` what survived. `SimDynamoDbSelect` is
   the `Select` matrix, and is what leaves `Items` out of a counted read.
 - `expression/filter/` reads the `FilterExpression`. It is the ordinary condition grammar rather than
@@ -735,9 +737,12 @@ The parts a batch is made of split by what they know:
   each, and refuses a request naming one table twice, comparing the tables the references resolved
   to rather than the references themselves.
 
-`UnprocessedItems` and `UnprocessedKeys` are always empty maps. Nothing here is throttled and no
-response stops at a size, so no request is ever left over, but the map is answered with rather than
-left out so a retry loop written around it terminates.
+`UnprocessedItems` is always an empty map, since nothing here is throttled. It is answered with all
+the same, so a retry loop written around it terminates. `UnprocessedKeys` holds what a batch read
+had no room for. `SimDynamoDbBatchReadBudget` counts each answered item, after its projection,
+against the 16 MB a response carries. The first item that does not fit closes the response, and its
+key and every key after it go back in the shape the request sent them, from
+`SimDynamoDbBatchTableReads.request`.
 
 A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamoDbPutRequest` and
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
@@ -891,7 +896,9 @@ The parts split by what they know:
 - `SimDynamoDbKeyConditionOperands` reads the three pieces every term is built from: the key
   attribute, the comparator, and the value.
 - `SimDynamoDbKeyConditionRefusals` is what a key condition is refused for being rather than for what
-  it says: `OR`, `NOT`, brackets, a function that is not `begins_with`, and a dereferenced attribute.
+  it says: `OR`, `NOT`, a function that is not `begins_with`, and a dereferenced attribute.
+  Brackets are read by the parser and group terms into the one conjunction, since `AND` is the only
+  operator a key condition has.
 - The three terms are a class each, in `sim-dynamodb-comparison-key-term.ts`,
   `sim-dynamodb-between-key-term.ts` and `sim-dynamodb-begins-with-key-term.ts`. Each knows what it
   refuses: a BETWEEN whose bounds run backwards or are different types, and a `begins_with` against a

@@ -24,6 +24,8 @@ interface SimDynamoDbKeyConditionParserProperties {
  * accept `OR`, which real DynamoDB refuses, and that is the kind of divergence
  * that passes here and fails on deploy.
  *
+ * Brackets are read, and group nothing that could mean anything else.
+ *
  * Which attribute is the partition key and which is the sort key is not known
  * here, since that is a property of the table rather than of the expression.
  * This reads the terms, and `SimDynamoDbKeyConditionTerms` holds them to the
@@ -51,13 +53,48 @@ export class SimDynamoDbKeyConditionParser {
    * Read the whole expression, refusing anything left over after it.
    */
   parse(): readonly SimDynamoDbKeyConditionTerm[] {
-    const terms: SimDynamoDbKeyConditionTerm[] = [this.term()];
-
-    while (this.tokens.takeKeyword("AND")) {
-      terms.push(this.term());
-    }
+    const terms = this.conjunction();
 
     this.refusals.assertNothingFollows();
+
+    return terms;
+  }
+
+  /**
+   * Read terms joined by AND.
+   *
+   * Brackets group terms without changing what they mean, since AND is the
+   * only operator a key condition has. Real DynamoDB accepts
+   * `(customerId = :c) AND (orderId > :o)`, so a group is read and its terms
+   * taken into the conjunction around it. How many terms there are, and which
+   * key each tests, is checked against the key schema afterwards, the same way
+   * whatever the brackets.
+   */
+  private conjunction(): readonly SimDynamoDbKeyConditionTerm[] {
+    const terms = [...this.grouped()];
+
+    while (this.tokens.takeKeyword("AND")) {
+      terms.push(...this.grouped());
+    }
+
+    return terms;
+  }
+
+  /**
+   * Read a bracketed conjunction, or one term.
+   */
+  private grouped(): readonly SimDynamoDbKeyConditionTerm[] {
+    if (!this.tokens.takeSymbol("(")) {
+      return [this.term()];
+    }
+
+    const terms = this.conjunction();
+
+    this.refusals.assertNoLogicalOperator();
+    this.tokens.expectSymbol(
+      ")",
+      "a bracket opened in the key condition is never closed",
+    );
 
     return terms;
   }
@@ -68,7 +105,6 @@ export class SimDynamoDbKeyConditionParser {
    */
   private term(): SimDynamoDbKeyConditionTerm {
     this.refusals.assertNoLogicalOperator();
-    this.refusals.assertNoBracket();
 
     if (this.refusals.takesBeginsWith()) {
       return SimDynamoDbBeginsWithKeyTerm.read({

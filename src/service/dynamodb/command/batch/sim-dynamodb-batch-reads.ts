@@ -23,6 +23,13 @@ const operation = "BatchGetItem";
 export interface SimDynamoDbBatchTableReads {
   readonly reference: string;
   readonly keys: readonly SimDynamoDbItem[];
+
+  /**
+   * What the request asked this table for, as it arrived. A key left unread
+   * goes back in `UnprocessedKeys` in this shape, so a retry sends it as it
+   * was sent the first time.
+   */
+  readonly request: SimDynamoDbKeysAndAttributes;
   readonly projection: SimDynamoDbProjection | undefined;
 
   /** The top-level attributes this table is asked for, per table as above. */
@@ -51,6 +58,7 @@ export function readSimDynamoDbBatchReads(
     return {
       reference,
       keys,
+      request: requested,
       projection: read.projection,
       attributes: simDynamoDbAttributesOf(
         read.attributes,
