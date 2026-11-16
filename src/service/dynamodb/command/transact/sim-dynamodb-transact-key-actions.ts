@@ -42,6 +42,10 @@ abstract class SimDynamoDbTransactKeyAction implements SimDynamoDbTransactWrite 
     return table.keyOfKey(this.key);
   }
 
+  storedIn(table: SimDynamoDbTable): SimDynamoDbItem | undefined {
+    return table.getItem(this.key);
+  }
+
   assertApplicableTo(table: SimDynamoDbTable): void {
     this.check.assertHoldsFor(table.getItem(this.key));
   }
@@ -68,8 +72,17 @@ class SimDynamoDbTransactDeleteAction extends SimDynamoDbTransactKeyAction {
  * so a transaction has one shape to apply rather than two.
  */
 class SimDynamoDbTransactNoWrite implements SimDynamoDbTableWrite {
-  commit(): undefined {
-    return;
+  public readonly after: SimDynamoDbItem | undefined;
+
+  constructor(item: SimDynamoDbItem | undefined) {
+    this.after = item;
+  }
+
+  /**
+   * Answer with the item checked, which this leaves as it found it.
+   */
+  commit(): SimDynamoDbItem | undefined {
+    return this.after;
   }
 }
 
@@ -82,10 +95,11 @@ class SimDynamoDbTransactNoWrite implements SimDynamoDbTableWrite {
 class SimDynamoDbTransactConditionCheckAction extends SimDynamoDbTransactKeyAction {
   public readonly action = "dynamodb:ConditionCheckItem";
 
-  prepareFor(): SimDynamoDbTableWrite {
+  prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite {
     // A condition check changes nothing. What it does happened when its
-    // condition was checked against the item it names.
-    return new SimDynamoDbTransactNoWrite();
+    // condition was checked against the item it names, which it is still
+    // charged for.
+    return new SimDynamoDbTransactNoWrite(table.getItem(this.key));
   }
 }
 

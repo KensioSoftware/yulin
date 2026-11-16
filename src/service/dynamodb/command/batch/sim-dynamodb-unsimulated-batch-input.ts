@@ -1,29 +1,9 @@
 import { SimDynamoDbUnsimulatedInput } from "../item/sim-dynamodb-unsimulated-input.js";
 import type {
   SimBatchGetItemCommandInput,
-  SimBatchWriteItemCommandInput,
   SimDynamoDbKeysAndAttributes,
 } from "./batch.command.js";
-
-/**
- * Refuse the BatchWriteItem inputs this simulation does not model.
- */
-export function refuseUnsimulatedBatchWriteInput(
-  input: SimBatchWriteItemCommandInput,
-): void {
-  const unsimulated = new SimDynamoDbUnsimulatedInput("BatchWriteItem");
-
-  unsimulated.refuseReporting(
-    input.ReturnConsumedCapacity,
-    "ReturnConsumedCapacity",
-    "reporting a capacity cost nothing here measures",
-  );
-  unsimulated.refuseReporting(
-    input.ReturnItemCollectionMetrics,
-    "ReturnItemCollectionMetrics",
-    "reporting item collection sizes nothing here tracks",
-  );
-}
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 
 /**
  * Refuse the BatchGetItem inputs this simulation does not model.
@@ -31,13 +11,8 @@ export function refuseUnsimulatedBatchWriteInput(
 export function refuseUnsimulatedBatchReadInput(
   input: SimBatchGetItemCommandInput,
 ): void {
-  const unsimulated = new SimDynamoDbUnsimulatedInput("BatchGetItem");
-
-  unsimulated.refuseReporting(
-    input.ReturnConsumedCapacity,
-    "ReturnConsumedCapacity",
-    "reporting a capacity cost nothing here measures",
-  );
+  // Read here so a value AWS refuses is refused before anything is read.
+  SimDynamoDbReturnConsumedCapacity.read(input.ReturnConsumedCapacity);
 }
 
 /**

@@ -40,10 +40,6 @@ describe("DynamoDB ScanCommand unsimulated input", () => {
       },
     },
     { name: "ConditionalOperator", input: { ConditionalOperator: "AND" } },
-    {
-      name: "ReturnConsumedCapacity",
-      input: { ReturnConsumedCapacity: "TOTAL" },
-    },
   ])("refuses $name by name", async (example) => {
     // Given a table.
     const simAws = new SimAws();

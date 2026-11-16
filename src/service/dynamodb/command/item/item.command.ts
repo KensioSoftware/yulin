@@ -4,6 +4,8 @@ import type {
   SimDynamoDbAttributeValueUpdate,
   SimDynamoDbExpectedAttributeValue,
 } from "./item.types.js";
+import type { SimDynamoDbConsumedCapacity } from "../../capacity/sim-dynamodb-consumed-capacity.types.js";
+import type { SimDynamoDbItemCollectionSize } from "../../capacity/sim-dynamodb-item-collection-metrics.js";
 
 /**
  * Minimal structural sim DynamoDB PutItem command.
@@ -48,6 +50,8 @@ export interface SimPutItemCommandOutput {
   readonly Attributes?:
     | Readonly<Record<string, SimDynamoDbAttributeValue>>
     | undefined;
+  readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity | undefined;
+  readonly ItemCollectionMetrics?: SimDynamoDbItemCollectionSize | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -89,6 +93,7 @@ export interface SimGetItemCommandOutput {
   readonly Item?:
     | Readonly<Record<string, SimDynamoDbAttributeValue>>
     | undefined;
+  readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -131,6 +136,8 @@ export interface SimDeleteItemCommandOutput {
   readonly Attributes?:
     | Readonly<Record<string, SimDynamoDbAttributeValue>>
     | undefined;
+  readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity | undefined;
+  readonly ItemCollectionMetrics?: SimDynamoDbItemCollectionSize | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -181,5 +188,7 @@ export interface SimUpdateItemCommandOutput {
   readonly Attributes?:
     | Readonly<Record<string, SimDynamoDbAttributeValue>>
     | undefined;
+  readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity | undefined;
+  readonly ItemCollectionMetrics?: SimDynamoDbItemCollectionSize | undefined;
   readonly $metadata: SimResponseMetadata;
 }

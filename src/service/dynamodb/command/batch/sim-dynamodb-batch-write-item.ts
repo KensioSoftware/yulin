@@ -7,9 +7,9 @@ import type {
 import { assertDistinctBatchItems } from "./sim-dynamodb-batch-request-items.js";
 import { reachSimDynamoDbBatchTables } from "./sim-dynamodb-batch-tables.js";
 import { readSimDynamoDbBatchWrites } from "./sim-dynamodb-batch-writes.js";
-import { refuseUnsimulatedBatchWriteInput } from "./sim-dynamodb-unsimulated-batch-input.js";
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
 import { simDynamoDbItemAttributeNames } from "../authorize/sim-dynamodb-attributes.js";
+import { SimDynamoDbWritesReport } from "../../capacity/sim-dynamodb-writes-report.js";
 
 const operation = "BatchWriteItem";
 
@@ -48,7 +48,7 @@ export class SimDynamoDbBatchWriteItem {
   ): SimBatchWriteItemCommandOutput {
     const input = command.input;
 
-    refuseUnsimulatedBatchWriteInput(input);
+    const report = SimDynamoDbWritesReport.batch(input);
 
     const reached = reachSimDynamoDbBatchTables(
       readSimDynamoDbBatchWrites(input.RequestItems),
@@ -80,12 +80,12 @@ export class SimDynamoDbBatchWriteItem {
 
     for (const { table, requested } of reached) {
       for (const write of requested.writes) {
-        write.applyTo(table);
+        report.record(requested.reference, table, write.applyTo(table));
       }
     }
 
     // Nothing here throttles, so nothing is ever left unprocessed. The map is
     // still answered with, since that is the shape a retry loop reads.
-    return { UnprocessedItems: {}, $metadata: {} };
+    return { UnprocessedItems: {}, ...report.fields(), $metadata: {} };
   }
 }

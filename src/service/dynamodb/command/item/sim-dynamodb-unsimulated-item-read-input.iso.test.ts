@@ -55,10 +55,6 @@ describe("DynamoDB GetItemCommand unsimulated input", () => {
       named: "AttributesToGet",
       input: { AttributesToGet: ["userId"] },
     },
-    {
-      named: "ReturnConsumedCapacity",
-      input: { ReturnConsumedCapacity: "TOTAL" },
-    },
   ] as const satisfies readonly {
     named: string;
     input: SimGetItemCommandInput;

@@ -35,6 +35,10 @@ class SimDynamoDbTransactUpdateAction implements SimDynamoDbTransactWrite {
     return table.keyOfKey(this.key);
   }
 
+  storedIn(table: SimDynamoDbTable): SimDynamoDbItem | undefined {
+    return table.getItem(this.key);
+  }
+
   assertApplicableTo(table: SimDynamoDbTable): void {
     this.plan.check.assertHoldsFor(table.getItem(this.key));
     this.plan.assertLeavesKeyAlone(table.keySchema.attributeNames());

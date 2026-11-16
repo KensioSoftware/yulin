@@ -6,10 +6,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 const entryPut = {
@@ -55,7 +52,7 @@ describe("DynamoDB transactional write limits and reporting", () => {
     );
   });
 
-  it("refuses the write reporting inputs this simulation does not model", async () => {
+  it("refuses reporting values AWS does not have", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
@@ -65,30 +62,30 @@ describe("DynamoDB transactional write limits and reporting", () => {
       simAws,
     );
 
-    // When a transaction asks for a capacity cost.
+    // When a transaction asks for a capacity report AWS has no level for.
     const capacity = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.transactWriteItems(
-        new TransactWriteItemsCommand({
+      simDynamoDb.transactWriteItems({
+        input: {
           TransactItems: [entryPut],
-          ReturnConsumedCapacity: "TOTAL",
-        }),
-      ),
+          ReturnConsumedCapacity: "ALL",
+        },
+      }),
     );
 
-    // And when it asks for item collection sizes.
+    // And when it asks for item collection metrics the same way.
     const metrics = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.transactWriteItems(
-        new TransactWriteItemsCommand({
+      simDynamoDb.transactWriteItems({
+        input: {
           TransactItems: [entryPut],
-          ReturnItemCollectionMetrics: "SIZE",
-        }),
-      ),
+          ReturnItemCollectionMetrics: "ALL",
+        },
+      }),
     );
 
-    // Then both are refused by name rather than reported on.
-    assertInstanceOf(capacity, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(capacity.message, "ReturnConsumedCapacity");
-    assertInstanceOf(metrics, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(metrics.message, "ReturnItemCollectionMetrics");
+    // Then both are refused as AWS refuses them.
+    assertInstanceOf(capacity, SimDynamoDbValidationException);
+    assertStringIncludes(capacity.message, "returnConsumedCapacity");
+    assertInstanceOf(metrics, SimDynamoDbValidationException);
+    assertStringIncludes(metrics.message, "returnItemCollectionMetrics");
   });
 });

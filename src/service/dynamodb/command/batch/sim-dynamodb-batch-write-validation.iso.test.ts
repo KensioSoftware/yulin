@@ -13,10 +13,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 
 const ordersTable = new CreateTableCommand({
   TableName: "OrdersTable",
@@ -273,56 +270,56 @@ describe("DynamoDB BatchWriteItemCommand request validation", () => {
     assertUndefined(output.Item);
   });
 
-  it("refuses reporting a capacity cost nothing measures", async () => {
+  it("refuses a ReturnConsumedCapacity AWS does not have", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
     await simDynamoDb.createTable(ordersTable);
     await simAws.backgroundTasksComplete();
 
-    // When a batch asks for its consumed capacity.
+    // When a batch asks for a capacity report AWS has no level for.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.batchWriteItem(
-        new BatchWriteItemCommand({
+      simDynamoDb.batchWriteItem({
+        input: {
           RequestItems: {
             OrdersTable: [
               { PutRequest: { Item: { orderId: { S: "order-1" } } } },
             ],
           },
-          ReturnConsumedCapacity: "TOTAL",
-        }),
-      ),
+          ReturnConsumedCapacity: "ALL",
+        },
+      }),
     );
 
-    // Then it is refused as unsimulated rather than reported as zero.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ReturnConsumedCapacity");
+    // Then it is refused as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "returnConsumedCapacity");
   });
 
-  it("refuses reporting item collection sizes nothing tracks", async () => {
+  it("refuses a ReturnItemCollectionMetrics AWS does not have", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
     await simDynamoDb.createTable(ordersTable);
     await simAws.backgroundTasksComplete();
 
-    // When a batch asks for item collection metrics.
+    // When a batch asks for item collection metrics AWS has no level for.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.batchWriteItem(
-        new BatchWriteItemCommand({
+      simDynamoDb.batchWriteItem({
+        input: {
           RequestItems: {
             OrdersTable: [
               { PutRequest: { Item: { orderId: { S: "order-1" } } } },
             ],
           },
-          ReturnItemCollectionMetrics: "SIZE",
-        }),
-      ),
+          ReturnItemCollectionMetrics: "ALL",
+        },
+      }),
     );
 
-    // Then it is refused as unsimulated.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ReturnItemCollectionMetrics");
+    // Then it is refused as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "returnItemCollectionMetrics");
   });
 
   it("takes the reporting inputs that ask for nothing", async () => {

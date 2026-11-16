@@ -30,17 +30,9 @@ const keyInput = {
 } as const satisfies SimDeleteItemCommandInput;
 
 /**
- * The reporting and legacy conditional inputs PutItem and DeleteItem share.
+ * The legacy conditional inputs PutItem and DeleteItem share.
  */
 const writeInputs = [
-  {
-    named: "ReturnConsumedCapacity",
-    input: { ReturnConsumedCapacity: "TOTAL" },
-  },
-  {
-    named: "ReturnItemCollectionMetrics",
-    input: { ReturnItemCollectionMetrics: "SIZE" },
-  },
   {
     named: "Expected",
     input: { Expected: { userId: { Exists: false } } },

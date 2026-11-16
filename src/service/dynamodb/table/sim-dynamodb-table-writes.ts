@@ -26,6 +26,11 @@ interface SimDynamoDbTableWritesProperties extends SimDynamoDbTableStore {
  */
 export interface SimDynamoDbTableWrite {
   /**
+   * The item the key holds once this write is committed.
+   */
+  readonly after: SimDynamoDbItem | undefined;
+
+  /**
    * Make this write, and answer with whatever item it displaced.
    */
   commit(): SimDynamoDbItem | undefined;
@@ -49,6 +54,10 @@ class SimDynamoDbTableItemWrite implements SimDynamoDbTableWrite {
     this.item = item;
   }
 
+  get after(): SimDynamoDbItem {
+    return this.item;
+  }
+
   commit(): SimDynamoDbItem | undefined {
     const replaced = this.store.items.put(this.key, this.item);
 
@@ -62,6 +71,7 @@ class SimDynamoDbTableItemWrite implements SimDynamoDbTableWrite {
  * A prepared delete, which is the key the item to remove is held under.
  */
 class SimDynamoDbTableItemRemoval implements SimDynamoDbTableWrite {
+  public readonly after = undefined;
   private readonly store: SimDynamoDbTableStore;
   private readonly key: string;
 

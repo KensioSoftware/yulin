@@ -1,5 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
+import type { SimDynamoDbConsumedCapacity } from "../../capacity/sim-dynamodb-consumed-capacity.types.js";
+import type { SimDynamoDbItemCollectionSize } from "../../capacity/sim-dynamodb-item-collection-metrics.js";
 
 /**
  * What every action of a transactional write carries.
@@ -99,6 +101,12 @@ export interface SimTransactWriteItemsCommandInput {
  * every action or none of them, so there is nothing to say per action.
  */
 export interface SimTransactWriteItemsCommandOutput {
+  readonly ConsumedCapacity?:
+    | readonly SimDynamoDbConsumedCapacity[]
+    | undefined;
+  readonly ItemCollectionMetrics?:
+    | Readonly<Record<string, readonly SimDynamoDbItemCollectionSize[]>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -158,6 +166,9 @@ export interface SimDynamoDbItemResponse {
  */
 export interface SimTransactGetItemsCommandOutput {
   readonly Responses: readonly SimDynamoDbItemResponse[];
+  readonly ConsumedCapacity?:
+    | readonly SimDynamoDbConsumedCapacity[]
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

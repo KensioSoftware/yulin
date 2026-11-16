@@ -9,11 +9,11 @@ import {
   SimDynamoDbTransactionTokens,
   simDynamoDbTransactionPayload,
 } from "./sim-dynamodb-transaction-tokens.js";
-import { refuseUnsimulatedTransactWriteInput } from "./sim-dynamodb-unsimulated-transact-input.js";
 import type {
   SimTransactWriteItemsCommand,
   SimTransactWriteItemsCommandOutput,
 } from "./transact.command.js";
+import { SimDynamoDbWritesReport } from "../../capacity/sim-dynamodb-writes-report.js";
 
 interface SimDynamoDbTransactWriteItemsProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -57,7 +57,7 @@ export class SimDynamoDbTransactWriteItems {
   ): SimTransactWriteItemsCommandOutput {
     const input = command.input;
 
-    refuseUnsimulatedTransactWriteInput(input);
+    const report = SimDynamoDbWritesReport.transaction(input);
 
     const token = readSimDynamoDbClientRequestToken(input.ClientRequestToken);
     const payload = simDynamoDbTransactionPayload(input.TransactItems);
@@ -70,11 +70,28 @@ export class SimDynamoDbTransactWriteItems {
     // again, which is what makes the retry idempotent. The request is still
     // read and the caller still authorized against every table it names, since
     // IAM evaluates a request before the service handles it.
-    if (!this.tokens.isReplayOf(token, payload)) {
-      applySimDynamoDbTransaction(targets);
+    if (this.tokens.isReplayOf(token, payload)) {
+      // A replay changes nothing, and AWS charges it for reading each item.
+      for (const { item, table } of targets) {
+        report.recordRead(
+          item.reference ?? table.tableName,
+          item.storedIn(table),
+        );
+      }
+    } else {
+      const applied = applySimDynamoDbTransaction(targets);
       this.tokens.record(token, payload);
+
+      for (const { target, change } of applied) {
+        report.record(
+          target.item.reference ?? target.table.tableName,
+          target.table,
+          change,
+          target.item.action !== "dynamodb:ConditionCheckItem",
+        );
+      }
     }
 
-    return { $metadata: {} };
+    return { ...report.fields(), $metadata: {} };
   }
 }

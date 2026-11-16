@@ -1,4 +1,6 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
+import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
+import type { SimDynamoDbAttributeValue } from "./item.types.js";
 
 /**
  * The values PutItem and DeleteItem take for ReturnValues. Both answer with the
@@ -102,6 +104,20 @@ export class SimDynamoDbReturnValues {
    */
   reportsBefore(): boolean {
     return beforeModes.has(this.mode);
+  }
+
+  /**
+   * The `Attributes` a put or a delete answers with: the item it replaced or
+   * removed, where the request asked for it and there was one.
+   */
+  attributesBefore(item: SimDynamoDbItem | undefined): {
+    readonly Attributes?: Record<string, SimDynamoDbAttributeValue>;
+  } {
+    if (item === undefined || !this.reportsBefore()) {
+      return {};
+    }
+
+    return { Attributes: item.toAttributeValues() };
   }
 
   /**

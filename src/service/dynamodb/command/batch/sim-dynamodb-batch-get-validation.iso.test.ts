@@ -321,27 +321,27 @@ describe("DynamoDB BatchGetItemCommand request validation", () => {
     assertStringIncludes(error.message, "AttributesToGet");
   });
 
-  it("refuses reporting a capacity cost nothing measures", async () => {
+  it("refuses a ReturnConsumedCapacity AWS does not have", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
     await simDynamoDb.createTable(ordersTable);
     await simAws.backgroundTasksComplete();
 
-    // When a batch asks for its consumed capacity.
+    // When a batch asks for a capacity report AWS has no level for.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.batchGetItem(
-        new BatchGetItemCommand({
+      simDynamoDb.batchGetItem({
+        input: {
           RequestItems: {
             OrdersTable: { Keys: [{ orderId: { S: "order-1" } }] },
           },
-          ReturnConsumedCapacity: "TOTAL",
-        }),
-      ),
+          ReturnConsumedCapacity: "ALL",
+        },
+      }),
     );
 
-    // Then it is refused as unsimulated rather than reported as zero.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ReturnConsumedCapacity");
+    // Then it is refused as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "returnConsumedCapacity");
   });
 });
