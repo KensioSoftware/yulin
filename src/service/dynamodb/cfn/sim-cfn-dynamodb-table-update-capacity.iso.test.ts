@@ -1,5 +1,10 @@
 import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
-import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertObjectEquals,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
@@ -98,5 +103,27 @@ describe("DynamoDB CloudFormation Table update index capacity", () => {
     // Then the index has no capacity either.
     const capacity = await indexCapacity(simAws);
     assertIdentical(capacity?.ReadCapacityUnits, 0);
+  });
+
+  it("drops an index before switching the table to provisioned", async () => {
+    // Given an on-demand table deployed with an index.
+    const simAws = new SimAws();
+    await deployWithOrder(simAws, indexedOrders("PAY_PER_REQUEST"));
+
+    // When the stack is updated to provisioned billing without the index.
+    await updateOrdersTable(simAws, {
+      BillingMode: "PROVISIONED",
+      ProvisionedThroughput: { ReadCapacityUnits: 4, WriteCapacityUnits: 4 },
+    });
+
+    // Then the table is provisioned, has no index, and kept its order.
+    const described = await simAws
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: "orders" }));
+    const table = described.Table;
+    assertNonNullable(table);
+    assertIdentical(table.ProvisionedThroughput?.ReadCapacityUnits, 4);
+    assertUndefined(table.GlobalSecondaryIndexes);
+    assertIdentical(await storedStatus(simAws), "open");
   });
 });

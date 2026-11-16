@@ -23,7 +23,7 @@ export function simDynamoDbTableFigures(
     ...figuresOf(items, (item) => item.sizeInBytes()),
     indexes: new Map(
       table.indexes.elements.map((index) => [
-        index.name,
+        index,
         indexFigures(table, index, items),
       ]),
     ),
@@ -60,4 +60,29 @@ function figuresOf(
     itemCount: items.length,
     sizeBytes: items.reduce((sum, item) => sum + sizeOf(item), 0),
   };
+}
+
+/**
+ * Index descriptions carrying the item count and size of each index, as of the
+ * table's last refresh. An index added since then reports nothing yet.
+ */
+export function simDynamoDbIndexFigures<
+  Description extends { readonly IndexName?: string | undefined },
+>(
+  descriptions: readonly Description[] | undefined,
+  table: SimDynamoDbTable,
+  figures: SimDynamoDbTableFigures,
+): readonly Description[] | undefined {
+  return descriptions?.map((description) => {
+    const index = table.indexes.elements.find(
+      ({ name }) => name === description.IndexName,
+    );
+    const measured = index && figures.indexes.get(index);
+
+    return {
+      ...description,
+      ItemCount: measured?.itemCount ?? 0,
+      IndexSizeBytes: measured?.sizeBytes ?? 0,
+    };
+  });
 }

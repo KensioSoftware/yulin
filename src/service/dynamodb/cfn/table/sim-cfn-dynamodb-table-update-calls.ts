@@ -77,9 +77,11 @@ export async function simCfnDynamoDbRunReverting(
  * the order they are sent.
  *
  * DynamoDB takes one billing or index change per call. A stream whose view
- * type changes is switched off in a call of its own first. The billing, index
- * capacity, class, deletion protection and stream changes share the next call,
- * and the one index created or deleted comes last.
+ * type changes is switched off in a call of its own first. An index the
+ * template drops is deleted next, because a switch to provisioned billing needs
+ * the capacity of every index still on the table. The billing, index capacity,
+ * class, deletion protection and stream changes share the next call, and an
+ * index the template adds comes last.
  */
 export function simCfnDynamoDbTableUpdateCalls(
   before: SimCfnDynamoDbTableProperties,
@@ -98,6 +100,14 @@ export function simCfnDynamoDbTableUpdateCalls(
     before.globalSecondaryIndexes(),
     after.globalSecondaryIndexes(),
   ).slice(0, 1);
+  const indexCall = indexUpdates.map((indexUpdate) => ({
+    input: {
+      AttributeDefinitions: after.attributeDefinitions(),
+      GlobalSecondaryIndexUpdates: [indexUpdate],
+    },
+    settle: indexUpdate.Delete === undefined ? moveOn : activate,
+  }));
+  const deletes = indexCall.filter(({ settle }) => settle === activate);
 
   return [
     ...(stream.switchOffFirst
@@ -108,16 +118,11 @@ export function simCfnDynamoDbTableUpdateCalls(
           },
         ]
       : []),
+    ...deletes,
     ...(Object.keys(settings).length > 0
       ? [{ input: settings, settle: activate }]
       : []),
-    ...indexUpdates.map((indexUpdate) => ({
-      input: {
-        AttributeDefinitions: after.attributeDefinitions(),
-        GlobalSecondaryIndexUpdates: [indexUpdate],
-      },
-      settle: moveOn,
-    })),
+    ...indexCall.filter((call) => !deletes.includes(call)),
   ];
 }
 

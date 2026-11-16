@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
+import type { SimDynamoDbSecondaryIndex } from "../secondary-index/sim-dynamodb-secondary-index.js";
 
 /**
  * How often DynamoDB refreshes the figures it reports for a table's size.
@@ -14,10 +15,16 @@ export interface SimDynamoDbStoredFigures {
 }
 
 /**
- * The figures for a table and each of its indexes, by index name.
+ * The figures for a table and each of its indexes.
+ *
+ * An index is keyed by itself rather than by its name, so an index deleted and
+ * added back under the same name reports nothing until the next refresh.
  */
 export interface SimDynamoDbTableFigures extends SimDynamoDbStoredFigures {
-  readonly indexes: ReadonlyMap<string, SimDynamoDbStoredFigures>;
+  readonly indexes: ReadonlyMap<
+    SimDynamoDbSecondaryIndex,
+    SimDynamoDbStoredFigures
+  >;
 }
 
 /**

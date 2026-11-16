@@ -4,7 +4,7 @@ import type {
   SimDynamoDbTableDescription,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbTable } from "./sim-dynamodb-table.js";
-import type { SimDynamoDbTableFigures } from "./sim-dynamodb-table-statistics.js";
+import { simDynamoDbIndexFigures } from "./sim-dynamodb-table-figures.js";
 
 /**
  * How a table reports its class, when the request that made it named one.
@@ -42,12 +42,14 @@ export function describeSimDynamoDbTable(
     BillingModeSummary: table.billing.summary(),
     ProvisionedThroughput: table.billing.throughputDescription(),
     TableClassSummary: tableClassSummary(table.tableClass),
-    GlobalSecondaryIndexes: withFigures(
+    GlobalSecondaryIndexes: simDynamoDbIndexFigures(
       table.indexes.global.descriptions(table.status),
+      table,
       figures,
     ),
-    LocalSecondaryIndexes: withFigures(
+    LocalSecondaryIndexes: simDynamoDbIndexFigures(
       table.indexes.local.descriptions(),
+      table,
       figures,
     ),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
@@ -60,25 +62,4 @@ export function describeSimDynamoDbTable(
     ItemCount: figures.itemCount,
     TableSizeBytes: figures.sizeBytes,
   };
-}
-
-/**
- * Index descriptions carrying the item count and size of each index, as of the
- * table's last refresh. An index added since then reports nothing yet.
- */
-function withFigures<
-  Description extends { readonly IndexName?: string | undefined },
->(
-  descriptions: readonly Description[] | undefined,
-  figures: SimDynamoDbTableFigures,
-): readonly Description[] | undefined {
-  return descriptions?.map((description) => {
-    const index = figures.indexes.get(description.IndexName ?? "");
-
-    return {
-      ...description,
-      ItemCount: index?.itemCount ?? 0,
-      IndexSizeBytes: index?.sizeBytes ?? 0,
-    };
-  });
 }

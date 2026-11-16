@@ -3,6 +3,7 @@ import {
   DeleteItemCommand,
   DescribeTableCommand,
   PutItemCommand,
+  UpdateTableCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertIdentical,
@@ -136,5 +137,40 @@ describe("DynamoDB table ItemCount and TableSizeBytes", () => {
       { ItemCount: index?.ItemCount, IndexSizeBytes: index?.IndexSizeBytes },
       { ItemCount: 2, IndexSizeBytes: 48 },
     );
+  });
+
+  it("reports nothing for an index added back under the same name", async () => {
+    // Given a table whose index has been measured at its first refresh.
+    const simAws = await ordersByStatus();
+    await putOrder(simAws, "order-1", "open");
+    await simAws.clock().advanceBy({ hours: 6 });
+
+    // When the index is deleted and added back keyed on another attribute.
+    await simAws.dynamoDb().updateTable(
+      new UpdateTableCommand({
+        TableName: "orders",
+        GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: "byStatus" } }],
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+    await simAws.dynamoDb().updateTable(
+      new UpdateTableCommand({
+        TableName: "orders",
+        AttributeDefinitions: [{ AttributeName: "region", AttributeType: "S" }],
+        GlobalSecondaryIndexUpdates: [
+          {
+            Create: {
+              IndexName: "byStatus",
+              KeySchema: [{ AttributeName: "region", KeyType: "HASH" }],
+              Projection: { ProjectionType: "KEYS_ONLY" },
+            },
+          },
+        ],
+      }),
+    );
+
+    // Then the new index reports nothing until the next refresh.
+    const table = await describeOrders(simAws);
+    assertIdentical(table.GlobalSecondaryIndexes?.[0]?.ItemCount, 0);
   });
 });
