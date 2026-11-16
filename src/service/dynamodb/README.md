@@ -608,8 +608,9 @@ The parts a query is made of split by what they know:
   order itself, and is where a table with no sort key stops mattering: such a table holds at most one
   item under a partition key, so every question about ordering has a trivial answer.
 - `SimDynamoDbItemPage` under `command/item/` is `Limit`, the 1 MB page limit and
-  `LastEvaluatedKey`. It takes items and a read view, so `Scan` uses it unchanged. The 1 MB is
-  counted from `view.project(item)`, so an index counts what it projects.
+  `LastEvaluatedKey`. It takes items, a read view and a sizing function, so `Scan` uses it unchanged.
+  `simDynamoDbReadSize` under `command/read/` sizes an item as the view projects it, or whole when a
+  local secondary index read fetches it from the table.
 - `command/read/` is what a query and a scan answer with, since both answer the same way.
   `SimDynamoDbReadAnswer` holds the order the counts depend on: a page cut at the `Limit` or 1 MB, then
   filtered, so `ScannedCount` is what was evaluated and `Count` what survived. `SimDynamoDbSelect` is

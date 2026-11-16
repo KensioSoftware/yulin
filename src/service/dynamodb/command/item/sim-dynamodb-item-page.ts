@@ -37,6 +37,8 @@ interface SimDynamoDbItemPageProperties {
   readonly items: readonly SimDynamoDbItem[];
   readonly limit: number | undefined;
   readonly view: SimDynamoDbReadView;
+  /** The bytes one item adds to the data the page has read. */
+  readonly sizeOf: (item: SimDynamoDbItem) => number;
 }
 
 /**
@@ -48,11 +50,10 @@ interface SimDynamoDbItemPageProperties {
  * `ScannedCount` the items the read evaluated and lets a filtered page come
  * back shorter than the limit, or empty.
  *
- * The 1 MB is counted from each item as the view holds it, so a read of an
- * index counts the attributes the index projects rather than the whole item.
- * The item that takes the total past 1 MB is the last one read, and is on the
- * page: DynamoDB stops once the data read exceeds the limit, rather than
- * before it would.
+ * The 1 MB is counted by the `sizeOf` the read supplies, which sizes an item
+ * of an index by what the index projects. The item that would take the total
+ * past 1 MB is left for the next page, since AWS answers with pages of 1 MB or
+ * less. One item is at most 400 KB, so every page holds at least one.
  *
  * `LastEvaluatedKey` is there whenever the walk stopped early, including when
  * it stopped on the last matching item. A caller looping until the token is
@@ -74,7 +75,7 @@ export class SimDynamoDbItemPage {
     const { items, stoppedEarly } = cutPage(
       properties.items,
       limit,
-      properties.view,
+      properties.sizeOf,
     );
 
     this.items = items;
@@ -91,7 +92,7 @@ export class SimDynamoDbItemPage {
 function cutPage(
   walked: readonly SimDynamoDbItem[],
   limit: number,
-  view: SimDynamoDbReadView,
+  sizeOf: (item: SimDynamoDbItem) => number,
 ): {
   readonly items: readonly SimDynamoDbItem[];
   readonly stoppedEarly: boolean;
@@ -100,10 +101,15 @@ function cutPage(
   let bytesRead = 0;
 
   for (const item of walked) {
-    items.push(item);
-    bytesRead += view.project(item).sizeInBytes();
+    bytesRead += sizeOf(item);
 
-    if (items.length >= limit || bytesRead > simDynamoDbPageDataLimitBytes) {
+    if (items.length > 0 && bytesRead > simDynamoDbPageDataLimitBytes) {
+      return { items, stoppedEarly: true };
+    }
+
+    items.push(item);
+
+    if (items.length >= limit) {
       return { items, stoppedEarly: true };
     }
   }

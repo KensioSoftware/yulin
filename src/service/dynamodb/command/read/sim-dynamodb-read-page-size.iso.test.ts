@@ -66,12 +66,12 @@ describe("DynamoDB Query and Scan page size", () => {
       }),
     );
 
-    // Then the page holds the four items that took it past 1 MB and says
-    // where to resume.
-    assertArrayEquals(orderIdsOf(first.Items), ["o-1", "o-2", "o-3", "o-4"]);
+    // Then the page holds the three items that fit in 1 MB and says where to
+    // resume.
+    assertArrayEquals(orderIdsOf(first.Items), ["o-1", "o-2", "o-3"]);
     const token = first.LastEvaluatedKey;
     assertNonNullable(token);
-    assertIdentical(token["orderId"]?.S, "o-4");
+    assertIdentical(token["orderId"]?.S, "o-3");
 
     // And resuming from it reads the rest with no token after it.
     const second = await simDynamoDb.query(
@@ -83,7 +83,7 @@ describe("DynamoDB Query and Scan page size", () => {
       }),
     );
 
-    assertArrayEquals(orderIdsOf(second.Items), ["o-5"]);
+    assertArrayEquals(orderIdsOf(second.Items), ["o-4", "o-5"]);
     assertUndefined(second.LastEvaluatedKey);
   });
 
@@ -104,10 +104,10 @@ describe("DynamoDB Query and Scan page size", () => {
       }),
     );
 
-    // Then the page answers with nothing, having read four items, and still
+    // Then the page answers with nothing, having read three items, and still
     // hands out a token to resume from.
     assertIdentical(page.Count, 0);
-    assertIdentical(page.ScannedCount, 4);
+    assertIdentical(page.ScannedCount, 3);
     assertNonNullable(page.LastEvaluatedKey);
   });
 
@@ -172,5 +172,54 @@ describe("DynamoDB Query and Scan page size", () => {
     // large attribute.
     assertIdentical(page.Count, 5);
     assertUndefined(page.LastEvaluatedKey);
+  });
+
+  it("counts the whole item when a local index read fetches from the table", async () => {
+    // Given five large orders on a table whose local index projects only keys.
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
+    await simDynamoDb.createTable({
+      input: {
+        TableName: "OrdersTable",
+        KeySchema: [
+          { AttributeName: "customerId", KeyType: "HASH" },
+          { AttributeName: "orderId", KeyType: "RANGE" },
+        ],
+        AttributeDefinitions: [
+          { AttributeName: "customerId", AttributeType: "S" },
+          { AttributeName: "orderId", AttributeType: "S" },
+          { AttributeName: "status", AttributeType: "S" },
+        ],
+        LocalSecondaryIndexes: [
+          {
+            IndexName: "ByStatus",
+            KeySchema: [
+              { AttributeName: "customerId", KeyType: "HASH" },
+              { AttributeName: "status", KeyType: "RANGE" },
+            ],
+            Projection: { ProjectionType: "KEYS_ONLY" },
+          },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
+      },
+    });
+    await simAws.backgroundTasksComplete();
+    await putLargeOrders(simDynamoDb);
+
+    // When the index is queried for an attribute it leaves out.
+    const page = await simDynamoDb.query(
+      new QueryCommand({
+        TableName: "OrdersTable",
+        IndexName: "ByStatus",
+        KeyConditionExpression: "customerId = :c",
+        ExpressionAttributeValues: { ":c": { S: "c-1" } },
+        ProjectionExpression: "orderId, notes",
+      }),
+    );
+
+    // Then each item fetched from the table counts whole, and the page stops
+    // at 1 MB.
+    assertIdentical(page.Count, 3);
+    assertNonNullable(page.LastEvaluatedKey);
   });
 });

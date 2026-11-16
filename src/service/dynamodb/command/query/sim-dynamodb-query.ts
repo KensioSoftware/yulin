@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
+import { simDynamoDbReadSize } from "../read/sim-dynamodb-read-size.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
 import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
@@ -110,6 +111,11 @@ export class SimDynamoDbQuery {
       }),
       limit: input.Limit,
       view,
+      sizeOf: simDynamoDbReadSize({
+        view,
+        projection: expressions.projection,
+        select,
+      }),
     });
 
     return {

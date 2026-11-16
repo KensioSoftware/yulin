@@ -1429,8 +1429,9 @@ console.log(read); // [ "1", "2", "3" ]
 
 A page also ends once it has read more than 1 MB of items, whether or not the request set a `Limit`.
 The 1 MB is counted before any filter runs, from each item as the table or index holds it (an index
-counts the attributes it projects). The item that takes the total past 1 MB is the last one on the
-page. A collection of large items therefore pages even when a test asks for all of it.
+counts the attributes it projects). A read of a local secondary index that fetches an unprojected
+attribute from the table counts the whole item. The item that would take the total past 1 MB starts
+the next page. A collection of large items therefore pages even when a test asks for all of it.
 
 `LastEvaluatedKey` is left out only when the key range ran out inside the `Limit` and the 1 MB.
 Reaching the limit on the last matching item still hands out a token, and the next call answers with
@@ -4126,6 +4127,8 @@ is written.
   limit. AWS documents those as approximate, so a page near 1 MB here may hold one item more or one
   fewer than the same page on AWS. A test asserting exactly how many large items fit on a page is
   asserting something about this simulator.
+- A local secondary index read whose `FilterExpression` names an unprojected attribute fetches the
+  item from the table on AWS. Here that item still counts toward the 1 MB at its projected size.
 - No part of this throttles or measures a query or a scan, so `ReturnConsumedCapacity` is refused
   unless it names `NONE`.
 - `UnprocessedItems` is always empty, and `UnprocessedKeys` is filled only by the 16 MB response
