@@ -109,4 +109,56 @@ describe("the partitions a WHERE clause narrows a query to", () => {
     // scan to every projected day.
     assertArrayLength(prefixes, 3);
   });
+
+  it("leaves every partition in where an OR joins the filter to another term", () => {
+    // Given a query asking for one day or for anything a bot fetched.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE day = '2026-08-25' OR agent LIKE '%bot%'",
+    );
+
+    // Then all three stay in. A bot's rows from the other two days answer
+    // the second arm.
+    assertArrayLength(prefixes, 3);
+  });
+
+  it("keeps the filter beside an OR held in brackets", () => {
+    // Given the shape a rollup takes when either of two paths counts: prune
+    // on the day, then keep rows matching one test or the other.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE day = '2026-08-25' " +
+        String.raw`AND (regexp_like(uri, '\.css$') OR strpos(uri, '/beacon') = 1)`,
+    );
+
+    // Then the day goes on pruning. The OR chooses between the two tests,
+    // and every row either arm keeps still comes from that day.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("keeps the filter where the OR sits in a subquery", () => {
+    // Given a query pinning the day and testing each row against a subquery
+    // that chooses between two paths.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE day IN ('2026-08-25') AND visitor IN (" +
+        "SELECT visitor FROM t WHERE day IN ('2026-08-25') " +
+        "AND uri = '/a.css' OR uri = '/beacon')",
+    );
+
+    // Then the day outside the subquery goes on pruning.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("drops a filter inside brackets an OR splits, however deep", () => {
+    // Given a day pinned in a nested bracket under one arm of an OR.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE (status = 200 OR (day = '2026-08-25' AND bot))",
+    );
+
+    // Then all three stay in. A status 200 row from any day answers the
+    // first arm.
+    assertArrayLength(prefixes, 3);
+  });
 });

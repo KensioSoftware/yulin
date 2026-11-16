@@ -723,7 +723,7 @@ A query fails where a partition key carries no `projection.<key>.type`, where a 
 
 `NOW` is read against the simulated clock, along with an offset such as `NOW-3YEARS`. A test that froze time projects the same partitions on every run.
 
-The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read, and a query carrying `OR` anywhere is left unnarrowed. A `NOT` leaves the columns it reaches unnarrowed and the rest alone. A query pruning on the day and filtering bots out of what is left goes on pruning on the day. A filter left unread keeps every projected partition in. That is always the safe answer.
+The `WHERE` clause narrows what is projected. `day = '2026-08-25'` and `day IN ('a', 'b')` are the two forms read. An `OR` leaves everything inside the brackets around it unread (the whole `WHERE`, where no brackets enclose it), and a filter joined to those brackets by `AND` goes on narrowing. A `NOT` leaves the columns it reaches unnarrowed and the rest alone. A query pruning on the day and filtering bots out of what is left goes on pruning on the day. A filter left unread keeps every projected partition in. That is always the safe answer.
 
 A table with projection on and no `storage.location.template` gets the Hive layout under its own location, as `<location>/day=2026-08-25/`.
 
@@ -1170,8 +1170,9 @@ Current documented limitations:
   scans nothing and passes.
 - A projected date's format understands `y`, `M`, `d`, `H`, `m` and `s`, which covers the patterns a
   partition path is written in. The wider `SimpleDateFormat` grammar stays out of reach.
-- The `WHERE` clause is read for `column = 'value'` and `column IN ('a', 'b')` only, and a query
-  carrying `OR` anywhere is left unnarrowed. A partition narrowed less than real Athena would narrow
+- The `WHERE` clause is read for `column = 'value'` and `column IN ('a', 'b')` only. Everything
+  inside the brackets around an `OR` is left unnarrowed, including an `OR` in a function's arguments
+  or a `CASE`. A partition narrowed less than real Athena would narrow
   it costs a wider scan here, and the answer stays the same.
 - How far a `NOT` reaches is read without parsing. A column it could not really have reached is left
   unnarrowed as well, which costs that same wider scan.

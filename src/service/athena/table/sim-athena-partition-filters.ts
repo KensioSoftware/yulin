@@ -1,3 +1,4 @@
+import { simAthenaDisjunctivePositions } from "./sim-athena-disjunctive-positions.js";
 import { simAthenaNegatedColumns } from "./sim-athena-negated-columns.js";
 import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
 
@@ -5,8 +6,10 @@ import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
  * The partition values a query's `WHERE` clause pins down.
  *
  * Only two shapes are read, `column = 'value'` and `column IN ('a', 'b')`, and
- * they are read wherever they appear. A query carrying `OR` anywhere is left
- * unfiltered, since a value under one arm constrains nothing on its own.
+ * they are read wherever they appear. An `OR` leaves unread everything inside
+ * the brackets it sits in (the whole statement, outside any brackets). A value
+ * under one arm constrains nothing on its own. A value beside the brackets,
+ * joined to them by `AND`, still constrains the rows the query reads.
  *
  * A `NOT` leaves the columns it reaches unconstrained and the rest alone. A
  * negated value names the partition the query does not want, and reading it as
@@ -41,12 +44,18 @@ export function simAthenaPartitionFilters(
   const tokens = simAthenaSqlTokens(sql);
   const byColumn = new Map<string, readonly string[]>();
 
-  if (tokens === undefined || tokens.some(isUnreadableTerm)) {
+  if (tokens === undefined) {
     return new SimAthenaPartitionFilters(byColumn);
   }
 
+  const disjunctive = simAthenaDisjunctivePositions(tokens);
+
   for (const [position, token] of tokens.entries()) {
     if (token.kind !== "word" && token.kind !== "quoted") {
+      continue;
+    }
+
+    if (disjunctive.has(position)) {
       continue;
     }
 
@@ -103,10 +112,6 @@ function narrow(
     name,
     already.filter((value) => wanted.has(value)),
   );
-}
-
-function isUnreadableTerm(token: { kind: string; text: string }): boolean {
-  return token.kind === "word" && token.text === "or";
 }
 
 /**
