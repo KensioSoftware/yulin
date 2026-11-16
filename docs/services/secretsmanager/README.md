@@ -672,7 +672,9 @@ code into the simulation, served in process. See
   empty page.
 - Tags are stored and reported by `DescribeSecret` and `ListSecrets`, but `TagResource` and
   `UntagResource` are absent. A request on a secret carries its tags as both
-  `secretsmanager:ResourceTag/<key>` and `aws:ResourceTag/<key>`. A stack update applies the tags its template declares to the deployed
+  `secretsmanager:ResourceTag/<key>` and `aws:ResourceTag/<key>`. Creating a secret with tags needs
+  `secretsmanager:TagResource` as well, and both actions see the tags as `aws:RequestTag/<key>` and
+  `aws:TagKeys`. A stack update applies the tags its template declares to the deployed
   secret, since there is no command to ask for it with.
 - A stack update authorizes the whole change as `secretsmanager:UpdateSecret`. Real CloudFormation
   needs `secretsmanager:TagResource` as well for a change to the tags.

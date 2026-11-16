@@ -1,3 +1,4 @@
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimDynamoDbReached } from "../authorize/sim-dynamodb-reached.js";
 import type { SimDynamoDbLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -17,6 +18,7 @@ export interface SimDynamoDbTableReach {
   readonly leadingKeys?: SimDynamoDbLeadingKeys | undefined;
   readonly attributes?: readonly string[] | undefined;
   readonly indexName?: string | undefined;
+  readonly requestConditions?: SimIamConditions | undefined;
 }
 
 /**
@@ -36,6 +38,7 @@ export function simDynamoDbReachedIn(
     indexName: reach.indexName,
     leadingKeys: table === undefined ? undefined : leadingKeysIn(reach, table),
     attributes: reach.attributes,
+    requestConditions: reach.requestConditions,
   };
 }
 

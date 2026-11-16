@@ -1,3 +1,4 @@
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { simDynamoDbAttributesConditionKey } from "./sim-dynamodb-attributes.js";
 import { simDynamoDbLeadingKeysConditionKey } from "./sim-dynamodb-leading-keys.js";
 
@@ -18,6 +19,9 @@ export interface SimDynamoDbReached {
 
   /** The top-level attribute names the request names. */
   readonly attributes?: readonly string[] | undefined;
+
+  /** The tags a request sets or the keys it removes, for IAM to read. */
+  readonly requestConditions?: SimIamConditions | undefined;
 }
 
 /**
@@ -25,11 +29,13 @@ export interface SimDynamoDbReached {
  */
 export function simDynamoDbConditionContextOf(
   reached: SimDynamoDbReached,
-): Readonly<Record<string, readonly string[]>> {
-  return Object.fromEntries(
+): SimIamConditions {
+  const reachedKeys = Object.fromEntries(
     [
       [simDynamoDbLeadingKeysConditionKey, reached.leadingKeys],
       [simDynamoDbAttributesConditionKey, reached.attributes],
     ].filter(([, values]) => (values ?? []).length > 0),
   ) as Readonly<Record<string, readonly string[]>>;
+
+  return { ...reached.requestConditions, ...reachedKeys };
 }

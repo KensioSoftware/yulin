@@ -1052,6 +1052,42 @@ same key is the one evaluated.
 A resource the request names before it exists, such as the table a `CreateTable` makes, carries no
 tags.
 
+### Tags a request sets
+
+A request that creates a resource with tags, or tags one later, carries each tag as
+`aws:RequestTag/` and the tag key, and the keys together as `aws:TagKeys`. A request removing tags
+carries the keys it removes as `aws:TagKeys`. A policy can then insist that every new resource is
+tagged for the caller's own team, or allow a caller to change one tag and no others.
+
+Creating a resource with at least one tag also needs the service's tag action, as on AWS. A caller
+allowed `dynamodb:CreateTable` alone can create an untagged table and is refused a tagged one. An
+empty tag list asks for no tagging.
+
+| Service         | Requests carrying the tags                                    | Creating with tags also needs            |
+| --------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| Lambda          | `CreateFunction`, `TagResource`, `UntagResource`              | `lambda:TagResource`                     |
+| DynamoDB        | `CreateTable`, `TagResource`, `UntagResource`                 | `dynamodb:TagResource`                   |
+| Step Functions  | `CreateStateMachine`, `TagResource`, `UntagResource`          | `states:TagResource`                     |
+| Secrets Manager | `CreateSecret`                                                | `secretsmanager:TagResource`             |
+| SQS             | `CreateQueue`, `TagQueue`, `UntagQueue`                       | `sqs:TagQueue`                           |
+| SNS             | `CreateTopic`, `TagResource`, `UntagResource`                 | `sns:TagResource`                        |
+| SSM             | `PutParameter`, `AddTagsToResource`, `RemoveTagsFromResource` | `ssm:AddTagsToResource`                  |
+| CloudWatch Logs | `CreateLogGroup`, `TagResource`, `UntagResource`              | `logs:TagResource` or `logs:TagLogGroup` |
+| EventBridge     | `PutRule`, `CreateEventBus`, `TagResource`, `UntagResource`   | `events:TagResource`                     |
+| KMS             | `CreateKey`, `TagResource`, `UntagResource`                   | `kms:TagResource`                        |
+| Kinesis         | none                                                          | `kinesis:AddTagsToStream`                |
+| ECS             | `CreateCluster`, `RegisterTaskDefinition`                     | `ecs:TagResource`                        |
+| ACM             | `RequestCertificate`                                          | `acm:AddTagsToCertificate`               |
+| SES             | `CreateEmailIdentity`                                         | `ses:TagResource`                        |
+| WAFv2           | `CreateWebACL`, `CreateIPSet`, `CreateRegexPatternSet`        | `wafv2:TagResource`                      |
+
+The tag action is authorized against the resource being created. ECS also supplies the create
+action's name as `ecs:CreateAction`, so a statement can allow `ecs:TagResource` only while a cluster
+is being created. ACM authorizes `acm:AddTagsToCertificate` against the same wildcard certificate
+resource as `acm:RequestCertificate`, since the certificate has no ARN until the request succeeds.
+The Service Authorization Reference lists no request tag keys for Kinesis, so a Kinesis policy can
+allow tagging on create without reading the tags.
+
 ## Policy variables
 
 A policy written in the `2012-10-17` language can name request values as variables, such as
@@ -2531,8 +2567,9 @@ Sim IAM models the policy behaviour that multi-service tests most commonly need.
   `aws:UserAgent`, `aws:Referer`, `aws:SourceVpc` or `aws:SourceVpce`. An ordinary condition on one
   of those fails to match, and `Null` or an `...IfExists` operator treats it as absent
 - S3 supplies bucket tags only once ABAC is enabled on the bucket, which is absent, and reads object
-  tags as `s3:ExistingObjectTag/`. Outside IAM, Lambda, SQS, SNS, SSM, CloudWatch Logs, EventBridge
-  and KMS, no create or tag command carries `aws:RequestTag/` or `aws:TagKeys`
+  tags as `s3:ExistingObjectTag/`
+- Secrets Manager, ECS, ACM, SES, WAFv2 and Kinesis take tags only when a resource is created.
+  Their tag commands are not simulated
 - A KMS key's tags reach its key policy as well as IAM policies. Real KMS supplies
   `aws:ResourceTag/` to IAM policies only
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`

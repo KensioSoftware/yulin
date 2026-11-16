@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
@@ -9,6 +10,7 @@ interface SimDynamoDbTagResourceReach {
   readonly action: string;
   readonly resourceArn: string | undefined;
   readonly caller: SimAwsCaller | undefined;
+  readonly requestConditions?: SimIamConditions;
 }
 
 /**
@@ -28,6 +30,7 @@ export function reachSimDynamoDbTagResource(
     reach.action,
     reach.access.reference(arn),
     reach.caller,
+    { requestConditions: reach.requestConditions },
   );
 }
 

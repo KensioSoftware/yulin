@@ -1,3 +1,4 @@
+import { simWafAuthorizeCreate } from "../authorize/sim-wafv2-authorize-create.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimWafAssociations } from "../../association/sim-waf-associations.js";
@@ -98,9 +99,11 @@ export class SimWafWebAclCommands {
       clock: this.#clock,
     });
 
-    this.#authorizer.authorizeResource(
+    simWafAuthorizeCreate(
+      this.#authorizer,
       "wafv2:CreateWebACL",
       webAcl.arn,
+      input.Tags,
       options?.caller,
     );
 

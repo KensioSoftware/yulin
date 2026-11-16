@@ -87,7 +87,7 @@ export class RequestCertificateCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(options?.caller);
+    this.authorizer.authorize(command.input.Tags, options?.caller);
 
     const certificate = this.makeUntakenCertificate(command);
     const { certificateArn } = certificate;

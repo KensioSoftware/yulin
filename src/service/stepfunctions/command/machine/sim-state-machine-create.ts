@@ -6,6 +6,7 @@ import { simStateMachineArn } from "../../machine/sim-state-machine-arn.js";
 import type { SimStateMachineStore } from "../../machine/sim-state-machine-store.js";
 import type { SimStepFunctionsAuthorizer } from "../authorize/sim-step-functions-authorizer.js";
 import type { SimStepFunctionsRequestOptions } from "../sim-step-functions-request-options.js";
+import { simStatesTagOnCreate } from "../tag/sim-states-request-tags.js";
 import type {
   SimCreateStateMachineCommand,
   SimCreateStateMachineCommandOutput,
@@ -48,6 +49,11 @@ export class SimStateMachineCreate {
    * `CreateStateMachine` is idempotent. A second request carrying the same
    * name, definition and type answers with the state machine that is already
    * there, and is authorized the same way as the first.
+   *
+   * A request carrying tags needs `states:TagResource` as well, and both
+   * actions see the tags as `aws:RequestTag/<key>` and `aws:TagKeys`. A
+   * repeat request is authorized for its tags too, though the state machine
+   * already there keeps the tags it has.
    */
   handle(
     command: SimCreateStateMachineCommand,
@@ -55,11 +61,16 @@ export class SimStateMachineCreate {
   ): SimCreateStateMachineCommandOutput {
     const read = readSimStateMachineCreateInput(command.input);
 
-    this.#authorizer.authorizeStateMachineName(
-      "states:CreateStateMachine",
-      read.name,
-      options?.caller,
-    );
+    const request = simStatesTagOnCreate(command.input.tags);
+
+    for (const action of request.actions) {
+      this.#authorizer.authorizeStateMachineName(
+        action,
+        read.name,
+        options?.caller,
+        request.conditions,
+      );
+    }
     this.#authorizer.authorizePassRole(read.roleArn, options?.caller);
 
     const existing = this.#stateMachines.findByName(read.name);

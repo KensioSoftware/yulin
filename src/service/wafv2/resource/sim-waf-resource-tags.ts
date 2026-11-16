@@ -30,7 +30,11 @@ export function simWafTagConditionIam(
   });
 }
 
-function simWafTagRecord(
+/**
+ * The tags a WAFv2 request or resource holds, value by key. They are held as
+ * they were written, and an entry without a string `Key` is passed over.
+ */
+export function simWafTagRecord(
   tags: readonly unknown[],
 ): Readonly<Record<string, string>> {
   return Object.fromEntries(

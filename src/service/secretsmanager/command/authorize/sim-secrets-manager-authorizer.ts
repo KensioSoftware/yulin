@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimSecretsManagerSecret } from "../../secret/sim-secrets-manager-secret.js";
 
 /**
@@ -34,13 +35,16 @@ export class SimSecretsManagerAuthorizer {
 
   /**
    * Ensure the caller may perform an action on one secret.
+   *
+   * A request setting tags carries them as conditions.
    */
   authorizeSecret(
     action: string,
     secret: SimSecretsManagerSecret,
     caller?: SimAwsCaller,
+    conditions?: SimIamConditions,
   ): void {
-    this.authorizeResource(action, secret.arn.value, caller);
+    this.authorizeResource(action, secret.arn.value, caller, conditions);
   }
 
   /**
@@ -54,8 +58,14 @@ export class SimSecretsManagerAuthorizer {
     action: string,
     resource: string,
     caller: SimAwsCaller | undefined,
+    conditionContext?: SimIamConditions,
   ): void {
-    const decision = this.iam.authorize({ action, resource, caller });
+    const decision = this.iam.authorize({
+      action,
+      resource,
+      caller,
+      conditionContext,
+    });
 
     if (decision.isDenied) {
       throw new SimIamAccessDenied({

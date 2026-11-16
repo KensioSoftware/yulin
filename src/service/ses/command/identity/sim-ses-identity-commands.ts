@@ -1,3 +1,4 @@
+import { simIamTagOnCreate } from "../../../iam/tag/sim-iam-tag-on-create.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimSesIdentityStore } from "../../identity/sim-ses-identity-store.js";
 import {
@@ -52,6 +53,10 @@ export class SimSesIdentityCommands {
 
   /**
    * Begin verifying an email address or a domain.
+   *
+   * A request carrying tags needs `ses:TagResource` on the identity as well,
+   * and both actions see the tags as `aws:RequestTag/<key>` and
+   * `aws:TagKeys`.
    */
   createEmailIdentity(
     command: SimCreateEmailIdentityCommand,
@@ -61,11 +66,20 @@ export class SimSesIdentityCommands {
       command.input.EmailIdentity,
     );
 
-    this.#authorizer.authorizeIdentity(
+    const request = simIamTagOnCreate(
       "ses:CreateEmailIdentity",
-      emailIdentity,
-      options?.caller,
+      "ses:TagResource",
+      command.input.Tags,
     );
+
+    for (const action of request.actions) {
+      this.#authorizer.authorizeIdentity(
+        action,
+        emailIdentity,
+        options?.caller,
+        request.conditions,
+      );
+    }
 
     const identity = this.#identities.create(
       emailIdentity,

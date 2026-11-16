@@ -635,6 +635,10 @@ console.log(Tags); // [{ Key: "Environment", Value: "staging" }]
 to see what either did. Untagging a key that was never set succeeds. The request asks for a table
 without that key, and that is what it gets either way.
 
+`CreateTable` and `TagResource` give IAM the tags they set as `aws:RequestTag/<key>` and their keys
+as `aws:TagKeys`. `UntagResource` gives the keys it removes as `aws:TagKeys`. A `CreateTable`
+carrying tags needs `dynamodb:TagResource` as well as `dynamodb:CreateTable`.
+
 The rules a tag is held to are DynamoDB's:
 
 - a key is 1 to 128 characters, and a value is 0 to 256, and a key with no value of its own is a tag

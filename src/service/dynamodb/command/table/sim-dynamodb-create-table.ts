@@ -21,6 +21,7 @@ import type {
   SimCreateTableCommandInput,
   SimCreateTableCommandOutput,
 } from "./table.command.js";
+import { simDynamoDbAuthorizeCreateTable } from "./sim-dynamodb-create-table-authorization.js";
 import { refuseUnsimulatedTableInput } from "./sim-dynamodb-unsimulated-table-input.js";
 
 interface SimDynamoDbCreateTableProperties {
@@ -44,6 +45,10 @@ interface SimDynamoDbCreateTableOptions {
  * created on AWS is not created here, and one that could is described the way
  * AWS describes it, so what a test reads off the response is what a deployment
  * would read.
+ *
+ * A request carrying tags needs `dynamodb:TagResource` as well as
+ * `dynamodb:CreateTable`, and both see the tags as `aws:RequestTag/<key>`
+ * and `aws:TagKeys`.
  *
  * The whole command runs in one turn. Nothing is awaited between finding the
  * name free and taking it, so two creates racing for the same name cannot both
@@ -79,9 +84,10 @@ export class SimDynamoDbCreateTable {
 
     const name = SimDynamoDbTableName.required(input.TableName);
 
-    this.authorizer.authorizeTable(
-      "dynamodb:CreateTable",
+    simDynamoDbAuthorizeCreateTable(
+      this.authorizer,
       name.value,
+      input.Tags,
       options?.caller,
     );
 

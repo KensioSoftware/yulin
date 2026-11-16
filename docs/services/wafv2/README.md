@@ -1663,7 +1663,8 @@ traffic volume, and `ApplicationConfig` configures the WAF-hosted sign-in pages.
 `AssociationConfig` limit for a resource type no simulated request passes through is held too.
 
 Tags on a web ACL, an IP set or a regex pattern set are held, and an IAM policy reads them as
-`aws:ResourceTag/<key>`. `unsimulatedParts` still lists them, as Yulin leaves out
+`aws:ResourceTag/<key>`. A create request carrying tags needs `wafv2:TagResource` as well, and both
+actions see the tags as `aws:RequestTag/<key>` and `aws:TagKeys`. `unsimulatedParts` still lists them, as Yulin leaves out
 `ListTagsForResource`, the operation that would read them back. Logging, sampled requests and CloudWatch metrics for a
 web ACL are not simulated.
 

@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { simIamTagOnCreate } from "../../../iam/tag/sim-iam-tag-on-create.js";
 import type { SimSecretsManagerSecretFactory } from "../../secret/sim-secrets-manager-secret-factory.js";
 import type { SimSecretsManagerSecretStore } from "../../secret/sim-secrets-manager-secret-store.js";
 import { SimSecretsManagerSecretValue } from "../../secret/sim-secrets-manager-secret-value.js";
@@ -50,6 +51,9 @@ export class SimSecretsManagerSecretCommands {
    * Authorization happens against the ARN the secret is about to get, suffix
    * and all, so a policy allowing `secretsmanager:CreateSecret` on a bare name
    * fails here just as it would on real AWS.
+   *
+   * A request carrying tags needs `secretsmanager:TagResource` as well, and
+   * both actions see the tags as `aws:RequestTag/<key>` and `aws:TagKeys`.
    */
   async create(
     command: SimCreateSecretCommand,
@@ -64,11 +68,20 @@ export class SimSecretsManagerSecretCommands {
     });
     const value = SimSecretsManagerSecretValue.required(input);
 
-    this.authorizer.authorizeSecret(
+    const request = simIamTagOnCreate(
       "secretsmanager:CreateSecret",
-      secret,
-      options?.caller,
+      "secretsmanager:TagResource",
+      input.Tags,
     );
+
+    for (const action of request.actions) {
+      this.authorizer.authorizeSecret(
+        action,
+        secret,
+        options?.caller,
+        request.conditions,
+      );
+    }
     // The name is claimed for the whole of the create, because the first
     // version is encrypted through KMS in between: another create of the same
     // name is refused rather than overwriting this one. The secret itself is

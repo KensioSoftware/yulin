@@ -1,3 +1,4 @@
+import { simWafAuthorizeCreate } from "../authorize/sim-wafv2-authorize-create.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimWafIpSet,
@@ -72,9 +73,11 @@ export class SimWafIpSetCommands {
       addresses: input.Addresses ?? [],
     });
 
-    this.#authorizer.authorizeResource(
+    simWafAuthorizeCreate(
+      this.#authorizer,
       "wafv2:CreateIPSet",
       ipSet.arn,
+      input.Tags,
       options?.caller,
     );
 

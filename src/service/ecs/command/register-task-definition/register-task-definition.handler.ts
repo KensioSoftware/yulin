@@ -1,4 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import { simEcsAuthorizeTaggedCreate } from "../authorize/sim-ecs-tag-on-create.js";
 import { requiredSimEcsName } from "../../sim-ecs-name.js";
 import { SimEcsContainerDefinitions } from "../../task-definition/container/sim-ecs-container-definitions.js";
 import type { SimEcsTaskDefinitionArn } from "../../task-definition/sim-ecs-task-definition-arn.js";
@@ -61,7 +62,8 @@ export class RegisterTaskDefinitionCommandHandler
    *
    * The declaration is read before authorization, because a malformed
    * registration is malformed whoever made it. Nothing is stored until the
-   * caller has been authorized.
+   * caller has been authorized. A registration carrying tags needs
+   * `ecs:TagResource` on the revision it makes as well.
    */
   async handle(
     command: SimRegisterTaskDefinitionCommand,
@@ -80,8 +82,13 @@ export class RegisterTaskDefinitionCommandHandler
 
     await this.sequence();
 
-    const caller = this.authorizer.authorizeAnyResource(
-      "ecs:RegisterTaskDefinition",
+    const revision = this.taskDefinitions.nextRevisionNumber(family);
+    const taskDefinitionArn = this.taskDefinitionArn.make(family, revision);
+    const caller = simEcsAuthorizeTaggedCreate(
+      this.authorizer,
+      "RegisterTaskDefinition",
+      taskDefinitionArn,
+      command.input.tags,
       options,
     );
     this.authorizer.authorizePassRole(
@@ -90,9 +97,8 @@ export class RegisterTaskDefinitionCommandHandler
     );
 
     const familyRevisions = this.taskDefinitions.family(family);
-    const revision = familyRevisions.nextRevisionNumber();
     const taskDefinition = new SimEcsTaskDefinition({
-      taskDefinitionArn: this.taskDefinitionArn.make(family, revision),
+      taskDefinitionArn,
       family,
       revision,
       containers,

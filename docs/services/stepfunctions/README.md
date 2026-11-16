@@ -1125,6 +1125,11 @@ reads a state machine's tags as `aws:ResourceTag/<key>`. A caller allowed `state
 only where `aws:ResourceTag/team` is `enrolment` starts that team's state machines and no others. An
 execution carries no tags, so a request naming one supplies none.
 
+`CreateStateMachine` and `TagResource` give IAM the tags they set as `aws:RequestTag/<key>` and their
+keys as `aws:TagKeys`. `UntagResource` gives the keys it removes as `aws:TagKeys`. A
+`CreateStateMachine` carrying tags needs `states:TagResource` as well. A repeat of an idempotent
+create is authorized for its tags too, and the state machine already there keeps the tags it has.
+
 ## Deploying one from CloudFormation
 
 A template declaring `AWS::StepFunctions::StateMachine` creates a state machine. It goes through the

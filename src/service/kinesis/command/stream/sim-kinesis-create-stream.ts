@@ -11,6 +11,7 @@ import { SimKinesisStreamName } from "../../stream/sim-kinesis-stream-name.js";
 import type { SimKinesisStreamStore } from "../../stream/sim-kinesis-stream-store.js";
 import type { SimKinesisRequestOptions } from "../sim-kinesis-request-options.js";
 import type { SimKinesisStreamAccess } from "../sim-kinesis-stream-access.js";
+import { simKinesisAuthorizeCreateStream } from "./sim-kinesis-create-stream-authorization.js";
 import type {
   SimCreateStreamCommand,
   SimCreateStreamCommandOutput,
@@ -48,6 +49,9 @@ export class SimKinesisCreateStream {
    * up, and a status a test has to poll through earns nothing when there are no
    * shards to bring up.
    *
+   * A request carrying tags needs `kinesis:AddTagsToStream` on the stream as
+   * well.
+   *
    * Tags are kept on the stream. No command here reads them back, since the tag
    * operations are unsimulated, and a test that cares reads them through the
    * simulator's own accessor.
@@ -59,7 +63,7 @@ export class SimKinesisCreateStream {
     const { input } = command;
     const name = new SimKinesisStreamName(input.StreamName);
 
-    this.access.authorizeName("kinesis:CreateStream", name.value, options);
+    simKinesisAuthorizeCreateStream(this.access, name.value, input, options);
 
     if (this.streams.find(name.value) !== undefined) {
       throw new SimKinesisResourceInUseException(
