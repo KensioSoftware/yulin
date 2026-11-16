@@ -14,6 +14,7 @@ import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
 import { refuseUnsimulatedItemUpdateInput } from "./sim-dynamodb-unsimulated-item-update-input.js";
 import { SimDynamoDbUpdateAnswer } from "./sim-dynamodb-update-answer.js";
 import { SimDynamoDbUpdatePlan } from "./sim-dynamodb-update-plan.js";
+import { SimDynamoDbWriteReport } from "../../capacity/sim-dynamodb-write-report.js";
 
 interface SimDynamoDbUpdateItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -51,6 +52,7 @@ export class SimDynamoDbUpdateItem {
     const input = command.input;
 
     refuseUnsimulatedItemUpdateInput(input);
+    const report = SimDynamoDbWriteReport.read(input);
 
     // The expressions are read before the table is reached, so one DynamoDB
     // would refuse is refused whether or not the key holds anything.
@@ -82,9 +84,15 @@ export class SimDynamoDbUpdateItem {
     const updated = plan.applyTo(existing, key);
     table.putItem(updated);
 
-    return new SimDynamoDbUpdateAnswer({
-      asked,
-      touched: plan.touched(),
-    }).of(existing, updated);
+    return {
+      ...new SimDynamoDbUpdateAnswer({
+        asked,
+        touched: plan.touched(),
+      }).of(existing, updated),
+      ...report.of(input.TableName, table, {
+        before: existing,
+        after: updated,
+      }),
+    };
   }
 }

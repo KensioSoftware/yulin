@@ -23,7 +23,7 @@ export class SimDynamoDbTransactRead {
   public readonly action = "dynamodb:GetItem";
   public readonly reference: string | undefined;
 
-  private readonly key: SimDynamoDbItem;
+  public readonly key: SimDynamoDbItem;
   private readonly projection: SimDynamoDbProjection | undefined;
 
   private constructor(

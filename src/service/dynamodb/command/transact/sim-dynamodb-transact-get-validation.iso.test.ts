@@ -8,7 +8,6 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimDynamoDbResourceNotFoundException,
-  SimDynamoDbUnsupportedOperation,
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
 import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
@@ -185,7 +184,7 @@ describe("DynamoDB TransactGetItemsCommand request validation", () => {
     assertInstanceOf(error, SimDynamoDbResourceNotFoundException);
   });
 
-  it("refuses the read reporting inputs this simulation does not model", async () => {
+  it("refuses a ReturnConsumedCapacity AWS does not have", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
@@ -195,10 +194,11 @@ describe("DynamoDB TransactGetItemsCommand request validation", () => {
       simAws,
     );
 
-    // When a transactional read asks for a capacity cost.
+    // When a transactional read asks for a capacity report AWS has no level
+    // for.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.transactGetItems(
-        new TransactGetItemsCommand({
+      simDynamoDb.transactGetItems({
+        input: {
           TransactItems: [
             {
               Get: {
@@ -207,13 +207,13 @@ describe("DynamoDB TransactGetItemsCommand request validation", () => {
               },
             },
           ],
-          ReturnConsumedCapacity: "TOTAL",
-        }),
-      ),
+          ReturnConsumedCapacity: "ALL",
+        },
+      }),
     );
 
-    // Then it is refused by name rather than reported on.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ReturnConsumedCapacity");
+    // Then it is refused as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "returnConsumedCapacity");
   });
 });

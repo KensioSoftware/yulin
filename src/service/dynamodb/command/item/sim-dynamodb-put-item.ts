@@ -15,6 +15,7 @@ import type {
 import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
 import { refuseUnsimulatedItemWriteInput } from "./sim-dynamodb-unsimulated-item-write-input.js";
+import { SimDynamoDbWriteReport } from "../../capacity/sim-dynamodb-write-report.js";
 
 interface SimDynamoDbPutItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -62,6 +63,7 @@ export class SimDynamoDbPutItem {
     const input = command.input;
 
     refuseUnsimulatedItemWriteInput(input, "PutItem");
+    const report = SimDynamoDbWriteReport.read(input);
 
     // The condition is read before the table is reached, so an expression
     // DynamoDB would refuse is refused whether or not the key holds anything.
@@ -84,11 +86,15 @@ export class SimDynamoDbPutItem {
     check.assertHoldsFor(table.itemUnder(item));
 
     const replaced = table.putItem(item);
+    const reported = report.of(input.TableName, table, {
+      before: replaced,
+      after: item,
+    });
 
-    if (replaced === undefined || !asked.reportsBefore()) {
-      return { $metadata: {} };
-    }
-
-    return { Attributes: replaced.toAttributeValues(), $metadata: {} };
+    return {
+      ...asked.attributesBefore(replaced),
+      ...reported,
+      $metadata: {},
+    };
   }
 }

@@ -7,6 +7,8 @@ import type {
   SimTransactGetItemsCommand,
   SimTransactGetItemsCommandOutput,
 } from "./transact.command.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
+import { simDynamoDbTransactReadTallies } from "./sim-dynamodb-transact-read-capacity.js";
 
 interface SimDynamoDbTransactGetItemsProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -53,6 +55,9 @@ export class SimDynamoDbTransactGetItems {
 
     return {
       Responses: targets.map(({ item, table }) => item.readFrom(table)),
+      ...SimDynamoDbReturnConsumedCapacity.read(
+        input.ReturnConsumedCapacity,
+      ).each(simDynamoDbTransactReadTallies(targets)),
       $metadata: {},
     };
   }

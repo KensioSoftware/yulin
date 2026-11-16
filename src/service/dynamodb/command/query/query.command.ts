@@ -3,6 +3,7 @@ import type {
   SimDynamoDbAttributeValue,
   SimDynamoDbLegacyCondition,
 } from "../item/item.types.js";
+import type { SimDynamoDbConsumedCapacity } from "../../capacity/sim-dynamodb-consumed-capacity.types.js";
 
 /**
  * Minimal structural sim DynamoDB Query command.
@@ -76,5 +77,6 @@ export interface SimQueryCommandOutput {
   readonly LastEvaluatedKey?:
     | Readonly<Record<string, SimDynamoDbAttributeValue>>
     | undefined;
+  readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity | undefined;
   readonly $metadata: SimResponseMetadata;
 }

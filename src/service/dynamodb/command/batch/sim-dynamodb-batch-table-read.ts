@@ -6,6 +6,10 @@ import type { SimDynamoDbBatchReadBudget } from "./sim-dynamodb-batch-read-budge
 import type { SimDynamoDbBatchTableReads } from "./sim-dynamodb-batch-reads.js";
 import { assertDistinctBatchItems } from "./sim-dynamodb-batch-request-items.js";
 import type { SimDynamoDbBatchTable } from "./sim-dynamodb-batch-tables.js";
+import {
+  simDynamoDbReadConsistency,
+  simDynamoDbReadUnits,
+} from "../../capacity/sim-dynamodb-capacity-units.js";
 
 /**
  * The items one table of a batch read answers with.
@@ -21,6 +25,12 @@ export interface SimDynamoDbBatchTableRead {
   readonly reference: string;
   readonly items: SimDynamoDbReadItems;
   readonly unprocessed: SimDynamoDbKeysAndAttributes | undefined;
+
+  /**
+   * The read units the keys that were read consumed, whole items counted
+   * whatever the projection kept, and a key that held nothing counted too.
+   */
+  readonly readUnits: number;
 }
 
 /**
@@ -64,9 +74,24 @@ export function readSimDynamoDbBatchTable(
     return false;
   });
 
+  const read =
+    unreadKeys === -1 ? requested.keys : requested.keys.slice(0, unreadKeys);
+  const consistency = simDynamoDbReadConsistency(
+    requested.request.ConsistentRead,
+  );
+
   return {
     reference: requested.reference,
     items,
+    readUnits: read.reduce(
+      (units, key) =>
+        units +
+        simDynamoDbReadUnits(
+          table.getItem(key)?.sizeInBytes() ?? 0,
+          consistency,
+        ),
+      0,
+    ),
     unprocessed:
       unreadKeys === -1
         ? undefined

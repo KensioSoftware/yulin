@@ -1,5 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
+import type { SimDynamoDbConsumedCapacity } from "../../capacity/sim-dynamodb-consumed-capacity.types.js";
+import type { SimDynamoDbItemCollectionSize } from "../../capacity/sim-dynamodb-item-collection-metrics.js";
 
 /**
  * Minimal structural sim DynamoDB PutRequest.
@@ -66,6 +68,12 @@ export interface SimBatchWriteItemCommandOutput {
   readonly UnprocessedItems: Readonly<
     Record<string, SimDynamoDbWriteRequest[]>
   >;
+  readonly ConsumedCapacity?:
+    | readonly SimDynamoDbConsumedCapacity[]
+    | undefined;
+  readonly ItemCollectionMetrics?:
+    | Readonly<Record<string, readonly SimDynamoDbItemCollectionSize[]>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -122,5 +130,8 @@ export interface SimBatchGetItemCommandOutput {
   readonly UnprocessedKeys: Readonly<
     Record<string, SimDynamoDbKeysAndAttributes>
   >;
+  readonly ConsumedCapacity?:
+    | readonly SimDynamoDbConsumedCapacity[]
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }

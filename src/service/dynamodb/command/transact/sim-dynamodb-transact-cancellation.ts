@@ -6,6 +6,7 @@ import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTransactTarget } from "./sim-dynamodb-transact-tables.js";
 import type { SimDynamoDbTransactWrite } from "./sim-dynamodb-transact-write.js";
 import type { SimDynamoDbCancellationReason } from "./transact.command.js";
+import type { SimDynamoDbItemWrite } from "../../capacity/sim-dynamodb-write-capacity.js";
 
 /**
  * The code an action that was fine carries.
@@ -44,14 +45,26 @@ const conditionalCheckFailed = "ConditionalCheckFailed";
  */
 export function applySimDynamoDbTransaction(
   targets: readonly SimDynamoDbTransactTarget<SimDynamoDbTransactWrite>[],
-): void {
+): readonly SimDynamoDbTransactApplied[] {
   assertApplies(targets);
 
-  const writes = targets.map(({ item, table }) => item.prepareFor(table));
+  const prepared = targets.map((target) => ({
+    target,
+    write: target.item.prepareFor(target.table),
+  }));
 
-  for (const write of writes) {
-    write.commit();
-  }
+  return prepared.map(({ target, write }) => ({
+    target,
+    change: { before: write.commit(), after: write.after },
+  }));
+}
+
+/**
+ * One action a transaction applied, and the item before and after it.
+ */
+export interface SimDynamoDbTransactApplied {
+  readonly target: SimDynamoDbTransactTarget<SimDynamoDbTransactWrite>;
+  readonly change: SimDynamoDbItemWrite;
 }
 
 /**

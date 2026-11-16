@@ -14,14 +14,28 @@ export interface SimDynamoDbDocumentCommandPaths {
 }
 
 /**
- * What a write answers with.
- *
- * `ItemCollectionMetrics` is not converted, because it is only reported when a
- * request asks for it with `ReturnItemCollectionMetrics`, which simulated
- * DynamoDB refuses.
+ * The size of one item collection a write touched, whose key is a record of
+ * values like any other.
+ */
+const collectionMetrics = simDynamoDbDocumentFields({
+  ItemCollectionKey: simDynamoDbDocumentValues(),
+});
+
+/**
+ * The collection sizes a write across tables answers with: a list for each
+ * table.
+ */
+const collectionMetricsByTable = simDynamoDbDocumentEach(
+  simDynamoDbDocumentEach(collectionMetrics),
+);
+
+/**
+ * What a write answers with: the item it replaced or removed, and the size of
+ * the collection it left the item in.
  */
 const writtenAttributes = simDynamoDbDocumentFields({
   Attributes: simDynamoDbDocumentValues(),
+  ItemCollectionMetrics: collectionMetrics,
 });
 
 /**
@@ -121,18 +135,17 @@ const transactGetResponses = simDynamoDbDocumentEach(
 );
 
 /**
- * What a transactional write answers with, which is nothing to convert.
- *
- * `ItemCollectionMetrics` is the one place the real document client converts
- * this output, and it is only reported when a request asks for it with
- * `ReturnItemCollectionMetrics`, which simulated DynamoDB refuses.
+ * What a transactional write answers with, which is the collection sizes it
+ * was asked for and nothing else to convert.
  *
  * A cancelled transaction is not converted either. `CancellationReasons` reach
  * a caller on a thrown `TransactionCanceledException` rather than in an
  * answer, and the real document client leaves the `Item` of a reason as the
  * descriptors the low-level Command reports.
  */
-const transactWritten = simDynamoDbDocumentFields({});
+const transactWritten = simDynamoDbDocumentFields({
+  ItemCollectionMetrics: collectionMetricsByTable,
+});
 
 /**
  * Where each supported document Command carries native values.
@@ -185,7 +198,10 @@ export const simDynamoDbDocumentCommandPaths = {
   },
   batchWrite: {
     input: simDynamoDbDocumentFields({ RequestItems: batchWriteRequests }),
-    output: simDynamoDbDocumentFields({ UnprocessedItems: batchWriteRequests }),
+    output: simDynamoDbDocumentFields({
+      UnprocessedItems: batchWriteRequests,
+      ItemCollectionMetrics: collectionMetricsByTable,
+    }),
   },
   batchGet: {
     input: simDynamoDbDocumentFields({ RequestItems: batchGetKeys }),

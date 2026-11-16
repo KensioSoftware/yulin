@@ -1,5 +1,6 @@
 import { SimDynamoDbUnsimulatedInput } from "../item/sim-dynamodb-unsimulated-input.js";
 import type { SimQueryCommandInput } from "./query.command.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 
 /**
  * Refuse the Query inputs this simulation does not model.
@@ -32,9 +33,7 @@ export function refuseUnsimulatedQueryInput(input: SimQueryCommandInput): void {
     "ConditionalOperator",
     "joining the legacy conditions it applies to",
   );
-  unsimulated.refuseReporting(
-    input.ReturnConsumedCapacity,
-    "ReturnConsumedCapacity",
-    "reporting a capacity cost nothing here measures",
-  );
+
+  // Read here so a value AWS refuses is refused before anything is read.
+  SimDynamoDbReturnConsumedCapacity.read(input.ReturnConsumedCapacity);
 }

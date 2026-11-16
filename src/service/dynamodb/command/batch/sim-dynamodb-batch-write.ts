@@ -7,6 +7,7 @@ import type {
   SimDynamoDbPutRequest,
   SimDynamoDbWriteRequest,
 } from "./batch.command.js";
+import type { SimDynamoDbItemWrite } from "../../capacity/sim-dynamodb-write-capacity.js";
 
 /**
  * One put or delete a batch write asks for.
@@ -28,9 +29,9 @@ export interface SimDynamoDbBatchWrite {
   keyIn(table: SimDynamoDbTable): string;
 
   /**
-   * Apply this write to the table.
+   * Apply this write to the table, and give back the item before and after.
    */
-  applyTo(table: SimDynamoDbTable): void;
+  applyTo(table: SimDynamoDbTable): SimDynamoDbItemWrite;
 }
 
 /**
@@ -47,8 +48,8 @@ class SimDynamoDbBatchPut implements SimDynamoDbBatchWrite {
     return table.keyOfItem(this.names);
   }
 
-  applyTo(table: SimDynamoDbTable): void {
-    table.putItem(this.names);
+  applyTo(table: SimDynamoDbTable): SimDynamoDbItemWrite {
+    return { before: table.putItem(this.names), after: this.names };
   }
 }
 
@@ -67,8 +68,8 @@ class SimDynamoDbBatchDelete implements SimDynamoDbBatchWrite {
     return table.keyOfKey(this.names);
   }
 
-  applyTo(table: SimDynamoDbTable): void {
-    table.deleteItem(this.names);
+  applyTo(table: SimDynamoDbTable): SimDynamoDbItemWrite {
+    return { before: table.deleteItem(this.names), after: undefined };
   }
 }
 

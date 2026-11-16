@@ -10,6 +10,7 @@ import { readSimDynamoDbScanExpressions } from "./sim-dynamodb-scan-expressions.
 import { readSimDynamoDbScanSegment } from "./sim-dynamodb-scan-segment-input.js";
 import { readSimDynamoDbScanStartKey } from "./sim-dynamodb-scan-start-key.js";
 import { refuseUnsimulatedScanInput } from "./sim-dynamodb-unsimulated-scan-input.js";
+import { simDynamoDbPageCapacity } from "../../capacity/sim-dynamodb-page-capacity.js";
 
 interface SimDynamoDbScanProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -89,15 +90,16 @@ export class SimDynamoDbScan {
       exclusiveStartKey: input.ExclusiveStartKey,
     });
 
+    const sizeOf = simDynamoDbReadSize({
+      view,
+      projection: expressions.projection,
+      select,
+    });
     const page = new SimDynamoDbItemPage({
       items: scan.walk({ segment, after }),
       limit: input.Limit,
       view,
-      sizeOf: simDynamoDbReadSize({
-        view,
-        projection: expressions.projection,
-        select,
-      }),
+      sizeOf,
     });
 
     return {
@@ -108,6 +110,12 @@ export class SimDynamoDbScan {
         select,
         view,
       }).fields(),
+      ...simDynamoDbPageCapacity({
+        input,
+        table,
+        evaluated: page.items,
+        sizeOf,
+      }),
       $metadata: {},
     };
   }

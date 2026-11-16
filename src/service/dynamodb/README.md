@@ -532,10 +532,9 @@ Important behavior:
   checked against what is stored before anything changes, so a write it turns away leaves the item
   exactly as it was. PutItem finds what is stored through `SimDynamoDbTable.itemUnder`, which reads
   the key out of the item being written rather than out of a Key of its own.
-- GetItem refuses the legacy `AttributesToGet` and a `ReturnConsumedCapacity` that asks for anything,
-  in `sim-dynamodb-unsimulated-item-read-input.ts`. `ExpressionAttributeNames` with no expression to
+- GetItem refuses the legacy `AttributesToGet` in `sim-dynamodb-unsimulated-item-read-input.ts`. `ExpressionAttributeNames` with no expression to
   use them in is a `ValidationException` rather than an unsupported operation, because real DynamoDB
-  refuses that too. DeleteItem refuses the same conditional write and reporting inputs PutItem does.
+  refuses that too. DeleteItem refuses the same conditional write inputs PutItem does.
 
 ## UpdateItem behavior
 
@@ -825,6 +824,31 @@ refused whichever token it carries.
 
 A transactional read answers positionally too. `Responses` is never compacted: a key holding nothing
 gives an entry with no `Item`, where BatchGetItem leaves the item out altogether.
+
+## Capacity reporting
+
+`capacity/` answers `ReturnConsumedCapacity` and `ReturnItemCollectionMetrics` for every item
+command. It only reports. A handler spreads the fields it gives back into the response.
+
+- `simDynamoDbReadUnits` and `simDynamoDbWriteUnits` hold AWS's unit maths: 4 KB per read unit and
+  1 KB per write unit, never less than one block, halved for an eventually consistent read and
+  doubled inside a transaction.
+- `SimDynamoDbCapacityTally` adds up what one request consumed against one table and each index,
+  and renders it as `ConsumedCapacity` for `TOTAL` or `INDEXES`.
+- `simDynamoDbChargeWrite` charges one write, given the item before and after it. Each index is
+  charged for its own entry (the item cut down by `view.project`), and an index the write leaves
+  alone is skipped. `INDEXES` leaves it out. A transaction's writes get their before and
+  after from `SimDynamoDbTableWrite.after` and the item `commit()` displaced.
+- `SimDynamoDbWriteReport` serves the three single-item writes, and `SimDynamoDbWritesReport` the
+  batch and transactional writes. Those answer with one entry per table.
+- `simDynamoDbPageCapacity` charges a Query or Scan page for the items it evaluated, sized the way
+  the page's 1 MB is. A local secondary index read that fetches from the table counts the whole
+  item.
+- `simDynamoDbItemCollectionSize` walks the table for the items under one partition key and adds
+  their local index entries. It only runs when a request asks for `SIZE` on a table with a local
+  secondary index.
+
+An invalid level is refused with AWS's enum message, before the table is reached.
 
 ## Expressions
 

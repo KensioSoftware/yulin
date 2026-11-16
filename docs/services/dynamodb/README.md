@@ -2561,6 +2561,77 @@ console.log(second.Responses?.[0]); // {}
 `TransactItems` order. A reason's `Item` holds AttributeValues, because a cancelled transaction is
 thrown, and the real document client converts nothing on the way out of a transactional write.
 
+## Consumed capacity and item collection sizes
+
+Every item command takes `ReturnConsumedCapacity`. `TOTAL` answers with what each table consumed,
+and `INDEXES` adds what the table and each index consumed apart. The units follow AWS's rules:
+
+- A read costs one unit per 4 KB read strongly consistently, half that eventually consistently, and
+  two inside a transaction. A read of an absent key still costs the first 4 KB.
+- A `Query` or `Scan` page adds up the sizes of the items it read before rounding, and a filter saves
+  nothing. A read of an index is charged to the index.
+- A write costs one unit per 1 KB of the larger of the item before and after, and two inside a
+  transaction. A batch rounds each item before adding them up.
+- A write to an indexed table is charged again to each index whose entry it changes. An entry that
+  appears or goes costs one write, and one whose index key changes costs two.
+
+```typescript sim-dynamodb-consumed-capacity
+/**
+ * Reading the capacity a write and a read consumed.
+ */
+
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+// About 1.5 KB, which a write rounds up to 2 KB.
+const put = await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, notes: { S: "x".repeat(1500) } },
+    ReturnConsumedCapacity: "TOTAL",
+  }),
+);
+
+console.log(put.ConsumedCapacity?.WriteCapacityUnits); // 2
+
+// A read rounds up to 4 KB, and an eventually consistent one costs half.
+const read = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: { S: "order-1" } },
+    ReturnConsumedCapacity: "TOTAL",
+  }),
+);
+
+console.log(read.ConsumedCapacity?.ReadCapacityUnits); // 0.5
+```
+
+Nothing here throttles a request, whatever it consumed. The figures say what the same request would
+cost on AWS (on-demand or provisioned alike).
+
+`ReturnItemCollectionMetrics` set to `SIZE` reports the size of the item collection a write left an
+item in, for a table with a local secondary index. A table without one has no item collections, and
+the write answers without the field, as AWS answers. The size is a range in gigabytes, and a
+collection under a gigabyte reports `[0, 1]`.
+
 ## Expiring items with time to live
 
 `UpdateTimeToLive` names the attribute a table expires items by, and `DescribeTimeToLive` reports
@@ -3955,6 +4026,9 @@ is written.
   `ClientRequestToken` making a retry idempotent for ten simulated minutes.
 - `TransactGetItems`, reading up to 100 items in one step, with a positional `Responses` array in
   which a missing item is an entry with no `Item`.
+- `ReturnConsumedCapacity` at `TOTAL` and `INDEXES` on every item command, with AWS's read and write
+  unit rules, and `ReturnItemCollectionMetrics` at `SIZE` on every write to a table with a local
+  secondary index.
 - `UpdateTable`, doing one of a billing and throughput change, one global secondary index creation
   or one global secondary index deletion per call, with `TableClass` and `DeletionProtectionEnabled`
   riding along. The table moves through `UPDATING` while serving reads and writes, a new index
@@ -4021,8 +4095,7 @@ is written.
 - The 10 GB limit on one item collection is left out, along with
   `ItemCollectionSizeLimitExceededException`. A table with a local secondary index can hold as much
   under one partition key here as memory allows. A write real DynamoDB would refuse for the size of
-  the collection it lands in goes through. `ReturnItemCollectionMetrics` is refused by name, and a
-  write cannot ask how large the collection it touched has grown either.
+  the collection it lands in goes through.
 - An index key is one attribute, or two. Real DynamoDB now takes more than that, and a key schema of
   more than two elements is refused here.
 - `ItemCount` and `IndexSizeBytes` are 0 for every index, the same way the table's own figures are.
@@ -4151,8 +4224,10 @@ is written.
   asserting something about this simulator.
 - A local secondary index read whose `FilterExpression` names an unprojected attribute fetches the
   item from the table on AWS. Here that item still counts toward the 1 MB at its projected size.
-- No part of this throttles or measures a query or a scan, so `ReturnConsumedCapacity` is refused
-  unless it names `NONE`.
+- A `Query` or `Scan` is charged for the items it read. AWS also charges for the partitions it
+  searched, so a read finding nothing can cost more there than the 4 KB minimum it costs here.
+- A conditional write that fails, and a cancelled transaction, consume capacity on AWS. The
+  exception carries no `ConsumedCapacity`, so the cost goes unreported in both.
 - `UnprocessedItems` is always empty, and `UnprocessedKeys` is filled only by the 16 MB response
   limit. No request here is throttled. Which keys a full batch read leaves unread is this
   simulator's choice (the ones named last), where AWS reads a batch in parallel and leaves no order
@@ -4218,8 +4293,8 @@ is written.
 - The 4 KB limit on an expression and the 300 operator limit go unenforced. No operation here is
   slower for a long expression, and an expression real DynamoDB would refuse for its size is
   evaluated.
-- Capacity and item collection reporting are absent. `ReturnConsumedCapacity` and
-  `ReturnItemCollectionMetrics` are refused unless they name `NONE`.
+- `SizeEstimateRangeGB` is the whole gigabytes a collection holds and one more. AWS's estimate is
+  its own, and only agrees for a collection under a gigabyte.
 - A `Key` that fails to match the table's key schema is refused with the attribute named. Real
   DynamoDB answers `The provided key element fails to match the schema` without saying which
   attribute was at fault.

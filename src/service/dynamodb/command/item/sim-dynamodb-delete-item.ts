@@ -13,6 +13,7 @@ import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
 import { refuseUnsimulatedItemWriteInput } from "./sim-dynamodb-unsimulated-item-write-input.js";
+import { SimDynamoDbWriteReport } from "../../capacity/sim-dynamodb-write-report.js";
 
 interface SimDynamoDbDeleteItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -49,6 +50,7 @@ export class SimDynamoDbDeleteItem {
     const input = command.input;
 
     refuseUnsimulatedItemWriteInput(input, "DeleteItem");
+    const report = SimDynamoDbWriteReport.read(input);
 
     // The condition is read before the table is reached, so an expression
     // DynamoDB would refuse is refused whether or not the key holds anything.
@@ -76,11 +78,15 @@ export class SimDynamoDbDeleteItem {
     check.assertHoldsFor(table.getItem(key));
 
     const removed = table.deleteItem(key);
+    const reported = report.of(input.TableName, table, {
+      before: removed,
+      after: undefined,
+    });
 
-    if (removed === undefined || !asked.reportsBefore()) {
-      return { $metadata: {} };
-    }
-
-    return { Attributes: removed.toAttributeValues(), $metadata: {} };
+    return {
+      ...asked.attributesBefore(removed),
+      ...reported,
+      $metadata: {},
+    };
   }
 }

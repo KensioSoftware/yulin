@@ -12,6 +12,15 @@ import {
   simDynamoDbAttributesOf,
   simDynamoDbItemAttributeNames,
 } from "../authorize/sim-dynamodb-attributes.js";
+import {
+  SimDynamoDbCapacityTally,
+  simDynamoDbTableTarget,
+} from "../../capacity/sim-dynamodb-capacity-tally.js";
+import {
+  simDynamoDbReadConsistency,
+  simDynamoDbReadUnits,
+} from "../../capacity/sim-dynamodb-capacity-units.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 
 interface SimDynamoDbGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -49,6 +58,9 @@ export class SimDynamoDbGetItem {
     const input = command.input;
 
     refuseUnsimulatedItemReadInput(input);
+    const capacity = SimDynamoDbReturnConsumedCapacity.read(
+      input.ReturnConsumedCapacity,
+    );
 
     // The projection is read before the table is reached, so an expression
     // DynamoDB would refuse is refused whether or not the key holds anything.
@@ -70,8 +82,22 @@ export class SimDynamoDbGetItem {
     );
     const found = table.getItem(readSimDynamoDbKey(input.Key));
 
+    // The whole item is read whatever the projection keeps, and a key that
+    // holds nothing still costs the first 4 KB.
+    const tally = new SimDynamoDbCapacityTally(
+      input.TableName ?? table.tableName,
+    );
+    tally.read(
+      simDynamoDbTableTarget,
+      simDynamoDbReadUnits(
+        found?.sizeInBytes() ?? 0,
+        simDynamoDbReadConsistency(input.ConsistentRead),
+      ),
+    );
+    const consumed = capacity.one(tally);
+
     if (found === undefined) {
-      return { $metadata: {} };
+      return { ...consumed, $metadata: {} };
     }
 
     // A projection that found none of what it asked for leaves an item with no
@@ -79,6 +105,6 @@ export class SimDynamoDbGetItem {
     // miss: the key was there, and nothing the request asked for was.
     const projected = projection?.apply(found) ?? found;
 
-    return { Item: projected.toAttributeValues(), $metadata: {} };
+    return { Item: projected.toAttributeValues(), ...consumed, $metadata: {} };
   }
 }

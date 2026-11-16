@@ -14,6 +14,7 @@ import { readSimDynamoDbQueryExpressions } from "./sim-dynamodb-query-expression
 import { refuseSimDynamoDbQuerySegment } from "./sim-dynamodb-query-segment.js";
 import { readSimDynamoDbQueryStartKey } from "./sim-dynamodb-query-start-key.js";
 import { refuseUnsimulatedQueryInput } from "./sim-dynamodb-unsimulated-query-input.js";
+import { simDynamoDbPageCapacity } from "../../capacity/sim-dynamodb-page-capacity.js";
 
 interface SimDynamoDbQueryProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -104,6 +105,11 @@ export class SimDynamoDbQuery {
       exclusiveStartKey: input.ExclusiveStartKey,
     });
 
+    const sizeOf = simDynamoDbReadSize({
+      view,
+      projection: expressions.projection,
+      select,
+    });
     const page = new SimDynamoDbItemPage({
       items: view.itemCollection(keyCondition).walk({
         forward: input.ScanIndexForward ?? true,
@@ -111,11 +117,7 @@ export class SimDynamoDbQuery {
       }),
       limit: input.Limit,
       view,
-      sizeOf: simDynamoDbReadSize({
-        view,
-        projection: expressions.projection,
-        select,
-      }),
+      sizeOf,
     });
 
     return {
@@ -126,6 +128,12 @@ export class SimDynamoDbQuery {
         select,
         view,
       }).fields(),
+      ...simDynamoDbPageCapacity({
+        input,
+        table,
+        evaluated: page.items,
+        sizeOf,
+      }),
       $metadata: {},
     };
   }

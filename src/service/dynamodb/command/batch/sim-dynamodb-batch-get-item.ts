@@ -10,6 +10,11 @@ import { refuseUnsimulatedBatchReadInput } from "./sim-dynamodb-unsimulated-batc
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
 import { SimDynamoDbBatchReadBudget } from "./sim-dynamodb-batch-read-budget.js";
 import { readSimDynamoDbBatchTable } from "./sim-dynamodb-batch-table-read.js";
+import {
+  SimDynamoDbCapacityTally,
+  simDynamoDbTableTarget,
+} from "../../capacity/sim-dynamodb-capacity-tally.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 
 interface SimDynamoDbBatchGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -72,6 +77,16 @@ export class SimDynamoDbBatchGetItem {
         read.flatMap(({ reference, unprocessed }) =>
           unprocessed === undefined ? [] : [[reference, unprocessed] as const],
         ),
+      ),
+      ...SimDynamoDbReturnConsumedCapacity.read(
+        input.ReturnConsumedCapacity,
+      ).each(
+        read.map(({ reference, readUnits }) => {
+          const tally = new SimDynamoDbCapacityTally(reference);
+          tally.read(simDynamoDbTableTarget, readUnits);
+
+          return tally;
+        }),
       ),
       $metadata: {},
     };

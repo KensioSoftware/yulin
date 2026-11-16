@@ -20,9 +20,4 @@ export function refuseUnsimulatedItemReadInput(
     "AttributesToGet",
     "answering with the whole item where part of it was asked for",
   );
-  unsimulated.refuseReporting(
-    input.ReturnConsumedCapacity,
-    "ReturnConsumedCapacity",
-    "reporting a capacity cost nothing here measures",
-  );
 }
