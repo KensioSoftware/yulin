@@ -1,23 +1,15 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
-import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
-import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
 import type {
   SimBatchGetItemCommand,
   SimBatchGetItemCommandOutput,
 } from "./batch.command.js";
-import {
-  readSimDynamoDbBatchReads,
-  type SimDynamoDbBatchTableReads,
-} from "./sim-dynamodb-batch-reads.js";
-import { assertDistinctBatchItems } from "./sim-dynamodb-batch-request-items.js";
-import {
-  reachSimDynamoDbBatchTables,
-  type SimDynamoDbBatchTable,
-} from "./sim-dynamodb-batch-tables.js";
+import { readSimDynamoDbBatchReads } from "./sim-dynamodb-batch-reads.js";
+import { reachSimDynamoDbBatchTables } from "./sim-dynamodb-batch-tables.js";
 import { refuseUnsimulatedBatchReadInput } from "./sim-dynamodb-unsimulated-batch-input.js";
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
+import { SimDynamoDbBatchReadBudget } from "./sim-dynamodb-batch-read-budget.js";
+import { readSimDynamoDbBatchTable } from "./sim-dynamodb-batch-table-read.js";
 
 interface SimDynamoDbBatchGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -26,13 +18,6 @@ interface SimDynamoDbBatchGetItemProperties {
 interface SimDynamoDbBatchGetItemOptions {
   readonly caller?: SimAwsCaller;
 }
-
-/**
- * The items one table of a batch read answers with.
- */
-type SimDynamoDbReadItems = readonly Readonly<
-  Record<string, SimDynamoDbAttributeValue>
->[];
 
 /**
  * The BatchGetItem command.
@@ -74,55 +59,21 @@ export class SimDynamoDbBatchGetItem {
         }),
       },
     );
-    const responses = Object.fromEntries(
-      reached.map((entry) => [entry.requested.reference, readItems(entry)]),
+    const budget = new SimDynamoDbBatchReadBudget();
+    const read = reached.map((entry) =>
+      readSimDynamoDbBatchTable(entry, budget),
     );
 
-    // Nothing here throttles or stops at a response size, so no key is ever
-    // left unread. The map is still answered with, since that is the shape a
-    // retry loop reads.
-    return { Responses: responses, UnprocessedKeys: {}, $metadata: {} };
+    return {
+      Responses: Object.fromEntries(
+        read.map((table) => [table.reference, table.items]),
+      ),
+      UnprocessedKeys: Object.fromEntries(
+        read.flatMap(({ reference, unprocessed }) =>
+          unprocessed === undefined ? [] : [[reference, unprocessed] as const],
+        ),
+      ),
+      $metadata: {},
+    };
   }
-}
-
-/**
- * Read what one table of the batch was asked for.
- *
- * DynamoDB reads a batch in parallel and answers in no particular order. The
- * items here come back in the order their keys were named, which is one of the
- * orders that is allowed rather than one that can be relied on.
- */
-function readItems(
-  reached: SimDynamoDbBatchTable<SimDynamoDbBatchTableReads>,
-): SimDynamoDbReadItems {
-  const { table, requested } = reached;
-
-  // Marshalling every key checks it against the table's key schema, and is
-  // what tells two reads of one item apart.
-  assertDistinctBatchItems(
-    requested.keys.map((key) => table.keyOfKey(key)),
-    requested.reference,
-    "BatchGetItem",
-  );
-
-  return requested.keys
-    .map((key) => foundItem(table, key, requested))
-    .filter((item) => item !== undefined);
-}
-
-/**
- * Read one item, as the table it is in and the projection asked for it.
- */
-function foundItem(
-  table: SimDynamoDbTable,
-  key: SimDynamoDbItem,
-  requested: SimDynamoDbBatchTableReads,
-): Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined {
-  const item = table.getItem(key);
-
-  if (item === undefined) {
-    return undefined;
-  }
-
-  return (requested.projection?.apply(item) ?? item).toAttributeValues();
 }

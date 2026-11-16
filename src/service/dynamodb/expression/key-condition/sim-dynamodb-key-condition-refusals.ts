@@ -60,24 +60,6 @@ export class SimDynamoDbKeyConditionRefusals {
   }
 
   /**
-   * Refuse a bracketed term.
-   *
-   * Brackets group a condition, and there is nothing here to group: the shape
-   * of a key condition is fixed. Refusing them is stricter than real DynamoDB,
-   * and is recorded in the Limitations section of the usage docs.
-   */
-  assertNoBracket(): void {
-    const token = this.tokens.peek();
-
-    if (token?.kind === "symbol" && token.text === "(") {
-      throw simDynamoDbKeyConditionError(
-        `a key condition takes no brackets: it is one partition key ` +
-          `equality, optionally with one sort key condition after AND`,
-      );
-    }
-  }
-
-  /**
    * Whether the next term is a `begins_with` call, refusing any other function.
    *
    * A function name followed by anything but an opening bracket is an ordinary

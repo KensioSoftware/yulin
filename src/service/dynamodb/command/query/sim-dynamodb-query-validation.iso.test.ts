@@ -164,13 +164,22 @@ describe("DynamoDB QueryCommand key condition validation", () => {
     assertStringIncludes(error.message, "begins_with");
   });
 
-  it("refuses a bracketed key condition", async () => {
-    // When a term is bracketed.
-    const error = await refusalFor("(customerId = :customer)");
+  it("refuses OR inside brackets", async () => {
+    // When a bracketed group joins two terms with OR.
+    const error = await refusalFor(
+      "(customerId = :customer OR orderId = :order)",
+    );
 
-    // Then it is refused. This is stricter than real DynamoDB, and is recorded
-    // under Limitations in the usage docs.
-    assertStringIncludes(error.message, "takes no brackets");
+    // Then it is refused the same way it is outside brackets.
+    assertStringIncludes(error.message, "OR is not part of a key condition");
+  });
+
+  it("refuses a bracket that is never closed", async () => {
+    // When a group is opened and the expression ends inside it.
+    const error = await refusalFor("(customerId = :customer");
+
+    // Then it is refused for the bracket.
+    assertStringIncludes(error.message, "never closed");
   });
 
   it("refuses a key condition naming the same attribute twice", async () => {

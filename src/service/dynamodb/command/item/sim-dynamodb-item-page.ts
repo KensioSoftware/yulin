@@ -4,11 +4,18 @@ import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js"
 import type { SimDynamoDbAttributeValue } from "./item.types.js";
 
 /**
+ * The most data one Query or Scan page reads, in bytes.
+ *
+ * DynamoDB counts this before any filter runs, so a page of items a filter
+ * mostly drops still stops at 1 MB of what it read.
+ */
+export const simDynamoDbPageDataLimitBytes = 1024 * 1024;
+
+/**
  * Read the page size a request asks for.
  *
- * A request with no `Limit` reads everything the key range holds. Real DynamoDB
- * stops a page at 1 MB instead, which is not modelled here, so a page breaks
- * only on a `Limit`.
+ * A request with no `Limit` reads until the range runs out or the page has
+ * read 1 MB, whichever comes first.
  */
 function readLimit(limit: number | undefined): number {
   if (limit === undefined) {
@@ -33,22 +40,28 @@ interface SimDynamoDbItemPageProperties {
 }
 
 /**
- * One page of items, as a Query hands them out.
+ * One page of items, as a Query or a Scan hands them out.
  *
- * `Limit` counts the items a walk evaluated rather than the items it answers
- * with. A page is cut here and filtered afterwards, which is what makes
+ * A page ends at the `Limit` or at 1 MB of data read, whichever comes first.
+ * Both count the items a walk evaluated rather than the items it answers with.
+ * A page is cut here and filtered afterwards, which is what makes
  * `ScannedCount` the items the read evaluated and lets a filtered page come
  * back shorter than the limit, or empty.
  *
- * `LastEvaluatedKey` is there whenever the walk stopped at the limit, including
- * when it stopped on the last matching item. A caller looping until the token
- * is absent therefore reads one empty page at the end. That is what real
- * DynamoDB does: it cannot know the range is exhausted without looking past it.
+ * The 1 MB is counted from each item as the view holds it, so a read of an
+ * index counts the attributes the index projects rather than the whole item.
+ * The item that takes the total past 1 MB is the last one read, and is on the
+ * page: DynamoDB stops once the data read exceeds the limit, rather than
+ * before it would.
  *
- * Scan pages the same way, so this takes items and the view they came from
- * rather than a query. The view is also what decides which key attributes the
- * token carries: a read of an index names the item it stopped on by the index
- * key and the table key together, since an index key is not unique.
+ * `LastEvaluatedKey` is there whenever the walk stopped early, including when
+ * it stopped on the last matching item. A caller looping until the token is
+ * absent therefore reads one empty page at the end. That is what real DynamoDB
+ * does: it cannot know the range is exhausted without looking past it.
+ *
+ * The view also decides which key attributes the token carries: a read of an
+ * index names the item it stopped on by the index key and the table key
+ * together, since an index key is not unique.
  */
 export class SimDynamoDbItemPage {
   public readonly items: readonly SimDynamoDbItem[];
@@ -58,25 +71,54 @@ export class SimDynamoDbItemPage {
 
   constructor(properties: SimDynamoDbItemPageProperties) {
     const limit = readLimit(properties.limit);
+    const { items, stoppedEarly } = cutPage(
+      properties.items,
+      limit,
+      properties.view,
+    );
 
-    this.items = properties.items.slice(0, limit);
-    this.lastEvaluatedKey = this.tokenFor(properties.view, limit);
+    this.items = items;
+    this.lastEvaluatedKey = stoppedEarly
+      ? tokenFor(properties.view, items)
+      : undefined;
   }
+}
 
-  /**
-   * The key to resume from, when the walk stopped at the limit rather than at
-   * the end of the range.
-   */
-  private tokenFor(
-    view: SimDynamoDbReadView,
-    limit: number,
-  ): Record<string, SimDynamoDbAttributeValue> | undefined {
-    const last = this.items.at(-1);
+/**
+ * Take items off the front of the walk until the limit or the data limit is
+ * reached.
+ */
+function cutPage(
+  walked: readonly SimDynamoDbItem[],
+  limit: number,
+  view: SimDynamoDbReadView,
+): {
+  readonly items: readonly SimDynamoDbItem[];
+  readonly stoppedEarly: boolean;
+} {
+  const items: SimDynamoDbItem[] = [];
+  let bytesRead = 0;
 
-    if (last === undefined || this.items.length < limit) {
-      return undefined;
+  for (const item of walked) {
+    items.push(item);
+    bytesRead += view.project(item).sizeInBytes();
+
+    if (items.length >= limit || bytesRead > simDynamoDbPageDataLimitBytes) {
+      return { items, stoppedEarly: true };
     }
-
-    return view.tokenKey(last);
   }
+
+  return { items, stoppedEarly: false };
+}
+
+/**
+ * The key to resume from, naming the last item the page read.
+ */
+function tokenFor(
+  view: SimDynamoDbReadView,
+  items: readonly SimDynamoDbItem[],
+): Record<string, SimDynamoDbAttributeValue> | undefined {
+  const last = items.at(-1);
+
+  return last === undefined ? undefined : view.tokenKey(last);
 }
