@@ -127,8 +127,7 @@ describe("the partitions a WHERE clause narrows a query to", () => {
     // on the day, then keep rows matching one test or the other.
     // When its partitions are read.
     const prefixes = prefixesFor(
-      "SELECT * FROM t WHERE day = '2026-08-25' " +
-        String.raw`AND (regexp_like(uri, '\.css$') OR strpos(uri, '/beacon') = 1)`,
+      String.raw`SELECT * FROM t WHERE day = '2026-08-25' AND (regexp_like(uri, '\.css$') OR strpos(uri, '/beacon') = 1)`,
     );
 
     // Then the day goes on pruning. The OR chooses between the two tests,
