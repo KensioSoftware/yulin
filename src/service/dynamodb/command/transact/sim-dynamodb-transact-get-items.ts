@@ -57,7 +57,7 @@ export class SimDynamoDbTransactGetItems {
       Responses: targets.map(({ item, table }) => item.readFrom(table)),
       ...SimDynamoDbReturnConsumedCapacity.read(
         input.ReturnConsumedCapacity,
-      ).each(simDynamoDbTransactReadTallies(targets)),
+      ).each(() => simDynamoDbTransactReadTallies(targets)),
       $metadata: {},
     };
   }

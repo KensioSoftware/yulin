@@ -848,6 +848,12 @@ command. It only reports. A handler spreads the fields it gives back into the re
   their local index entries. It only runs when a request asks for `SIZE` on a table with a local
   secondary index.
 
+`SimDynamoDbReturnConsumedCapacity.one()` and `each()` take the tally as a function, and only call
+it when the request asked for a report. A write that asked for no report skips measuring its
+indexes.
+`simDynamoDbIndexEntry` projects an item through an index's definition. A Query's read view refuses
+an index still being created, and a write is charged for that index all the same.
+
 An invalid level is refused with AWS's enum message, before the table is reached.
 
 ## Expressions

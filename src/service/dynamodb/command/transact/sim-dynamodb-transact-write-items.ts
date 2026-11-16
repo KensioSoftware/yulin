@@ -70,7 +70,15 @@ export class SimDynamoDbTransactWriteItems {
     // again, which is what makes the retry idempotent. The request is still
     // read and the caller still authorized against every table it names, since
     // IAM evaluates a request before the service handles it.
-    if (!this.tokens.isReplayOf(token, payload)) {
+    if (this.tokens.isReplayOf(token, payload)) {
+      // A replay changes nothing, and AWS charges it for reading each item.
+      for (const { item, table } of targets) {
+        report.recordRead(
+          item.reference ?? table.tableName,
+          item.storedIn(table),
+        );
+      }
+    } else {
       const applied = applySimDynamoDbTransaction(targets);
       this.tokens.record(token, payload);
 
@@ -79,6 +87,7 @@ export class SimDynamoDbTransactWriteItems {
           target.item.reference ?? target.table.tableName,
           target.table,
           change,
+          target.item.action !== "dynamodb:ConditionCheckItem",
         );
       }
     }

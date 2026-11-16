@@ -3,6 +3,7 @@ import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import { SimDynamoDbScanSegment } from "../table/sim-dynamodb-scan-segment.js";
 import type { SimDynamoDbTable } from "../table/sim-dynamodb-table.js";
+import { simDynamoDbIndexEntriesSize } from "./sim-dynamodb-index-entry.js";
 
 const bytesPerGb = 1024 * 1024 * 1024;
 
@@ -39,6 +40,7 @@ export function simDynamoDbItemCollectionSize(
   }
 
   const partitionKey = table.keySchema.hashKeyAttributeName;
+  const entriesSize = simDynamoDbIndexEntriesSize(table, localIndexes);
   const partition = valueOf(item, partitionKey);
   const collection = table
     .view(undefined)
@@ -46,20 +48,7 @@ export function simDynamoDbItemCollectionSize(
     .walk({ segment: SimDynamoDbScanSegment.whole(), after: undefined })
     .filter((member) => valueOf(member, partitionKey) === partition);
   const bytes = collection.reduce(
-    (total, member) =>
-      total +
-      member.sizeInBytes() +
-      localIndexes
-        .filter((index) =>
-          index.keySchema
-            .attributeNames()
-            .every((name) => member.attribute(name) !== undefined),
-        )
-        .reduce(
-          (entries, index) =>
-            entries + table.view(index.name).project(member).sizeInBytes(),
-          0,
-        ),
+    (total, member) => total + member.sizeInBytes() + entriesSize(member),
     0,
   );
   const gigabytes = Math.floor(bytes / bytesPerGb);

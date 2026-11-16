@@ -48,22 +48,25 @@ export class SimDynamoDbReturnConsumedCapacity {
 
   /**
    * The `ConsumedCapacity` a request on one table answers with.
+   *
+   * The tally is measured only when the request asked for a report, so a
+   * request that did not pays nothing for it.
    */
-  one(tally: SimDynamoDbCapacityTally): {
+  one(measure: () => SimDynamoDbCapacityTally): {
     readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity;
   } {
     if (this.level === "NONE") {
       return {};
     }
 
-    return { ConsumedCapacity: tally.consumedCapacity(this.withIndexes) };
+    return { ConsumedCapacity: measure().consumedCapacity(this.withIndexes) };
   }
 
   /**
    * The `ConsumedCapacity` a request on several tables answers with, one entry
    * for each table.
    */
-  each(tallies: readonly SimDynamoDbCapacityTally[]): {
+  each(measure: () => readonly SimDynamoDbCapacityTally[]): {
     readonly ConsumedCapacity?: readonly SimDynamoDbConsumedCapacity[];
   } {
     if (this.level === "NONE") {
@@ -71,7 +74,7 @@ export class SimDynamoDbReturnConsumedCapacity {
     }
 
     return {
-      ConsumedCapacity: tallies.map((tally) =>
+      ConsumedCapacity: measure().map((tally) =>
         tally.consumedCapacity(this.withIndexes),
       ),
     };

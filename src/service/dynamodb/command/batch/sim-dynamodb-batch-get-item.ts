@@ -80,7 +80,7 @@ export class SimDynamoDbBatchGetItem {
       ),
       ...SimDynamoDbReturnConsumedCapacity.read(
         input.ReturnConsumedCapacity,
-      ).each(
+      ).each(() =>
         read.map(({ reference, readUnits }) => {
           const tally = new SimDynamoDbCapacityTally(reference);
           tally.read(simDynamoDbTableTarget, readUnits);

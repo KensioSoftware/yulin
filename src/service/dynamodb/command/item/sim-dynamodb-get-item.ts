@@ -84,17 +84,20 @@ export class SimDynamoDbGetItem {
 
     // The whole item is read whatever the projection keeps, and a key that
     // holds nothing still costs the first 4 KB.
-    const tally = new SimDynamoDbCapacityTally(
-      input.TableName ?? table.tableName,
-    );
-    tally.read(
-      simDynamoDbTableTarget,
-      simDynamoDbReadUnits(
-        found?.sizeInBytes() ?? 0,
-        simDynamoDbReadConsistency(input.ConsistentRead),
-      ),
-    );
-    const consumed = capacity.one(tally);
+    const consumed = capacity.one(() => {
+      const tally = new SimDynamoDbCapacityTally(
+        input.TableName ?? table.tableName,
+      );
+      tally.read(
+        simDynamoDbTableTarget,
+        simDynamoDbReadUnits(
+          found?.sizeInBytes() ?? 0,
+          simDynamoDbReadConsistency(input.ConsistentRead),
+        ),
+      );
+
+      return tally;
+    });
 
     if (found === undefined) {
       return { ...consumed, $metadata: {} };

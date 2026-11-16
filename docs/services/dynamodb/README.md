@@ -2569,11 +2569,14 @@ and `INDEXES` adds what the table and each index consumed apart. The units follo
 - A read costs one unit per 4 KB read strongly consistently, half that eventually consistently, and
   two inside a transaction. A read of an absent key still costs the first 4 KB.
 - A `Query` or `Scan` page adds up the sizes of the items it read before rounding, and a filter saves
-  nothing. A read of an index is charged to the index.
+  nothing. A read of an index is charged to the index. A local secondary index read that fetches an
+  unprojected attribute charges each item it fetched to the table as a read of its own.
 - A write costs one unit per 1 KB of the larger of the item before and after, and two inside a
   transaction. A batch rounds each item before adding them up.
 - A write to an indexed table is charged again to each index whose entry it changes. An entry that
   appears or goes costs one write, and one whose index key changes costs two.
+- A `TransactWriteItems` replayed under the same `ClientRequestToken` writes nothing, and is charged
+  for reading each item it names.
 
 ```typescript sim-dynamodb-consumed-capacity
 /**

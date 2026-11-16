@@ -67,13 +67,17 @@ export class SimDynamoDbWriteReport {
     table: SimDynamoDbTable,
     write: SimDynamoDbItemWrite,
   ): SimDynamoDbWriteReportFields {
-    const tally = new SimDynamoDbCapacityTally(tableName ?? table.tableName);
-    simDynamoDbChargeWrite(tally, table, write, false);
-
     const size = simDynamoDbWrittenCollectionSize(this.metrics, table, write);
 
     return {
-      ...this.capacity.one(tally),
+      ...this.capacity.one(() => {
+        const tally = new SimDynamoDbCapacityTally(
+          tableName ?? table.tableName,
+        );
+        simDynamoDbChargeWrite(tally, table, write, false);
+
+        return tally;
+      }),
       ...(size !== undefined && { ItemCollectionMetrics: size }),
     };
   }

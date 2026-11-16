@@ -1,4 +1,3 @@
-import { jsonStringify } from "../../../util/type-guard/json.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbSecondaryIndex } from "../secondary-index/sim-dynamodb-secondary-index.js";
 import type { SimDynamoDbTable } from "../table/sim-dynamodb-table.js";
@@ -7,6 +6,8 @@ import {
   type SimDynamoDbCapacityTarget,
   simDynamoDbTableTarget,
 } from "./sim-dynamodb-capacity-tally.js";
+import { simDynamoDbEntrySignature as signature } from "./sim-dynamodb-entry-signature.js";
+import { simDynamoDbIndexEntry } from "./sim-dynamodb-index-entry.js";
 import { simDynamoDbWriteUnits } from "./sim-dynamodb-capacity-units.js";
 
 /**
@@ -79,10 +80,10 @@ function indexEntries(
   index: SimDynamoDbSecondaryIndex,
   write: SimDynamoDbItemWrite,
 ): readonly number[] {
-  const view = table.view(index.name);
+  const project = simDynamoDbIndexEntry(table, index);
   const keyNames = index.keySchema.attributeNames();
-  const before = entryOf(write.before, keyNames, (item) => view.project(item));
-  const after = entryOf(write.after, keyNames, (item) => view.project(item));
+  const before = entryOf(write.before, keyNames, project);
+  const after = entryOf(write.after, keyNames, project);
 
   if (before === undefined || after === undefined) {
     return [before, after].flatMap((entry) =>
@@ -115,20 +116,6 @@ function entryOf(
   return keyNames.every((name) => item.attribute(name) !== undefined)
     ? project(item)
     : undefined;
-}
-
-/**
- * A stable string for an entry, or for the named attributes of it.
- */
-function signature(
-  entry: SimDynamoDbItem,
-  names: readonly string[] = entry.attributeNames(),
-): string {
-  return jsonStringify(
-    Object.entries(entry.toAttributeValues())
-      .filter(([name]) => names.includes(name))
-      .toSorted(([left], [right]) => left.localeCompare(right)),
-  );
 }
 
 function sizeOf(item: SimDynamoDbItem | undefined): number {

@@ -7,6 +7,21 @@ export class SimDynamoDbCapacityTallies {
   private readonly tallies = new Map<string, SimDynamoDbCapacityTally>();
 
   /**
+   * The tallies a list of charges adds up to.
+   */
+  static of(
+    charges: readonly ((tallies: SimDynamoDbCapacityTallies) => void)[],
+  ): readonly SimDynamoDbCapacityTally[] {
+    const tallies = new this();
+
+    for (const charge of charges) {
+      charge(tallies);
+    }
+
+    return tallies.all();
+  }
+
+  /**
    * The tally for one table, named as the request named it.
    */
   for(reference: string): SimDynamoDbCapacityTally {

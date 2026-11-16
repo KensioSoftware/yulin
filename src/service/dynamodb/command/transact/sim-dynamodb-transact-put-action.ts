@@ -34,6 +34,10 @@ class SimDynamoDbTransactPutAction implements SimDynamoDbTransactWrite {
     return table.keyOfItem(this.item);
   }
 
+  storedIn(table: SimDynamoDbTable): SimDynamoDbItem | undefined {
+    return table.itemUnder(this.item);
+  }
+
   assertApplicableTo(table: SimDynamoDbTable): void {
     this.check.assertHoldsFor(table.itemUnder(this.item));
   }

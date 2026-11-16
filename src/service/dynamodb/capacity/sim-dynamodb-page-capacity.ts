@@ -10,6 +10,7 @@ import {
   simDynamoDbReadUnits,
 } from "./sim-dynamodb-capacity-units.js";
 import type { SimDynamoDbConsumedCapacity } from "./sim-dynamodb-consumed-capacity.types.js";
+import { simDynamoDbIndexEntry } from "./sim-dynamodb-index-entry.js";
 import { SimDynamoDbReturnConsumedCapacity } from "./sim-dynamodb-return-consumed-capacity.js";
 
 interface SimDynamoDbPageCapacityProperties {
@@ -39,22 +40,68 @@ interface SimDynamoDbPageCapacityProperties {
 export function simDynamoDbPageCapacity(
   properties: SimDynamoDbPageCapacityProperties,
 ): { readonly ConsumedCapacity?: SimDynamoDbConsumedCapacity } {
+  return SimDynamoDbReturnConsumedCapacity.read(
+    properties.input.ReturnConsumedCapacity,
+  ).one(() => measurePage(properties));
+}
+
+/**
+ * Add up what one page consumed.
+ *
+ * An item a local secondary index read fetched from the table is charged to
+ * the table as a read of its own, rounded up to the next 4 KB, and its index
+ * entry is charged to the index with the rest.
+ */
+function measurePage(
+  properties: SimDynamoDbPageCapacityProperties,
+): SimDynamoDbCapacityTally {
   const { input, table, evaluated, sizeOf } = properties;
   const tally = new SimDynamoDbCapacityTally(
     input.TableName ?? table.tableName,
   );
+  const consistency = simDynamoDbReadConsistency(input.ConsistentRead);
+  const entrySize = entrySizer(table, input.IndexName);
+  let entries = 0;
+
+  for (const item of evaluated) {
+    const read = sizeOf(item);
+    const entry = Math.min(read, entrySize(item));
+
+    entries += entry;
+
+    if (read > entry) {
+      tally.read(
+        simDynamoDbTableTarget,
+        simDynamoDbReadUnits(read, consistency),
+      );
+    }
+  }
 
   tally.read(
     readTarget(table, input.IndexName),
-    simDynamoDbReadUnits(
-      evaluated.reduce((total, item) => total + sizeOf(item), 0),
-      simDynamoDbReadConsistency(input.ConsistentRead),
-    ),
+    simDynamoDbReadUnits(entries, consistency),
   );
 
-  return SimDynamoDbReturnConsumedCapacity.read(
-    input.ReturnConsumedCapacity,
-  ).one(tally);
+  return tally;
+}
+
+/**
+ * The size of an item's entry in the index being read, or no limit when the
+ * read is of the table.
+ */
+function entrySizer(
+  table: SimDynamoDbTable,
+  indexName: string | undefined,
+): (item: SimDynamoDbItem) => number {
+  const index = table.indexes.elements.find(({ name }) => name === indexName);
+
+  if (index === undefined) {
+    return () => Infinity;
+  }
+
+  const project = simDynamoDbIndexEntry(table, index);
+
+  return (item) => project(item).sizeInBytes();
 }
 
 /**
