@@ -3432,6 +3432,11 @@ since CloudFormation does not wait for an index to finish building either. An up
 the key schema or projection of an index it keeps fails, as it fails on AWS. Remove the index in
 one update and add it back under a new name in another.
 
+A call that DynamoDB refuses fails the update, and the changes the update had already made to the
+table are put back before the stack rolls back. Time to live goes first, since it is the change
+DynamoDB is likeliest to refuse. A time to live the update changed stays changed, because DynamoDB
+refuses a second change to it within the hour.
+
 ## Deploying a table with secondary indexes
 
 `GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are read off the resource and handed to

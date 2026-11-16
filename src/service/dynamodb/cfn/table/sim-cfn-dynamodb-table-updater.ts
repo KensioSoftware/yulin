@@ -4,7 +4,13 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCloudFormationResourceInPlaceUpdateContext } from "../../../cloudformation/resource/sim-cfn-resource.type.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
-import { simCfnDynamoDbTableUpdateCalls } from "./sim-cfn-dynamodb-table-update-calls.js";
+import {
+  simCfnDynamoDbRunNow,
+  simCfnDynamoDbRunPassingOver,
+  simCfnDynamoDbRunReverting,
+  simCfnDynamoDbTableUpdateCalls,
+  type SimCfnDynamoDbTableRun,
+} from "./sim-cfn-dynamodb-table-update-calls.js";
 import {
   SimCfnDynamoDbTableLabels,
   type SimCfnDynamoDbTableStep,
@@ -26,8 +32,8 @@ interface SimCfnDynamoDbTableUpdaterProperties {
  * switching the stream off and on again.
  *
  * CloudFormation waits for the table to be ACTIVE between calls, and the table
- * is activated here at the same points. Time to live and tags go last, through
- * their own commands.
+ * is activated here at the same points. Time to live and tags go through their
+ * own commands.
  */
 export class SimCfnDynamoDbTableUpdater {
   private readonly dynamoDb: SimDynamoDb;
@@ -70,18 +76,62 @@ export class SimCfnDynamoDbTableUpdater {
 
     await table.activate();
 
-    for (const call of simCfnDynamoDbTableUpdateCalls(step.before, after)) {
-      // oxlint-disable-next-line no-await-in-loop -- DynamoDB takes these one at a time.
-      await this.dynamoDb.updateTable(
-        { input: { TableName: table.tableName, ...call.input } },
-        step.options,
-      );
-      // oxlint-disable-next-line no-await-in-loop -- each waits on the call before it.
-      await call.settle(table);
-    }
+    // Time to live is the change DynamoDB is likeliest to refuse, so it goes
+    // first, and a refusal leaves the rest of the table as it was.
+    await this.labels.updateTimeToLive(step);
 
-    await this.labels.update(step);
+    await simCfnDynamoDbRunReverting(
+      async () => {
+        await this.send(step);
+        await this.labels.updateTags(step);
+      },
+      async () => this.revert(step),
+    );
 
     return table;
+  }
+
+  /**
+   * Send the UpdateTable calls that take the table from one definition to the
+   * next, each through `run`.
+   */
+  private async send(
+    step: SimCfnDynamoDbTableStep,
+    run: SimCfnDynamoDbTableRun = simCfnDynamoDbRunNow,
+  ): Promise<void> {
+    const { table, options } = step;
+
+    for (const call of simCfnDynamoDbTableUpdateCalls(
+      step.before,
+      step.after,
+    )) {
+      // oxlint-disable-next-line no-await-in-loop -- DynamoDB takes these one at a time.
+      await run(async () => {
+        await this.dynamoDb.updateTable(
+          { input: { TableName: table.tableName, ...call.input } },
+          options,
+        );
+        await call.settle(table);
+      });
+    }
+  }
+
+  /**
+   * Put back what a failed update had already changed.
+   *
+   * The stack rolls back onto the definition it holds, which is the one this
+   * update started from, so a change made here before the failure would
+   * otherwise outlast the rollback. Each call back is sent on its own and a
+   * refusal is passed over, since a call the update never reached asks for the
+   * state the table is already in. A time to live changed within the hour
+   * stays changed, since DynamoDB refuses a second change to it.
+   */
+  private async revert(step: SimCfnDynamoDbTableStep): Promise<void> {
+    const back = { ...step, before: step.after, after: step.before };
+
+    await this.send(back, simCfnDynamoDbRunPassingOver);
+    await simCfnDynamoDbRunPassingOver(async () =>
+      this.labels.updateTags(back),
+    );
   }
 }

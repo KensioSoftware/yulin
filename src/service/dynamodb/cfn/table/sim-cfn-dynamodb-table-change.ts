@@ -40,10 +40,10 @@ export function simCfnDynamoDbTableUpdatesInPlace(
 /**
  * Whether the change between two definitions of a table replaces it.
  *
- * The properties are read as the template writes them, before intrinsic
- * resolution, which is all the update plan has to go on. Two different
- * expressions resolving to the same value replace the table, which is the safe
- * way round to be wrong.
+ * The properties are read with Parameters resolved, so a Parameter that names
+ * the table replaces it when its value changes. Two different expressions
+ * resolving to the same value replace the table, which is the safe way round
+ * to be wrong.
  */
 export function simCfnDynamoDbTableReplaced(
   current: SimCfnResource,

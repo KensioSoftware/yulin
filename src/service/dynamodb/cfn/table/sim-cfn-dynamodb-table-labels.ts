@@ -35,19 +35,11 @@ export class SimCfnDynamoDbTableLabels {
   }
 
   /**
-   * Apply the time to live and the tags the new definition asks for.
-   */
-  async update(step: SimCfnDynamoDbTableStep): Promise<void> {
-    await this.updateTimeToLive(step);
-    await this.updateTags(step);
-  }
-
-  /**
    * Switch time to live off for the old attribute and on for the new one.
    *
    * A template naming a different attribute takes both calls.
    */
-  private async updateTimeToLive(step: SimCfnDynamoDbTableStep): Promise<void> {
+  async updateTimeToLive(step: SimCfnDynamoDbTableStep): Promise<void> {
     const before = step.before.timeToLiveSpecification();
     const after = step.after.timeToLiveSpecification();
     const wasOn = before?.Enabled === true;
@@ -66,25 +58,10 @@ export class SimCfnDynamoDbTableLabels {
     }
   }
 
-  private async sendTimeToLive(
-    step: SimCfnDynamoDbTableStep,
-    specification: SimDynamoDbTimeToLiveSpecificationInput,
-  ): Promise<void> {
-    await this.dynamoDb.updateTimeToLive(
-      {
-        input: {
-          TableName: step.table.tableName,
-          TimeToLiveSpecification: specification,
-        },
-      },
-      step.options,
-    );
-  }
-
   /**
    * Remove the tags the template dropped, and write the ones it holds.
    */
-  private async updateTags(step: SimCfnDynamoDbTableStep): Promise<void> {
+  async updateTags(step: SimCfnDynamoDbTableStep): Promise<void> {
     const before = step.before.tags();
     const after = step.after.tags();
 
@@ -110,5 +87,20 @@ export class SimCfnDynamoDbTableLabels {
         step.options,
       );
     }
+  }
+
+  private async sendTimeToLive(
+    step: SimCfnDynamoDbTableStep,
+    specification: SimDynamoDbTimeToLiveSpecificationInput,
+  ): Promise<void> {
+    await this.dynamoDb.updateTimeToLive(
+      {
+        input: {
+          TableName: step.table.tableName,
+          TimeToLiveSpecification: specification,
+        },
+      },
+      step.options,
+    );
   }
 }

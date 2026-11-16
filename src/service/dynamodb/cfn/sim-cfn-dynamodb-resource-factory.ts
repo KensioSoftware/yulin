@@ -80,8 +80,8 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
    * Whether a changed table can be applied to the deployed one.
    *
    * A table keeps its items across every change but its name, its key schema,
-   * its local secondary indexes and the type of an attribute it already
-   * defines. A global table is still replaced on any change.
+   * its local secondary indexes, its import source and the type of an
+   * attribute it already defines. A global table is still replaced on any change.
    */
   updatesInPlace(
     resourceTypeName: string,

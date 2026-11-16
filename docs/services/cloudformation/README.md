@@ -459,7 +459,8 @@ secret, which keeps its ARN and its versions across the update. See the
 for which changes write a new secret version and which leave the value alone.
 
 An `AWS::DynamoDB::Table` keeps its items across every change but its name, its key schema, its
-local secondary indexes and the type of an attribute it already defines. See
+local secondary indexes, its `ImportSourceSpecification` and the type of an attribute it already
+defines. See
 [updating a deployed table](https://yulinsim.dev/services/dynamodb/#updating-a-deployed-table "Simulated DynamoDB usage docs").
 
 These changes are applied first, while everything the stack had is still deployed. An update that

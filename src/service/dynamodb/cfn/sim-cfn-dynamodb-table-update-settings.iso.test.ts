@@ -80,4 +80,37 @@ describe("DynamoDB CloudFormation Table update settings", () => {
     );
     assertIdentical(await storedStatus(simAws), "open");
   });
+
+  it("puts the table class back when a later change is refused", async () => {
+    // Given a deployed table of the standard class.
+    const simAws = new SimAws();
+    await deployWithOrder(simAws);
+
+    // When an update changes the class and adds an index keyed by an
+    // attribute the template never defines, which UpdateTable refuses after
+    // the class has changed.
+    const error = await assertThrowsErrorAsync(async () => {
+      await updateOrdersTable(simAws, {
+        TableClass: "STANDARD_INFREQUENT_ACCESS",
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: "byRegion",
+            KeySchema: [{ AttributeName: "region", KeyType: "HASH" }],
+            Projection: { ProjectionType: "ALL" },
+          },
+        ],
+      });
+    });
+
+    // Then the update fails and the table is back to the standard class.
+    assertStringIncludes(error.message, "region");
+
+    const described = await simAws
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: "orders" }));
+    const table = described.Table;
+    assertNonNullable(table);
+    assertIdentical(table.TableClassSummary?.TableClass, "STANDARD");
+    assertIdentical(await storedStatus(simAws), "open");
+  });
 });

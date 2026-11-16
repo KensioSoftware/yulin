@@ -28,6 +28,48 @@ const activate = async (table: SimDynamoDbTable): Promise<void> =>
 const moveOn = (): Promise<void> => Promise.resolve();
 
 /**
+ * How one change to a table is run.
+ */
+export type SimCfnDynamoDbTableRun = (
+  change: () => Promise<void>,
+) => Promise<void>;
+
+/**
+ * Run a change, letting a refusal fail the update.
+ */
+export const simCfnDynamoDbRunNow: SimCfnDynamoDbTableRun = async (change) =>
+  change();
+
+/**
+ * Run a change while putting a table back, passing over a refusal.
+ */
+export const simCfnDynamoDbRunPassingOver: SimCfnDynamoDbTableRun = async (
+  change,
+) => {
+  try {
+    await change();
+  } catch {
+    // A change the failed update never made asks for the state the table is
+    // already in, and DynamoDB refuses it.
+  }
+};
+
+/**
+ * Run a change, and put the table back before failing when it is refused.
+ */
+export async function simCfnDynamoDbRunReverting(
+  change: () => Promise<void>,
+  revert: () => Promise<void>,
+): Promise<void> {
+  try {
+    await change();
+  } catch (error) {
+    await revert();
+    throw error;
+  }
+}
+
+/**
  * The UpdateTable calls that take a table from one definition to the next, in
  * the order they are sent.
  *
