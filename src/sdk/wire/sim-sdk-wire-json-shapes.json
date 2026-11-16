@@ -472,6 +472,7 @@
       "CreateJob": "CreateJobRequest",
       "CreatePartition": "CreatePartitionRequest",
       "CreateTable": "CreateTableRequest",
+      "CreateUserDefinedFunction": "CreateUserDefinedFunctionRequest",
       "GetMLTaskRuns": "GetMLTaskRunsRequest",
       "GetMLTransforms": "GetMLTransformsRequest",
       "GetPartitions": "GetPartitionsRequest",
@@ -493,7 +494,8 @@
       "UpdateColumnStatisticsForTable": "UpdateColumnStatisticsForTableRequest",
       "UpdateJob": "UpdateJobRequest",
       "UpdatePartition": "UpdatePartitionRequest",
-      "UpdateTable": "UpdateTableRequest"
+      "UpdateTable": "UpdateTableRequest",
+      "UpdateUserDefinedFunction": "UpdateUserDefinedFunctionRequest"
     },
     "shapes": {
       "BatchCreatePartitionRequest": {
@@ -536,6 +538,9 @@
       },
       "CreateTableRequest": {
         "TableInput": "#TableInput"
+      },
+      "CreateUserDefinedFunctionRequest": {
+        "FunctionInput": "#UserDefinedFunctionInput"
       },
       "DataQualityResultFilterCriteria": {
         "StartedAfter": "timestamp",
@@ -645,6 +650,9 @@
       "QuerySessionContext": {
         "QueryStartTime": "timestamp"
       },
+      "ResourceUri": {
+        "LastModified": "timestamp"
+      },
       "StatisticSummary": {
         "InclusionAnnotation": "#TimestampedInclusionAnnotation",
         "RecordedOn": "timestamp"
@@ -684,6 +692,12 @@
       },
       "UpdateTableRequest": {
         "TableInput": "#TableInput"
+      },
+      "UpdateUserDefinedFunctionRequest": {
+        "FunctionInput": "#UserDefinedFunctionInput"
+      },
+      "UserDefinedFunctionInput": {
+        "ResourceUris": "list:#ResourceUri"
       }
     }
   },
