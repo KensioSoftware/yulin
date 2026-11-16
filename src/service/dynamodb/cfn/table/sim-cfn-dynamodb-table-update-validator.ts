@@ -1,14 +1,12 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type {
-  SimDynamoDbGlobalSecondaryIndexUpdateInput,
-  SimDynamoDbSecondaryIndexInput,
-} from "../../command/table/table.types.js";
-import { readSimDynamoDbIndexName } from "../../secondary-index/sim-dynamodb-index-name.js";
 import { SimDynamoDbIndexUpdate } from "../../table/sim-dynamodb-index-update.js";
+import { assertSimCfnDynamoDbNoIndexRedefined } from "./sim-cfn-dynamodb-table-index-change.js";
+import { simCfnDynamoDbIndexUpdates } from "./sim-cfn-dynamodb-table-index-updates.js";
 import { SimCfnDynamoDbTableProperties } from "./sim-cfn-dynamodb-table-properties.js";
 
 interface SimCfnDynamoDbTableUpdateValidatorProperties {
+  readonly resourceTypeName: string;
   readonly currentResource: SimCfnResource;
   readonly updatedResource: SimCfnResource;
   readonly currentProperties: SimCfnTemplateValueRecord;
@@ -31,7 +29,13 @@ export class SimCfnDynamoDbTableUpdateValidator {
    * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html
    */
   assertAllowed(): void {
-    const { currentResource, updatedResource } = this.properties;
+    const { resourceTypeName, currentResource, updatedResource } =
+      this.properties;
+
+    if (resourceTypeName !== "Table") {
+      return;
+    }
+
     const current = this.tableProperties(
       currentResource,
       this.properties.currentProperties,
@@ -41,7 +45,10 @@ export class SimCfnDynamoDbTableUpdateValidator {
       this.properties.updatedProperties,
     ).globalSecondaryIndexes();
 
-    SimDynamoDbIndexUpdate.fromInput(this.indexUpdates(current, updated));
+    SimDynamoDbIndexUpdate.fromInput(
+      simCfnDynamoDbIndexUpdates(current, updated),
+    );
+    assertSimCfnDynamoDbNoIndexRedefined(this.properties);
   }
 
   private tableProperties(
@@ -49,32 +56,5 @@ export class SimCfnDynamoDbTableUpdateValidator {
     properties: SimCfnTemplateValueRecord,
   ): SimCfnDynamoDbTableProperties {
     return new SimCfnDynamoDbTableProperties({ resource, properties });
-  }
-
-  private indexUpdates(
-    current: readonly SimDynamoDbSecondaryIndexInput[],
-    updated: readonly SimDynamoDbSecondaryIndexInput[],
-  ): readonly SimDynamoDbGlobalSecondaryIndexUpdateInput[] {
-    const currentNames = new Set(
-      current.map((index) => readSimDynamoDbIndexName(index.IndexName)),
-    );
-    const updatedNames = new Set(
-      updated.map((index) => readSimDynamoDbIndexName(index.IndexName)),
-    );
-
-    return [
-      ...updated
-        .filter(
-          (index) =>
-            !currentNames.has(readSimDynamoDbIndexName(index.IndexName)),
-        )
-        .map((index) => ({ Create: index })),
-      ...current
-        .filter(
-          (index) =>
-            !updatedNames.has(readSimDynamoDbIndexName(index.IndexName)),
-        )
-        .map((index) => ({ Delete: { IndexName: index.IndexName } })),
-    ];
   }
 }

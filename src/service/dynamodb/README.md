@@ -992,6 +992,12 @@ The parts under `cfn/table/` split by responsibility:
   property being declared at all.
 - `SimCfnDynamoDbTableCreator` calls `SimDynamoDb.createTable()` with that input and finds the
   created table through `SimDynamoDb.findTable()`.
+- `simCfnDynamoDbTableReplaced` decides whether a stack update replaces a table, from the template
+  as written. `SimCfnDynamoDbTableUpdater` applies every other change through `UpdateTable`, in the
+  order and the number of calls DynamoDB takes them in, activating the table between calls where
+  CloudFormation waits for it. `SimCfnDynamoDbTableLabels` does the same for time to live and tags.
+  `SimCfnDynamoDbTableUpdateValidator` refuses more than one index change, and a change to an index
+  a table updated in place keeps.
 
 Nothing here decides what a key schema, a billing mode, a table class or a secondary index is
 allowed to be. Creating the table through the ordinary command is what keeps a template-created

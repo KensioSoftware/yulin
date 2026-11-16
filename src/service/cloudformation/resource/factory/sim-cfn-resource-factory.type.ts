@@ -35,7 +35,8 @@ export interface SimCfnServiceResourceFactory {
   ): Promise<void>;
 
   /**
-   * Refuse an invalid replacement before CloudFormation deletes anything.
+   * Refuse an invalid change before CloudFormation changes or deletes
+   * anything, whether the change replaces the Resource or updates it in place.
    *
    * Most simulated Resource types have no update-specific validation. A
    * service can implement this hook when an update carries constraints that a
