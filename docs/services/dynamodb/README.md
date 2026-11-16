@@ -3412,6 +3412,26 @@ CDK works without hand-editing. A `dynamodb.Table` synthesises a template that d
 the table name reaching a function through its environment and a grant policy naming the table by
 the ARN `Fn::GetAtt` gives.
 
+### Updating a deployed table
+
+A stack update changes a deployed table in place and keeps its items, as real CloudFormation does.
+The table is replaced only for a change to `TableName`, `KeySchema`, `LocalSecondaryIndexes` or
+`ImportSourceSpecification`, or to the type of an attribute it already defines. Adding an attribute
+definition (to key a new index) is applied in place.
+
+Each change goes through the DynamoDB command an SDK caller would send, so its refusals are
+DynamoDB's own. Billing, capacity, table class, deletion protection and the stream go through
+`UpdateTable`. A new `StreamViewType` switches the stream off and then on again, which gives the
+table a new stream ARN. Time to live goes through `UpdateTimeToLive`, which DynamoDB takes once per
+table per hour, so an update that switches it on soon after it was switched off fails the stack. Tags
+go through `TagResource` and `UntagResource`.
+
+An update may add or remove one global secondary index. The new index is built from the items
+already there, and the table reports `UPDATING` until `simAws.backgroundTasksComplete()` has run,
+since CloudFormation does not wait for an index to finish building either. An update that changes
+the key schema or projection of an index it keeps fails, as it fails on AWS. Remove the index in
+one update and add it back under a new name in another.
+
 ## Deploying a table with secondary indexes
 
 `GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are read off the resource and handed to
@@ -3620,9 +3640,9 @@ caller in.
 absent. The table is created without it and the whole property path is recorded in
 [`stack.ignoredProperties`](https://yulinsim.dev/services/cloudformation/#properties-a-resource-was-created-without).
 
-Changing `StreamViewType` in a deployed template is a different thing here to what it is on real
-CloudFormation, which replaces the table. `UpdateTable` refuses the change in place, so switching
-the stream off and on again is what gives a table a stream with a different view type.
+Changing `StreamViewType` in a deployed template switches the stream off and on again, which leaves
+the table with a new stream of the new view type. See
+[updating a deployed table](#updating-a-deployed-table).
 
 ## Deploying a global table from CloudFormation
 
@@ -4057,9 +4077,6 @@ is written.
 - `Fn::GetAtt … StreamArn` on a table with no `StreamSpecification` is refused when the attribute is
   asked for, where real CloudFormation refuses the template while validating it. The timing differs,
   and the outcome matches.
-- Changing a deployed table's `StreamViewType` falls short of the table replacement real
-  CloudFormation performs. The change goes through `UpdateTable`, which refuses a view type change
-  in place.
 - An `AWS::DynamoDB::GlobalTable` naming two or more replica regions is created as an ordinary table
   in the region the stack is deploying into, with `Replicas` recorded in `stack.ignoredProperties`.
   Replication between regions is absent at all, so everything the table does within one region
@@ -4161,9 +4178,11 @@ is written.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, and a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
-- A CloudFormation stack update replaces a changed table rather than updating it in place. The items
-  in it are lost where real CloudFormation would keep them for a property it can change without
-  replacement.
+- A CloudFormation stack update that changes the `ProvisionedThroughput` of a global secondary index
+  the table keeps leaves that index at the capacity it had. `UpdateTable` refuses a change of index
+  capacity.
+- An `AWS::DynamoDB::GlobalTable` is still replaced on any change in a stack update, and loses its
+  items. An `AWS::DynamoDB::Table` is updated in place.
 - `ProjectionExpression` is simulated on every read that takes one, which is `GetItem`,
   `BatchGetItem`, `TransactGetItems`, `Query` and `Scan`.
 - The legacy `AttributesToGet` is refused outright, since an item that came back whole where part of

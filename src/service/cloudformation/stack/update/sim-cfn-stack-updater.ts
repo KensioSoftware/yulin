@@ -85,11 +85,10 @@ export class SimCfnStackUpdater {
     const { resources, operations } = this.properties;
     const { plan } = this;
 
-    await operations.assertUpdatesAllowed(
-      resources,
-      plan.updated,
-      plan.replacements,
-    );
+    await operations.assertUpdatesAllowed(resources, plan.updated, [
+      ...plan.replacements,
+      ...plan.updates,
+    ]);
 
     // Before anything comes down. An update that fails here has changed some
     // of the Stack's Resources and deleted none of them.

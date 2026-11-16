@@ -61,15 +61,15 @@ export class SimCfnStackResourceUpdates {
   }
 
   /**
-   * Validate every Resource replacement before the update changes the Stack.
+   * Validate every Resource change before the update changes the Stack.
    */
   async assertAllowed(
     currentResources: ReadonlyMap<string, SimCfnResource>,
     updatedResources: ReadonlyMap<string, SimCfnResource>,
-    replacements: readonly SimCfnStackResourceChange[],
+    changes: readonly SimCfnStackResourceChange[],
   ): Promise<void> {
     await Promise.all(
-      replacements.map(async ({ current, updated }) => {
+      changes.map(async ({ current, updated }) => {
         await new SimCfnResourceUpdateValidator({
           current,
           updated,

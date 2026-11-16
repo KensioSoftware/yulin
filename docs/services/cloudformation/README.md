@@ -452,11 +452,15 @@ A service can claim a change for the properties real CloudFormation applies with
 The resource is then left where it is. It keeps its physical name and everything it holds, and
 every resource naming it is left standing too.
 
-`AWS::SecretsManager::Secret` is the one resource type that does this so far. `Name` is the only
-property real CloudFormation replaces a secret for. A change to anything else is applied to the
-deployed secret, which keeps its ARN and its versions across the update. See the
+Two resource types do this so far. For `AWS::SecretsManager::Secret`, `Name` is the only property
+real CloudFormation replaces a secret for. A change to anything else is applied to the deployed
+secret, which keeps its ARN and its versions across the update. See the
 [simulated Secrets Manager docs](https://yulinsim.dev/services/secretsmanager/ "Simulated Secrets Manager usage docs")
 for which changes write a new secret version and which leave the value alone.
+
+An `AWS::DynamoDB::Table` keeps its items across every change but its name, its key schema, its
+local secondary indexes and the type of an attribute it already defines. See
+[updating a deployed table](https://yulinsim.dev/services/dynamodb/#updating-a-deployed-table "Simulated DynamoDB usage docs").
 
 These changes are applied first, while everything the stack had is still deployed. An update that
 fails on one has deleted nothing yet. A claimed resource the replacement spread reaches is replaced

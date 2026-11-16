@@ -12,3 +12,24 @@ export const dynamoDbTableResourceTypeName = "AWS::DynamoDB::Table";
  * something this simulation has no answer for.
  */
 export const dynamoDbGlobalTableResourceTypeName = "AWS::DynamoDB::GlobalTable";
+
+/**
+ * The creator for a DynamoDB Resource type, refusing a type nothing creates.
+ *
+ * The refusal names the type in the words sim CloudFormation reads as an
+ * unsupported Resource, so the stack skips it rather than failing.
+ */
+export function requireSimCfnDynamoDbCreator<Creator>(
+  creators: ReadonlyMap<string, Creator>,
+  resourceTypeName: string,
+): Creator {
+  for (const [name, creator] of creators) {
+    if (name === resourceTypeName) {
+      return creator;
+    }
+  }
+
+  throw new Error(
+    `Unsupported sim DynamoDB CloudFormation Resource ${resourceTypeName}`,
+  );
+}

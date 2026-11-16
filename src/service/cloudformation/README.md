@@ -525,10 +525,11 @@ Secrets Manager writes a new secret version for a changed value, and leaves the 
 changed description.
 
 These run before the deletions. An update that fails on one has deleted nothing yet.
-`AWS::SecretsManager::Secret` is the only resource type implementing them so far.
+`AWS::SecretsManager::Secret` and `AWS::DynamoDB::Table` implement them so far. A service's
+`assertUpdateAllowed` runs for a claimed change as well as for a replacement, before either touches
+anything.
 
-Sim CloudFormation has no in-place resource update, so a changed resource is deleted and created
-again. That diverges from CloudFormation, which updates most properties in place and keeps what the
+A change no service claims is applied by deleting the resource and creating it again. That diverges from CloudFormation, which updates most properties in place and keeps what the
 resource holds, and it is recorded in the usage docs rather than hidden. Two things follow from it:
 
 - A resource naming a replaced resource is replaced too, all the way up the chain, so nothing is
