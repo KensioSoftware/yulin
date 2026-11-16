@@ -333,6 +333,13 @@ test can check a table came out the way the request or the CloudFormation templa
 
 The `TableName` parameter takes the table's name or its ARN.
 
+`ItemCount` and `TableSizeBytes` lag behind the items, as they do on AWS. DynamoDB refreshes them
+about every six hours, and here the refresh falls every six hours of simulated time after the table
+was created. A table reports 0 for both until its first refresh, and after that reports the items it
+held at the last one. Each index reports its own `ItemCount` and `IndexSizeBytes` the same way,
+counting the items that carry its key attributes at the size of what it projects. A test reads
+current figures by moving the clock on six hours with `simAws.clock().advanceBy({ hours: 6 })`.
+
 ## Listing tables
 
 `ListTables` returns table names in DynamoDB's order, sorted by UTF-8 bytes. `Limit` takes a whole
@@ -390,7 +397,7 @@ after the token.
 
 `UpdateTable` changes a table after it exists. It does one of these per call, as AWS does:
 
-- change what the table is billed and provisioned as
+- change what the table and its global secondary indexes are billed and provisioned as
 - add one global secondary index
 - remove one global secondary index
 
@@ -514,6 +521,14 @@ A request carrying `ProvisionedThroughput` and no `BillingMode` reprovisions the
 mode it already has, so setting capacity on an on-demand table is refused, and never quietly
 switched. Switching to `PROVISIONED` has to state the capacity here, which real DynamoDB estimates
 instead. See Limitations.
+
+An `Update` entry in `GlobalSecondaryIndexUpdates` gives an existing index new capacity, and one call
+can carry an `Update` for each index along with the table's own capacity. The index reports
+`UPDATING` until the table is `ACTIVE` again, and answers reads throughout. An `Update` naming an
+index the table lacks is a `ResourceNotFoundException`, and one carrying capacity for an on-demand
+table is a `ValidationException`. A switch to `PAY_PER_REQUEST` takes the capacity of every index
+away. A switch to `PROVISIONED` needs an `Update` stating the capacity of each index (the same
+stance the table's own capacity takes).
 
 ## Deleting a table
 
@@ -3500,6 +3515,10 @@ table a new stream ARN. Time to live goes through `UpdateTimeToLive`, which Dyna
 table per hour, so an update that switches it on soon after it was switched off fails the stack. Tags
 go through `TagResource` and `UntagResource`.
 
+A change to the `ProvisionedThroughput` of an index the table keeps goes through `UpdateTable` with
+the table's billing. So does the capacity of every kept index when the table switches to
+`PROVISIONED`.
+
 An update may add or remove one global secondary index. The new index is built from the items
 already there, and the table reports `UPDATING` until `simAws.backgroundTasksComplete()` has run,
 since CloudFormation does not wait for an index to finish building either. An update that changes
@@ -4101,7 +4120,6 @@ is written.
   the collection it lands in goes through.
 - An index key is one attribute, or two. Real DynamoDB now takes more than that, and a key schema of
   more than two elements is refused here.
-- `ItemCount` and `IndexSizeBytes` are 0 for every index, the same way the table's own figures are.
 - Per-index `ProvisionedThroughput` is read, validated and reported, and enforces no limit. No read
   or write against an index is throttled, since none against the table is either.
 - A local secondary index cannot be added to or removed from a table after it has been created, and
@@ -4117,10 +4135,8 @@ is written.
   `ACTIVE`. Real DynamoDB has a second phase in which the index is still `CREATING` with
   `Backfilling` false. After that point it can no longer be deleted mid-build. That phase is left
   out. An index here can be deleted at any point before it is `ACTIVE`.
-- Changing the provisioned capacity of an existing global secondary index is refused outright. A
-  per-index capacity is read and reported but enforces no limit, so changing one would move a number
-  with no effect.
-- Switching a table to `PROVISIONED` with `UpdateTable` has to state the capacity. Real DynamoDB
+- Switching a table to `PROVISIONED` with `UpdateTable` has to state the capacity of the table and
+  of each global secondary index. Real DynamoDB
   estimates it from the table's consumption over the previous half hour, and no measurement of
   consumption happens here, and an estimate would be an invented number that a deployment then reads
   back.
@@ -4205,8 +4221,10 @@ is written.
 - `BillingModeSummary` and `TableClassSummary` are reported only when the request named a
   `BillingMode` or a `TableClass`. Real DynamoDB reports the effective values whichever way the
   table was created.
-- `ItemCount` and `TableSizeBytes` are always 0. Real DynamoDB updates both about every six hours.
-  They lag behind the items there too.
+- `ItemCount`, `TableSizeBytes` and `IndexSizeBytes` refresh at fixed six hour points after the
+  table was created. AWS promises only "about every six hours", so a figure here can change at a
+  different moment from the same figure on AWS. The bytes are counted by the rules the 400 KB item
+  limit uses, which AWS documents as approximate.
 - Deletion happens as soon as the background work runs, where real DynamoDB may take a while over a
   large table. No call waits for a `DELETING` table to go. A test that needs it gone calls
   `simAws.backgroundTasksComplete()`.
@@ -4261,9 +4279,6 @@ is written.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, and a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
-- A CloudFormation stack update that changes the `ProvisionedThroughput` of a global secondary index
-  the table keeps leaves that index at the capacity it had. `UpdateTable` refuses a change of index
-  capacity.
 - An `AWS::DynamoDB::GlobalTable` is still replaced on any change in a stack update, and loses its
   items. An `AWS::DynamoDB::Table` is updated in place.
 - `ProjectionExpression` is simulated on every read that takes one, which is `GetItem`,

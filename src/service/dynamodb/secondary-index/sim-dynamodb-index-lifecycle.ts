@@ -62,10 +62,22 @@ export class SimDynamoDbIndexLifecycle {
   }
 
   /**
-   * Finish building the index.
+   * Finish building the index, or finish changing its capacity.
    */
   activate(): void {
     this.#status = "ACTIVE";
+  }
+
+  /**
+   * Start changing the capacity of the index.
+   *
+   * An index still being built stays CREATING, since that is the longer of the
+   * two things it is waiting for.
+   */
+  beginUpdate(): void {
+    if (this.#status === "ACTIVE") {
+      this.#status = "UPDATING";
+    }
   }
 
   /**
@@ -77,7 +89,7 @@ export class SimDynamoDbIndexLifecycle {
    * answer, which is the whole point of the index having a status.
    */
   assertReadable(): void {
-    if (this.#status === "ACTIVE") {
+    if (this.#status !== "CREATING") {
       return;
     }
 

@@ -4,6 +4,7 @@ import type {
   SimDynamoDbTableDescription,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbTable } from "./sim-dynamodb-table.js";
+import type { SimDynamoDbTableFigures } from "./sim-dynamodb-table-statistics.js";
 
 /**
  * How a table reports its class, when the request that made it named one.
@@ -28,6 +29,8 @@ function tableClassSummary(
 export function describeSimDynamoDbTable(
   table: SimDynamoDbTable,
 ): SimDynamoDbTableDescription {
+  const figures = table.figures;
+
   return {
     TableName: table.tableName,
     TableArn: table.arn,
@@ -39,8 +42,14 @@ export function describeSimDynamoDbTable(
     BillingModeSummary: table.billing.summary(),
     ProvisionedThroughput: table.billing.throughputDescription(),
     TableClassSummary: tableClassSummary(table.tableClass),
-    GlobalSecondaryIndexes: table.indexes.global.descriptions(table.status),
-    LocalSecondaryIndexes: table.indexes.local.descriptions(),
+    GlobalSecondaryIndexes: withFigures(
+      table.indexes.global.descriptions(table.status),
+      figures,
+    ),
+    LocalSecondaryIndexes: withFigures(
+      table.indexes.local.descriptions(),
+      figures,
+    ),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
     StreamSpecification: table.stream.specification(),
     // These stay set once the table has had a stream, whether or not it still
@@ -48,9 +57,28 @@ export function describeSimDynamoDbTable(
     // setting. A table that has never had one reports neither.
     LatestStreamArn: table.stream.latest?.arn,
     LatestStreamLabel: table.stream.latest?.label,
-    // Neither figure is tracked yet. Real DynamoDB updates both about every
-    // six hours, so they lag behind the items anyway.
-    ItemCount: 0,
-    TableSizeBytes: 0,
+    ItemCount: figures.itemCount,
+    TableSizeBytes: figures.sizeBytes,
   };
+}
+
+/**
+ * Index descriptions carrying the item count and size of each index, as of the
+ * table's last refresh. An index added since then reports nothing yet.
+ */
+function withFigures<
+  Description extends { readonly IndexName?: string | undefined },
+>(
+  descriptions: readonly Description[] | undefined,
+  figures: SimDynamoDbTableFigures,
+): readonly Description[] | undefined {
+  return descriptions?.map((description) => {
+    const index = figures.indexes.get(description.IndexName ?? "");
+
+    return {
+      ...description,
+      ItemCount: index?.itemCount ?? 0,
+      IndexSizeBytes: index?.sizeBytes ?? 0,
+    };
+  });
 }

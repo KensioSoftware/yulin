@@ -2,7 +2,10 @@ import type { SimUpdateTableCommandInput } from "../../command/table/table.comma
 import type { SimDynamoDbStreamSpecification } from "../../stream/sim-dynamodb-stream.types.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import { simCfnDynamoDbTableValueDiffers } from "./sim-cfn-dynamodb-table-change.js";
-import { simCfnDynamoDbIndexUpdates } from "./sim-cfn-dynamodb-table-index-updates.js";
+import {
+  simCfnDynamoDbIndexCapacityUpdates,
+  simCfnDynamoDbIndexUpdates,
+} from "./sim-cfn-dynamodb-table-index-updates.js";
 import type { SimCfnDynamoDbTableProperties } from "./sim-cfn-dynamodb-table-properties.js";
 import { simCfnDynamoDbTableSettings } from "./sim-cfn-dynamodb-table-settings.js";
 
@@ -74,9 +77,9 @@ export async function simCfnDynamoDbRunReverting(
  * the order they are sent.
  *
  * DynamoDB takes one billing or index change per call. A stream whose view
- * type changes is switched off in a call of its own first. The billing, class,
- * deletion protection and stream changes share the next call, and the one
- * index created or deleted comes last.
+ * type changes is switched off in a call of its own first. The billing, index
+ * capacity, class, deletion protection and stream changes share the next call,
+ * and the one index created or deleted comes last.
  */
 export function simCfnDynamoDbTableUpdateCalls(
   before: SimCfnDynamoDbTableProperties,
@@ -86,7 +89,11 @@ export function simCfnDynamoDbTableUpdateCalls(
     before.streamSpecification(),
     after.streamSpecification(),
   );
-  const settings = simCfnDynamoDbTableSettings(before, after, stream.next);
+  const capacity = simCfnDynamoDbIndexCapacityUpdates(before, after);
+  const settings = {
+    ...simCfnDynamoDbTableSettings(before, after, stream.next),
+    ...(capacity.length > 0 && { GlobalSecondaryIndexUpdates: capacity }),
+  };
   const indexUpdates = simCfnDynamoDbIndexUpdates(
     before.globalSecondaryIndexes(),
     after.globalSecondaryIndexes(),

@@ -393,7 +393,10 @@ The returned `TableDescription` reports the table back: `TableName`, `TableArn`,
 a billing mode or a table class. `GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are each
 there when the table has any of that kind, and left out altogether when it has none.
 `StreamSpecification`, `LatestStreamArn` and `LatestStreamLabel` are there once the table has ever
-had a stream. `ItemCount` and `TableSizeBytes` stay at 0.
+had a stream. `ItemCount` and `TableSizeBytes`, and the same figures for each index, come from
+`SimDynamoDbTableStatistics`. It measures the table lazily whenever a six hour refresh has fallen
+due, either when the table is described or just before an item changes, so the figures are the items
+as they stood at the refresh with nothing scheduled.
 
 Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
 is listed in the Limitations section of
@@ -422,9 +425,12 @@ definitions have been merged into a set of their own and the billing has been re
 holds those three privately so they can be replaced, where the rest of a table is fixed at creation.
 
 `SimDynamoDbIndexUpdate` reads `GlobalSecondaryIndexUpdates` into at most one creation or one
-deletion, since that is AWS's limit. `SimDynamoDbTableUpdate` then enforces the wider rule: a billing
-and throughput change, an index creation and an index deletion are one thing at a time, while a
-table class, deletion protection or stream change rides along with any of them.
+deletion, since that is AWS's limit, or into capacity updates for any number of indexes.
+`SimDynamoDbTableUpdate` then enforces the wider rule: a billing and throughput change (index
+capacity included), an index creation and an index deletion are one thing at a time, while a table
+class, deletion protection or stream change rides along with any of them.
+`simDynamoDbIndexThroughputs` resolves each index's new capacity under the billing the table will
+have, which is also how a switch of billing mode reaches every index.
 
 `readSimDynamoDbStreamUpdate` is where a `StreamSpecification` is read against the stream the table
 already has, in step 4 with the rest. Switching on a stream that is already on, switching off one

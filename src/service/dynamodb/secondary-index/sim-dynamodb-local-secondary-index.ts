@@ -139,9 +139,6 @@ export class SimDynamoDbLocalSecondaryIndex implements SimDynamoDbSecondaryIndex
       IndexArn: this.arn,
       KeySchema: this.keySchema.elements,
       Projection: this.projection.toDescription(),
-      // Neither figure is tracked, the same way the table's are not.
-      ItemCount: 0,
-      IndexSizeBytes: 0,
     };
   }
 }

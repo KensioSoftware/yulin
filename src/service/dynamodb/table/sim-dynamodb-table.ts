@@ -19,6 +19,11 @@ import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableDefinition } from "./sim-dynamodb-table-definition.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
+import { simDynamoDbTableFigures } from "./sim-dynamodb-table-figures.js";
+import {
+  type SimDynamoDbTableFigures,
+  SimDynamoDbTableStatistics,
+} from "./sim-dynamodb-table-statistics.js";
 import { SimDynamoDbTableStorage } from "./sim-dynamodb-table-storage.js";
 import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
 import type { SimDynamoDbTableWrites } from "./sim-dynamodb-table-writes.js";
@@ -90,6 +95,7 @@ export class SimDynamoDbTable {
   private readonly definition: SimDynamoDbTableDefinition;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
   private readonly storage: SimDynamoDbTableStorage;
+  private readonly statistics: SimDynamoDbTableStatistics;
 
   constructor(properties: SimDynamoDbTableProperties) {
     const {
@@ -133,6 +139,14 @@ export class SimDynamoDbTable {
       indexes: this.indexes,
       stream: this.stream,
       background,
+      beforeChange: (): void => {
+        this.statistics.catchUp();
+      },
+    });
+    this.statistics = new SimDynamoDbTableStatistics({
+      clock: background,
+      measure: (): SimDynamoDbTableFigures =>
+        simDynamoDbTableFigures(this, this.storage.allItems()),
     });
     this.creationDateTime = background.now();
   }
@@ -160,6 +174,13 @@ export class SimDynamoDbTable {
   /** Whether this table is protected from deletion. */
   public get deletionProtectionEnabled(): boolean {
     return this.lifecycle.deletionProtectionEnabled;
+  }
+
+  /**
+   * The item count and sizes this table reports, as of the last refresh.
+   */
+  public get figures(): SimDynamoDbTableFigures {
+    return this.statistics.figures;
   }
 
   /** This table's time to live, and the item removals it drives. */

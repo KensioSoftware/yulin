@@ -16,6 +16,9 @@ interface SimDynamoDbTableStorageProperties {
   readonly indexes: SimDynamoDbSecondaryIndexes;
   readonly stream: SimDynamoDbTableStream;
   readonly background: BackgroundScheduler;
+
+  /** Called before any item changes, with the items still as they were. */
+  readonly beforeChange: () => void;
 }
 
 /**
@@ -54,7 +57,10 @@ export class SimDynamoDbTableStorage {
   private readonly items: SimDynamoDbTableItems;
 
   constructor(properties: SimDynamoDbTableStorageProperties) {
-    this.items = new SimDynamoDbTableItems({ changes: properties.stream });
+    this.items = new SimDynamoDbTableItems({
+      changes: properties.stream,
+      beforeChange: properties.beforeChange,
+    });
     this.tableName = properties.tableName;
     this.definition = properties.definition;
     this.indexes = properties.indexes;
@@ -129,13 +135,20 @@ export class SimDynamoDbTableStorage {
   }
 
   /**
+   * Every item the table holds.
+   */
+  allItems(): readonly SimDynamoDbItem[] {
+    return this.items.entries().values().toArray();
+  }
+
+  /**
    * What a Query or a Scan reads: the table, or one of its indexes.
    */
   view(indexName: string | undefined): SimDynamoDbReadView {
     return simDynamoDbTableReadView({
       tableName: this.tableName,
       indexName,
-      items: this.items.entries().values().toArray(),
+      items: this.allItems(),
       keySchema: this.definition.keySchema,
       attributeDefinitions: this.definition.attributeDefinitions,
       indexes: this.indexes,
