@@ -64,10 +64,12 @@ export class SimDynamoDbGlobalSecondaryIndexes {
   }
 
   /**
-   * Take the part of an UpdateTable that adds or removes an index.
+   * Take the part of an UpdateTable that adds or removes an index, or changes
+   * the capacity of some.
    *
-   * A request carries at most one of either, since that is AWS's limit, and
-   * both have already been checked against the table by this point. A local
+   * A request carries at most one addition or removal, since that is AWS's
+   * limit, and all of it has already been checked against the table by this
+   * point. A local
    * secondary index is never here, because neither AWS nor this changes one
    * after the table exists.
    */
@@ -78,6 +80,14 @@ export class SimDynamoDbGlobalSecondaryIndexes {
 
     if (update.indexDeleted !== undefined) {
       this.remove(update.indexDeleted);
+    }
+
+    for (const index of this.#elements) {
+      const throughput = update.indexThroughputs.get(index.name);
+
+      if (throughput !== undefined) {
+        index.reprovision(throughput);
+      }
     }
   }
 

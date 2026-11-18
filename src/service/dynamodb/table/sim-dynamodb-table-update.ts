@@ -1,72 +1,34 @@
 import type { SimUpdateTableCommandInput } from "../command/table/table.command.js";
 import type { SimDynamoDbTableClass } from "../command/table/table.types.js";
-import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbGlobalSecondaryIndex } from "../secondary-index/sim-dynamodb-global-secondary-index.js";
 import type { SimDynamoDbStreamRequest } from "../stream/sim-dynamodb-stream-specification.js";
 import { readSimDynamoDbStreamUpdate } from "../stream/sim-dynamodb-stream-update.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbIndexUpdate } from "./sim-dynamodb-index-update.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
+import type { SimDynamoDbTableThroughput } from "./sim-dynamodb-table-throughput.js";
+import {
+  assertSimDynamoDbUpdateAsksForSomething,
+  assertSimDynamoDbUpdateIsOneOperation,
+} from "./sim-dynamodb-table-update-rules.js";
 import { readSimDynamoDbTableClass } from "./sim-dynamodb-table-class.js";
 import type { SimDynamoDbUpdatableTable } from "./sim-dynamodb-updatable-table.js";
 import { readSimDynamoDbUpdatedBilling } from "./sim-dynamodb-updated-billing.js";
 import {
   simDynamoDbCreatedIndex,
   simDynamoDbDeletedIndexName,
+  simDynamoDbIndexThroughputs,
 } from "./sim-dynamodb-updated-indexes.js";
 
-interface SimDynamoDbTableUpdateProperties {
+export interface SimDynamoDbTableUpdateProperties {
   readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
   readonly billing: SimDynamoDbTableBilling | undefined;
   readonly indexCreated: SimDynamoDbGlobalSecondaryIndex | undefined;
   readonly indexDeleted: string | undefined;
+  readonly indexThroughputs: ReadonlyMap<string, SimDynamoDbTableThroughput>;
   readonly tableClass: SimDynamoDbTableClass | undefined;
   readonly deletionProtectionEnabled: boolean | undefined;
   readonly stream: SimDynamoDbStreamRequest | undefined;
-}
-
-/**
- * Refuse a request asking for more than one thing at a time.
- *
- * AWS takes one of these per call: change what the table is billed and
- * provisioned as, add one global secondary index, or remove one. A table class,
- * a deletion protection or a stream change is not one of them and rides along
- * with any of them.
- */
-function assertOneOperation(
-  billing: SimDynamoDbTableBilling | undefined,
-  indexUpdate: SimDynamoDbIndexUpdate,
-): void {
-  if (billing !== undefined && !indexUpdate.isEmpty) {
-    throw new SimDynamoDbValidationException(
-      "One or more parameter values were invalid: UpdateTable does one thing " +
-        "at a time, and this request changes the table's throughput and a " +
-        "global secondary index together",
-    );
-  }
-}
-
-/**
- * Refuse a request that asks for nothing.
- */
-function assertAsksForSomething(
-  properties: SimDynamoDbTableUpdateProperties,
-): void {
-  const asks =
-    properties.billing !== undefined ||
-    properties.indexCreated !== undefined ||
-    properties.indexDeleted !== undefined ||
-    properties.tableClass !== undefined ||
-    properties.deletionProtectionEnabled !== undefined ||
-    properties.stream !== undefined;
-
-  if (!asks) {
-    throw new SimDynamoDbValidationException(
-      "An UpdateTable request changes the table's billing and throughput, " +
-        "its global secondary indexes, its stream, its table class or its " +
-        "deletion protection, and this one changes none of them",
-    );
-  }
 }
 
 /**
@@ -81,17 +43,25 @@ export class SimDynamoDbTableUpdate {
   public readonly billing: SimDynamoDbTableBilling | undefined;
   public readonly indexCreated: SimDynamoDbGlobalSecondaryIndex | undefined;
   public readonly indexDeleted: string | undefined;
+
+  /** The capacity each index whose capacity changes is given. */
+  public readonly indexThroughputs: ReadonlyMap<
+    string,
+    SimDynamoDbTableThroughput
+  >;
+
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean | undefined;
   public readonly stream: SimDynamoDbStreamRequest | undefined;
 
   private constructor(properties: SimDynamoDbTableUpdateProperties) {
-    assertAsksForSomething(properties);
+    assertSimDynamoDbUpdateAsksForSomething(properties);
 
     this.attributeDefinitions = properties.attributeDefinitions;
     this.billing = properties.billing;
     this.indexCreated = properties.indexCreated;
     this.indexDeleted = properties.indexDeleted;
+    this.indexThroughputs = properties.indexThroughputs;
     this.tableClass = properties.tableClass;
     this.deletionProtectionEnabled = properties.deletionProtectionEnabled;
     this.stream = properties.stream;
@@ -108,7 +78,7 @@ export class SimDynamoDbTableUpdate {
       input.GlobalSecondaryIndexUpdates,
     );
     const billing = readSimDynamoDbUpdatedBilling(input, table);
-    assertOneOperation(billing, indexUpdate);
+    assertSimDynamoDbUpdateIsOneOperation(billing, indexUpdate);
 
     // UpdateTable is the only chance to declare the key attributes of the index
     // it is adding, so the definitions it carries are added to the table's.
@@ -125,6 +95,11 @@ export class SimDynamoDbTableUpdate {
         attributeDefinitions,
       ),
       indexDeleted: simDynamoDbDeletedIndexName(indexUpdate, table),
+      indexThroughputs: simDynamoDbIndexThroughputs(
+        indexUpdate,
+        table,
+        billing,
+      ),
       tableClass: readSimDynamoDbTableClass(input.TableClass),
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
       stream: readSimDynamoDbStreamUpdate(input, table.stream),
