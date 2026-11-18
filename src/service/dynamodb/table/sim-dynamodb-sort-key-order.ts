@@ -1,14 +1,12 @@
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
-import type { SimDynamoDbValue } from "../item/sim-dynamodb-value.js";
 import type { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import {
   compareSimDynamoDbItemIdentities,
   compareSimDynamoDbSortKeys,
-  simDynamoDbSortKeyValue,
 } from "./sim-dynamodb-sort-key-compare.js";
 
 interface SimDynamoDbSortKeyOrderProperties {
-  readonly attributeName: string | undefined;
+  readonly attributeNames: readonly string[];
   readonly identity?: SimDynamoDbItemKey | undefined;
 }
 
@@ -16,8 +14,11 @@ interface SimDynamoDbSortKeyOrderProperties {
  * The order a sort key puts an item collection in.
  *
  * A table with no sort key holds at most one item under a partition key, so
- * every question here has a trivial answer for one. That is why the attribute
- * name is optional rather than each caller asking whether there is one.
+ * every question here has a trivial answer for one. That is why the list of
+ * sort key attributes may be empty rather than each caller asking whether there
+ * is one. A global secondary index may sort by up to four attributes, and
+ * orders by the first, then by the second among items sharing the first, and
+ * so on.
  *
  * The order is DynamoDB's rather than JavaScript's: numbers order by value
  * however they were written, strings by their UTF-8 bytes, and binary as
@@ -30,25 +31,12 @@ interface SimDynamoDbSortKeyOrderProperties {
  * read of an index hands out a token carrying both.
  */
 export class SimDynamoDbSortKeyOrder {
-  private readonly attributeName: string | undefined;
+  private readonly attributeNames: readonly string[];
   private readonly identity: SimDynamoDbItemKey | undefined;
 
   constructor(properties: SimDynamoDbSortKeyOrderProperties) {
-    this.attributeName = properties.attributeName;
+    this.attributeNames = properties.attributeNames;
     this.identity = properties.identity;
-  }
-
-  /**
-   * The sort key of an item, or nothing when the collection has no sort key.
-   */
-  valueOf(item: SimDynamoDbItem): SimDynamoDbValue | undefined {
-    const attributeName = this.attributeName;
-
-    if (attributeName === undefined) {
-      return undefined;
-    }
-
-    return simDynamoDbSortKeyValue(item, attributeName);
   }
 
   /**
@@ -95,19 +83,21 @@ export class SimDynamoDbSortKeyOrder {
   }
 
   /**
-   * Order two items by their sort keys, if the collection has one.
+   * Order two items by their sort key attributes, one after another.
    */
   private compareSortKeys(
     first: SimDynamoDbItem,
     second: SimDynamoDbItem,
   ): number {
-    const attributeName = this.attributeName;
+    for (const attributeName of this.attributeNames) {
+      const order = compareSimDynamoDbSortKeys(first, second, attributeName);
 
-    if (attributeName === undefined) {
-      return 0;
+      if (order !== 0) {
+        return order;
+      }
     }
 
-    return compareSimDynamoDbSortKeys(first, second, attributeName);
+    return 0;
   }
 
   /**

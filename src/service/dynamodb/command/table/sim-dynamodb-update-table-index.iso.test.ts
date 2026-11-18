@@ -175,6 +175,62 @@ describe("DynamoDB UpdateTableCommand secondary indexes", () => {
     assertIdentical(open.Items?.[0]?.["orderId"]?.S, "order-1");
   });
 
+  it("adds an index keyed by several attributes the items already carry", async () => {
+    // Given a live table holding an order with a status and a priority.
+    const simAws = new SimAws();
+    await ordersWithoutIndex(simAws);
+    await simAws.dynamoDb().putItem(
+      new PutItemCommand({
+        TableName: "orders",
+        Item: {
+          orderId: { S: "order-2" },
+          status: { S: "OPEN" },
+          priority: { N: "3" },
+        },
+      }),
+    );
+
+    // When an index keyed by both is added and has finished building.
+    await simAws.dynamoDb().updateTable(
+      new UpdateTableCommand({
+        TableName: "orders",
+        AttributeDefinitions: [
+          { AttributeName: "status", AttributeType: "S" },
+          { AttributeName: "priority", AttributeType: "N" },
+        ],
+        GlobalSecondaryIndexUpdates: [
+          {
+            Create: {
+              IndexName: "byStatusAndPriority",
+              KeySchema: [
+                { AttributeName: "status", KeyType: "HASH" },
+                { AttributeName: "priority", KeyType: "HASH" },
+              ],
+              Projection: { ProjectionType: "KEYS_ONLY" },
+            },
+          },
+        ],
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then it answers for the order carrying both, with nothing to backfill.
+    const page = await simAws.dynamoDb().query(
+      new QueryCommand({
+        TableName: "orders",
+        IndexName: "byStatusAndPriority",
+        KeyConditionExpression: "#status = :status AND priority = :priority",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: {
+          ":status": { S: "OPEN" },
+          ":priority": { N: "3" },
+        },
+      }),
+    );
+    assertIdentical(page.Count, 1);
+    assertIdentical(page.Items?.[0]?.["orderId"]?.S, "order-2");
+  });
+
   it("leaves the indexes a table already had ACTIVE while a new one builds", async () => {
     // Given a table that already carries an index.
     const simAws = new SimAws();

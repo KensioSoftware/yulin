@@ -1,13 +1,9 @@
-import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimDynamoDbKeyCondition } from "../expression/key-condition/sim-dynamodb-key-condition.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
-import { simDynamoDbValuesEqual } from "../item/sim-dynamodb-value-comparison.js";
-import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbSortKeyOrder } from "./sim-dynamodb-sort-key-order.js";
 
 interface SimDynamoDbItemCollectionProperties {
   readonly items: Iterable<SimDynamoDbItem>;
-  readonly keySchema: SimDynamoDbKeySchema;
   readonly order: SimDynamoDbSortKeyOrder;
   readonly keyCondition: SimDynamoDbKeyCondition;
 }
@@ -26,23 +22,21 @@ interface SimDynamoDbItemCollectionWalk {
  * sort key order, and a query reads the same items in the same order either
  * way.
  *
- * The key schema is the one being read by, which for a query on an index is the
- * index's own rather than the table's. The order comes in alongside it, since
- * what separates two items sharing a sort key is the view's business rather
- * than the collection's.
+ * The key condition was read against the key schema being read by, which for a
+ * query on an index is the index's own rather than the table's. The order comes
+ * in alongside it, since what separates two items sharing a sort key is the
+ * view's business rather than the collection's.
  */
 export class SimDynamoDbItemCollection {
   private readonly order: SimDynamoDbSortKeyOrder;
   private readonly ascending: readonly SimDynamoDbItem[];
 
   constructor(properties: SimDynamoDbItemCollectionProperties) {
-    const { keySchema, keyCondition, order } = properties;
+    const { keyCondition, order } = properties;
 
     this.order = order;
     this.ascending = order.ascending(
-      [...properties.items].filter((item) =>
-        this.named(item, keySchema, keyCondition),
-      ),
+      [...properties.items].filter((item) => keyCondition.names(item)),
     );
   }
 
@@ -59,25 +53,6 @@ export class SimDynamoDbItemCollection {
     }
 
     return this.order.beyond(inOrder, after, properties.forward);
-  }
-
-  /**
-   * Whether a key condition names an item: it belongs to the item collection,
-   * and its sort key is inside the run the condition asks for.
-   */
-  private named(
-    item: SimDynamoDbItem,
-    keySchema: SimDynamoDbKeySchema,
-    keyCondition: SimDynamoDbKeyCondition,
-  ): boolean {
-    const partitionKey = item.attribute(keySchema.hashKeyAttributeName);
-
-    assertDefined(partitionKey, "partition key of a stored item");
-
-    return (
-      simDynamoDbValuesEqual(partitionKey, keyCondition.partitionKeyValue) &&
-      keyCondition.holdsForSortKey(this.order.valueOf(item))
-    );
   }
 
   /**

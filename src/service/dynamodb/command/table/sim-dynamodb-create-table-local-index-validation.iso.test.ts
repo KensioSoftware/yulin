@@ -73,6 +73,27 @@ describe("DynamoDB CreateTable local secondary index validation", () => {
     );
   });
 
+  it("refuses a multi-attribute sort key", async () => {
+    // When a local index sorts by two attributes, as a global one may.
+    const error = await refusedIndexes([
+      {
+        ...byPlacedAt,
+        KeySchema: [
+          ...byPlacedAt.KeySchema,
+          { AttributeName: "orderId", KeyType: "RANGE" },
+        ],
+      },
+    ]);
+
+    // Then the key schema is refused, since only a global index takes one.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "a key schema holds a HASH element and at most one RANGE element, but " +
+        "3 elements were given",
+    );
+  });
+
   it("refuses an index with no sort key", async () => {
     // When an index is declared with a partition key alone.
     const error = await refusedIndexes([

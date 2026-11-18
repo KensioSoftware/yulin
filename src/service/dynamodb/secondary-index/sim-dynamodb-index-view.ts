@@ -64,7 +64,7 @@ export class SimDynamoDbIndexView implements SimDynamoDbReadView {
     // Index key values are not unique, so the table key is what separates two
     // entries sharing one and lets a walk resume after either.
     this.order = new SimDynamoDbSortKeyOrder({
-      attributeName: index.keySchema.rangeKeyAttributeName,
+      attributeNames: index.keySchema.sortKeyAttributeNames,
       identity: properties.tableItemKey,
     });
 
@@ -79,7 +79,6 @@ export class SimDynamoDbIndexView implements SimDynamoDbReadView {
   ): SimDynamoDbItemCollection {
     return new SimDynamoDbItemCollection({
       items: this.items,
-      keySchema: this.keySchema,
       order: this.order,
       keyCondition,
     });

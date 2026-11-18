@@ -100,6 +100,30 @@ describe("DynamoDB CreateTableCommand validation", () => {
     );
   });
 
+  it("refuses a table key of two HASH elements", async () => {
+    // When a table is created with a multi-attribute partition key, which only
+    // a global secondary index takes.
+    const error = await refusedCreateTable({
+      TableName: "FoobarTable",
+      KeySchema: [
+        { AttributeName: "pk", KeyType: "HASH" },
+        { AttributeName: "region", KeyType: "HASH" },
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "pk", AttributeType: "S" },
+        { AttributeName: "region", AttributeType: "S" },
+      ],
+      BillingMode: "PAY_PER_REQUEST",
+    });
+
+    // Then the second element is refused for not being a sort key.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "KeySchema element 2 is not a RANGE key type",
+    );
+  });
+
   it("refuses a key schema with more than two elements", async () => {
     // When a table is created with three key schema elements.
     const error = await refusedCreateTable({
@@ -149,7 +173,10 @@ describe("DynamoDB CreateTableCommand validation", () => {
 
     // Then the repeated attribute is reported.
     assertInstanceOf(error, SimDynamoDbValidationException);
-    assertStringIncludes(error.message, "both name the attribute id");
+    assertStringIncludes(
+      error.message,
+      "the attribute id is named by more than one key element",
+    );
   });
 
   it("requires attribute definitions", async () => {

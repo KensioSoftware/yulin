@@ -5,6 +5,7 @@ import { SimDynamoDbKeyCondition } from "./sim-dynamodb-key-condition.js";
 import { simDynamoDbKeyConditionError } from "./sim-dynamodb-key-condition-error.js";
 import { SimDynamoDbComparisonKeyTerm } from "./sim-dynamodb-comparison-key-term.js";
 import type { SimDynamoDbKeyConditionTerm } from "./sim-dynamodb-key-condition-term.js";
+import { readSimDynamoDbSortKeyTerms } from "./sim-dynamodb-sort-key-terms.js";
 
 /**
  * What a key condition needs to know about the table it names.
@@ -38,12 +39,38 @@ export class SimDynamoDbKeyConditionTerms {
     this.assertNameKeyAttributes(keySchema);
 
     return new SimDynamoDbKeyCondition({
-      partitionKeyValue: this.partitionKeyValue(
-        keySchema,
-        attributeDefinitions,
+      partitionKey: new Map(
+        keySchema.partitionKeyAttributeNames.map((attributeName) => [
+          attributeName,
+          this.partitionKeyValue(attributeName, attributeDefinitions),
+        ]),
       ),
-      sortKeyTerm: this.sortKeyTerm(keySchema, attributeDefinitions),
+      sortKeyTerms: this.sortKeyTerms(keySchema, attributeDefinitions),
     });
+  }
+
+  /**
+   * The sort key terms, held to the left-to-right rule before their types.
+   *
+   * A term AWS refuses for where it sits is refused for that, whatever type
+   * its value is.
+   */
+  private sortKeyTerms(
+    keySchema: SimDynamoDbKeySchema,
+    attributeDefinitions: SimDynamoDbAttributeDefinitions,
+  ): readonly SimDynamoDbKeyConditionTerm[] {
+    const terms = readSimDynamoDbSortKeyTerms(
+      keySchema.sortKeyAttributeNames.map((attributeName) => ({
+        attributeName,
+        term: this.single(attributeName),
+      })),
+    );
+
+    for (const term of terms) {
+      term.assertUsableOn(attributeDefinitions.typeOf(term.attributeName));
+    }
+
+    return terms;
   }
 
   /**
@@ -67,13 +94,15 @@ export class SimDynamoDbKeyConditionTerms {
   }
 
   /**
-   * The one partition key value this condition names an item collection by.
+   * The value one partition key attribute is held equal to.
+   *
+   * A query reads one item collection, so every partition key attribute is
+   * named, and named by equality.
    */
   private partitionKeyValue(
-    keySchema: SimDynamoDbKeySchema,
+    attributeName: string,
     attributeDefinitions: SimDynamoDbAttributeDefinitions,
   ): SimDynamoDbValue {
-    const attributeName = keySchema.hashKeyAttributeName;
     const term = this.single(attributeName);
 
     if (term === undefined) {
@@ -96,28 +125,6 @@ export class SimDynamoDbKeyConditionTerms {
     term.assertUsableOn(attributeDefinitions.typeOf(attributeName));
 
     return term.value;
-  }
-
-  /**
-   * The sort key condition, when the table has a sort key and one was written.
-   */
-  private sortKeyTerm(
-    keySchema: SimDynamoDbKeySchema,
-    attributeDefinitions: SimDynamoDbAttributeDefinitions,
-  ): SimDynamoDbKeyConditionTerm | undefined {
-    const attributeName = keySchema.rangeKeyAttributeName;
-
-    // A table with no sort key has no other key attribute for a term to name,
-    // which the key attribute check has already refused.
-    if (attributeName === undefined) {
-      return undefined;
-    }
-
-    const term = this.single(attributeName);
-
-    term?.assertUsableOn(attributeDefinitions.typeOf(attributeName));
-
-    return term;
   }
 
   /**
