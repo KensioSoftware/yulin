@@ -156,6 +156,15 @@ describe("DynamoDB legacy ScanFilter", () => {
       message: "ComparisonOperator BEGINS_WITH is not valid for N",
     },
     {
+      refusal: "a Boolean compared by EQ",
+      condition: {
+        ComparisonOperator: "EQ",
+        AttributeValueList: [{ BOOL: true }],
+      },
+      message:
+        "ComparisonOperator EQ is not valid for BOOL AttributeValue type",
+    },
+    {
       refusal: "EQ with two values",
       condition: { ComparisonOperator: "EQ", AttributeValueList: [n(1), n(2)] },
       message: "Invalid number of argument(s) for the EQ ComparisonOperator",

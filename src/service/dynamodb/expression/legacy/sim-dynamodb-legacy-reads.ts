@@ -18,9 +18,16 @@ const keyOperators: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The longest attribute name `AttributesToGet` takes, which AWS documents in
+ * characters.
+ */
+const maximumNameLength = 65_535;
+
+/**
  * Write an `AttributesToGet` list as the projection expression it stands for.
  *
- * AWS refuses an empty list and a list naming one attribute twice.
+ * AWS refuses an empty list, a list naming one attribute twice, and a name
+ * over 65,535 characters.
  */
 export function simDynamoDbLegacyProjection(
   attributes: readonly string[] | undefined,
@@ -46,6 +53,18 @@ export function simDynamoDbLegacyProjection(
     throw new SimDynamoDbValidationException(
       `One or more parameter values were invalid: Duplicate value in ` +
         `attribute name: ${repeated}`,
+    );
+  }
+
+  const tooLong = attributes.find(
+    (attribute) => attribute.length > maximumNameLength,
+  );
+
+  if (tooLong !== undefined) {
+    throw new SimDynamoDbValidationException(
+      `One or more parameter values were invalid: AttributesToGet names an ` +
+        `attribute of ${tooLong.length.toString()} characters, and an ` +
+        `attribute name is at most ${maximumNameLength.toString()}`,
     );
   }
 

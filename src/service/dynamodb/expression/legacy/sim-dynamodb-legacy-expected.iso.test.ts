@@ -175,6 +175,49 @@ describe("DynamoDB legacy Expected", () => {
     assertStringIncludes(error.message, message);
   });
 
+  it.each([
+    { operator: "CONTAINS", sought: [2, 3], holds: true },
+    { operator: "CONTAINS", sought: [3, 2], holds: false },
+    { operator: "NOT_CONTAINS", sought: [2, 3], holds: false },
+    { operator: "NOT_CONTAINS", sought: [3, 2], holds: true },
+  ])(
+    "reads $operator of bytes $sought as a run inside binary",
+    async ({ operator, sought, holds }) => {
+      // Given an order carrying a binary payload of 1, 2, 3.
+      const simAws = await openOrder();
+      await simAws.dynamoDb().putItem({
+        input: {
+          TableName: "FoobarTable",
+          Item: {
+            id: { S: "order-1" },
+            payload: { B: Uint8Array.of(1, 2, 3) },
+          },
+        },
+      });
+
+      // When a write is guarded by a run of bytes.
+      const write = shipOrder(simAws, {
+        Expected: {
+          payload: {
+            ComparisonOperator: operator,
+            AttributeValueList: [{ B: Uint8Array.from(sought) }],
+          },
+        },
+      });
+
+      // Then the run is found only where the bytes appear in that order.
+      if (holds) {
+        await write;
+        assertIdentical(await statusOf(simAws), "SHIPPED");
+      } else {
+        assertInstanceOf(
+          await assertThrowsErrorAsync(async () => write),
+          SimDynamoDbConditionalCheckFailedException,
+        );
+      }
+    },
+  );
+
   it("refuses Expected alongside a ConditionExpression", async () => {
     // Given an open order.
     const simAws = await openOrder();

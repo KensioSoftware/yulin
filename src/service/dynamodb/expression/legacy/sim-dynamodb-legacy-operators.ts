@@ -25,7 +25,7 @@ const many: SimDynamoDbLegacyArity = {
 export interface SimDynamoDbLegacyOperator {
   readonly arity: SimDynamoDbLegacyArity;
 
-  /** The value types it takes, or nothing where it takes any. */
+  /** The value types it takes, missing for an operator that takes no values. */
   readonly kinds?: ReadonlySet<string>;
   readonly render: (attribute: string, values: readonly string[]) => string;
 }
@@ -37,6 +37,18 @@ export interface SimDynamoDbLegacyOperator {
 const inLimit = 100;
 
 const scalars: ReadonlySet<string> = new Set(["S", "N", "B"]);
+
+/**
+ * The value types `EQ` and `NE` take: a scalar or a set of them.
+ */
+const equatables: ReadonlySet<string> = new Set([
+  "S",
+  "N",
+  "B",
+  "SS",
+  "NS",
+  "BS",
+]);
 
 /**
  * Write a two-sided comparison with one value.
@@ -90,6 +102,7 @@ export const simDynamoDbLegacyOperators: ReadonlyMap<
     "EQ",
     {
       arity: one,
+      kinds: equatables,
       render: (attribute, values) => `${attribute} = ${values.join("")}`,
     },
   ],
@@ -97,6 +110,7 @@ export const simDynamoDbLegacyOperators: ReadonlyMap<
     "NE",
     {
       arity: one,
+      kinds: equatables,
       render: (attribute, values) => `${attribute} <> ${values.join("")}`,
     },
   ],

@@ -647,8 +647,9 @@ Important behavior:
 - `ExclusiveStartKey` resumes exclusively, by comparing sort keys rather than by looking the item up,
   so a token still works when the item it names has since been deleted. That is the same choice
   `ListTables` and `ListTagsOfResource` make.
-- `ProjectionExpression` is refused by name, since it changes which parts of an item a query answers
-  with.
+- `ProjectionExpression` cuts each item a query answers with down to the paths it names, through
+  `SimDynamoDbReadAnswer`. A legacy `AttributesToGet` reaches the same path once rewritten.
+  `SimDynamoDbSelect` refuses a projection alongside any `Select` other than `SPECIFIC_ATTRIBUTES`.
 - `IndexName` chooses what is read, through `SimDynamoDbTable.view`. Everything after that asks the
   view rather than the table, so a query of an index is the same query against a narrower thing.
 
@@ -1010,7 +1011,8 @@ expressions that replaced them. Every item command, query, scan and batch read t
 through it first, and a request carrying none comes back unchanged.
 
 It refuses a request mixing legacy parameters with expressions, and a legacy request carrying
-placeholders of its own. Neither can then collide with the `#n0` and `:v0` placeholders
+placeholders of its own. An empty `ExpressionAttributeNames` or `ExpressionAttributeValues` defines
+no placeholder, so it is let through and replaced. Neither can then collide with the `#n0` and `:v0` placeholders
 `SimDynamoDbLegacyPlaceholders` writes. A legacy comparison is checked in
 `sim-dynamodb-legacy-comparison.ts` for its operator, its number of values and their types, so a
 comparison AWS refuses is refused for what it said. The expression it becomes is parsed, limited

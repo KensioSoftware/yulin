@@ -178,6 +178,41 @@ describe("DynamoDB expression limits", () => {
     );
   });
 
+  it("refuses an expression that is not a string", async () => {
+    // Given a table.
+    const simAws = new SimAws();
+    await simDynamoDbCreatedTableFactory.make({}, simAws);
+
+    // When a request built without the SDK's types carries a number.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.dynamoDb().scan({
+        input: { TableName: "FoobarTable", FilterExpression: 42 as never },
+      }),
+    );
+
+    // Then it is refused as invalid input.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "Invalid FilterExpression");
+  });
+
+  it("refuses a placeholder standing for something other than a name", async () => {
+    // Given a table.
+    const simAws = new SimAws();
+    await simDynamoDbCreatedTableFactory.make({}, simAws);
+
+    // When a request built without the SDK's types maps a name to null.
+    const error = await assertThrowsErrorAsync(async () =>
+      scanWith(simAws, {
+        FilterExpression: "attribute_exists(a)",
+        ExpressionAttributeNames: { "#spare": null as never },
+      }),
+    );
+
+    // Then it is refused as invalid input.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "ExpressionAttributeNames maps #spare");
+  });
+
   it("refuses placeholders over 2 MB between them", async () => {
     // Given a table.
     const simAws = new SimAws();

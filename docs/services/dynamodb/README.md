@@ -1183,8 +1183,9 @@ expression, in both directions. A placeholder the request leaves undefined is a
 
 ### Expression limits
 
-Every expression a request carries is held to the limits AWS documents, each a
-`ValidationException` naming the expression:
+Every expression a request carries is held to the limits AWS documents. Each is a
+`ValidationException`. The first two name the expression that broke them, and the last two name
+`ExpressionAttributeNames` or `ExpressionAttributeValues`.
 
 - An expression string holds at most 4 KB, counted in UTF-8 bytes. `a=b` is 3 bytes.
 - An expression holds at most 300 operators and functions. Each comparator, each `AND`, `OR` and
@@ -2102,8 +2103,10 @@ console.log(output.Items);
 
 The comparison operators are `EQ`, `NE`, `LE`, `LT`, `GE`, `GT`, `NOT_NULL`, `NULL`, `CONTAINS`,
 `NOT_CONTAINS`, `BEGINS_WITH`, `IN` and `BETWEEN`. Each takes the number and types of values AWS
-documents. `NULL` and `NOT_NULL` take none, and test whether the attribute is there. `LT` and the
-other orderings take one string, number or binary, and so do `CONTAINS` and `NOT_CONTAINS`.
+documents. `NULL` and `NOT_NULL` take none, and test whether the attribute is there. `EQ` and `NE`
+take one string, number or binary, or a set of them. `LT` and the other orderings take one string,
+number or binary, and so do `CONTAINS` and `NOT_CONTAINS`, which find a run of bytes inside a binary
+attribute as well as a substring inside a string.
 `BEGINS_WITH` takes a string or binary. `BETWEEN` takes two values of one type, and `IN` takes any
 number of them. A key condition takes `EQ`, `LE`, `LT`, `GE`, `GT`, `BEGINS_WITH` and `BETWEEN`, and
 any other operator there is refused with `Attempted conditional constraint is not an indexable
@@ -2121,7 +2124,8 @@ adds members to a set. An update made only of `DELETE` actions leaves a missing 
 AWS documents. Every other update creates the item, as an `UpdateExpression` does.
 
 A request mixing legacy parameters with expressions is refused, naming both, as AWS refuses it. So
-is a legacy request carrying `ExpressionAttributeNames` or `ExpressionAttributeValues`. The document
+is a legacy request carrying an `ExpressionAttributeNames` or `ExpressionAttributeValues` that
+defines a placeholder. An empty one defines none, and is let through. The document
 client converts the values inside every legacy parameter, in the places the real client does.
 
 ## Reading and writing items in batches
@@ -4414,7 +4418,9 @@ is written.
 - A legacy parameter is held to the expression limits once it has been rewritten. A legacy request
   large enough to pass them only as legacy input, such as `Expected` with more than 150 entries, is
   refused for the size of the expression it became. A legacy `IN` longer than 100 values is split
-  into several joined by `OR`, and passes.
+  into several joined by `OR`, which keeps each one within the 100 values an expression `IN` takes.
+  The split still counts towards the 4 KB and 300 operator limits, and an `IN` of several hundred
+  values is refused for its size.
 - A refusal found after a legacy parameter has been rewritten names the expression and the
   placeholders it was rewritten with, such as `#n0`. AWS names the legacy parameter.
 - A legacy `ADD` to an item that does not exist yet takes a number or any set. AWS documents it as

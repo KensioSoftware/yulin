@@ -1,9 +1,4 @@
-import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
-import type { SimDynamoDbValue } from "../item/sim-dynamodb-value.js";
-import {
-  simDynamoDbTextSize,
-  simDynamoDbValueSize,
-} from "../item/sim-dynamodb-value-size.js";
+import { simDynamoDbTextSize } from "../item/sim-dynamodb-value-size.js";
 import { simDynamoDbExpressionError } from "./sim-dynamodb-expression-error.js";
 import type { SimDynamoDbExpressionToken } from "./sim-dynamodb-expression-token.js";
 
@@ -16,12 +11,6 @@ const maximumExpressionBytes = 4096;
  * The most operators and functions one expression may hold.
  */
 const maximumOperators = 300;
-
-/**
- * The most bytes the placeholders of one request may hold between them, which
- * AWS documents as 2 MB.
- */
-const maximumSubstitutionBytes = 2 * 1024 * 1024;
 
 /**
  * The comparators of the condition grammar, each one operator.
@@ -58,6 +47,14 @@ export function assertSimDynamoDbExpressionSize(
   expressionName: string,
   expression: string,
 ): void {
+  // A request built without the SDK's types can carry anything here.
+  if (typeof expression !== "string") {
+    throw simDynamoDbExpressionError(
+      expressionName,
+      "the expression has to be a string",
+    );
+  }
+
   const size = simDynamoDbTextSize(expression);
 
   if (size > maximumExpressionBytes) {
@@ -115,33 +112,4 @@ function isOperator(
     token.kind === "name" &&
     (keywords.has(token.text.toUpperCase()) || next?.text === "(")
   );
-}
-
-/**
- * Refuse placeholders that come to more than 2 MB between them.
- *
- * Each entry counts its placeholder and what the placeholder stands for. A
- * value counts the bytes it would count towards an item.
- */
-export function assertSimDynamoDbSubstitutionSize(
-  names: ReadonlyMap<string, string>,
-  values: ReadonlyMap<string, SimDynamoDbValue>,
-): void {
-  const named = names
-    .entries()
-    .map(([key, name]) => simDynamoDbTextSize(key) + simDynamoDbTextSize(name));
-  const valued = values
-    .entries()
-    .map(
-      ([key, value]) => simDynamoDbTextSize(key) + simDynamoDbValueSize(value),
-    );
-  const size = [...named, ...valued].reduce((sum, bytes) => sum + bytes, 0);
-
-  if (size > maximumSubstitutionBytes) {
-    throw new SimDynamoDbValidationException(
-      `ExpressionAttributeNames and ExpressionAttributeValues come to ` +
-        `${size.toString()} bytes, and the substitutions of one request ` +
-        `are at most 2 MB`,
-    );
-  }
 }

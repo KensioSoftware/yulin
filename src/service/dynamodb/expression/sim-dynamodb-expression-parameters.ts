@@ -3,7 +3,7 @@ import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { readSimDynamoDbValue } from "../item/sim-dynamodb-value-reader.js";
 import type { SimDynamoDbValue } from "../item/sim-dynamodb-value.js";
 import { SimDynamoDbExpressionAttributes } from "./sim-dynamodb-expression-attributes.js";
-import { assertSimDynamoDbSubstitutionSize } from "./sim-dynamodb-expression-limits.js";
+import { assertSimDynamoDbSubstitutionSize } from "./sim-dynamodb-expression-substitution-limit.js";
 import { SimDynamoDbExpressionPlaceholders } from "./sim-dynamodb-expression-placeholders.js";
 
 /**

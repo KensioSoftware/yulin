@@ -79,6 +79,23 @@ describe("DynamoDB GetItemCommand input", () => {
     assertStringIncludes(error.message, "Duplicate value in attribute name");
   });
 
+  it("refuses an AttributesToGet name over 65,535 characters", async () => {
+    // Given a table holding an item.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+
+    // When a read names an attribute one character too long.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.getItem({
+        input: { ...keyInput, AttributesToGet: ["a".repeat(65_536)] },
+      }),
+    );
+
+    // Then it is refused for the length of the name.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "an attribute of 65536 characters");
+  });
+
   it("reads an item for input that asks for none of it", async () => {
     // Given a table holding an item.
     const simAws = new SimAws();
