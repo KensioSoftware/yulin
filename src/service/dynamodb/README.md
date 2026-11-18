@@ -142,7 +142,8 @@ Supported key schema behavior:
 
 - a `HASH` element is required, and comes first
 - a `RANGE` element is optional, and comes after every `HASH` element
-- a table and a local secondary index take one `HASH` element and at most one `RANGE` element
+- a table takes one `HASH` element and at most one `RANGE` element, and a local secondary index
+  exactly one of each
 - a global secondary index takes up to four of each, which AWS calls a multi-attribute key.
   `SimDynamoDbKeySchemaShape` is the limit, and `SimDynamoDbGlobalSecondaryIndex` is the one caller
   passing the wider one

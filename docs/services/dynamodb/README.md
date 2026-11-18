@@ -298,8 +298,8 @@ bytes).
 The index is sparse in all of its key attributes. An item missing any one of them is absent from
 the index. A `LastEvaluatedKey` from the index carries every index key attribute and the table key.
 
-A table key and a local secondary index key still take one `HASH` element and at most one `RANGE`
-element, as on AWS.
+A table key still takes one `HASH` element and at most one `RANGE` element, and a local secondary
+index key takes exactly one of each, as on AWS.
 
 ## Local secondary indexes
 
@@ -1487,7 +1487,7 @@ The grammar is closed, and deliberately narrower than a `ConditionExpression`. E
 - a key condition that leaves the partition key, or one of its attributes, untested for equality
 - a range operator or `begins_with` applied to the partition key
 - an operator or function a sort key condition refuses, such as `<>` or `contains`
-- an attribute outside the table's primary key
+- an attribute outside the key schema of the table or index being queried
 - `OR` or `NOT` anywhere
 - the same key attribute tested twice
 - on a [multi-attribute key](#multi-attribute-keys), a skipped sort key attribute, or one tested
@@ -4324,8 +4324,9 @@ is written.
 
 - `dynamodb:LeadingKeys` and `dynamodb:Attributes` are the DynamoDB condition keys supplied.
   `dynamodb:Select`, `dynamodb:ReturnValues`, `dynamodb:ReturnConsumedCapacity` and the numbered
-  partition key families are absent from the condition context, and a statement conditioned on one
-  of them matches no request. The transactional operations supply neither key, and are authorized by
+  partition key families are absent from the condition context. A statement conditioned on one of
+  them sees a request carrying no value for its key. A `ForAllValues:` condition matches such a
+  request, as it does on AWS, and any other condition on the key does not. The transactional operations supply neither key, and are authorized by
   action and table alone.
 - A partition key value reaches a policy condition as a string for a `S` key and as its digits for
   an `N` key. A binary partition key has no documented form for the condition key. A request

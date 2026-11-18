@@ -246,6 +246,14 @@ describe("DynamoDB Query on a multi-attribute index key", () => {
         "Query key condition not supported: status is tested with >, so no " +
         "sort key attribute after it can be tested",
     },
+    {
+      refusal: "a skipped attribute before checking the value type",
+      input: {
+        KeyConditionExpression: `${inWarehouse} AND priority = :priority`,
+        ExpressionAttributeValues: { ":priority": { S: "high" } },
+      },
+      message: "Query key condition not supported",
+    },
   ])("refuses $refusal", async ({ input, message }) => {
     // Given the orders.
     const simAws = new SimAws();
