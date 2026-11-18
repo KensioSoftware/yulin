@@ -66,6 +66,32 @@ describe("DynamoDB request parameter condition keys", () => {
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
+  it("refuses a write asking for the item a failed condition met", async () => {
+    // Given a caller allowed updates that return nothing.
+    const { simAws, caller } = await callerUnder({
+      StringEqualsIfExists: { "dynamodb:ReturnValues": "NONE" },
+    });
+
+    // When an update asks for the item back only if its condition fails.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.dynamoDb().updateItem(
+        {
+          input: {
+            TableName: tableName,
+            Key: key,
+            UpdateExpression: "SET total = :t",
+            ExpressionAttributeValues: { ":t": { N: "1" } },
+            ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+          },
+        },
+        { caller },
+      ),
+    );
+
+    // Then it is refused, since a failed condition would hand the item back.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
   it("refuses a read asking for its consumed capacity", async () => {
     // Given a caller allowed reads that report no capacity.
     const { simAws, caller } = await callerUnder({

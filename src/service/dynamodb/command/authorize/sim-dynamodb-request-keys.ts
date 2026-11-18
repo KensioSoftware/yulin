@@ -51,10 +51,15 @@ export function simDynamoDbRequestKeyConditions(
  * The `dynamodb:ReturnValues` a write supplies.
  *
  * AWS documents the parameter as always having a value on a write, `NONE`
- * unless the request asked for another.
+ * unless the request asked for another. The key also governs the item a
+ * failed condition returns, so a write returning nothing on success but
+ * `ALL_OLD` on failure supplies `ALL_OLD`.
  */
-export function simDynamoDbReturnValuesKey(returnValues = "NONE"): string {
-  return returnValues;
+export function simDynamoDbReturnValuesKey(
+  returnValues = "NONE",
+  onConditionFailure = "NONE",
+): string {
+  return returnValues === "NONE" ? onConditionFailure : returnValues;
 }
 
 /**

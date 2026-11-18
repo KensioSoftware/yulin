@@ -80,7 +80,10 @@ export class SimDynamoDbPutItem {
           check.attributeNames,
           simDynamoDbItemAttributeNames(() => [readItem(input)]),
         ),
-        returnValues: simDynamoDbReturnValuesKey(input.ReturnValues),
+        returnValues: simDynamoDbReturnValuesKey(
+          input.ReturnValues,
+          check.returnValuesKey,
+        ),
         returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
           input.ReturnConsumedCapacity,
         ),

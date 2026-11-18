@@ -4239,12 +4239,12 @@ one) is written against that key, as in the developer guide's transaction exampl
 Four more condition keys carry a parameter of the request. Each holds the value the request asked
 for, or the value DynamoDB defaults to.
 
-| Condition key                     | Supplied by                                                                    | Value                                                                                                                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dynamodb:Select`                 | `GetItem`, `BatchGetItem`, `Query`, `Scan`, and a transaction's `Get`          | The `Select` asked for. With none, `SPECIFIC_ATTRIBUTES` for a read naming a `ProjectionExpression`, `ALL_PROJECTED_ATTRIBUTES` for an index, and `ALL_ATTRIBUTES` otherwise |
-| `dynamodb:ReturnValues`           | `PutItem`, `UpdateItem`, `DeleteItem`, and every write action of a transaction | `ReturnValues` on a single write, `NONE` by default. On a transaction action, its `ReturnValuesOnConditionCheckFailure`                                                      |
-| `dynamodb:ReturnConsumedCapacity` | Every item operation                                                           | `ReturnConsumedCapacity`, `NONE` by default                                                                                                                                  |
-| `dynamodb:EnclosingOperation`     | Each action of a transaction                                                   | `TransactWriteItems` or `TransactGetItems`                                                                                                                                   |
+| Condition key                     | Supplied by                                                                    | Value                                                                                                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dynamodb:Select`                 | `GetItem`, `BatchGetItem`, `Query`, `Scan`, and a transaction's `Get`          | The `Select` asked for. With none, `SPECIFIC_ATTRIBUTES` for a read naming a `ProjectionExpression`, `ALL_PROJECTED_ATTRIBUTES` for an index, and `ALL_ATTRIBUTES` otherwise                                                         |
+| `dynamodb:ReturnValues`           | `PutItem`, `UpdateItem`, `DeleteItem`, and every write action of a transaction | `ReturnValues` on a single write, or `ALL_OLD` when it returns nothing on success but asks for `ReturnValuesOnConditionCheckFailure: ALL_OLD`. `NONE` by default. On a transaction action, its `ReturnValuesOnConditionCheckFailure` |
+| `dynamodb:ReturnConsumedCapacity` | Every item operation                                                           | `ReturnConsumedCapacity`, `NONE` by default                                                                                                                                                                                          |
+| `dynamodb:EnclosingOperation`     | Each action of a transaction                                                   | `TransactWriteItems` or `TransactGetItems`                                                                                                                                                                                           |
 
 The developer guide pairs these with `dynamodb:Attributes` under `StringEqualsIfExists`, so a caller
 restricted to some attributes cannot read the rest through `Select: ALL_ATTRIBUTES` or
@@ -4355,10 +4355,10 @@ restricted to some attributes cannot read the rest through `Select: ALL_ATTRIBUT
 
 - `dynamodb:FullTableScan` goes unsupplied. AWS lists it for `PartiQLSelect` alone, and PartiQL is
   an operation this simulation lacks.
-- `dynamodb:ReturnValues` on a single write carries its `ReturnValues`. A `PutItem`, `UpdateItem` or
-  `DeleteItem` asking for `ReturnValuesOnConditionCheckFailure: ALL_OLD` with `ReturnValues` left at
-  `NONE` supplies `NONE`. AWS documents the key against `ReturnValuesOnConditionCheckFailure` only
-  for a transaction's actions.
+- A single write asking for both `ReturnValues` other than `NONE` and
+  `ReturnValuesOnConditionCheckFailure: ALL_OLD` supplies its `ReturnValues` alone as
+  `dynamodb:ReturnValues`. AWS applies the key to both parameters, and does not document what it
+  holds when a request sets both.
 - `dynamodb:ReturnConsumedCapacity` carries `INDEXES` as it is when a request asks for it. AWS
   documents the key as holding `TOTAL` or `NONE`, and does not say what `INDEXES` reaches a policy
   as.

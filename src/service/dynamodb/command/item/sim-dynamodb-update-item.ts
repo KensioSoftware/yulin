@@ -75,7 +75,10 @@ export class SimDynamoDbUpdateItem {
           plan.attributeNames,
           simDynamoDbItemAttributeNames(() => [readSimDynamoDbKey(input.Key)]),
         ),
-        returnValues: simDynamoDbReturnValuesKey(input.ReturnValues),
+        returnValues: simDynamoDbReturnValuesKey(
+          input.ReturnValues,
+          plan.check.returnValuesKey,
+        ),
         returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
           input.ReturnConsumedCapacity,
         ),

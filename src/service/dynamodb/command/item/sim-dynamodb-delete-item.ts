@@ -69,7 +69,10 @@ export class SimDynamoDbDeleteItem {
           check.attributeNames,
           simDynamoDbItemAttributeNames(() => [readSimDynamoDbKey(input.Key)]),
         ),
-        returnValues: simDynamoDbReturnValuesKey(input.ReturnValues),
+        returnValues: simDynamoDbReturnValuesKey(
+          input.ReturnValues,
+          check.returnValuesKey,
+        ),
         returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
           input.ReturnConsumedCapacity,
         ),
