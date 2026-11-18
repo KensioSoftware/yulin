@@ -159,27 +159,69 @@ describe("DynamoDB CreateTableCommand index validation", () => {
     );
   });
 
-  it("refuses an index key schema with more than two elements", async () => {
-    // When an index is declared with three key schema elements.
-    const error = await refusedIndexes([
-      {
-        ...byStatus,
-        KeySchema: [
-          { AttributeName: "status", KeyType: "HASH" },
-          { AttributeName: "updatedAt", KeyType: "RANGE" },
-          { AttributeName: "extra", KeyType: "RANGE" },
-        ],
-      },
-    ]);
+  it.each([
+    {
+      shape: "five HASH elements",
+      keySchema: [
+        ...["a", "b", "c", "d", "e"].map((name) => ({
+          AttributeName: name,
+          KeyType: "HASH" as const,
+        })),
+      ],
+      message: "KeySchema element 5 is not a RANGE key type",
+    },
+    {
+      shape: "five RANGE elements",
+      keySchema: [
+        { AttributeName: "status", KeyType: "HASH" as const },
+        ...["a", "b", "c", "d", "e"].map((name) => ({
+          AttributeName: name,
+          KeyType: "RANGE" as const,
+        })),
+      ],
+      message: "a key schema holds at most 4 RANGE elements",
+    },
+    {
+      shape: "nine elements",
+      keySchema: [
+        ...["a", "b", "c", "d", "e"].map((name) => ({
+          AttributeName: name,
+          KeyType: "HASH" as const,
+        })),
+        ...["f", "g", "h", "i"].map((name) => ({
+          AttributeName: name,
+          KeyType: "RANGE" as const,
+        })),
+      ],
+      message:
+        "a key schema holds at most 4 HASH elements and 4 RANGE elements, " +
+        "but 9 elements were given",
+    },
+    {
+      shape: "a HASH element after a RANGE one",
+      keySchema: [
+        { AttributeName: "status", KeyType: "HASH" as const },
+        { AttributeName: "a", KeyType: "RANGE" as const },
+        { AttributeName: "b", KeyType: "HASH" as const },
+      ],
+      message: "KeySchema element 3 is not a RANGE key type",
+    },
+  ])(
+    "refuses an index key schema of $shape",
+    async ({ keySchema, message }) => {
+      // When an index is declared with a key schema no index takes.
+      const error = await refusedIndexes([
+        { ...byStatus, KeySchema: keySchema },
+      ]);
 
-    // Then the extra element is reported, naming the index.
-    assertInstanceOf(error, SimDynamoDbValidationException);
-    assertStringIncludes(
-      error.message,
-      "Invalid KeySchema for index byStatus: a key schema holds a HASH " +
-        "element and at most one RANGE element, but 3 elements were given",
-    );
-  });
+      // Then the key schema is refused, naming the index.
+      assertInstanceOf(error, SimDynamoDbValidationException);
+      assertStringIncludes(
+        error.message,
+        `Invalid KeySchema for index byStatus: ${message}`,
+      );
+    },
+  );
 
   it("refuses an index whose two keys name one attribute", async () => {
     // When an index is declared with the same attribute as both its keys.
@@ -197,8 +239,8 @@ describe("DynamoDB CreateTableCommand index validation", () => {
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(
       error.message,
-      "Invalid KeySchema for index byStatus: the HASH and RANGE elements " +
-        "both name the attribute status",
+      "Invalid KeySchema for index byStatus: the attribute status is named " +
+        "by more than one key element",
     );
   });
 

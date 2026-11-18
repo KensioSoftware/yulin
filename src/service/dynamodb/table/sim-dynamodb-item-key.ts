@@ -121,9 +121,21 @@ export class SimDynamoDbItemKey {
    *
    * A Scan orders a table by this and a parallel Scan divides one by it, since
    * the items sharing a partition key are the items DynamoDB keeps together.
+   * A multi-attribute partition key is all of its attributes together, which
+   * AWS hashes as one.
    */
   partitionOf(item: SimDynamoDbItem): string {
-    return this.keyValue(item, this.keySchema.hashKeyAttributeName);
+    const values = this.keySchema.partitionKeyAttributeNames.map(
+      (attributeName) => this.keyValue(item, attributeName),
+    );
+
+    // A key of one attribute keeps the form it had before an index could key
+    // by several, so the order a Scan reads a table in stays as it was.
+    if (values.length === 1) {
+      return values.join("");
+    }
+
+    return jsonStringify(values);
   }
 
   /**

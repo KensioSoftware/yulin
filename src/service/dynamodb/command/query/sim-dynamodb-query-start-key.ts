@@ -50,7 +50,7 @@ export function readSimDynamoDbQueryStartKey(
   // index takes a token carrying the index key and the table key together.
   view.assertStartKey(startKey);
 
-  assertSamePartition(startKey, view, keyCondition);
+  assertSamePartition(startKey, keyCondition);
 
   return startKey;
 }
@@ -60,21 +60,22 @@ export function readSimDynamoDbQueryStartKey(
  */
 function assertSamePartition(
   startKey: SimDynamoDbItem,
-  view: SimDynamoDbReadView,
   keyCondition: SimDynamoDbKeyCondition,
 ): void {
-  const attributeName = view.keySchema.hashKeyAttributeName;
-  const value = startKey.attribute(attributeName);
+  for (const [attributeName, expected] of keyCondition.partitionKey) {
+    const value = startKey.attribute(attributeName);
 
-  assertDefined(
-    value,
-    `partition key ${attributeName} of an ExclusiveStartKey`,
-  );
-
-  if (!simDynamoDbValuesEqual(value, keyCondition.partitionKeyValue)) {
-    throw new SimDynamoDbValidationException(
-      `The ExclusiveStartKey names the partition key ${attributeName} of a ` +
-        `different item collection to the one the KeyConditionExpression reads`,
+    assertDefined(
+      value,
+      `partition key ${attributeName} of an ExclusiveStartKey`,
     );
+
+    if (!simDynamoDbValuesEqual(value, expected)) {
+      throw new SimDynamoDbValidationException(
+        `The ExclusiveStartKey names the partition key ${attributeName} of a ` +
+          `different item collection to the one the KeyConditionExpression ` +
+          `reads`,
+      );
+    }
   }
 }

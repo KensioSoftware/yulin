@@ -8,6 +8,7 @@ import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbAttributeDefinitions } from "../table/sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
+import { simDynamoDbMultiAttributeKeys } from "../table/sim-dynamodb-key-schema-shape.js";
 import { SimDynamoDbKeySchemaSubject } from "../table/sim-dynamodb-key-schema-subject.js";
 import type { SimDynamoDbTableThroughput } from "../table/sim-dynamodb-table-throughput.js";
 import type { SimDynamoDbIndexAttributes } from "./sim-dynamodb-index-attributes.js";
@@ -114,6 +115,7 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
       keySchema: SimDynamoDbKeySchema.fromInput(
         input.KeySchema,
         SimDynamoDbKeySchemaSubject.index(name),
+        simDynamoDbMultiAttributeKeys,
       ),
       projection: SimDynamoDbIndexProjection.fromInput(input.Projection, name),
       throughput: readSimDynamoDbIndexThroughput(input, name, table.billing),

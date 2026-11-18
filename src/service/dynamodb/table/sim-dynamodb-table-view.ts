@@ -44,7 +44,7 @@ export class SimDynamoDbTableView implements SimDynamoDbReadView {
     // A table primary key is unique, so the sort key settles every order
     // question and nothing has to separate two items sharing one.
     this.order = new SimDynamoDbSortKeyOrder({
-      attributeName: properties.keySchema.rangeKeyAttributeName,
+      attributeNames: properties.keySchema.sortKeyAttributeNames,
     });
   }
 
@@ -56,7 +56,6 @@ export class SimDynamoDbTableView implements SimDynamoDbReadView {
   ): SimDynamoDbItemCollection {
     return new SimDynamoDbItemCollection({
       items: this.items,
-      keySchema: this.keySchema,
       order: this.order,
       keyCondition,
     });

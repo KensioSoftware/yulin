@@ -141,10 +141,19 @@ naming what was wrong:
 Supported key schema behavior:
 
 - a `HASH` element is required, and comes first
-- a `RANGE` element is optional, and comes second
+- a `RANGE` element is optional, and comes after every `HASH` element
+- a table and a local secondary index take one `HASH` element and at most one `RANGE` element
+- a global secondary index takes up to four of each, which AWS calls a multi-attribute key.
+  `SimDynamoDbKeySchemaShape` is the limit, and `SimDynamoDbGlobalSecondaryIndex` is the one caller
+  passing the wider one
 - key attributes are `S`, `N` or `B`, and must have a matching attribute definition
 - item partition and sort key values must be strings or numbers
 - item keys are serialized as JSON and used as the internal item map key
+
+`partitionKeyAttributeNames` and `sortKeyAttributeNames` list the attributes of each half in key
+schema order. `hashKeyAttributeName` and `rangeKeyAttributeName` are the first of each, and only code
+reading a single-attribute key uses them (leading keys, item collection metrics and the local
+secondary index checks).
 
 A request carries several key schemas: the table's own, and one per index. `SimDynamoDbKeySchemaSubject`
 is which of them a key schema is, and it travels with the key schema so a refusal names the one that
@@ -946,8 +955,12 @@ The parts split by what they know:
   refused rather than matching nothing, since an empty page would read as a collection that happens
   to hold nothing.
 - `SimDynamoDbKeyConditionTerms` holds the terms to the key schema once the table has been reached,
-  and answers with a `SimDynamoDbKeyCondition`: the partition key value whose collection is read, and
-  the run of it the sort key condition asks for.
+  and answers with a `SimDynamoDbKeyCondition`: the value of each partition key attribute, which
+  together name the collection read, and the run of it the sort key terms ask for.
+- `readSimDynamoDbSortKeyTerms` holds the sort key terms to the left-to-right rule of a
+  multi-attribute key. It refuses a skipped attribute, and a term after a range. A table has one
+  sort key attribute at most, and its one term always passes.
+- `SimDynamoDbSortKeyOrder` orders by each sort key attribute in turn.
 
 `SimDynamoDbConditionCheck` under `command/item/` is what PutItem and DeleteItem both use. It reads
 the expression before the table is reached, so an expression DynamoDB would refuse is refused

@@ -165,9 +165,10 @@ directions. Declaring an index without adding its key attribute definitions is a
 `ValidationException`, and so is defining an attribute no key uses. This is where `CreateTable`
 input most often goes wrong.
 
-An index key schema takes the same shape the table's does, with one `HASH` element, optionally
-followed by one `RANGE` element, and key attributes of `S`, `N` or `B`. Index names are unique
-within a table, and a table holds at most 20 indexes.
+An index key schema lists its `HASH` elements and then its `RANGE` elements, with key attributes of
+`S`, `N` or `B`. A global secondary index takes up to four of each, covered under
+[multi-attribute keys](#multi-attribute-keys). Index names are unique within a table, and a table
+holds at most 20 indexes.
 
 `Projection` says which attributes the index carries. `ALL` is the whole item, `KEYS_ONLY` is the
 index keys plus the table keys, and `INCLUDE` adds 1 to 20 `NonKeyAttributes` to those. `INCLUDE`
@@ -190,6 +191,115 @@ An index is sparse. An item missing any one of an index's key attributes is abse
 and the write itself still succeeds. An index keyed on two attributes needs both. The one thing a
 write is held to on account of an index is the type. An item carrying an index key attribute as a
 type the index did not declare is a `ValidationException`, since the index could never hold it.
+
+### Multi-attribute keys
+
+A global secondary index can key by up to four partition key attributes and up to four sort key
+attributes. The key schema lists every `HASH` element before the first `RANGE` element.
+
+```typescript sim-dynamodb-multi-attribute-index
+/**
+ * Querying a global secondary index keyed by several attributes.
+ */
+
+import { QueryCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable({
+  input: {
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [
+      { AttributeName: "orderId", AttributeType: "S" },
+      { AttributeName: "region", AttributeType: "S" },
+      { AttributeName: "warehouse", AttributeType: "S" },
+      { AttributeName: "status", AttributeType: "S" },
+      { AttributeName: "priority", AttributeType: "N" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "byWarehouse",
+        KeySchema: [
+          { AttributeName: "region", KeyType: "HASH" },
+          { AttributeName: "warehouse", KeyType: "HASH" },
+          { AttributeName: "status", KeyType: "RANGE" },
+          { AttributeName: "priority", KeyType: "RANGE" },
+        ],
+        Projection: { ProjectionType: "ALL" },
+      },
+    ],
+  },
+});
+await simAws.backgroundTasksComplete();
+
+const orders = [
+  { orderId: "order-1", status: "OPEN", priority: "10" },
+  { orderId: "order-2", status: "OPEN", priority: "9" },
+  { orderId: "order-3", status: "SHIPPED", priority: "1" },
+];
+
+await Promise.all(
+  orders.map(async ({ orderId, status, priority }) =>
+    dynamoDb.putItem({
+      input: {
+        TableName: "OrdersTable",
+        Item: {
+          orderId: { S: orderId },
+          region: { S: "north" },
+          warehouse: { S: "w1" },
+          status: { S: status },
+          priority: { N: priority },
+        },
+      },
+    }),
+  ),
+);
+
+// Every partition key attribute is named with =. The sort key attributes are
+// named from the left, and only the last one named may take a range.
+const open = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    IndexName: "byWarehouse",
+    KeyConditionExpression:
+      "#region = :region AND warehouse = :warehouse AND " +
+      "#status = :status AND priority < :priority",
+    ExpressionAttributeNames: { "#region": "region", "#status": "status" },
+    ExpressionAttributeValues: {
+      ":region": { S: "north" },
+      ":warehouse": { S: "w1" },
+      ":status": { S: "OPEN" },
+      ":priority": { N: "20" },
+    },
+  }),
+);
+
+// Items sort by status, then by priority as a number.
+console.log(open.Items?.map((item) => item["orderId"]?.S)); // ["order-2", "order-1"]
+```
+
+A query names every partition key attribute with `=`. Leaving one out, or giving one a range, is a
+`ValidationException`, the same as for a single partition key.
+
+The sort key attributes are tested from the left. A query may test the first alone, the first two,
+and so on, and every test but the last is an equality. The last may be a comparison, `BETWEEN` or
+`begins_with`. Skipping an attribute, or testing one after a range, is a `ValidationException`
+reading `Query key condition not supported`.
+
+Items in one partition sort by the first sort key attribute, then by the second among items sharing
+the first, and so on. Each attribute sorts by its own type (a number by value, a string by its
+bytes).
+
+The index is sparse in all of its key attributes. An item missing any one of them is absent from
+the index. A `LastEvaluatedKey` from the index carries every index key attribute and the table key.
+
+A table key and a local secondary index key still take one `HASH` element and at most one `RANGE`
+element, as on AWS.
 
 ## Local secondary indexes
 
@@ -1374,12 +1484,14 @@ A query on a table with no sort key is allowed, and reads the one item under the
 The grammar is closed, and deliberately narrower than a `ConditionExpression`. Each of these is a
 `ValidationException` naming what was wrong:
 
-- a key condition that leaves the partition key untested for equality
+- a key condition that leaves the partition key, or one of its attributes, untested for equality
 - a range operator or `begins_with` applied to the partition key
 - an operator or function a sort key condition refuses, such as `<>` or `contains`
 - an attribute outside the table's primary key
 - `OR` or `NOT` anywhere
 - the same key attribute tested twice
+- on a [multi-attribute key](#multi-attribute-keys), a skipped sort key attribute, or one tested
+  after a range
 - a `BETWEEN` whose upper bound is below its lower bound, or whose bounds are different types
 - a value written into the expression, where `ExpressionAttributeValues` should supply it
 - a value whose type differs from the one the table declared for that key attribute, such as
@@ -4236,8 +4348,12 @@ is written.
   `ItemCollectionSizeLimitExceededException`. A table with a local secondary index can hold as much
   under one partition key here as memory allows. A write real DynamoDB would refuse for the size of
   the collection it lands in goes through.
-- An index key is one attribute, or two. Real DynamoDB now takes more than that, and a key schema of
-  more than two elements is refused here.
+- A query of a [multi-attribute key](#multi-attribute-keys) checks which sort key attributes it
+  tests, and ignores the order the key condition writes them in. AWS documents the left-to-right
+  rule in terms of the key schema, and does not say whether the written order matters too.
+- A query of an index with a multi-attribute partition key is authorized with the first partition
+  key attribute as `dynamodb:LeadingKeys`. AWS does not document which value the condition key holds
+  for such an index.
 - Per-index `ProvisionedThroughput` is read, validated and reported, and enforces no limit. No read
   or write against an index is throttled, since none against the table is either.
 - A local secondary index cannot be added to or removed from a table after it has been created, and
