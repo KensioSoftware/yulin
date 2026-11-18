@@ -469,6 +469,7 @@
       "BatchCreatePartition": "BatchCreatePartitionRequest",
       "BatchGetPartition": "BatchGetPartitionRequest",
       "BatchUpdatePartition": "BatchUpdatePartitionRequest",
+      "CreateDataQualityEvaluationConfig": "CreateDataQualityEvaluationConfigRequest",
       "CreateJob": "CreateJobRequest",
       "CreatePartition": "CreatePartitionRequest",
       "CreateTable": "CreateTableRequest",
@@ -492,6 +493,7 @@
       "PublishDataQualityResultV2": "PublishDataQualityResultV2Request",
       "UpdateColumnStatisticsForPartition": "UpdateColumnStatisticsForPartitionRequest",
       "UpdateColumnStatisticsForTable": "UpdateColumnStatisticsForTableRequest",
+      "UpdateDataQualityEvaluationConfig": "UpdateDataQualityEvaluationConfigRequest",
       "UpdateJob": "UpdateJobRequest",
       "UpdatePartition": "UpdatePartitionRequest",
       "UpdateTable": "UpdateTableRequest",
@@ -529,6 +531,10 @@
       "ColumnStatisticsData": {
         "DateColumnStatisticsData": "#DateColumnStatisticsData",
         "DecimalColumnStatisticsData": "#DecimalColumnStatisticsData"
+      },
+      "CreateDataQualityEvaluationConfigRequest": {
+        "EndAt": "timestamp",
+        "StartAt": "timestamp"
       },
       "CreateJobRequest": {
         "CodeGenConfigurationNodes": "map:#CodeGenConfigurationNode"
@@ -683,6 +689,10 @@
       },
       "UpdateColumnStatisticsForTableRequest": {
         "ColumnStatisticsList": "list:#ColumnStatistics"
+      },
+      "UpdateDataQualityEvaluationConfigRequest": {
+        "EndAt": "timestamp",
+        "StartAt": "timestamp"
       },
       "UpdateJobRequest": {
         "JobUpdate": "#JobUpdate"
