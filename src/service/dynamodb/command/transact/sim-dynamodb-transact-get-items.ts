@@ -50,7 +50,12 @@ export class SimDynamoDbTransactGetItems {
 
     const targets = reachSimDynamoDbTransactTables(
       readSimDynamoDbTransactGets(input.TransactItems),
-      { access: this.access, caller: options?.caller },
+      {
+        access: this.access,
+        caller: options?.caller,
+        operation: "TransactGetItems",
+        returnConsumedCapacity: input.ReturnConsumedCapacity,
+      },
     );
 
     return {

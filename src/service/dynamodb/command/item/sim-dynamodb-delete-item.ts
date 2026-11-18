@@ -1,3 +1,7 @@
+import {
+  simDynamoDbReturnConsumedCapacityKey,
+  simDynamoDbReturnValuesKey,
+} from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import { simDynamoDbLeadingKeysOf } from "../authorize/sim-dynamodb-leading-keys.js";
@@ -64,6 +68,13 @@ export class SimDynamoDbDeleteItem {
         attributes: simDynamoDbAttributesOf(
           check.attributeNames,
           simDynamoDbItemAttributeNames(() => [readSimDynamoDbKey(input.Key)]),
+        ),
+        returnValues: simDynamoDbReturnValuesKey(
+          input.ReturnValues,
+          check.returnValuesKey,
+        ),
+        returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+          input.ReturnConsumedCapacity,
         ),
       },
     );

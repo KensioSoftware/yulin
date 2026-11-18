@@ -1,21 +1,24 @@
 import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import { simDynamoDbAttributesConditionKey } from "./sim-dynamodb-attributes.js";
-import { simDynamoDbLeadingKeysConditionKey } from "./sim-dynamodb-leading-keys.js";
+import type { SimDynamoDbPartitionKeyValues } from "./sim-dynamodb-leading-keys.js";
+import { simDynamoDbPartitionKeyConditions } from "./sim-dynamodb-leading-keys.js";
+import type { SimDynamoDbRequestKeys } from "./sim-dynamodb-request-keys.js";
+import { simDynamoDbRequestKeyConditions } from "./sim-dynamodb-request-keys.js";
 
 /**
  * What one request reaches in the table it names.
  *
- * The partition key values and attribute names each become a DynamoDB
- * condition key. A request reaching nothing under one of them leaves it out,
- * as AWS leaves a key out for an operation that reaches nothing it names. The
- * index name decides the resource authorized.
+ * The partition key values, attribute names and request parameters each
+ * become a DynamoDB condition key. A request reaching nothing under one of
+ * them leaves it out, as AWS leaves a key out for an operation that reaches
+ * nothing it names. The index name decides the resource authorized.
  */
-export interface SimDynamoDbReached {
+export interface SimDynamoDbReached extends SimDynamoDbRequestKeys {
   /** The index the request reads, when it names one. */
   readonly indexName?: string | undefined;
 
-  /** The partition key values the request reaches. */
-  readonly leadingKeys?: readonly string[] | undefined;
+  /** The partition key values the request reaches, by key position. */
+  readonly partitionKeys?: SimDynamoDbPartitionKeyValues | undefined;
 
   /** The top-level attribute names the request names. */
   readonly attributes?: readonly string[] | undefined;
@@ -30,12 +33,16 @@ export interface SimDynamoDbReached {
 export function simDynamoDbConditionContextOf(
   reached: SimDynamoDbReached,
 ): SimIamConditions {
-  const reachedKeys = Object.fromEntries(
-    [
-      [simDynamoDbLeadingKeysConditionKey, reached.leadingKeys],
-      [simDynamoDbAttributesConditionKey, reached.attributes],
-    ].filter(([, values]) => (values ?? []).length > 0),
-  ) as Readonly<Record<string, readonly string[]>>;
+  const attributes = reached.attributes ?? [];
+  const attributeConditions =
+    attributes.length === 0
+      ? {}
+      : { [simDynamoDbAttributesConditionKey]: attributes };
 
-  return { ...reached.requestConditions, ...reachedKeys };
+  return {
+    ...reached.requestConditions,
+    ...simDynamoDbPartitionKeyConditions(reached.partitionKeys ?? []),
+    ...attributeConditions,
+    ...simDynamoDbRequestKeyConditions(reached),
+  };
 }

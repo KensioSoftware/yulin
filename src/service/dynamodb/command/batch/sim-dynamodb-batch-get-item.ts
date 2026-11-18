@@ -1,3 +1,7 @@
+import {
+  simDynamoDbKeyReadSelectKey,
+  simDynamoDbReturnConsumedCapacityKey,
+} from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
@@ -61,6 +65,10 @@ export class SimDynamoDbBatchGetItem {
         reached: (entry) => ({
           leadingKeys: simDynamoDbLeadingKeysOf(() => entry.keys),
           attributes: entry.attributes,
+          select: simDynamoDbKeyReadSelectKey(entry.projection !== undefined),
+          returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+            input.ReturnConsumedCapacity,
+          ),
         }),
       },
     );

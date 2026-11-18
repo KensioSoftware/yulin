@@ -1,3 +1,5 @@
+import type { SimDynamoDbTableReach } from "../table/sim-dynamodb-table-reach.js";
+import { simDynamoDbTransactKeyReach } from "./sim-dynamodb-transact-reach.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -25,6 +27,12 @@ class SimDynamoDbTransactUpdateAction implements SimDynamoDbTransactWrite {
     this.reference = reference;
     this.key = key;
     this.plan = plan;
+  }
+
+  reach(): SimDynamoDbTableReach {
+    return simDynamoDbTransactKeyReach(this.key, this.plan.check, [
+      ...this.plan.attributeNames,
+    ]);
   }
 
   sizeInBytes(): number {

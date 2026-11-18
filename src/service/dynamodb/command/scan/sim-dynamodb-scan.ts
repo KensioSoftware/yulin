@@ -1,3 +1,4 @@
+import { simDynamoDbReturnConsumedCapacityKey } from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { simDynamoDbReadSize } from "../read/sim-dynamodb-read-size.js";
@@ -69,7 +70,14 @@ export class SimDynamoDbScan {
       "dynamodb:Scan",
       input.TableName,
       options?.caller,
-      { attributes: expressions.attributes, indexName: input.IndexName },
+      {
+        attributes: expressions.attributes,
+        indexName: input.IndexName,
+        select: select.conditionValue,
+        returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+          input.ReturnConsumedCapacity,
+        ),
+      },
     );
 
     // What is being read is settled here: the table, or one of its indexes.
