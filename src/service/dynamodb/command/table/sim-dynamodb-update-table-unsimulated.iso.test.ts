@@ -67,18 +67,15 @@ describe("DynamoDB UpdateTableCommand unsimulated settings", () => {
     assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
   });
 
-  it("refuses changing the capacity of an existing index", async () => {
-    // Given a table, when an index capacity change is asked for, then it is
-    // refused rather than moving a number nothing acts on.
+  it("refuses on-demand throughput maximums on an index", async () => {
+    // Given a table, when a request cap is set on an index, then it is refused
+    // rather than reported as a limit nothing applies.
     const error = await refusedUpdate({
       GlobalSecondaryIndexUpdates: [
         {
           Update: {
             IndexName: "byStatus",
-            ProvisionedThroughput: {
-              ReadCapacityUnits: 2,
-              WriteCapacityUnits: 2,
-            },
+            OnDemandThroughput: { MaxReadRequestUnits: 100 },
           },
         },
       ],

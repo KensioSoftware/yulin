@@ -3,6 +3,9 @@ import type { SimDynamoDbItemChanges } from "../stream/sim-dynamodb-item-change.
 
 interface SimDynamoDbTableItemsProperties {
   readonly changes: SimDynamoDbItemChanges;
+
+  /** Called before any item changes, with the items still as they were. */
+  readonly beforeChange: () => void;
 }
 
 /**
@@ -22,9 +25,11 @@ interface SimDynamoDbTableItemsProperties {
 export class SimDynamoDbTableItems {
   private readonly items = new Map<string, SimDynamoDbItem>();
   private readonly changes: SimDynamoDbItemChanges;
+  private readonly beforeChange: () => void;
 
   constructor(properties: SimDynamoDbTableItemsProperties) {
     this.changes = properties.changes;
+    this.beforeChange = properties.beforeChange;
   }
 
   /**
@@ -39,6 +44,7 @@ export class SimDynamoDbTableItems {
   put(key: string, item: SimDynamoDbItem): SimDynamoDbItem | undefined {
     const replaced = this.items.get(key);
 
+    this.beforeChange();
     this.items.set(key, item);
     this.changes.capture({
       oldImage: replaced,
@@ -95,6 +101,7 @@ export class SimDynamoDbTableItems {
   private removed(key: string, expired: boolean): SimDynamoDbItem | undefined {
     const removed = this.items.get(key);
 
+    this.beforeChange();
     this.items.delete(key);
 
     if (removed !== undefined) {

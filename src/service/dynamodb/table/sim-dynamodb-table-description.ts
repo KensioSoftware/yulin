@@ -4,6 +4,7 @@ import type {
   SimDynamoDbTableDescription,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbTable } from "./sim-dynamodb-table.js";
+import { simDynamoDbIndexFigures } from "./sim-dynamodb-table-figures.js";
 
 /**
  * How a table reports its class, when the request that made it named one.
@@ -28,6 +29,8 @@ function tableClassSummary(
 export function describeSimDynamoDbTable(
   table: SimDynamoDbTable,
 ): SimDynamoDbTableDescription {
+  const figures = table.figures;
+
   return {
     TableName: table.tableName,
     TableArn: table.arn,
@@ -39,8 +42,16 @@ export function describeSimDynamoDbTable(
     BillingModeSummary: table.billing.summary(),
     ProvisionedThroughput: table.billing.throughputDescription(),
     TableClassSummary: tableClassSummary(table.tableClass),
-    GlobalSecondaryIndexes: table.indexes.global.descriptions(table.status),
-    LocalSecondaryIndexes: table.indexes.local.descriptions(),
+    GlobalSecondaryIndexes: simDynamoDbIndexFigures(
+      table.indexes.global.descriptions(table.status),
+      table,
+      figures,
+    ),
+    LocalSecondaryIndexes: simDynamoDbIndexFigures(
+      table.indexes.local.descriptions(),
+      table,
+      figures,
+    ),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
     StreamSpecification: table.stream.specification(),
     // These stay set once the table has had a stream, whether or not it still
@@ -48,9 +59,7 @@ export function describeSimDynamoDbTable(
     // setting. A table that has never had one reports neither.
     LatestStreamArn: table.stream.latest?.arn,
     LatestStreamLabel: table.stream.latest?.label,
-    // Neither figure is tracked yet. Real DynamoDB updates both about every
-    // six hours, so they lag behind the items anyway.
-    ItemCount: 0,
-    TableSizeBytes: 0,
+    ItemCount: figures.itemCount,
+    TableSizeBytes: figures.sizeBytes,
   };
 }

@@ -46,7 +46,7 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   public readonly keySchema: SimDynamoDbKeySchema;
   public readonly projection: SimDynamoDbIndexProjection;
 
-  private readonly throughput: SimDynamoDbTableThroughput;
+  private throughput: SimDynamoDbTableThroughput;
   private readonly lifecycle: SimDynamoDbIndexLifecycle;
 
   private constructor(properties: SimDynamoDbGlobalSecondaryIndexProperties) {
@@ -129,6 +129,17 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   }
 
   /**
+   * Give this index the capacity an UpdateTable asks for.
+   *
+   * The index is UPDATING until the table finishes the update, and answers
+   * reads throughout, as it does on AWS.
+   */
+  reprovision(throughput: SimDynamoDbTableThroughput): void {
+    this.throughput = throughput;
+    this.lifecycle.beginUpdate();
+  }
+
+  /**
    * Refuse a read of this index while it is still being built.
    */
   assertReadable(): void {
@@ -198,9 +209,6 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
       IndexStatus: simDynamoDbIndexStatus(tableStatus, this.lifecycle.status),
       Backfilling: this.lifecycle.backfilling,
       ProvisionedThroughput: this.throughput.toDescription(),
-      // Neither figure is tracked, the same way the table's are not.
-      ItemCount: 0,
-      IndexSizeBytes: 0,
     };
   }
 }
