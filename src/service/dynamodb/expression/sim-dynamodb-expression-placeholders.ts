@@ -1,4 +1,10 @@
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import { simDynamoDbTextSize } from "../item/sim-dynamodb-value-size.js";
+
+/**
+ * The most bytes one placeholder may hold, its `#` or `:` included.
+ */
+const maximumPlaceholderBytes = 255;
 
 interface SimDynamoDbExpressionPlaceholdersProperties<Value> {
   /** The request parameter the entries came from, for a refusal to name. */
@@ -74,7 +80,15 @@ export class SimDynamoDbExpressionPlaceholders<Value> {
   }
 
   /**
-   * Refuse a key that is not a placeholder at all.
+   * Every placeholder with what it stands for.
+   */
+  get defined(): ReadonlyMap<string, Value> {
+    return this.entries;
+  }
+
+  /**
+   * Refuse a key that is not a placeholder at all, or is longer than AWS
+   * accepts.
    *
    * A map keyed by the bare attribute name rather than by `#name` would leave
    * every placeholder in the expression undefined, which is a confusing way to
@@ -88,6 +102,23 @@ export class SimDynamoDbExpressionPlaceholders<Value> {
             `placeholder starts with '${this.marker}'.`,
         );
       }
+
+      this.assertShortEnough(key);
+    }
+  }
+
+  /**
+   * Refuse a placeholder over 255 bytes.
+   */
+  private assertShortEnough(key: string): void {
+    const size = simDynamoDbTextSize(key);
+
+    if (size > maximumPlaceholderBytes) {
+      throw new SimDynamoDbValidationException(
+        `${this.parameterName} contains a key of ${size.toString()} bytes, ` +
+          `and a placeholder is at most ` +
+          `${maximumPlaceholderBytes.toString()}: ${key.slice(0, 32)}...`,
+      );
     }
   }
 }

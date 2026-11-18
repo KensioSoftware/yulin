@@ -26,11 +26,17 @@ export class SimDynamoDbUpdateAnswer {
 
   /**
    * The output for an update that has already been applied.
+   *
+   * An update that wrote nothing has nothing to answer with.
    */
   of(
     existing: SimDynamoDbItem | undefined,
-    updated: SimDynamoDbItem,
+    updated: SimDynamoDbItem | undefined,
   ): SimUpdateItemCommandOutput {
+    if (updated === undefined) {
+      return { $metadata: {} };
+    }
+
     if (this.asked.reportsAfter()) {
       return this.attributesOf(updated);
     }

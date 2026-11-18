@@ -88,7 +88,8 @@ export class SimDynamoDbBeginsWithCondition implements SimDynamoDbCondition {
 }
 
 /**
- * Whether a string holds a substring, or a set or a list holds a member.
+ * Whether a string holds a substring, binary holds a run of bytes, or a set or
+ * a list holds a member.
  */
 export class SimDynamoDbContainsCondition implements SimDynamoDbCondition {
   private readonly operand: SimDynamoDbConditionOperand;
@@ -115,6 +116,10 @@ export class SimDynamoDbContainsCondition implements SimDynamoDbCondition {
 
     if (value.kind === "S" && sought.kind === "S") {
       return value.text.includes(sought.text);
+    }
+
+    if (value.kind === "B" && sought.kind === "B") {
+      return Buffer.from(value.bytes).includes(Buffer.from(sought.bytes));
     }
 
     return membersOf(value).some((member) =>

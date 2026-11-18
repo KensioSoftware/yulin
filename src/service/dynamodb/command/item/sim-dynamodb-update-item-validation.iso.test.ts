@@ -13,10 +13,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 
 /**
@@ -330,20 +327,21 @@ describe("DynamoDB UpdateItemCommand validation", () => {
     assertStringIncludes(error.message, "Item size has exceeded");
   });
 
-  it("refuses the legacy AttributeUpdates", async () => {
+  it("refuses a legacy PUT that carries no Value", async () => {
     // Given a table holding an order.
     const simAws = new SimAws();
     const simDynamoDb = await tableFor(simAws);
 
-    // When an update says what to change the old way.
+    // When an AttributeUpdates entry puts nothing.
     const error = await refusalOf(simDynamoDb, {
-      AttributeUpdates: {
-        status: { Value: { S: "shipped" }, Action: "PUT" },
-      },
+      AttributeUpdates: { status: { Action: "PUT" } },
     });
 
-    // Then it is refused by name, rather than leaving the item unchanged.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "AttributeUpdates is not simulated");
+    // Then it is refused, as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "Only DELETE action is allowed when no attribute value is specified",
+    );
   });
 });

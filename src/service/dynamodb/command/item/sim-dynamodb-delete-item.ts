@@ -12,7 +12,7 @@ import type {
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
-import { refuseUnsimulatedItemWriteInput } from "./sim-dynamodb-unsimulated-item-write-input.js";
+import { simDynamoDbExpressionsOf } from "../../expression/legacy/sim-dynamodb-legacy-request.js";
 import { SimDynamoDbWriteReport } from "../../capacity/sim-dynamodb-write-report.js";
 
 interface SimDynamoDbDeleteItemProperties {
@@ -47,9 +47,7 @@ export class SimDynamoDbDeleteItem {
     command: SimDeleteItemCommand,
     options?: SimDynamoDbDeleteItemOptions,
   ): SimDeleteItemCommandOutput {
-    const input = command.input;
-
-    refuseUnsimulatedItemWriteInput(input, "DeleteItem");
+    const input = simDynamoDbExpressionsOf(command.input);
     const report = SimDynamoDbWriteReport.read(input);
 
     // The condition is read before the table is reached, so an expression

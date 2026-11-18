@@ -11,10 +11,13 @@ import type {
 } from "./item.command.js";
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
-import { refuseUnsimulatedItemUpdateInput } from "./sim-dynamodb-unsimulated-item-update-input.js";
 import { SimDynamoDbUpdateAnswer } from "./sim-dynamodb-update-answer.js";
 import { SimDynamoDbUpdatePlan } from "./sim-dynamodb-update-plan.js";
 import { SimDynamoDbWriteReport } from "../../capacity/sim-dynamodb-write-report.js";
+import {
+  readSimDynamoDbUpdateItemRequest,
+  simDynamoDbUpdatedItem,
+} from "./sim-dynamodb-update-item-request.js";
 
 interface SimDynamoDbUpdateItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -49,9 +52,8 @@ export class SimDynamoDbUpdateItem {
     command: SimUpdateItemCommand,
     options?: SimDynamoDbUpdateItemOptions,
   ): SimUpdateItemCommandOutput {
-    const input = command.input;
-
-    refuseUnsimulatedItemUpdateInput(input);
+    const request = readSimDynamoDbUpdateItemRequest(command.input);
+    const input = request.input;
     const report = SimDynamoDbWriteReport.read(input);
 
     // The expressions are read before the table is reached, so one DynamoDB
@@ -81,8 +83,11 @@ export class SimDynamoDbUpdateItem {
     plan.check.assertHoldsFor(existing);
     plan.assertLeavesKeyAlone(table.keySchema.attributeNames());
 
-    const updated = plan.applyTo(existing, key);
-    table.putItem(updated);
+    const updated = simDynamoDbUpdatedItem(request, plan, existing, key);
+
+    if (updated !== undefined) {
+      table.putItem(updated);
+    }
 
     return {
       ...new SimDynamoDbUpdateAnswer({

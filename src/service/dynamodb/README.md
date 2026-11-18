@@ -503,10 +503,9 @@ Important behavior:
   scheduled.
 - `ReturnValues` takes `NONE` and `ALL_OLD`, which are the two real PutItem has. `ALL_OLD` answers
   with the item that was replaced, and with nothing when there was none.
-- the inputs this simulation does not model are refused by name in
-  `sim-dynamodb-unsimulated-item-write-input.ts`, which DeleteItem shares, and a request naming only
-  their `NONE` default is let through. `SimDynamoDbUnsimulatedInput` is what each refusal is made of,
-  so the wording is the same across the item commands.
+- the legacy `Expected` and `ConditionalOperator` are rewritten as a `ConditionExpression` by
+  `simDynamoDbExpressionsOf` before anything else reads the request. See
+  [legacy parameters](#legacy-parameters).
 
 ## GetItem and DeleteItem behavior
 
@@ -538,9 +537,9 @@ Important behavior:
   checked against what is stored before anything changes, so a write it turns away leaves the item
   exactly as it was. PutItem finds what is stored through `SimDynamoDbTable.itemUnder`, which reads
   the key out of the item being written rather than out of a Key of its own.
-- GetItem refuses the legacy `AttributesToGet` in `sim-dynamodb-unsimulated-item-read-input.ts`. `ExpressionAttributeNames` with no expression to
-  use them in is a `ValidationException` rather than an unsupported operation, because real DynamoDB
-  refuses that too. DeleteItem refuses the same conditional write inputs PutItem does.
+- GetItem rewrites the legacy `AttributesToGet` as a `ProjectionExpression`, and DeleteItem
+  rewrites `Expected` the way PutItem does. `ExpressionAttributeNames` with no expression to use them
+  in is a `ValidationException`, because real DynamoDB refuses that too.
 
 ## UpdateItem behavior
 
@@ -549,8 +548,9 @@ its table the same way, and reads its `Key` through the same `readSimDynamoDbKey
 
 The order it works in matters:
 
-1. `refuseUnsimulatedItemUpdateInput` refuses the inputs this simulation does not model, including
-   the legacy `AttributeUpdates`.
+1. `simDynamoDbExpressionsOf` rewrites the legacy `AttributeUpdates` and `Expected` as expressions.
+   An update made only of legacy `DELETE` actions leaves a missing item missing, which
+   `simDynamoDbLegacyUpdateCreatesItem` decides from the request as it arrived.
 2. `SimDynamoDbUpdatePlan` reads both expressions, before the table is reached.
 3. The table is found and the caller authorized against `dynamodb:UpdateItem`.
 4. The condition is checked against what is stored.
@@ -590,9 +590,11 @@ lookup.
 
 The order it works in is the order the other commands follow, with one addition:
 
-1. `SimDynamoDbSelect.from` reads which attributes the request asks for. It comes first because it
-   decides whether the projection the request carries is one it could have asked for at all.
-2. `refuseUnsimulatedQueryInput` refuses the inputs this simulation does not model.
+1. `simDynamoDbExpressionsOf` rewrites `KeyConditions`, `QueryFilter` and `AttributesToGet` as
+   expressions, so everything after it sees the projection a legacy request asked for.
+2. `SimDynamoDbSelect.from` reads which attributes the request asks for. It comes before the
+   expressions are read because it decides whether the projection the request carries is one it
+   could have asked for at all.
 3. `readSimDynamoDbQueryExpressions` reads the `KeyConditionExpression`, the `FilterExpression` and
    the `ProjectionExpression`, before the table is reached, so an expression DynamoDB would refuse is
    refused whether or not the table is there. All three draw on one
@@ -645,8 +647,9 @@ Important behavior:
 - `ExclusiveStartKey` resumes exclusively, by comparing sort keys rather than by looking the item up,
   so a token still works when the item it names has since been deleted. That is the same choice
   `ListTables` and `ListTagsOfResource` make.
-- `ProjectionExpression` is refused by name, since it changes which parts of an item a query answers
-  with.
+- `ProjectionExpression` cuts each item a query answers with down to the paths it names, through
+  `SimDynamoDbReadAnswer`. A legacy `AttributesToGet` reaches the same path once rewritten.
+  `SimDynamoDbSelect` refuses a projection alongside any `Select` other than `SPECIFIC_ATTRIBUTES`.
 - `IndexName` chooses what is read, through `SimDynamoDbTable.view`. Everything after that asks the
   view rather than the table, so a query of an index is the same query against a narrower thing.
 
@@ -655,8 +658,8 @@ Important behavior:
 `SimDynamoDbScan` reads a whole table rather than one item collection, so it needs no key condition
 and no key knowledge. It takes the same steps a query does, minus the key condition:
 
-1. `SimDynamoDbSelect.from` reads which attributes the request asks for.
-2. `refuseUnsimulatedScanInput` refuses the inputs this simulation does not model.
+1. `simDynamoDbExpressionsOf` rewrites `ScanFilter` and `AttributesToGet` as expressions.
+2. `SimDynamoDbSelect.from` reads which attributes the request asks for.
 3. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, and
    `readSimDynamoDbScanExpressions` the `FilterExpression` and the `ProjectionExpression` against one
    set of placeholders, before the table is reached, so input DynamoDB would refuse is refused
@@ -987,6 +990,37 @@ Applying a projection is `undefined` for anything the item does not have, at eve
 attribute, an index past the end of a list, and a path reaching into the wrong kind of value all
 come back as nothing rather than as an error. A projected list is closed up, so `lines[2]` on its own
 answers with a one element list.
+
+### Expression limits
+
+`SimDynamoDbExpressionTokens.of` is where every expression kind starts, so the limits on one
+expression live there, in `sim-dynamodb-expression-limits.ts`. The 4 KB size is checked before the
+expression is tokenised. The 300 operator count is taken from the tokens. A comparator, `+`, `-`,
+`AND`, `OR`, `NOT`, `IN` and a name followed by `(` each count once. `BETWEEN` counts for nothing
+of its own, since the `AND` written with it stands in for it. `=` counts everywhere except an
+`UpdateExpression`, where it is assignment.
+
+`SimDynamoDbExpressionPlaceholders` refuses a key over 255 bytes, and
+`SimDynamoDbExpressionParameters` refuses placeholders over 2 MB between them, counting a value by
+`simDynamoDbValueSize`.
+
+### Legacy parameters
+
+`simDynamoDbExpressionsOf` in `expression/legacy/` rewrites a request's legacy parameters as the
+expressions that replaced them. Every item command, query, scan and batch read table runs its input
+through it first, and a request carrying none comes back unchanged.
+
+It refuses a request mixing legacy parameters with expressions, and a legacy request carrying
+placeholders of its own. An empty `ExpressionAttributeNames` or `ExpressionAttributeValues` defines
+no placeholder, so it is let through and replaced. Neither can then collide with the `#n0` and `:v0` placeholders
+`SimDynamoDbLegacyPlaceholders` writes. A legacy comparison is checked in
+`sim-dynamodb-legacy-comparison.ts` for its operator, its number of values and their types, so a
+comparison AWS refuses is refused for what it said. The expression it becomes is parsed, limited
+and evaluated by the same code as one the caller wrote.
+
+A legacy `IN` longer than the 100 values an expression `IN` takes is written as several joined by
+`OR`. A legacy update made only of `DELETE` actions is the one place the rewrite differs from AWS's
+own equivalence, and UpdateItem decides it from the request as it arrived.
 
 ## CloudFormation
 

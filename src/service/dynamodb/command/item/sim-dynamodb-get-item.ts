@@ -6,7 +6,7 @@ import type {
   SimGetItemCommandOutput,
 } from "./item.command.js";
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
-import { refuseUnsimulatedItemReadInput } from "./sim-dynamodb-unsimulated-item-read-input.js";
+import { simDynamoDbExpressionsOf } from "../../expression/legacy/sim-dynamodb-legacy-request.js";
 import { readSimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection-expression.js";
 import {
   simDynamoDbAttributesOf,
@@ -55,9 +55,7 @@ export class SimDynamoDbGetItem {
     command: SimGetItemCommand,
     options?: SimDynamoDbGetItemOptions,
   ): SimGetItemCommandOutput {
-    const input = command.input;
-
-    refuseUnsimulatedItemReadInput(input);
+    const input = simDynamoDbExpressionsOf(command.input);
     const capacity = SimDynamoDbReturnConsumedCapacity.read(
       input.ReturnConsumedCapacity,
     );

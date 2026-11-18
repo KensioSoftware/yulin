@@ -1,4 +1,8 @@
 import { simDynamoDbExpressionError } from "./sim-dynamodb-expression-error.js";
+import {
+  assertSimDynamoDbExpressionOperators,
+  assertSimDynamoDbExpressionSize,
+} from "./sim-dynamodb-expression-limits.js";
 import type { SimDynamoDbExpressionToken } from "./sim-dynamodb-expression-token.js";
 import { SimDynamoDbExpressionTokeniser } from "./sim-dynamodb-expression-tokeniser.js";
 
@@ -30,18 +34,25 @@ export class SimDynamoDbExpressionTokens {
    * An expression with nothing in it is refused here rather than by each
    * parser, since none of them has anything to read either way. The reason
    * says what that expression kind would have been asking for.
+   *
+   * Every expression kind arrives here, so this is where the limits on the
+   * size of an expression and on how many operators it holds are applied. The
+   * size is checked before the expression is read at all.
    */
   static of(
     expressionName: string,
     expression: string,
     emptyReason: string,
   ): SimDynamoDbExpressionTokens {
-    const read = new this({
+    assertSimDynamoDbExpressionSize(expressionName, expression);
+
+    const tokens = new SimDynamoDbExpressionTokeniser({
       expressionName,
-      tokens: new SimDynamoDbExpressionTokeniser({ expressionName }).tokenise(
-        expression,
-      ),
-    });
+    }).tokenise(expression);
+
+    assertSimDynamoDbExpressionOperators(expressionName, tokens);
+
+    const read = new this({ expressionName, tokens });
 
     if (read.atEnd) {
       throw simDynamoDbExpressionError(expressionName, emptyReason);
