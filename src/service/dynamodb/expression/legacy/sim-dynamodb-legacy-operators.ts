@@ -79,60 +79,59 @@ function renderIn(attribute: string, values: readonly string[]): string {
   return groups.join(" OR ");
 }
 
-export const /**
-   *
-   */
-  simDynamoDbLegacyOperators: ReadonlyMap<string, SimDynamoDbLegacyOperator> =
-    new Map([
-      [
-        "EQ",
-        {
-          arity: one,
-          render: (attribute, values) => `${attribute} = ${values.join("")}`,
-        },
-      ],
-      [
-        "NE",
-        {
-          arity: one,
-          render: (attribute, values) => `${attribute} <> ${values.join("")}`,
-        },
-      ],
-      ["LE", comparing("<=")],
-      ["LT", comparing("<")],
-      ["GE", comparing(">=")],
-      ["GT", comparing(">")],
-      [
-        "NOT_NULL",
-        {
-          arity: none,
-          render: (attribute) => `attribute_exists(${attribute})`,
-        },
-      ],
-      [
-        "NULL",
-        {
-          arity: none,
-          render: (attribute) => `attribute_not_exists(${attribute})`,
-        },
-      ],
-      ["CONTAINS", calling("contains", scalars)],
-      [
-        "NOT_CONTAINS",
-        { ...calling("contains", scalars), render: notContains },
-      ],
-      ["BEGINS_WITH", calling("begins_with", new Set(["S", "B"]))],
-      ["IN", { arity: many, kinds: scalars, render: renderIn }],
-      [
-        "BETWEEN",
-        {
-          arity: two,
-          kinds: scalars,
-          render: (attribute, values) =>
-            `${attribute} BETWEEN ${values.join(" AND ")}`,
-        },
-      ],
-    ]);
+/**
+ * Every legacy comparison operator AWS takes, by name.
+ */
+export const simDynamoDbLegacyOperators: ReadonlyMap<
+  string,
+  SimDynamoDbLegacyOperator
+> = new Map([
+  [
+    "EQ",
+    {
+      arity: one,
+      render: (attribute, values) => `${attribute} = ${values.join("")}`,
+    },
+  ],
+  [
+    "NE",
+    {
+      arity: one,
+      render: (attribute, values) => `${attribute} <> ${values.join("")}`,
+    },
+  ],
+  ["LE", comparing("<=")],
+  ["LT", comparing("<")],
+  ["GE", comparing(">=")],
+  ["GT", comparing(">")],
+  [
+    "NOT_NULL",
+    {
+      arity: none,
+      render: (attribute) => `attribute_exists(${attribute})`,
+    },
+  ],
+  [
+    "NULL",
+    {
+      arity: none,
+      render: (attribute) => `attribute_not_exists(${attribute})`,
+    },
+  ],
+  ["CONTAINS", calling("contains", scalars)],
+  ["NOT_CONTAINS", { ...calling("contains", scalars), render: notContains }],
+  ["BEGINS_WITH", calling("begins_with", new Set(["S", "B"]))],
+  ["IN", { arity: many, kinds: scalars, render: renderIn }],
+  [
+    "BETWEEN",
+    {
+      arity: two,
+      kinds: scalars,
+      render: (attribute, values) =>
+        `${attribute} BETWEEN ${values.join(" AND ")}`,
+    },
+  ],
+]);
 
 /**
  * Write a `NOT_CONTAINS`.
