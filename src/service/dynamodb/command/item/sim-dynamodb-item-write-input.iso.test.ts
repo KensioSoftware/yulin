@@ -12,7 +12,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimDynamoDbUnsupportedOperation } from "../../error/dynamodb.error.js";
+import {
+  SimDynamoDbConditionalCheckFailedException,
+  SimDynamoDbValidationException,
+} from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import type {
   SimDeleteItemCommandInput,
@@ -28,23 +31,6 @@ const keyInput = {
   TableName: "FooTable",
   Key: { userId: { S: "user-1" } },
 } as const satisfies SimDeleteItemCommandInput;
-
-/**
- * The legacy conditional inputs PutItem and DeleteItem share.
- */
-const writeInputs = [
-  {
-    named: "Expected",
-    input: { Expected: { userId: { Exists: false } } },
-  },
-  {
-    named: "ConditionalOperator",
-    input: { ConditionalOperator: "AND" },
-  },
-] as const satisfies readonly {
-  named: string;
-  input: SimDeleteItemCommandInput;
-}[];
 
 /**
  * A table to read from and write to.
@@ -65,21 +51,39 @@ async function tableFor(simAws: SimAws): Promise<SimDynamoDb> {
   return simDynamoDb;
 }
 
-describe("DynamoDB PutItemCommand unsimulated input", () => {
-  it.each(writeInputs)("refuses $named", async ({ named, input }) => {
+describe("DynamoDB PutItemCommand input", () => {
+  it("refuses a put the Expected entry rules out", async () => {
+    // Given a table holding an item.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+    await simDynamoDb.putItem(new PutItemCommand(itemInput));
+
+    // When a put expects the key to be free the legacy way.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.putItem({
+        input: { ...itemInput, Expected: { userId: { Exists: false } } },
+      }),
+    );
+
+    // Then the condition fails, as a ConditionExpression would.
+    assertInstanceOf(error, SimDynamoDbConditionalCheckFailedException);
+  });
+
+  it("refuses ConditionalOperator with no Expected to join", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = await tableFor(simAws);
 
-    // When a write asks for something this simulation does not model.
+    // When a put carries the operator alone.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.putItem({ input: { ...itemInput, ...input } }),
+      simDynamoDb.putItem({
+        input: { ...itemInput, ConditionalOperator: "AND" },
+      }),
     );
 
-    // Then it is refused by name, rather than quietly ignored.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, named);
-    assertStringIncludes(error.message, "PutItem");
+    // Then it is refused for having nothing to join.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "ConditionalOperator");
   });
 
   it("writes an item for input that asks for none of it", async () => {
@@ -108,21 +112,24 @@ describe("DynamoDB PutItemCommand unsimulated input", () => {
   });
 });
 
-describe("DynamoDB DeleteItemCommand unsimulated input", () => {
-  it.each(writeInputs)("refuses $named", async ({ named, input }) => {
-    // Given a table.
+describe("DynamoDB DeleteItemCommand input", () => {
+  it("deletes when the Expected value matches", async () => {
+    // Given a table holding an item.
     const simAws = new SimAws();
     const simDynamoDb = await tableFor(simAws);
+    await simDynamoDb.putItem(new PutItemCommand(itemInput));
 
-    // When a delete asks for something this simulation does not model.
-    const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.deleteItem({ input: { ...keyInput, ...input } }),
+    // When a delete expects the value the item holds.
+    await simDynamoDb.deleteItem(
+      new DeleteItemCommand({
+        ...keyInput,
+        Expected: { userId: { Value: { S: "user-1" } } },
+      }),
     );
 
-    // Then it is refused by name, naming the command that will not take it.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, named);
-    assertStringIncludes(error.message, "DeleteItem");
+    // Then the item is gone.
+    const read = await simDynamoDb.getItem({ input: keyInput });
+    assertUndefined(read.Item);
   });
 
   it("deletes an item for input that asks for none of it", async () => {

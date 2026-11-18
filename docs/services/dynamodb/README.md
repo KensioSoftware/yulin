@@ -1181,6 +1181,20 @@ attributes.
 expression, in both directions. A placeholder the request leaves undefined is a
 `ValidationException`, and so is an entry no expression uses.
 
+### Expression limits
+
+Every expression a request carries is held to the limits AWS documents, each a
+`ValidationException` naming the expression:
+
+- An expression string holds at most 4 KB, counted in UTF-8 bytes. `a=b` is 3 bytes.
+- An expression holds at most 300 operators and functions. Each comparator, each `AND`, `OR` and
+  `NOT`, each `BETWEEN` and `IN`, each function and each `+` or `-` of an update counts as one. The
+  `=` of a `SET` action is assignment and counts for none. The refusal reports a count of 301
+  however far over the expression goes, as AWS reports it.
+- A placeholder holds at most 255 bytes, its `#` or `:` included.
+- The placeholders of one request hold at most 2 MB between them. Each counts its key and what it
+  stands for, and a value counts the bytes it would count towards an item.
+
 ## Projecting attributes
 
 `ProjectionExpression` is a comma-separated list of document paths returned by `GetItem`. A path can
@@ -2006,6 +2020,109 @@ The other two values are held to the rules AWS holds them to, each a `Validation
 
 `SPECIFIC_ATTRIBUTES` alongside a `ProjectionExpression` answers with the attributes that
 projection names. See [projecting a read](#projecting-a-read).
+
+## Legacy parameters
+
+AWS still answers the parameters that expressions replaced, and documents each one as equivalent to
+an expression. Each is rewritten here as that expression and evaluated by the same code.
+
+| Legacy parameter   | Operations                                 | Expression               |
+| ------------------ | ------------------------------------------ | ------------------------ |
+| `AttributesToGet`  | `GetItem`, `BatchGetItem`, `Query`, `Scan` | `ProjectionExpression`   |
+| `Expected`         | `PutItem`, `DeleteItem`, `UpdateItem`      | `ConditionExpression`    |
+| `AttributeUpdates` | `UpdateItem`                               | `UpdateExpression`       |
+| `KeyConditions`    | `Query`                                    | `KeyConditionExpression` |
+| `QueryFilter`      | `Query`                                    | `FilterExpression`       |
+| `ScanFilter`       | `Scan`                                     | `FilterExpression`       |
+
+`ConditionalOperator` joins the entries of `Expected`, `QueryFilter` or `ScanFilter` with `AND`
+(the default) or `OR`.
+
+```typescript sim-dynamodb-legacy-parameters
+/**
+ * Querying and updating with the legacy parameters.
+ */
+
+import { QueryCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable({
+  input: {
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  },
+});
+await simAws.backgroundTasksComplete();
+
+const key = { customerId: { S: "c-1" }, orderId: { S: "2026-01" } };
+
+// ADD starts a missing number at 0, and PUT is the default action.
+await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "OrdersTable",
+    Key: key,
+    AttributeUpdates: {
+      total: { Action: "ADD", Value: { N: "12" } },
+      status: { Value: { S: "OPEN" } },
+    },
+  }),
+);
+
+const output = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    KeyConditions: {
+      customerId: {
+        ComparisonOperator: "EQ",
+        AttributeValueList: [{ S: "c-1" }],
+      },
+    },
+    QueryFilter: {
+      total: { ComparisonOperator: "GT", AttributeValueList: [{ N: "10" }] },
+    },
+    AttributesToGet: ["orderId", "total"],
+  }),
+);
+
+console.log(output.Items);
+// [ { orderId: { S: "2026-01" }, total: { N: "12" } } ]
+```
+
+The comparison operators are `EQ`, `NE`, `LE`, `LT`, `GE`, `GT`, `NOT_NULL`, `NULL`, `CONTAINS`,
+`NOT_CONTAINS`, `BEGINS_WITH`, `IN` and `BETWEEN`. Each takes the number and types of values AWS
+documents. `NULL` and `NOT_NULL` take none, and test whether the attribute is there. `LT` and the
+other orderings take one string, number or binary, and so do `CONTAINS` and `NOT_CONTAINS`.
+`BEGINS_WITH` takes a string or binary. `BETWEEN` takes two values of one type, and `IN` takes any
+number of them. A key condition takes `EQ`, `LE`, `LT`, `GE`, `GT`, `BEGINS_WITH` and `BETWEEN`, and
+any other operator there is refused with `Attempted conditional constraint is not an indexable
+operation`.
+
+An `Expected` entry names a `Value` the attribute has to hold, or sets `Exists` to `false` to say
+the attribute has to be absent. It can compare with `ComparisonOperator` and `AttributeValueList` in
+their place. An entry mixing the two forms is refused, and so is `Exists: false` with a `Value` and
+`Exists: true` without one.
+
+An `AttributeUpdates` entry carries an `Action` of `PUT`, `DELETE` or `ADD`, and `PUT` is the
+default. `PUT` sets the attribute. `DELETE` with no `Value` removes it, and with a set as its
+`Value` takes those members out of the set. `ADD` adds a number to a number, starting from 0, or
+adds members to a set. An update made only of `DELETE` actions leaves a missing item missing, as
+AWS documents. Every other update creates the item, as an `UpdateExpression` does.
+
+A request mixing legacy parameters with expressions is refused, naming both, as AWS refuses it. So
+is a legacy request carrying `ExpressionAttributeNames` or `ExpressionAttributeValues`. The document
+client converts the values inside every legacy parameter, in the places the real client does.
 
 ## Reading and writing items in batches
 
@@ -4105,9 +4222,6 @@ is written.
   `ExecuteTransactionCommand` are refused by name, never half converted.
 - A document client's translate config goes unread. The marshalling options it was built with do not
   apply. See [the SDK docs](https://yulinsim.dev/sdk/#limitations).
-- `Expected`, `ConditionalOperator`, `AttributeUpdates`, `KeyConditions`, `QueryFilter` and
-  `ScanFilter` go unconverted for the document client, because simulated DynamoDB refuses all six
-  anyway. A request carrying one is refused by the operation rather than by the conversion.
 - A read of a global secondary index answers with the attributes the index projects, and no fetch
   fills in the rest. Real DynamoDB behaves the same way. It never reads the base table for an
   attribute a global secondary index omits. That is why `Select: ALL_ATTRIBUTES` against a partial
@@ -4283,12 +4397,6 @@ is written.
   items. An `AWS::DynamoDB::Table` is updated in place.
 - `ProjectionExpression` is simulated on every read that takes one, which is `GetItem`,
   `BatchGetItem`, `TransactGetItems`, `Query` and `Scan`.
-- The legacy `AttributesToGet` is refused outright, since an item that came back whole where part of
-  it was asked for would hide an application reading an attribute it never requested.
-  `ProjectionExpression` replaced it, and real DynamoDB has built no feature on it since.
-- The 4 KB limit on an expression and the 255 byte limit on a placeholder go unenforced. No
-  operation here is slower for a long expression. An expression real DynamoDB would refuse for its
-  size is evaluated.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
   whether a request sets it once for a read or per table for a batch read, and a test cannot observe
   a stale read here the way it might against a real table.
@@ -4300,17 +4408,19 @@ is written.
 - An update is applied in one go. No part of this shows the concurrency an atomic counter is for. A
   simulated `ADD` counts exactly once per call, where a real one is what makes two callers counting
   at the same time both count.
-- The legacy `AttributeUpdates` is refused outright, for the same reason `Expected` is.
-  `UpdateExpression` replaced it, and real DynamoDB has built no feature on it since.
 - A `REMOVE` whose path reaches through an attribute that is missing, or that is something other
   than a map, changes nothing rather than being refused. `REMOVE` names a place in the item. There
   was nothing there to remove either way.
-- The legacy `Expected` and `ConditionalOperator` are refused outright, since an expectation that is
-  never evaluated would let a write or a delete through that DynamoDB would have turned away.
-  `ConditionExpression` replaced them, and real DynamoDB has built no feature on them since.
-- The 4 KB limit on an expression and the 300 operator limit go unenforced. No operation here is
-  slower for a long expression, and an expression real DynamoDB would refuse for its size is
-  evaluated.
+- A legacy parameter is held to the expression limits once it has been rewritten. A legacy request
+  large enough to pass them only as legacy input, such as `Expected` with more than 150 entries, is
+  refused for the size of the expression it became. A legacy `IN` longer than 100 values is split
+  into several joined by `OR`, and passes.
+- A refusal found after a legacy parameter has been rewritten names the expression and the
+  placeholders it was rewritten with, such as `#n0`. AWS names the legacy parameter.
+- A legacy `ADD` to an item that does not exist yet takes a number or any set. AWS documents it as
+  taking a number or a number set there.
+- The 2 MB limit on a request's placeholders counts a value by the bytes it would count towards an
+  item. AWS documents the limit as the sum of their lengths without saying how a value is measured.
 - `SizeEstimateRangeGB` is the whole gigabytes a collection holds and one more. AWS's estimate is
   its own, and only agrees for a collection under a gigabyte.
 - A `Key` that fails to match the table's key schema is refused with the attribute named. Real

@@ -60,6 +60,20 @@ class SimDynamoDbDocumentValuesPath implements SimDynamoDbDocumentPath {
 }
 
 /**
+ * One attribute value on its own, which is what the `Value` of a legacy
+ * condition or update is.
+ */
+class SimDynamoDbDocumentValuePath implements SimDynamoDbDocumentPath {
+  convert(
+    value: unknown,
+    conversion: SimDynamoDbDocumentConversion,
+    path: string,
+  ): unknown {
+    return conversion(value, path);
+  }
+}
+
+/**
  * Every member of a record or a list, each read through the same path.
  */
 class SimDynamoDbDocumentEachPath implements SimDynamoDbDocumentPath {
@@ -137,6 +151,13 @@ class SimDynamoDbDocumentFieldsPath implements SimDynamoDbDocumentPath {
  */
 export function simDynamoDbDocumentValues(): SimDynamoDbDocumentPath {
   return new SimDynamoDbDocumentValuesPath();
+}
+
+/**
+ * A path to one attribute value.
+ */
+export function simDynamoDbDocumentValue(): SimDynamoDbDocumentPath {
+  return new SimDynamoDbDocumentValuePath();
 }
 
 /**

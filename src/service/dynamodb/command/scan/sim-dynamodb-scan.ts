@@ -9,7 +9,8 @@ import type { SimScanCommand, SimScanCommandOutput } from "./scan.command.js";
 import { readSimDynamoDbScanExpressions } from "./sim-dynamodb-scan-expressions.js";
 import { readSimDynamoDbScanSegment } from "./sim-dynamodb-scan-segment-input.js";
 import { readSimDynamoDbScanStartKey } from "./sim-dynamodb-scan-start-key.js";
-import { refuseUnsimulatedScanInput } from "./sim-dynamodb-unsimulated-scan-input.js";
+import { simDynamoDbExpressionsOf } from "../../expression/legacy/sim-dynamodb-legacy-request.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 import { simDynamoDbPageCapacity } from "../../capacity/sim-dynamodb-page-capacity.js";
 
 interface SimDynamoDbScanProperties {
@@ -46,14 +47,15 @@ export class SimDynamoDbScan {
     command: SimScanCommand,
     options?: SimDynamoDbScanOptions,
   ): SimScanCommandOutput {
-    const input = command.input;
+    const input = simDynamoDbExpressionsOf(command.input);
 
     // Which attributes the request asks for is read first, since it decides
     // whether the projection the request carries is one it could have asked
     // for at all.
     const select = SimDynamoDbSelect.from(input);
 
-    refuseUnsimulatedScanInput(input);
+    // Read here so a value AWS refuses is refused before anything is read.
+    SimDynamoDbReturnConsumedCapacity.read(input.ReturnConsumedCapacity);
 
     // The segment and the expressions are read before the table is reached, so
     // input DynamoDB would refuse is refused whether or not the table is

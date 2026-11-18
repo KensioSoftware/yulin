@@ -6,15 +6,13 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import type { SimGetItemCommandInput } from "./item.command.js";
 
@@ -49,29 +47,36 @@ async function tableFor(simAws: SimAws): Promise<SimDynamoDb> {
   return simDynamoDb;
 }
 
-describe("DynamoDB GetItemCommand unsimulated input", () => {
-  it.each([
-    {
-      named: "AttributesToGet",
-      input: { AttributesToGet: ["userId"] },
-    },
-  ] as const satisfies readonly {
-    named: string;
-    input: SimGetItemCommandInput;
-  }[])("refuses $named", async ({ named, input }) => {
-    // Given a table.
+describe("DynamoDB GetItemCommand input", () => {
+  it("answers with the attributes AttributesToGet names", async () => {
+    // Given a table holding an item.
     const simAws = new SimAws();
     const simDynamoDb = await tableFor(simAws);
 
-    // When a read asks for something this simulation does not model.
-    const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.getItem({ input: { ...keyInput, ...input } }),
+    // When a read asks for part of it the legacy way.
+    const output = await simDynamoDb.getItem(
+      new GetItemCommand({ ...keyInput, AttributesToGet: ["note"] }),
     );
 
-    // Then it is refused by name, rather than answering with the whole item.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, named);
-    assertStringIncludes(error.message, "GetItem");
+    // Then only that part comes back.
+    assertObjectEquals(output.Item, { note: { S: "first" } });
+  });
+
+  it("refuses AttributesToGet naming one attribute twice", async () => {
+    // Given a table holding an item.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+
+    // When a read names the same attribute twice.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.getItem({
+        input: { ...keyInput, AttributesToGet: ["note", "note"] },
+      }),
+    );
+
+    // Then it is refused, as AWS refuses it.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "Duplicate value in attribute name");
   });
 
   it("reads an item for input that asks for none of it", async () => {
@@ -104,8 +109,8 @@ describe("DynamoDB GetItemCommand unsimulated input", () => {
       }),
     );
 
-    // Then it is a ValidationException rather than an unsupported operation:
-    // real DynamoDB refuses this too, since nothing would ever read them.
+    // Then it is a ValidationException, as on AWS, since nothing would ever
+    // read them.
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(
       error.message,

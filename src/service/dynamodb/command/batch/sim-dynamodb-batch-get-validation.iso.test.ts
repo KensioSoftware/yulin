@@ -6,6 +6,7 @@ import {
 import {
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -13,7 +14,6 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimDynamoDbResourceNotFoundException,
-  SimDynamoDbUnsupportedOperation,
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
 
@@ -295,30 +295,35 @@ describe("DynamoDB BatchGetItemCommand request validation", () => {
     assertStringIncludes(error.message, "Invalid ProjectionExpression");
   });
 
-  it("refuses the legacy AttributesToGet", async () => {
-    // Given a table.
+  it("answers with the attributes AttributesToGet names", async () => {
+    // Given a table holding an order.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
     await simDynamoDb.createTable(ordersTable);
     await simAws.backgroundTasksComplete();
-
-    // When a batch asks for part of an item the legacy way.
-    const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.batchGetItem(
-        new BatchGetItemCommand({
-          RequestItems: {
-            OrdersTable: {
-              Keys: [{ orderId: { S: "order-1" } }],
-              AttributesToGet: ["total"],
-            },
-          },
-        }),
-      ),
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "OrdersTable",
+        Item: { orderId: { S: "order-1" }, total: { N: "12" } },
+      }),
     );
 
-    // Then it is refused as unsimulated, as GetItem refuses it.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "AttributesToGet");
+    // When a batch asks for part of the order the legacy way.
+    const output = await simDynamoDb.batchGetItem(
+      new BatchGetItemCommand({
+        RequestItems: {
+          OrdersTable: {
+            Keys: [{ orderId: { S: "order-1" } }],
+            AttributesToGet: ["total"],
+          },
+        },
+      }),
+    );
+
+    // Then only that part comes back.
+    assertObjectEquals(output.Responses["OrdersTable"], [
+      { total: { N: "12" } },
+    ]);
   });
 
   it("refuses a ReturnConsumedCapacity AWS does not have", async () => {

@@ -13,7 +13,8 @@ import type {
 import { readSimDynamoDbQueryExpressions } from "./sim-dynamodb-query-expressions.js";
 import { refuseSimDynamoDbQuerySegment } from "./sim-dynamodb-query-segment.js";
 import { readSimDynamoDbQueryStartKey } from "./sim-dynamodb-query-start-key.js";
-import { refuseUnsimulatedQueryInput } from "./sim-dynamodb-unsimulated-query-input.js";
+import { simDynamoDbExpressionsOf } from "../../expression/legacy/sim-dynamodb-legacy-request.js";
+import { SimDynamoDbReturnConsumedCapacity } from "../../capacity/sim-dynamodb-return-consumed-capacity.js";
 import { simDynamoDbPageCapacity } from "../../capacity/sim-dynamodb-page-capacity.js";
 
 interface SimDynamoDbQueryProperties {
@@ -45,14 +46,15 @@ export class SimDynamoDbQuery {
     command: SimQueryCommand,
     options?: SimDynamoDbQueryOptions,
   ): SimQueryCommandOutput {
-    const input = command.input;
+    const input = simDynamoDbExpressionsOf(command.input);
 
     // Which attributes the request asks for is read first, since it decides
     // whether the projection the request carries is one it could have asked
     // for at all.
     const select = SimDynamoDbSelect.from(input);
 
-    refuseUnsimulatedQueryInput(input);
+    // Read here so a value AWS refuses is refused before anything is read.
+    SimDynamoDbReturnConsumedCapacity.read(input.ReturnConsumedCapacity);
     refuseSimDynamoDbQuerySegment(input);
 
     const expressions = readSimDynamoDbQueryExpressions(input);

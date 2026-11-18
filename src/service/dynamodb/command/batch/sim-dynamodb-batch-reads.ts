@@ -10,7 +10,7 @@ import {
 import type { SimDynamoDbKeysAndAttributes } from "./batch.command.js";
 import { readSimDynamoDbBatchRequestItems } from "./sim-dynamodb-batch-request-items.js";
 import { assertSimDynamoDbBatchReadLimit } from "./sim-dynamodb-batch-read-limit.js";
-import { refuseUnsimulatedBatchKeysAndAttributes } from "./sim-dynamodb-unsimulated-batch-input.js";
+import { simDynamoDbExpressionsOf } from "../../expression/legacy/sim-dynamodb-legacy-request.js";
 
 const operation = "BatchGetItem";
 
@@ -53,7 +53,7 @@ export function readSimDynamoDbBatchReads(
 
   return tables.map(({ reference, requested }) => {
     const keys = readTableKeys(reference, requested);
-    const read = readSimDynamoDbProjection(requested);
+    const read = readSimDynamoDbProjection(simDynamoDbExpressionsOf(requested));
 
     return {
       reference,
@@ -75,8 +75,6 @@ function readTableKeys(
   reference: string,
   requested: SimDynamoDbKeysAndAttributes,
 ): readonly SimDynamoDbItem[] {
-  refuseUnsimulatedBatchKeysAndAttributes(requested);
-
   const keys = requested.Keys ?? [];
 
   if (keys.length === 0) {

@@ -2,6 +2,7 @@ import {
   simDynamoDbDocumentEach,
   simDynamoDbDocumentFields,
   type SimDynamoDbDocumentPath,
+  simDynamoDbDocumentValue,
   simDynamoDbDocumentValues,
 } from "./sim-dynamodb-document-path.js";
 
@@ -45,12 +46,50 @@ const writtenAttributes = simDynamoDbDocumentFields({
 const valueRecords = simDynamoDbDocumentEach(simDynamoDbDocumentValues());
 
 /**
- * What a read is given: where to carry on from, and the values its expressions
- * compare against. A Query and a Scan take the same ones.
+ * The legacy conditions of a read, each comparing against a list of values.
  */
-const readInput = simDynamoDbDocumentFields({
+const legacyConditions = simDynamoDbDocumentEach(
+  simDynamoDbDocumentFields({
+    AttributeValueList: simDynamoDbDocumentValues(),
+  }),
+);
+
+/**
+ * The legacy expectations of a write, each naming one value or comparing
+ * against a list of them.
+ */
+const legacyExpected = simDynamoDbDocumentEach(
+  simDynamoDbDocumentFields({
+    Value: simDynamoDbDocumentValue(),
+    AttributeValueList: simDynamoDbDocumentValues(),
+  }),
+);
+
+/**
+ * The legacy changes of an update, each carrying the one value it applies.
+ */
+const legacyUpdates = simDynamoDbDocumentEach(
+  simDynamoDbDocumentFields({ Value: simDynamoDbDocumentValue() }),
+);
+
+/**
+ * What a query is given: where to carry on from, and the values its
+ * conditions compare against.
+ */
+const queryInput = simDynamoDbDocumentFields({
   ExclusiveStartKey: simDynamoDbDocumentValues(),
   ExpressionAttributeValues: simDynamoDbDocumentValues(),
+  KeyConditions: legacyConditions,
+  QueryFilter: legacyConditions,
+});
+
+/**
+ * What a scan is given, which differs from a query only in the legacy filter.
+ */
+const scanInput = simDynamoDbDocumentFields({
+  ExclusiveStartKey: simDynamoDbDocumentValues(),
+  ExpressionAttributeValues: simDynamoDbDocumentValues(),
+  ScanFilter: legacyConditions,
 });
 
 /**
@@ -155,18 +194,16 @@ const transactWritten = simDynamoDbDocumentFields({
  * off the Command. A wrong one shows up as a value reaching a simulated table
  * unconverted, which the round trip tests catch.
  *
- * They stop short of the real ones in one place. `Expected`,
- * `ConditionalOperator` and `AttributeUpdates` are the conditional write and
- * the update that expressions replaced, and `KeyConditions`, `QueryFilter` and
- * `ScanFilter` are the read the same expressions replaced. Simulated DynamoDB
- * refuses all six, so a request carrying one never reaches a conversion.
- * Converting input that is about to be refused would only move the refusal.
+ * The legacy parameters are converted too. `Expected`, `AttributeUpdates`,
+ * `KeyConditions`, `QueryFilter` and `ScanFilter` carry values in the same
+ * places the real client converts them.
  */
 export const simDynamoDbDocumentCommandPaths = {
   put: {
     input: simDynamoDbDocumentFields({
       Item: simDynamoDbDocumentValues(),
       ExpressionAttributeValues: simDynamoDbDocumentValues(),
+      Expected: legacyExpected,
     }),
     output: writtenAttributes,
   },
@@ -178,6 +215,7 @@ export const simDynamoDbDocumentCommandPaths = {
     input: simDynamoDbDocumentFields({
       Key: simDynamoDbDocumentValues(),
       ExpressionAttributeValues: simDynamoDbDocumentValues(),
+      Expected: legacyExpected,
     }),
     output: writtenAttributes,
   },
@@ -185,15 +223,17 @@ export const simDynamoDbDocumentCommandPaths = {
     input: simDynamoDbDocumentFields({
       Key: simDynamoDbDocumentValues(),
       ExpressionAttributeValues: simDynamoDbDocumentValues(),
+      Expected: legacyExpected,
+      AttributeUpdates: legacyUpdates,
     }),
     output: writtenAttributes,
   },
   query: {
-    input: readInput,
+    input: queryInput,
     output: readPage,
   },
   scan: {
-    input: readInput,
+    input: scanInput,
     output: readPage,
   },
   batchWrite: {

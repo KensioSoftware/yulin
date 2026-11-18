@@ -30,7 +30,6 @@ const tableDefault: SimDynamoDbSelectKind = "ALL_ATTRIBUTES";
 export interface SimDynamoDbSelectInput {
   readonly Select?: string | undefined;
   readonly ProjectionExpression?: string | undefined;
-  readonly AttributesToGet?: readonly string[] | undefined;
   readonly IndexName?: string | undefined;
 }
 
@@ -147,9 +146,8 @@ function assertIndexToProjectFrom(
  *
  * `SPECIFIC_ATTRIBUTES` is the one that projects, so it is the only one a
  * projection goes with, and it needs one to have anything to answer with.
- * `AttributesToGet` counts as a projection here as it does on AWS, which leaves
- * a request using it refused by name rather than for a missing
- * `ProjectionExpression` it never meant to write.
+ * A legacy `AttributesToGet` has been rewritten as a `ProjectionExpression` by
+ * the time this runs, so it counts as a projection here as it does on AWS.
  *
  * A request that writes a projection and no `Select` at all is asking for
  * exactly one thing, so there is nothing for it to contradict.
@@ -162,9 +160,7 @@ function assertProjectionAgrees(
     return;
   }
 
-  const projects =
-    input.ProjectionExpression !== undefined ||
-    (input.AttributesToGet ?? []).length > 0;
+  const projects = input.ProjectionExpression !== undefined;
 
   if (kind === "SPECIFIC_ATTRIBUTES" && !projects) {
     throw new SimDynamoDbValidationException(

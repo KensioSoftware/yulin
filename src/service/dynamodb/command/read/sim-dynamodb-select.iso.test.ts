@@ -9,10 +9,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { simDynamoDbStockedTableFactory } from "../../table/sim-dynamodb-stocked-table.factory.js";
 import { simDynamoDbTableReads as reads } from "./sim-dynamodb-table-read.fixture.js";
 
@@ -208,33 +205,6 @@ describe("DynamoDB Select", () => {
       assertArrayLength(items, 2);
       assertObjectEquals(items[0], { orderId: { S: "2026-01" } });
       assertObjectEquals(items[1], { orderId: { S: "2026-02" } });
-    },
-  );
-
-  it.each(reads)(
-    "refuses SPECIFIC_ATTRIBUTES with AttributesToGet by name on $operation",
-    async ({ read }) => {
-      // Given a table holding a customer's orders.
-      const simAws = new SimAws();
-      const simDynamoDb = simAws.dynamoDb();
-
-      await simDynamoDbStockedTableFactory.make(
-        { customerCount: 1, orderCount: 2 },
-        simAws,
-      );
-
-      // When a read asks for specific attributes the legacy way.
-      const error = await assertThrowsErrorAsync(async () =>
-        read(simDynamoDb, {
-          Select: "SPECIFIC_ATTRIBUTES",
-          AttributesToGet: ["orderId"],
-        }),
-      );
-
-      // Then AttributesToGet counts as the projection, so the refusal names it
-      // rather than a ProjectionExpression the request never meant to write.
-      assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-      assertStringIncludes(error.message, "AttributesToGet");
     },
   );
 });
