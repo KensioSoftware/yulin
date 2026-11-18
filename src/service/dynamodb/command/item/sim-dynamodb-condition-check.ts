@@ -110,6 +110,14 @@ export class SimDynamoDbConditionCheck {
   }
 
   /**
+   * The `dynamodb:ReturnValues` a transaction action supplies, which is what
+   * it asked to see of an item that turned it away.
+   */
+  get returnValuesKey(): string {
+    return this.reportsItem ? "ALL_OLD" : "NONE";
+  }
+
+  /**
    * Refuse the write when the condition does not hold for what is stored.
    *
    * Nothing has changed by the time this throws, so the item is left exactly as

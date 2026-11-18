@@ -42,10 +42,19 @@ export interface SimDynamoDbSelectInput {
  * should be refused here too.
  */
 export class SimDynamoDbSelect {
+  /**
+   * The value `dynamodb:Select` holds for this read.
+   *
+   * It is the `Select` the request wrote, or the one DynamoDB defaults to: a
+   * read naming a projection asks for specific attributes.
+   */
+  public readonly conditionValue: string;
+
   private readonly kind: SimDynamoDbSelectKind;
 
-  private constructor(kind: SimDynamoDbSelectKind) {
+  private constructor(kind: SimDynamoDbSelectKind, conditionValue: string) {
     this.kind = kind;
+    this.conditionValue = conditionValue;
   }
 
   /**
@@ -58,7 +67,10 @@ export class SimDynamoDbSelect {
     assertIndexToProjectFrom(kind, input);
     assertProjectionAgrees(kind, input);
 
-    return new this(kind);
+    const projects =
+      input.Select === undefined && input.ProjectionExpression !== undefined;
+
+    return new this(kind, projects ? "SPECIFIC_ATTRIBUTES" : kind);
   }
 
   /**

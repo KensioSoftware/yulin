@@ -1,3 +1,4 @@
+import { simDynamoDbReturnConsumedCapacityKey } from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
@@ -62,6 +63,9 @@ export class SimDynamoDbBatchWriteItem {
           ),
           attributes: simDynamoDbItemAttributeNames(() =>
             entry.writes.map((write) => write.names),
+          ),
+          returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+            input.ReturnConsumedCapacity,
           ),
         }),
       },

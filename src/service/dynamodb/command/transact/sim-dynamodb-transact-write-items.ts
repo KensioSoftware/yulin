@@ -63,7 +63,12 @@ export class SimDynamoDbTransactWriteItems {
     const payload = simDynamoDbTransactionPayload(input.TransactItems);
     const targets = reachSimDynamoDbTransactTables(
       readSimDynamoDbTransactWrites(input.TransactItems),
-      { access: this.access, caller: options?.caller },
+      {
+        access: this.access,
+        caller: options?.caller,
+        operation: "TransactWriteItems",
+        returnConsumedCapacity: input.ReturnConsumedCapacity,
+      },
     );
 
     // A retry under a token this simulation has already applied writes nothing

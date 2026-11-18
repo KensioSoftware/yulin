@@ -1,6 +1,10 @@
 import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
 import type { SimDynamoDbReached } from "../authorize/sim-dynamodb-reached.js";
-import type { SimDynamoDbLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
+import type {
+  SimDynamoDbLeadingKeys,
+  SimDynamoDbPartitionKeyValues,
+} from "../authorize/sim-dynamodb-leading-keys.js";
+import type { SimDynamoDbRequestKeys } from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 
 /**
@@ -12,9 +16,10 @@ import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
  * parameters before the table is reached, so they arrive as they are.
  *
  * A read naming one of the table's indexes carries the index name. The index
- * is then the resource authorized.
+ * is then the resource authorized. The request parameters a condition key is
+ * named after arrive as the values to supply.
  */
-export interface SimDynamoDbTableReach {
+export interface SimDynamoDbTableReach extends SimDynamoDbRequestKeys {
   readonly leadingKeys?: SimDynamoDbLeadingKeys | undefined;
   readonly attributes?: readonly string[] | undefined;
   readonly indexName?: string | undefined;
@@ -34,11 +39,12 @@ export function simDynamoDbReachedIn(
   reach: SimDynamoDbTableReach,
   table: SimDynamoDbTable | undefined,
 ): SimDynamoDbReached {
+  const { leadingKeys: _leadingKeys, ...rest } = reach;
+
   return {
-    indexName: reach.indexName,
-    leadingKeys: table === undefined ? undefined : leadingKeysIn(reach, table),
-    attributes: reach.attributes,
-    requestConditions: reach.requestConditions,
+    ...rest,
+    partitionKeys:
+      table === undefined ? undefined : leadingKeysIn(reach, table),
   };
 }
 
@@ -49,7 +55,7 @@ export function simDynamoDbReachedIn(
 function leadingKeysIn(
   reach: SimDynamoDbTableReach,
   table: SimDynamoDbTable,
-): readonly string[] | undefined {
+): SimDynamoDbPartitionKeyValues | undefined {
   try {
     return reach.leadingKeys?.(table);
   } catch {

@@ -86,6 +86,22 @@ type for both. The command hands the index name to `SimDynamoDbTableAccess` on i
 index ARN in place of the table's. The condition keys are the same as
 for the table, with `dynamodb:LeadingKeys` read through the index's key schema.
 
+The condition context is built by `simDynamoDbConditionContextOf` from three sources:
+
+- `sim-dynamodb-leading-keys.ts` reads the partition key values one list per partition key
+  attribute (`SimDynamoDbPartitionKeyValues`). The first list is `dynamodb:LeadingKeys` and
+  `dynamodb:FirstPartitionKeyValues`, and the rest are the numbered families a multi-attribute index
+  key supplies.
+- `sim-dynamodb-attributes.ts` gathers `dynamodb:Attributes`.
+- `sim-dynamodb-request-keys.ts` carries `dynamodb:Select`, `dynamodb:ReturnValues`,
+  `dynamodb:ReturnConsumedCapacity` and `dynamodb:EnclosingOperation`. Each command sets the ones its
+  action takes on `SimDynamoDbTableReach`, defaulted the way AWS documents. `SimDynamoDbSelect`
+  works out a read's `conditionValue`.
+
+A transaction authorizes each action separately. Every action implements `reach()`, and
+`reachSimDynamoDbTransactTables` adds the transaction's `EnclosingOperation` and
+`ReturnConsumedCapacity` before authorizing it.
+
 The table need not exist. Real IAM evaluates a request before the service handles it, so
 authorization comes before any lookup in the table store.
 

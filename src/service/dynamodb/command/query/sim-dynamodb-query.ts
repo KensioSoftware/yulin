@@ -5,7 +5,8 @@ import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
 import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
-import { simDynamoDbLeadingKeyOf } from "../authorize/sim-dynamodb-leading-keys.js";
+import { simDynamoDbKeyConditionLeadingKeys } from "../authorize/sim-dynamodb-leading-keys.js";
+import { simDynamoDbReturnConsumedCapacityKey } from "../authorize/sim-dynamodb-request-keys.js";
 import type {
   SimQueryCommand,
   SimQueryCommandOutput,
@@ -69,12 +70,15 @@ export class SimDynamoDbQuery {
       options?.caller,
       {
         leadingKeys: (reached) =>
-          simDynamoDbLeadingKeyOf(
-            expressions.terms.forTable(reached.view(input.IndexName))
-              .partitionKeyValue,
+          simDynamoDbKeyConditionLeadingKeys(
+            expressions.terms.forTable(reached.view(input.IndexName)),
           ),
         attributes: expressions.attributes,
         indexName: input.IndexName,
+        select: select.conditionValue,
+        returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+          input.ReturnConsumedCapacity,
+        ),
       },
     );
 

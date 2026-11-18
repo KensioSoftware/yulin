@@ -1,3 +1,4 @@
+import type { SimDynamoDbTableReach } from "../table/sim-dynamodb-table-reach.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableWrite } from "../../table/sim-dynamodb-table-writes.js";
@@ -24,6 +25,11 @@ export interface SimDynamoDbTransactWrite {
    * check needs `dynamodb:ConditionCheckItem`.
    */
   readonly action: string;
+
+  /**
+   * What this action reaches, for the condition keys it is authorized with.
+   */
+  reach(): SimDynamoDbTableReach;
 
   /**
    * The bytes this action counts towards the size of the transaction.

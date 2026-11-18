@@ -4113,6 +4113,11 @@ key restricts a caller to the items under particular partition keys. AWS scopes 
 shared table to their own rows this way.
 
 A `Query` of an index supplies the index's partition key value, the value its key condition names.
+`dynamodb:FirstPartitionKeyValues` carries the same values as `dynamodb:LeadingKeys`. An index with a
+[multi-attribute partition key](#multi-attribute-keys) supplies its second, third and fourth
+attributes as `dynamodb:SecondPartitionKeyValues`, `dynamodb:ThirdPartitionKeyValues` and
+`dynamodb:FourthPartitionKeyValues`. A table key has one partition key attribute, so a request
+against the table supplies the first family alone.
 
 The condition takes the `ForAllValues:` qualifier, as AWS requires for this key. Every partition key
 value the request reaches has to match. A batch or a write naming one item outside the allowed set
@@ -4224,6 +4229,27 @@ A transaction is authorized as the operations it is made of rather than as itsel
 needs `dynamodb:GetItem`. A caller refused any one of them is refused the whole transaction. No item
 is written.
 
+Each action is authorized with the condition keys of its own item. It supplies its partition key
+value, the attributes it names, and `dynamodb:EnclosingOperation` set to `TransactWriteItems` or
+`TransactGetItems`. A policy allowing the item actions only outside a transaction (or only inside
+one) is written against that key, as in the developer guide's transaction examples.
+
+### Request parameter condition keys
+
+Four more condition keys carry a parameter of the request. Each holds the value the request asked
+for, or the value DynamoDB defaults to.
+
+| Condition key                     | Supplied by                                                                    | Value                                                                                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dynamodb:Select`                 | `GetItem`, `BatchGetItem`, `Query`, `Scan`, and a transaction's `Get`          | The `Select` asked for. With none, `SPECIFIC_ATTRIBUTES` for a read naming a `ProjectionExpression`, `ALL_PROJECTED_ATTRIBUTES` for an index, and `ALL_ATTRIBUTES` otherwise |
+| `dynamodb:ReturnValues`           | `PutItem`, `UpdateItem`, `DeleteItem`, and every write action of a transaction | `ReturnValues` on a single write, `NONE` by default. On a transaction action, its `ReturnValuesOnConditionCheckFailure`                                                      |
+| `dynamodb:ReturnConsumedCapacity` | Every item operation                                                           | `ReturnConsumedCapacity`, `NONE` by default                                                                                                                                  |
+| `dynamodb:EnclosingOperation`     | Each action of a transaction                                                   | `TransactWriteItems` or `TransactGetItems`                                                                                                                                   |
+
+The developer guide pairs these with `dynamodb:Attributes` under `StringEqualsIfExists`, so a caller
+restricted to some attributes cannot read the rest through `Select: ALL_ATTRIBUTES` or
+`ReturnValues: ALL_NEW`.
+
 ## Available functionality
 
 - `CreateTable`, with table name, key schema, attribute definition, billing mode and throughput
@@ -4245,6 +4271,11 @@ is written.
   `ForAllValues:` condition can scope a caller to particular items.
 - `dynamodb:Attributes` on those seven and on `Scan`, carrying the top-level attribute names the
   request reaches, read from every expression it carries and from its `Key` or `Item`.
+- `dynamodb:FirstPartitionKeyValues` to `dynamodb:FourthPartitionKeyValues`, one per attribute of a
+  multi-attribute partition key.
+- `dynamodb:Select`, `dynamodb:ReturnValues`, `dynamodb:ReturnConsumedCapacity` and
+  `dynamodb:EnclosingOperation`, carrying the request's own parameters.
+- Each action of a transaction authorized with the condition keys of its own item.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -4322,12 +4353,19 @@ is written.
 
 ## Limitations
 
-- `dynamodb:LeadingKeys` and `dynamodb:Attributes` are the DynamoDB condition keys supplied.
-  `dynamodb:Select`, `dynamodb:ReturnValues`, `dynamodb:ReturnConsumedCapacity` and the numbered
-  partition key families are absent from the condition context. A statement conditioned on one of
-  them sees a request carrying no value for its key. A `ForAllValues:` condition matches such a
-  request, as it does on AWS, and any other condition on the key does not. The transactional operations supply neither key, and are authorized by
-  action and table alone.
+- `dynamodb:FullTableScan` goes unsupplied. AWS lists it for `PartiQLSelect` alone, and PartiQL is
+  an operation this simulation lacks.
+- `dynamodb:ReturnValues` on a single write carries its `ReturnValues`. A `PutItem`, `UpdateItem` or
+  `DeleteItem` asking for `ReturnValuesOnConditionCheckFailure: ALL_OLD` with `ReturnValues` left at
+  `NONE` supplies `NONE`. AWS documents the key against `ReturnValuesOnConditionCheckFailure` only
+  for a transaction's actions.
+- `dynamodb:ReturnConsumedCapacity` carries `INDEXES` as it is when a request asks for it. AWS
+  documents the key as holding `TOTAL` or `NONE`, and does not say what `INDEXES` reaches a policy
+  as.
+- `dynamodb:EnclosingOperation` is supplied to a transaction's `ConditionCheck` as well as to its
+  other actions. The service authorization reference leaves the key off `ConditionCheckItem`. The
+  developer guide's transaction policies condition `dynamodb:ConditionCheckItem` on it all the same,
+  and they would deny every condition check if it were absent.
 - A partition key value reaches a policy condition as a string for a `S` key and as its digits for
   an `N` key. A binary partition key has no documented form for the condition key. A request
   carrying one leaves the value out.
@@ -4352,9 +4390,6 @@ is written.
 - A query of a [multi-attribute key](#multi-attribute-keys) checks which sort key attributes it
   tests, and ignores the order the key condition writes them in. AWS documents the left-to-right
   rule in terms of the key schema, and does not say whether the written order matters too.
-- A query of an index with a multi-attribute partition key is authorized with the first partition
-  key attribute as `dynamodb:LeadingKeys`. AWS does not document which value the condition key holds
-  for such an index.
 - Per-index `ProvisionedThroughput` is read, validated and reported, and enforces no limit. No read
   or write against an index is throttled, since none against the table is either.
 - A local secondary index cannot be added to or removed from a table after it has been created, and

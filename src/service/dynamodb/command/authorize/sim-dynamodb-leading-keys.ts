@@ -1,3 +1,5 @@
+import type { SimIamConditions } from "../../../iam/tag/sim-iam-tag-conditions.js";
+import type { SimDynamoDbKeyCondition } from "../../expression/key-condition/sim-dynamodb-key-condition.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -6,6 +8,27 @@ import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
  * The condition key DynamoDB names a request's partition key values by.
  */
 export const simDynamoDbLeadingKeysConditionKey = "dynamodb:LeadingKeys";
+
+/**
+ * The condition keys AWS names the partition key attributes by, in key schema
+ * order. `dynamodb:FirstPartitionKeyValues` holds the same values as
+ * `dynamodb:LeadingKeys`. The others hold the second, third and fourth
+ * attributes of a multi-attribute partition key, which only a global secondary
+ * index has.
+ */
+const partitionKeyConditionKeys = [
+  "dynamodb:FirstPartitionKeyValues",
+  "dynamodb:SecondPartitionKeyValues",
+  "dynamodb:ThirdPartitionKeyValues",
+  "dynamodb:FourthPartitionKeyValues",
+] as const;
+
+/**
+ * The partition key values one request reaches, one list per partition key
+ * attribute in key schema order. A table's own key has one attribute, so a
+ * request against it reaches one list.
+ */
+export type SimDynamoDbPartitionKeyValues = readonly (readonly string[])[];
 
 /**
  * The partition key values one request reaches in one table.
@@ -17,7 +40,7 @@ export const simDynamoDbLeadingKeysConditionKey = "dynamodb:LeadingKeys";
  */
 export type SimDynamoDbLeadingKeys = (
   table: SimDynamoDbTable,
-) => readonly string[];
+) => SimDynamoDbPartitionKeyValues;
 
 /**
  * Write one partition key value the way an IAM policy condition holds it.
@@ -53,24 +76,52 @@ function leadingKeyText(
 export function simDynamoDbLeadingKeysOf(
   items: () => readonly SimDynamoDbItem[],
 ): SimDynamoDbLeadingKeys {
-  return (table): readonly string[] =>
-    items()
-      .map((item) =>
-        leadingKeyText(item.attribute(table.keySchema.hashKeyAttributeName)),
-      )
-      .filter((text): text is string => text !== undefined);
+  return (table): SimDynamoDbPartitionKeyValues => {
+    const read = items();
+
+    return table.keySchema.partitionKeyAttributeNames.map((attributeName) =>
+      read
+        .map((item) => leadingKeyText(item.attribute(attributeName)))
+        .filter((text): text is string => text !== undefined),
+    );
+  };
 }
 
 /**
- * Read the one partition key value a key condition names.
+ * Read the partition key values a key condition names, one per attribute.
  *
- * The value is already held against the key schema of what is being read, so
- * the table says nothing more about it here.
+ * The values are already held against the key schema of what is being read,
+ * so the table says nothing more about them here.
  */
-export function simDynamoDbLeadingKeyOf(
-  value: SimDynamoDbValue,
-): readonly string[] {
-  const text = leadingKeyText(value);
+export function simDynamoDbKeyConditionLeadingKeys(
+  keyCondition: SimDynamoDbKeyCondition,
+): SimDynamoDbPartitionKeyValues {
+  return keyCondition.partitionKey
+    .values()
+    .map((value) => {
+      const text = leadingKeyText(value);
 
-  return text === undefined ? [] : [text];
+      return text === undefined ? [] : [text];
+    })
+    .toArray();
+}
+
+/**
+ * The condition values the partition key values supply, leaving out a
+ * position that reached none.
+ */
+export function simDynamoDbPartitionKeyConditions(
+  values: SimDynamoDbPartitionKeyValues,
+): SimIamConditions {
+  const keyed = [
+    simDynamoDbLeadingKeysConditionKey,
+    ...partitionKeyConditionKeys,
+  ].map((conditionKey, index) => {
+    // LeadingKeys and FirstPartitionKeyValues both name the first position.
+    const position = Math.max(index - 1, 0);
+
+    return [conditionKey, values.at(position) ?? []] as const;
+  });
+
+  return Object.fromEntries(keyed.filter(([, reached]) => reached.length > 0));
 }

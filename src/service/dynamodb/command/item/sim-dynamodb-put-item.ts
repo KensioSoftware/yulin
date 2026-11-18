@@ -1,3 +1,7 @@
+import {
+  simDynamoDbReturnConsumedCapacityKey,
+  simDynamoDbReturnValuesKey,
+} from "../authorize/sim-dynamodb-request-keys.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
@@ -75,6 +79,10 @@ export class SimDynamoDbPutItem {
         attributes: simDynamoDbAttributesOf(
           check.attributeNames,
           simDynamoDbItemAttributeNames(() => [readItem(input)]),
+        ),
+        returnValues: simDynamoDbReturnValuesKey(input.ReturnValues),
+        returnConsumedCapacity: simDynamoDbReturnConsumedCapacityKey(
+          input.ReturnConsumedCapacity,
         ),
       },
     );
