@@ -1,4 +1,5 @@
 import { simAthenaDisjunctivePositions } from "./sim-athena-disjunctive-positions.js";
+import { simAthenaFilteringPositions } from "./sim-athena-filtering-positions.js";
 import { simAthenaNegatedColumns } from "./sim-athena-negated-columns.js";
 import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
 
@@ -6,7 +7,9 @@ import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
  * The partition values a query's `WHERE` clause pins down.
  *
  * Only two shapes are read, `column = 'value'` and `column IN ('a', 'b')`, and
- * they are read wherever they appear. An `OR` leaves unread everything inside
+ * only in a `WHERE` or an `ON` clause, outside any `CASE` and any function's
+ * arguments. A comparison in the select list picks a value out of each row
+ * and leaves every row in. An `OR` leaves unread everything inside
  * the brackets it sits in (the whole statement, outside any brackets). A value
  * under one arm constrains nothing on its own. A value beside the brackets,
  * joined to them by `AND`, still constrains the rows the query reads.
@@ -48,6 +51,7 @@ export function simAthenaPartitionFilters(
     return new SimAthenaPartitionFilters(byColumn);
   }
 
+  const filtering = simAthenaFilteringPositions(tokens);
   const disjunctive = simAthenaDisjunctivePositions(tokens);
 
   for (const [position, token] of tokens.entries()) {
@@ -55,7 +59,7 @@ export function simAthenaPartitionFilters(
       continue;
     }
 
-    if (disjunctive.has(position)) {
+    if (!filtering.has(position) || disjunctive.has(position)) {
       continue;
     }
 
