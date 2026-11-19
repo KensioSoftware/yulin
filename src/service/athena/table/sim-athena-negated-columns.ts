@@ -1,5 +1,11 @@
 import type { SimAthenaSqlToken } from "./sim-athena-sql-tokens.js";
 
+/** One column a `NOT` could have negated, and where that `NOT` sits. */
+export interface SimAthenaNegatedColumn {
+  readonly name: string;
+  readonly position: number;
+}
+
 /**
  * The columns a `NOT` in this query could have negated.
  *
@@ -17,13 +23,13 @@ import type { SimAthenaSqlToken } from "./sim-athena-sql-tokens.js";
  */
 export function simAthenaNegatedColumns(
   tokens: readonly SimAthenaSqlToken[],
-): ReadonlySet<string> {
-  const negated = new Set<string>();
+): readonly SimAthenaNegatedColumn[] {
+  const negated: SimAthenaNegatedColumn[] = [];
 
   for (const [position, token] of tokens.entries()) {
     if (token.kind === "word" && token.text === "not") {
       for (const name of namesUnder(tokens, position)) {
-        negated.add(name.toLowerCase());
+        negated.push({ name: name.toLowerCase(), position });
       }
     }
   }

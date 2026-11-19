@@ -1,43 +1,14 @@
 import { assertArrayEquals, assertArrayLength } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import {
-  simAthenaTablePartitions,
-  type SimAthenaPartitionedTable,
-} from "./sim-athena-table-partitions.js";
-
-const noon = new Date("2026-08-26T12:00:00.000Z");
-
-/** A table projecting the three days of August the tests below narrow. */
-function aThreeDayTable(): SimAthenaPartitionedTable {
-  return {
-    parameters: {
-      "projection.enabled": "true",
-      "projection.day.type": "date",
-      "projection.day.format": "yyyy-MM-dd",
-      "projection.day.range": "2026-08-24,2026-08-26",
-      "storage.location.template": `s3://rainlytics-logs/logs/\${day}/`,
-    },
-    partitionKeys: [{ Name: "day" }],
-    storageDescriptor: { Location: "s3://rainlytics-logs/cloudfront/" },
-  };
-}
-
-function prefixesFor(queryString: string): readonly string[] {
-  return simAthenaTablePartitions({
-    table: aThreeDayTable(),
-    registered: [],
-    queryString,
-    now: noon,
-  }).map((partition) => partition.prefix);
-}
+import { prefixesFor } from "./sim-athena-partition-narrowing.fixture.js";
 
 describe("the partitions a WHERE clause narrows a query to", () => {
   it("narrows to the partitions a WHERE clause pins down", () => {
     // Given a table projecting three days.
     // When a query filtering on one day reads them.
     const prefixes = prefixesFor(
-      "SELECT * FROM rainlytics.access_logs WHERE day = '2026-08-25'",
+      "SELECT * FROM rainlytics.t WHERE day = '2026-08-25'",
     );
 
     // Then only that day's prefix is read. This is the whole point of
@@ -137,7 +108,21 @@ describe("the partitions a WHERE clause narrows a query to", () => {
 
   it("keeps the filter where the OR sits in a subquery", () => {
     // Given a query pinning the day and testing each row against a subquery
-    // that chooses between two paths.
+    // that pins the same day and chooses between two paths.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE day IN ('2026-08-25') AND visitor IN (" +
+        "SELECT visitor FROM t WHERE day IN ('2026-08-25') " +
+        "AND (uri = '/a.css' OR uri = '/beacon'))",
+    );
+
+    // Then the day goes on pruning both reads.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("reads every partition a subquery's OR reaches", () => {
+    // Given a query pinning the day and testing each row against a subquery
+    // whose OR lets one path through from any day.
     // When its partitions are read.
     const prefixes = prefixesFor(
       "SELECT * FROM t WHERE day IN ('2026-08-25') AND visitor IN (" +
@@ -145,8 +130,9 @@ describe("the partitions a WHERE clause narrows a query to", () => {
         "AND uri = '/a.css' OR uri = '/beacon')",
     );
 
-    // Then the day outside the subquery goes on pruning.
-    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+    // Then all three are read. A beacon fetched on any day answers the
+    // subquery, and the outer filter says nothing about the subquery's read.
+    assertArrayLength(prefixes, 3);
   });
 
   it("drops a filter inside brackets an OR splits, however deep", () => {

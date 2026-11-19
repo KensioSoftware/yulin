@@ -133,12 +133,16 @@ a named failure instead of a test that hangs.
 `column IN (...)`. `sim-athena-filtering-positions.ts` marks the tokens in a `WHERE` or `ON`
 clause, outside every `CASE` and every function's arguments, and only those are read. A comparison
 in the select list picks a value out of each row and leaves every row in. A subquery inside a
-function's arguments or the select list is skipped too, since the filters apply to every read of a
-table and its `WHERE` would narrow the outer query's read as well. A value under one arm of an `OR` constrains nothing on its own, so
-`sim-athena-disjunctive-positions.ts` marks every token inside the brackets around an `OR` (the
-whole statement, where no brackets enclose it) and the filters skip those. A filter beside the
-brackets still narrows. Failing to read a filter is always safe here, because it
+function's arguments or the select list is skipped too. A value under one arm of an `OR` constrains
+nothing on its own, so `sim-athena-disjunctive-positions.ts` marks every token inside the brackets
+around an `OR` (the whole `SELECT`, where no brackets enclose it) and the filters skip those. A
+filter beside the brackets still narrows. Failing to read a filter is always safe here, because it
 leaves every projected partition in.
+
+`sim-athena-query-blocks.ts` assigns each token to the `SELECT` it belongs to. A filter constrains
+the reads in its own `SELECT`, and the reads inside a subquery in that `SELECT`'s `FROM`. A table
+read more than once (a subquery, a `UNION` or a common table expression) reads the union of what
+each read asks for, and one read with no filter on a column reads every value of it.
 
 `sim-athena-table-resolution.ts` turns those names into a refusal. It skips a query against a
 catalog other than `awsdatacatalog`, and it skips everything while the Data Catalog holds no

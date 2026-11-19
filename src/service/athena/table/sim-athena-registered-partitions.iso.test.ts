@@ -15,6 +15,8 @@ function aTable(
   location = "s3://rainlytics-logs/cloudfront/",
 ): SimAthenaPartitionedTable {
   return {
+    name: "access_logs",
+    databaseName: "rainlytics",
     parameters: {},
     partitionKeys: partitionKeys.map((Name) => ({ Name })),
     storageDescriptor: { Location: location },
@@ -26,6 +28,8 @@ function aTableWithoutLocation(
   partitionKeys: readonly string[],
 ): SimAthenaPartitionedTable {
   return {
+    name: "access_logs",
+    databaseName: "rainlytics",
     parameters: {},
     partitionKeys: partitionKeys.map((Name) => ({ Name })),
     storageDescriptor: undefined,

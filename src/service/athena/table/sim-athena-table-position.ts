@@ -44,7 +44,12 @@ function isTableClause(
 
   // A qualified name never has a clause keyword as one of its parts, so a
   // `from` straight after a dot is a column called from.
-  return !(previous?.kind === "symbol" && previous.text === ".");
+  if (previous?.kind === "symbol" && previous.text === ".") {
+    return false;
+  }
+
+  // The `FROM` of `IS DISTINCT FROM` is part of a comparison.
+  return !(previous?.kind === "word" && previous.text === "distinct");
 }
 
 /**
