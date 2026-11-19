@@ -25,11 +25,29 @@ const clauseStarters = new Set([
   "with",
 ]);
 
-/** What a bracket group opened by a function call is read as. */
-const functionArguments = "arguments";
+/**
+ * The clauses a subquery may open in and still narrow what is read.
+ *
+ * The empty clause is the statement before its first keyword, where a
+ * bracketed query starts a `UNION`.
+ */
+const narrowingContexts = new Set([
+  "",
+  "except",
+  "from",
+  "intersect",
+  "join",
+  "on",
+  "union",
+  "where",
+  "with",
+]);
 
-/** The words that start a query inside a function's arguments. */
-const queryStarters = new Set(["select", "values", "with"]);
+/** One bracket group, and whether anything inside it can narrow. */
+interface SimAthenaBracketGroup {
+  clause: string;
+  readonly excluded: boolean;
+}
 
 /**
  * The positions of every token that could constrain the rows a query reads.
@@ -41,9 +59,12 @@ const queryStarters = new Set(["select", "values", "with"]);
  *
  * A bracket opened after a symbol, or after a word that opens a subquery or a
  * list, carries on the clause around it. One opened after any other word is a
- * function call, and nothing inside it filters until a subquery inside it
- * starts a `WHERE` of its own. The `WHERE` of an aggregate's `FILTER` clause
- * chooses the rows that one aggregate sees, and leaves the scan alone.
+ * function call. Nothing inside a function call counts, a subquery included,
+ * and neither does anything inside a bracket opened in the select list or in
+ * a clause after `GROUP BY`. A subquery's `WHERE` there would otherwise narrow
+ * every read of its table, the outer query's own included. The `WHERE` of an
+ * aggregate's `FILTER` clause chooses the rows that one aggregate sees, and
+ * leaves the scan alone.
  *
  * Nothing here parses. A term it fails to count leaves its column unfiltered,
  * which is the answer a query with no filter gets.
@@ -51,21 +72,27 @@ const queryStarters = new Set(["select", "values", "with"]);
 export function simAthenaFilteringPositions(
   tokens: readonly SimAthenaSqlToken[],
 ): ReadonlySet<number> {
-  const clauses: string[] = [""];
+  const groups: SimAthenaBracketGroup[] = [{ clause: "", excluded: false }];
   const positions = new Set<number>();
   let caseDepth = 0;
 
   for (const [position, token] of tokens.entries()) {
+    const group = groups.at(-1) ?? { clause: "", excluded: true };
+
     if (token.kind === "symbol" && token.text === "(") {
-      clauses.push(groupClause(tokens.at(position - 1), clauses.at(-1) ?? ""));
+      groups.push(openedGroup(tokens.at(position - 1), group));
     } else if (token.kind === "symbol" && token.text === ")") {
-      clauses.length = Math.max(1, clauses.length - 1);
+      groups.length = Math.max(1, groups.length - 1);
     } else if (token.kind === "word") {
       caseDepth = Math.max(0, caseDepth + caseStep(token.text));
-      startClause(clauses, token.text);
+      startClause(group, token.text, tokens.at(position - 1));
     }
 
-    if (caseDepth === 0 && filteringClauses.has(clauses.at(-1) ?? "")) {
+    if (
+      caseDepth === 0 &&
+      !group.excluded &&
+      filteringClauses.has(group.clause)
+    ) {
       positions.add(position);
     }
   }
@@ -73,20 +100,22 @@ export function simAthenaFilteringPositions(
   return positions;
 }
 
-/** The clause a bracket group opens in, read from the token before it. */
-function groupClause(
+/** The group a bracket opens, read from the token before it. */
+function openedGroup(
   before: SimAthenaSqlToken | undefined,
-  around: string,
-): string {
+  around: SimAthenaBracketGroup,
+): SimAthenaBracketGroup {
+  const excluded = around.excluded || !narrowingContexts.has(around.clause);
+
   if (before === undefined || before.kind === "symbol") {
-    return around;
+    return { clause: around.clause, excluded };
   }
 
   if (before.kind === "word" && simAthenaSubqueryOpeners.has(before.text)) {
-    return around;
+    return { clause: around.clause, excluded };
   }
 
-  return functionArguments;
+  return { clause: around.clause, excluded: true };
 }
 
 /** How far one word moves into or out of a `CASE`. */
@@ -101,16 +130,25 @@ function caseStep(word: string): number {
 /**
  * Record the clause a keyword starts in the innermost bracket group.
  *
- * Inside a function's arguments only a query starts a clause.
+ * The `FROM` of `IS DISTINCT FROM` is part of a comparison, and leaves the
+ * clause it sits in going.
  */
-function startClause(clauses: string[], word: string): void {
+function startClause(
+  group: SimAthenaBracketGroup,
+  word: string,
+  before: SimAthenaSqlToken | undefined,
+): void {
   if (!clauseStarters.has(word)) {
     return;
   }
 
-  if (clauses.at(-1) === functionArguments && !queryStarters.has(word)) {
+  if (
+    word === "from" &&
+    before?.kind === "word" &&
+    before.text === "distinct"
+  ) {
     return;
   }
 
-  clauses[clauses.length - 1] = word;
+  group.clause = word;
 }

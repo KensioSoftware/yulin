@@ -214,4 +214,32 @@ describe("the partitions a WHERE clause narrows a query to", () => {
       "s3://rainlytics-logs/logs/2026-08-25/",
     ]);
   });
+
+  it("keeps the filter after an IS DISTINCT FROM comparison", () => {
+    // Given a query testing another column with IS DISTINCT FROM before it
+    // pins the day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE agent IS DISTINCT FROM 'bot' " +
+        "AND day = '2026-08-25'",
+    );
+
+    // Then the day goes on pruning. The FROM is part of the comparison.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("leaves every partition in where a subquery in the select list names one", () => {
+    // Given a query whose select list reads one day through a subquery, bare
+    // and inside a function's arguments, beside a column over every day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT (SELECT max(uri) FROM t WHERE day = '2026-08-24') AS first, " +
+        "coalesce((SELECT max(uri) FROM t WHERE day = '2026-08-25'), '') " +
+        "AS middle, min(day) AS first_day FROM t",
+    );
+
+    // Then all three stay in. The subqueries' filters say nothing about the
+    // rows the outer query reads.
+    assertArrayLength(prefixes, 3);
+  });
 });
