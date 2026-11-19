@@ -21,6 +21,8 @@ function aTable(
   location = "s3://rainlytics-logs/cloudfront/",
 ): SimAthenaPartitionedTable {
   return {
+    name: "access_logs",
+    databaseName: "rainlytics",
     parameters,
     partitionKeys: partitionKeys.map((Name) => ({ Name })),
     storageDescriptor: { Location: location },
@@ -174,7 +176,7 @@ describe("the S3 prefixes a query reads for one table", () => {
     // When a query constraining it reads its partitions.
     const prefixes = partitionsOf(
       table,
-      "SELECT * FROM t WHERE tenant IN ('acme', 'globex')",
+      "SELECT * FROM rainlytics.access_logs WHERE tenant IN ('acme', 'globex')",
     );
 
     // Then the query's own values are what it projects.
@@ -207,6 +209,8 @@ describe("the S3 prefixes a query reads for one table", () => {
   it("refuses a table projecting with neither a template nor a location", () => {
     // Given a table with projection on and nowhere for its data to be.
     const table: SimAthenaPartitionedTable = {
+      name: "access_logs",
+      databaseName: "rainlytics",
       parameters: {
         "projection.enabled": "true",
         "projection.day.type": "enum",
@@ -225,6 +229,8 @@ describe("the S3 prefixes a query reads for one table", () => {
   it("reads nothing for a table with neither projection nor a location", () => {
     // Given a table with no projection and no location either.
     const table: SimAthenaPartitionedTable = {
+      name: "access_logs",
+      databaseName: "rainlytics",
       parameters: {},
       partitionKeys: [],
       storageDescriptor: undefined,

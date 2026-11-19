@@ -173,4 +173,15 @@ describe("reading the tables an Athena query names", () => {
     assertTrue(read.readable);
     assertArrayEmpty(read.references);
   });
+
+  it("reads past an IS DISTINCT FROM comparison", () => {
+    // Given a query comparing a column with IS DISTINCT FROM.
+    // When its table names are read.
+    const names = namesIn(
+      "SELECT * FROM access_logs WHERE agent IS DISTINCT FROM 'bot'",
+    );
+
+    // Then the one table comes back. The comparison's FROM names none.
+    assertArrayEquals(names, ["access_logs"]);
+  });
 });

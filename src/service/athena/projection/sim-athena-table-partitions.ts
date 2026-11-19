@@ -1,4 +1,7 @@
-import { simAthenaPartitionFilters } from "../table/sim-athena-partition-filters.js";
+import {
+  simAthenaPartitionFilters,
+  type SimAthenaNamedTable,
+} from "../table/sim-athena-partition-filters.js";
 import {
   simAthenaRegisteredPartitions,
   type SimAthenaCatalogPartition,
@@ -19,7 +22,8 @@ import {
 import { simAthenaProjectedValues } from "./sim-athena-projection-values.js";
 
 /** The table a query names, as reading its partitions needs it. */
-export interface SimAthenaPartitionedTable extends SimAthenaProjectedTable {
+export interface SimAthenaPartitionedTable
+  extends SimAthenaProjectedTable, SimAthenaNamedTable {
   readonly storageDescriptor:
     | { readonly Location?: string | undefined }
     | undefined;
@@ -61,7 +65,7 @@ export function simAthenaTablePartitions(
 
   if (request.registered.length > 0) {
     return simAthenaRegisteredPartitions({
-      partitionKeys: request.table.partitionKeys,
+      table: request.table,
       registered: request.registered,
       tableLocation: location,
       queryString: request.queryString,
@@ -79,7 +83,7 @@ function projectedPartitions(
   projection: SimAthenaProjection,
   location: string | undefined,
 ): readonly SimAthenaTablePartition[] {
-  const filters = simAthenaPartitionFilters(request.queryString);
+  const filters = simAthenaPartitionFilters(request.queryString, request.table);
   const values = new Map<string, readonly string[]>();
 
   for (const column of projection.columns) {

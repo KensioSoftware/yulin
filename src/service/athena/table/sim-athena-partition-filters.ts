@@ -1,10 +1,28 @@
+import { simAthenaComparedValues } from "./sim-athena-compared-values.js";
 import { simAthenaDisjunctivePositions } from "./sim-athena-disjunctive-positions.js";
 import { simAthenaFilteringPositions } from "./sim-athena-filtering-positions.js";
 import { simAthenaNegatedColumns } from "./sim-athena-negated-columns.js";
-import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
+import {
+  simAthenaQueryBlocks,
+  type SimAthenaQueryBlocks,
+} from "./sim-athena-query-blocks.js";
+import {
+  simAthenaSqlTokens,
+  type SimAthenaSqlToken,
+} from "./sim-athena-sql-tokens.js";
+import {
+  simAthenaNarrow,
+  simAthenaReadFilters,
+  simAthenaTableReadBlocks,
+  simAthenaUnionOfReads,
+  type SimAthenaColumnValues,
+  type SimAthenaNamedTable,
+} from "./sim-athena-table-reads.js";
+
+export type { SimAthenaNamedTable } from "./sim-athena-table-reads.js";
 
 /**
- * The partition values a query's `WHERE` clause pins down.
+ * The partition values a query pins down for one table.
  *
  * Only two shapes are read, `column = 'value'` and `column IN ('a', 'b')`, and
  * only in a `WHERE` or an `ON` clause, outside any `CASE` and any function's
@@ -19,8 +37,14 @@ import { simAthenaSqlTokens } from "./sim-athena-sql-tokens.js";
  * a constraint would answer from the wrong prefixes. A negation on any other
  * column leaves the partition constraints as true as they were.
  *
- * Two constraints on one column are intersected, since a query carrying both
- * wants the rows they agree on.
+ * Two constraints on one column in one `SELECT` are intersected, since a
+ * query carrying both wants the rows they agree on.
+ *
+ * A filter constrains only the reads of its own `SELECT`, and the reads inside
+ * a subquery in that `SELECT`'s `FROM`. A table read more than once (in a
+ * subquery, a `UNION` or a common table expression) reads the union of what
+ * each read asks for. One read with no filter on a column reads every value
+ * of it.
  *
  * Not reading a filter is always safe. It leaves every projected partition in,
  * which is the answer a query with no filter gets anyway.
@@ -39,18 +63,33 @@ export class SimAthenaPartitionFilters {
 }
 
 /**
- * Read the partition filters out of one query.
+ * Read the partition filters one query puts on one table.
  */
 export function simAthenaPartitionFilters(
   sql: string,
+  table: SimAthenaNamedTable,
 ): SimAthenaPartitionFilters {
   const tokens = simAthenaSqlTokens(sql);
-  const byColumn = new Map<string, readonly string[]>();
 
   if (tokens === undefined) {
-    return new SimAthenaPartitionFilters(byColumn);
+    return new SimAthenaPartitionFilters(new Map());
   }
 
+  const blocks = simAthenaQueryBlocks(tokens);
+  const byBlock = blockFilters(tokens, blocks);
+  const reads = simAthenaTableReadBlocks(sql, tokens, blocks, table).map(
+    (block) => simAthenaReadFilters(byBlock, blocks, block),
+  );
+
+  return new SimAthenaPartitionFilters(simAthenaUnionOfReads(reads));
+}
+
+/** The filters each `SELECT` puts on the tables it reads directly. */
+function blockFilters(
+  tokens: readonly SimAthenaSqlToken[],
+  blocks: SimAthenaQueryBlocks,
+): ReadonlyMap<number, SimAthenaColumnValues> {
+  const byBlock = new Map<number, SimAthenaColumnValues>();
   const filtering = simAthenaFilteringPositions(tokens);
   const disjunctive = simAthenaDisjunctivePositions(tokens);
 
@@ -63,100 +102,27 @@ export function simAthenaPartitionFilters(
       continue;
     }
 
-    const operator = tokens.at(position + 1);
+    const values = simAthenaComparedValues(tokens, position);
 
-    if (operator?.kind === "symbol" && operator.text === "=") {
-      const value = tokens.at(position + 2);
-
-      if (value?.kind === "literal") {
-        narrow(byColumn, token.text, [value.text]);
-      }
-
+    if (values === undefined) {
       continue;
     }
 
-    if (operator?.kind !== "word" || operator.text !== "in") {
-      continue;
-    }
+    const block = blocks.blockOf.at(position) ?? 0;
+    const byColumn: SimAthenaColumnValues = byBlock.get(block) ?? new Map();
 
-    const values = literalList(tokens, position + 2);
+    simAthenaNarrow(byColumn, token.text, values);
+    byBlock.set(block, byColumn);
+  }
 
-    if (values !== undefined) {
-      narrow(byColumn, token.text, values);
+  const negated = simAthenaNegatedColumns(tokens);
+  const filters = byBlock.values().toArray();
+
+  for (const byColumn of filters) {
+    for (const name of negated) {
+      byColumn.delete(name);
     }
   }
 
-  for (const name of simAthenaNegatedColumns(tokens)) {
-    byColumn.delete(name);
-  }
-
-  return new SimAthenaPartitionFilters(byColumn);
-}
-
-/**
- * Add one constraint, keeping only what it and any earlier one agree on.
- */
-function narrow(
-  byColumn: Map<string, readonly string[]>,
-  columnName: string,
-  values: readonly string[],
-): void {
-  const name = columnName.toLowerCase();
-  const already = byColumn.get(name);
-
-  if (already === undefined) {
-    byColumn.set(name, values);
-
-    return;
-  }
-
-  const wanted = new Set(values);
-
-  byColumn.set(
-    name,
-    already.filter((value) => wanted.has(value)),
-  );
-}
-
-/**
- * Read `('a', 'b')` starting at its opening bracket.
- *
- * Anything else in the brackets, such as a subquery, answers with nothing and
- * leaves the column unfiltered.
- */
-function literalList(
-  tokens: readonly { kind: string; text: string }[],
-  start: number,
-): readonly string[] | undefined {
-  if (tokens.at(start)?.text !== "(") {
-    return undefined;
-  }
-
-  const values: string[] = [];
-  let cursor = start + 1;
-
-  while (cursor < tokens.length) {
-    const value = tokens.at(cursor);
-
-    if (value?.kind !== "literal") {
-      return undefined;
-    }
-
-    values.push(value.text);
-    cursor += 1;
-
-    const separator = tokens.at(cursor);
-
-    if (separator?.text === ")") {
-      return values;
-    }
-
-    if (separator?.text !== ",") {
-      return undefined;
-    }
-
-    cursor += 1;
-  }
-
-  return undefined;
+  return byBlock;
 }
