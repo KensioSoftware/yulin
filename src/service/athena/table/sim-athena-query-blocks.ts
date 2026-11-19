@@ -16,8 +16,9 @@ const tableClauses = new Set(["from", "join"]);
  * is a subquery and the query around it.
  *
  * A subquery standing in for a table, as in `FROM (SELECT ...)`, records the
- * block around it as its outer block. That query's `WHERE` filters the rows
- * the subquery produces, and Athena pushes the filter down into the read.
+ * block around it as its outer block, for every `SELECT` in its brackets. That
+ * query's `WHERE` filters the rows the subquery produces, and Athena pushes the
+ * filter down into the read.
  */
 export interface SimAthenaQueryBlocks {
   /** The block each token sits in, by token position. */
@@ -31,42 +32,60 @@ export interface SimAthenaQueryBlocks {
 export function simAthenaQueryBlocks(
   tokens: readonly SimAthenaSqlToken[],
 ): SimAthenaQueryBlocks {
-  const open: number[] = [leadingBlock];
+  const open: SimAthenaBracketFrame[] = [{ block: leadingBlock }];
   const blockOf: number[] = [];
   const outerOf = new Map<number, number>();
   let blocks = leadingBlock;
 
   for (const [position, token] of tokens.entries()) {
+    const frame = open.at(-1) ?? { block: leadingBlock };
+
     if (token.kind === "symbol" && token.text === "(") {
-      open.push(open.at(-1) ?? leadingBlock);
+      open.push({
+        block: frame.block,
+        outer: followsTableClause(tokens, position) ? frame.block : undefined,
+      });
     } else if (token.kind === "symbol" && token.text === ")") {
       open.length = Math.max(1, open.length - 1);
     } else if (token.kind === "word" && token.text === "select") {
       blocks += 1;
+      frame.block = blocks;
 
-      if (opensDerivedTable(tokens, position)) {
-        outerOf.set(blocks, open.at(-2) ?? leadingBlock);
+      if (frame.outer !== undefined) {
+        outerOf.set(blocks, frame.outer);
       }
-
-      open[open.length - 1] = blocks;
     }
 
-    blockOf.push(open.at(-1) ?? leadingBlock);
+    blockOf.push(open.at(-1)?.block ?? leadingBlock);
   }
 
   return { blockOf, outerOf };
 }
 
-/** Whether this `SELECT` opens a bracket that follows `FROM` or `JOIN`. */
-function opensDerivedTable(
+/** One open bracket, and the block around it where it holds a table. */
+interface SimAthenaBracketFrame {
+  block: number;
+  readonly outer?: number | undefined;
+}
+
+/**
+ * Whether the bracket at this position follows `FROM` or `JOIN`.
+ *
+ * The `FROM` of `IS DISTINCT FROM` is part of a comparison, and a subquery
+ * after it is a value.
+ */
+function followsTableClause(
   tokens: readonly SimAthenaSqlToken[],
   position: number,
 ): boolean {
-  if (position < 2 || tokens.at(position - 1)?.text !== "(") {
+  const before = tokens.at(position - 1);
+
+  if (position < 1 || before?.kind !== "word") {
     return false;
   }
 
-  const before = tokens.at(position - 2);
+  const comparison =
+    before.text === "from" && tokens.at(position - 2)?.text === "distinct";
 
-  return before?.kind === "word" && tableClauses.has(before.text);
+  return tableClauses.has(before.text) && !comparison;
 }

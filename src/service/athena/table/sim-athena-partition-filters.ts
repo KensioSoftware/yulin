@@ -28,11 +28,11 @@ export type { SimAthenaNamedTable } from "./sim-athena-table-reads.js";
  * only in a `WHERE` or an `ON` clause, outside any `CASE` and any function's
  * arguments. A comparison in the select list picks a value out of each row
  * and leaves every row in. An `OR` leaves unread everything inside
- * the brackets it sits in (the whole statement, outside any brackets). A value
+ * the brackets it sits in (the whole `SELECT`, outside any brackets). A value
  * under one arm constrains nothing on its own. A value beside the brackets,
  * joined to them by `AND`, still constrains the rows the query reads.
  *
- * A `NOT` leaves the columns it reaches unconstrained and the rest alone. A
+ * A `NOT` leaves the columns it reaches unconstrained in its own `SELECT`. A
  * negated value names the partition the query does not want, and reading it as
  * a constraint would answer from the wrong prefixes. A negation on any other
  * column leaves the partition constraints as true as they were.
@@ -115,13 +115,8 @@ function blockFilters(
     byBlock.set(block, byColumn);
   }
 
-  const negated = simAthenaNegatedColumns(tokens);
-  const filters = byBlock.values().toArray();
-
-  for (const byColumn of filters) {
-    for (const name of negated) {
-      byColumn.delete(name);
-    }
+  for (const { name, position } of simAthenaNegatedColumns(tokens)) {
+    byBlock.get(blocks.blockOf.at(position) ?? 0)?.delete(name);
   }
 
   return byBlock;

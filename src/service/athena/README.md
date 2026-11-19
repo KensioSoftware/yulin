@@ -135,7 +135,7 @@ clause, outside every `CASE` and every function's arguments, and only those are 
 in the select list picks a value out of each row and leaves every row in. A subquery inside a
 function's arguments or the select list is skipped too. A value under one arm of an `OR` constrains
 nothing on its own, so `sim-athena-disjunctive-positions.ts` marks every token inside the brackets
-around an `OR` (the whole statement, where no brackets enclose it) and the filters skip those. A
+around an `OR` (the whole `SELECT`, where no brackets enclose it) and the filters skip those. A
 filter beside the brackets still narrows. Failing to read a filter is always safe here, because it
 leaves every projected partition in.
 
