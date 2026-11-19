@@ -130,7 +130,11 @@ than refusing it. And a projection is capped at 20,000 partitions, which turns a
 a named failure instead of a test that hangs.
 
 `sim-athena-partition-filters.ts` reads the `WHERE` clause for `column = 'value'` and
-`column IN (...)`. A value under one arm of an `OR` constrains nothing on its own, so
+`column IN (...)`. `sim-athena-filtering-positions.ts` marks the tokens in a `WHERE` or `ON`
+clause, outside every `CASE` and every function's arguments, and only those are read. A comparison
+in the select list picks a value out of each row and leaves every row in. A subquery inside a
+function's arguments or the select list is skipped too, since the filters apply to every read of a
+table and its `WHERE` would narrow the outer query's read as well. A value under one arm of an `OR` constrains nothing on its own, so
 `sim-athena-disjunctive-positions.ts` marks every token inside the brackets around an `OR` (the
 whole statement, where no brackets enclose it) and the filters skip those. A filter beside the
 brackets still narrows. Failing to read a filter is always safe here, because it

@@ -160,4 +160,86 @@ describe("the partitions a WHERE clause narrows a query to", () => {
     // first arm.
     assertArrayLength(prefixes, 3);
   });
+
+  it("leaves every partition in where only a CASE in the select list names one", () => {
+    // Given a query picking one day's value out of each row.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT max(CASE WHEN day = '2026-08-25' THEN uri END) AS uri, " +
+        "min(day) AS first_day FROM t",
+    );
+
+    // Then all three stay in. The CASE leaves every row in, and the first
+    // day comes from a partition the CASE never named.
+    assertArrayLength(prefixes, 3);
+  });
+
+  it("leaves every partition in where a comparison sits in the select list", () => {
+    // Given a query comparing the day in its select list, bare and inside a
+    // function's arguments.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT day = '2026-08-24' AS first, " +
+        "count_if(day IN ('2026-08-25')) AS middle FROM t",
+    );
+
+    // Then all three stay in.
+    assertArrayLength(prefixes, 3);
+  });
+
+  it("leaves every partition in where an aggregate's FILTER names one", () => {
+    // Given a query counting one day's rows beside a count of all of them.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT count(*) FILTER (WHERE day = '2026-08-25') AS middle, " +
+        "count(*) AS every_day FROM t",
+    );
+
+    // Then all three stay in. The FILTER chooses the rows one aggregate
+    // sees, and the other aggregate counts every day.
+    assertArrayLength(prefixes, 3);
+  });
+
+  it("keeps the WHERE filter beside a CASE naming another day", () => {
+    // Given a query pinning two days and picking one of them out of each row.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT max(CASE WHEN day = '2026-08-24' THEN uri END) FROM t " +
+        "WHERE day IN ('2026-08-24', '2026-08-25')",
+    );
+
+    // Then the WHERE clause alone decides what is read.
+    assertArrayEquals(prefixes, [
+      "s3://rainlytics-logs/logs/2026-08-24/",
+      "s3://rainlytics-logs/logs/2026-08-25/",
+    ]);
+  });
+
+  it("keeps the filter after an IS DISTINCT FROM comparison", () => {
+    // Given a query testing another column with IS DISTINCT FROM before it
+    // pins the day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t WHERE agent IS DISTINCT FROM 'bot' " +
+        "AND day = '2026-08-25'",
+    );
+
+    // Then the day goes on pruning. The FROM is part of the comparison.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("leaves every partition in where a subquery in the select list names one", () => {
+    // Given a query whose select list reads one day through a subquery, bare
+    // and inside a function's arguments, beside a column over every day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT (SELECT max(uri) FROM t WHERE day = '2026-08-24') AS first, " +
+        "coalesce((SELECT max(uri) FROM t WHERE day = '2026-08-25'), '') " +
+        "AS middle, min(day) AS first_day FROM t",
+    );
+
+    // Then all three stay in. The subqueries' filters say nothing about the
+    // rows the outer query reads.
+    assertArrayLength(prefixes, 3);
+  });
 });
