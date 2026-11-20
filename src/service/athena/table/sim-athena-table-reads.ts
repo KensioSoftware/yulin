@@ -1,6 +1,10 @@
 import type { SimAthenaQueryBlocks } from "./sim-athena-query-blocks.js";
+import { simAthenaAliasAt } from "./sim-athena-read-alias.js";
 import type { SimAthenaSqlToken } from "./sim-athena-sql-tokens.js";
-import { simAthenaFoldedName } from "./sim-athena-table-reference.js";
+import {
+  simAthenaFoldedName,
+  type SimAthenaTableReference,
+} from "./sim-athena-table-reference.js";
 import { simAthenaTableReferences } from "./sim-athena-table-references.js";
 
 /** The table whose partitions are being read, as the catalog names it. */
@@ -12,19 +16,30 @@ export interface SimAthenaNamedTable {
 /** The values each column is pinned to, by lower-cased column name. */
 export type SimAthenaColumnValues = Map<string, readonly string[]>;
 
+/** One place the query reads the table, and the name its filters use. */
+export interface SimAthenaTableRead {
+  readonly block: number;
+
+  /** The alias, or the table's own name where it has none. */
+  readonly name: string;
+
+  /** The database an unaliased reference names, where it names one. */
+  readonly database: string | undefined;
+}
+
 /**
- * The block of every place the query reads this table.
+ * Every place the query reads this table.
  *
  * A reference matches on its name, and on its database where it names one.
  * An unqualified name could belong to another database, and matching it
  * anyway only widens the read.
  */
-export function simAthenaTableReadBlocks(
+export function simAthenaTableReads(
   sql: string,
   tokens: readonly SimAthenaSqlToken[],
   blocks: SimAthenaQueryBlocks,
   table: SimAthenaNamedTable,
-): readonly number[] {
+): readonly SimAthenaTableRead[] {
   const name = simAthenaFoldedName(table.name);
   const database = simAthenaFoldedName(table.databaseName);
   const matching = simAthenaTableReferences(sql).references.filter(
@@ -41,33 +56,27 @@ export function simAthenaTableReadBlocks(
       (token) => token.index === reference.index,
     );
 
-    return blocks.blockOf.at(position) ?? 0;
+    const alias = simAthenaAliasAt(
+      tokens,
+      position + 2 * partCount(reference) - 1,
+    );
+
+    return {
+      block: blocks.blockOf.at(position) ?? 0,
+      name: alias ?? name,
+      database:
+        alias === undefined && reference.database !== undefined
+          ? simAthenaFoldedName(reference.database)
+          : undefined,
+    };
   });
 }
 
-/**
- * The filters on one read of a table, from its own `SELECT` and from every
- * query a subquery in `FROM` sits in.
- */
-export function simAthenaReadFilters(
-  byBlock: ReadonlyMap<number, SimAthenaColumnValues>,
-  blocks: SimAthenaQueryBlocks,
-  block: number,
-): SimAthenaColumnValues {
-  const byColumn: SimAthenaColumnValues = new Map();
-  let cursor: number | undefined = block;
-
-  while (cursor !== undefined) {
-    const filters = byBlock.get(cursor) ?? new Map<string, readonly string[]>();
-
-    for (const [name, values] of filters) {
-      simAthenaNarrow(byColumn, name, values);
-    }
-
-    cursor = blocks.outerOf.get(cursor);
-  }
-
-  return byColumn;
+/** How many dot-separated parts a reference names. */
+function partCount(reference: SimAthenaTableReference): number {
+  return [reference.catalog, reference.database, reference.name].filter(
+    (part) => part !== undefined,
+  ).length;
 }
 
 /**

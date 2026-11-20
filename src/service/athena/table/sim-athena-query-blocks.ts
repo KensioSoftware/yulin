@@ -1,3 +1,4 @@
+import { simAthenaAliasAt } from "./sim-athena-read-alias.js";
 import type { SimAthenaSqlToken } from "./sim-athena-sql-tokens.js";
 
 /** Where a statement starts, before its first `SELECT`. */
@@ -18,7 +19,9 @@ const tableClauses = new Set(["from", "join"]);
  * A subquery standing in for a table, as in `FROM (SELECT ...)`, records the
  * block around it as its outer block, for every `SELECT` in its brackets. That
  * query's `WHERE` filters the rows the subquery produces, and Athena pushes the
- * filter down into the read.
+ * filter down into the read. Where the subquery takes an alias, as in
+ * `FROM (SELECT ...) s`, every `SELECT` in its brackets records it, and a
+ * filter on `s.day` reaches the reads inside it.
  */
 export interface SimAthenaQueryBlocks {
   /** The block each token sits in, by token position. */
@@ -26,26 +29,39 @@ export interface SimAthenaQueryBlocks {
 
   /** The block around each subquery in a `FROM` or a `JOIN`. */
   readonly outerOf: ReadonlyMap<number, number>;
+
+  /** The alias of each subquery in a `FROM` or a `JOIN`, where it has one. */
+  readonly aliasOf: ReadonlyMap<number, string>;
 }
 
 /** Read the blocks of one statement, from left to right. */
 export function simAthenaQueryBlocks(
   tokens: readonly SimAthenaSqlToken[],
 ): SimAthenaQueryBlocks {
-  const open: SimAthenaBracketFrame[] = [{ block: leadingBlock }];
+  const open: SimAthenaBracketFrame[] = [{ block: leadingBlock, started: [] }];
   const blockOf: number[] = [];
   const outerOf = new Map<number, number>();
+  const aliasOf = new Map<number, string>();
   let blocks = leadingBlock;
 
   for (const [position, token] of tokens.entries()) {
-    const frame = open.at(-1) ?? { block: leadingBlock };
+    const frame = open.at(-1) ?? { block: leadingBlock, started: [] };
 
     if (token.kind === "symbol" && token.text === "(") {
       open.push({
         block: frame.block,
         outer: followsTableClause(tokens, position) ? frame.block : undefined,
+        started: [],
       });
     } else if (token.kind === "symbol" && token.text === ")") {
+      const alias = simAthenaAliasAt(tokens, position + 1);
+
+      if (alias !== undefined) {
+        for (const block of frame.started) {
+          aliasOf.set(block, alias);
+        }
+      }
+
       open.length = Math.max(1, open.length - 1);
     } else if (token.kind === "word" && token.text === "select") {
       blocks += 1;
@@ -53,19 +69,23 @@ export function simAthenaQueryBlocks(
 
       if (frame.outer !== undefined) {
         outerOf.set(blocks, frame.outer);
+        frame.started.push(blocks);
       }
     }
 
     blockOf.push(open.at(-1)?.block ?? leadingBlock);
   }
 
-  return { blockOf, outerOf };
+  return { blockOf, outerOf, aliasOf };
 }
 
 /** One open bracket, and the block around it where it holds a table. */
 interface SimAthenaBracketFrame {
   block: number;
   readonly outer?: number | undefined;
+
+  /** The blocks started directly in a bracket holding a table. */
+  readonly started: number[];
 }
 
 /**
