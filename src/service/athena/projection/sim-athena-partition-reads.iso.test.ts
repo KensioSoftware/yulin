@@ -129,4 +129,70 @@ describe("the partitions each read of a table narrows a query to", () => {
     // subquery's own filter.
     assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-24/"]);
   });
+  it("reads the day each alias of a self-join asks for", () => {
+    // Given a query joining two days of the table to each other, each alias
+    // pinned to its own day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t a JOIN t b ON a.visitor = b.visitor " +
+        "WHERE a.day = '2026-08-24' AND b.day = '2026-08-25'",
+    );
+
+    // Then both days are read. Each filter belongs to one read, and
+    // intersecting them would leave nothing.
+    assertArrayEquals(prefixes, [
+      "s3://rainlytics-logs/logs/2026-08-24/",
+      "s3://rainlytics-logs/logs/2026-08-25/",
+    ]);
+  });
+  it("reads the day each aliased subquery of a self-join asks for", () => {
+    // Given a query joining two subqueries over the table, each alias pinned
+    // to its own day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM (SELECT * FROM t) a JOIN (SELECT * FROM t) AS b " +
+        "ON a.visitor = b.visitor " +
+        "WHERE a.day = '2026-08-24' AND b.day = '2026-08-25'",
+    );
+
+    // Then both days are read, each filter reaching the subquery it names.
+    assertArrayEquals(prefixes, [
+      "s3://rainlytics-logs/logs/2026-08-24/",
+      "s3://rainlytics-logs/logs/2026-08-25/",
+    ]);
+  });
+
+  it("narrows a subquery in FROM by a filter on its alias", () => {
+    // Given a query filtering an aliased subquery's rows by that alias.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM (SELECT uri, day FROM t) s WHERE s.day = '2026-08-25'",
+    );
+
+    // Then only that day is read.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("narrows a read by a filter qualified with the table's name", () => {
+    // Given a query qualifying its filter with the unaliased table's name.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM rainlytics.t WHERE t.day = '2026-08-25'",
+    );
+
+    // Then only that day is read.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("leaves every partition in where a joined table's filter names it", () => {
+    // Given a query joining another table and pinning that table's day.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM t JOIN rainlytics.signups s ON t.visitor = s.visitor " +
+        "WHERE s.day = '2026-08-25'",
+    );
+
+    // Then all three stay in. The filter belongs to the other table.
+    assertArrayLength(prefixes, 3);
+  });
 });

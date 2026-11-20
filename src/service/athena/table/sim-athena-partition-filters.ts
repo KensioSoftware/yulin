@@ -2,6 +2,11 @@ import { simAthenaComparedValues } from "./sim-athena-compared-values.js";
 import { simAthenaDisjunctivePositions } from "./sim-athena-disjunctive-positions.js";
 import { simAthenaFilteringPositions } from "./sim-athena-filtering-positions.js";
 import { simAthenaNegatedColumns } from "./sim-athena-negated-columns.js";
+import { simAthenaQualifierOf } from "./sim-athena-read-alias.js";
+import {
+  simAthenaReadFilters,
+  type SimAthenaColumnFilter,
+} from "./sim-athena-read-filters.js";
 import {
   simAthenaQueryBlocks,
   type SimAthenaQueryBlocks,
@@ -11,11 +16,8 @@ import {
   type SimAthenaSqlToken,
 } from "./sim-athena-sql-tokens.js";
 import {
-  simAthenaNarrow,
-  simAthenaReadFilters,
-  simAthenaTableReadBlocks,
+  simAthenaTableReads,
   simAthenaUnionOfReads,
-  type SimAthenaColumnValues,
   type SimAthenaNamedTable,
 } from "./sim-athena-table-reads.js";
 
@@ -37,8 +39,10 @@ export type { SimAthenaNamedTable } from "./sim-athena-table-reads.js";
  * a constraint would answer from the wrong prefixes. A negation on any other
  * column leaves the partition constraints as true as they were.
  *
- * Two constraints on one column in one `SELECT` are intersected, since a
- * query carrying both wants the rows they agree on.
+ * Two constraints on one column of one read are intersected, since a query
+ * carrying both wants the rows they agree on. A qualified column, as in
+ * `a.day`, constrains only the read its qualifier names. So a self-join
+ * pinning `a.day` and `b.day` to two days reads both.
  *
  * A filter constrains only the reads of its own `SELECT`, and the reads inside
  * a subquery in that `SELECT`'s `FROM`. A table read more than once (in a
@@ -77,8 +81,8 @@ export function simAthenaPartitionFilters(
 
   const blocks = simAthenaQueryBlocks(tokens);
   const byBlock = blockFilters(tokens, blocks);
-  const reads = simAthenaTableReadBlocks(sql, tokens, blocks, table).map(
-    (block) => simAthenaReadFilters(byBlock, blocks, block),
+  const reads = simAthenaTableReads(sql, tokens, blocks, table).map((read) =>
+    simAthenaReadFilters(byBlock, blocks, read),
   );
 
   return new SimAthenaPartitionFilters(simAthenaUnionOfReads(reads));
@@ -88,8 +92,8 @@ export function simAthenaPartitionFilters(
 function blockFilters(
   tokens: readonly SimAthenaSqlToken[],
   blocks: SimAthenaQueryBlocks,
-): ReadonlyMap<number, SimAthenaColumnValues> {
-  const byBlock = new Map<number, SimAthenaColumnValues>();
+): ReadonlyMap<number, readonly SimAthenaColumnFilter[]> {
+  const byBlock = new Map<number, SimAthenaColumnFilter[]>();
   const filtering = simAthenaFilteringPositions(tokens);
   const disjunctive = simAthenaDisjunctivePositions(tokens);
 
@@ -109,14 +113,24 @@ function blockFilters(
     }
 
     const block = blocks.blockOf.at(position) ?? 0;
-    const byColumn: SimAthenaColumnValues = byBlock.get(block) ?? new Map();
+    const filters = byBlock.get(block) ?? [];
 
-    simAthenaNarrow(byColumn, token.text, values);
-    byBlock.set(block, byColumn);
+    filters.push({
+      column: token.text.toLowerCase(),
+      qualifier: simAthenaQualifierOf(tokens, position),
+      values,
+    });
+    byBlock.set(block, filters);
   }
 
   for (const { name, position } of simAthenaNegatedColumns(tokens)) {
-    byBlock.get(blocks.blockOf.at(position) ?? 0)?.delete(name);
+    const block = blocks.blockOf.at(position) ?? 0;
+    const filters = byBlock.get(block) ?? [];
+
+    byBlock.set(
+      block,
+      filters.filter((filter) => filter.column !== name),
+    );
   }
 
   return byBlock;
