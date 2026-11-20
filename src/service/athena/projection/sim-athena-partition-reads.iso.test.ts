@@ -195,4 +195,28 @@ describe("the partitions each read of a table narrows a query to", () => {
     // Then all three stay in. The filter belongs to the other table.
     assertArrayLength(prefixes, 3);
   });
+  it("narrows a read by a filter on a quoted alias named as", () => {
+    // Given a query aliasing the table with the quoted identifier "as".
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      `SELECT * FROM t "as" WHERE "as".day = '2026-08-25'`,
+    );
+
+    // Then only that day is read.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-25/"]);
+  });
+
+  it("keeps a filter qualified with another database off the read", () => {
+    // Given a query joining the table to a table of the same name in another
+    // database, each pinned to its own day by its qualified name.
+    // When its partitions are read.
+    const prefixes = prefixesFor(
+      "SELECT * FROM rainlytics.t JOIN other.t ON rainlytics.t.visitor = " +
+        "other.t.visitor WHERE rainlytics.t.day = '2026-08-24' " +
+        "AND other.t.day = '2026-08-25'",
+    );
+
+    // Then only this table's day is read.
+    assertArrayEquals(prefixes, ["s3://rainlytics-logs/logs/2026-08-24/"]);
+  });
 });

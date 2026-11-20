@@ -17,7 +17,8 @@ export function simAthenaAliasAt(
   position: number,
 ): string | undefined {
   const first = tokens.at(position);
-  const alias = first?.text === "as" ? tokens.at(position + 1) : first;
+  const keyword = first?.kind === "word" && first.text === "as";
+  const alias = keyword ? tokens.at(position + 1) : first;
 
   if (alias?.kind === "quoted") {
     return simAthenaFoldedName(alias.text);
@@ -34,26 +35,47 @@ export function simAthenaAliasAt(
   return alias.text;
 }
 
+/** The name a column's qualifier gives, and the database it names. */
+export interface SimAthenaQualifier {
+  readonly name: string;
+  readonly database: string | undefined;
+}
+
 /**
- * The name a column's qualifier gives, as in the `a` of `a.day`.
+ * The qualifier of a column, as in the `a` of `a.day`.
  *
- * A name qualified further (`db.t.day`) gives the part next to the column.
+ * A name qualified further (`db.t.day`) gives the table next to the column
+ * and the database before it.
  */
 export function simAthenaQualifierOf(
   tokens: readonly SimAthenaSqlToken[],
   position: number,
+): SimAthenaQualifier | undefined {
+  const name = partBefore(tokens, position);
+
+  if (name === undefined) {
+    return undefined;
+  }
+
+  return { name, database: partBefore(tokens, position - 2) };
+}
+
+/** The name part before the dot ahead of this position, where there is one. */
+function partBefore(
+  tokens: readonly SimAthenaSqlToken[],
+  position: number,
 ): string | undefined {
   const dot = tokens.at(position - 1);
-  const qualifier = tokens.at(position - 2);
+  const part = tokens.at(position - 2);
 
   if (
     position < 2 ||
     dot?.kind !== "symbol" ||
     dot.text !== "." ||
-    (qualifier?.kind !== "word" && qualifier?.kind !== "quoted")
+    (part?.kind !== "word" && part?.kind !== "quoted")
   ) {
     return undefined;
   }
 
-  return simAthenaFoldedName(qualifier.text);
+  return simAthenaFoldedName(part.text);
 }

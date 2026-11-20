@@ -22,6 +22,9 @@ export interface SimAthenaTableRead {
 
   /** The alias, or the table's own name where it has none. */
   readonly name: string;
+
+  /** The database an unaliased reference names, where it names one. */
+  readonly database: string | undefined;
 }
 
 /**
@@ -53,11 +56,18 @@ export function simAthenaTableReads(
       (token) => token.index === reference.index,
     );
 
+    const alias = simAthenaAliasAt(
+      tokens,
+      position + 2 * partCount(reference) - 1,
+    );
+
     return {
       block: blocks.blockOf.at(position) ?? 0,
-      name:
-        simAthenaAliasAt(tokens, position + 2 * partCount(reference) - 1) ??
-        name,
+      name: alias ?? name,
+      database:
+        alias === undefined && reference.database !== undefined
+          ? simAthenaFoldedName(reference.database)
+          : undefined,
     };
   });
 }
