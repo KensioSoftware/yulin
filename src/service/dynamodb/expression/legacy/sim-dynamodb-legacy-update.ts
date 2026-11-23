@@ -5,6 +5,7 @@ import type {
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { readSimDynamoDbValue } from "../../item/sim-dynamodb-value-reader.js";
 import type { SimDynamoDbLegacyPlaceholders } from "./sim-dynamodb-legacy-placeholders.js";
+import { isOneOf } from "../../../../util/type-guard/one-of.js";
 
 /**
  * The clause each legacy action is written into.
@@ -76,7 +77,7 @@ function clauseOf(
   action: string,
   value: SimDynamoDbAttributeValue | undefined,
 ): SimDynamoDbLegacyClause {
-  if (action !== "PUT" && action !== "DELETE" && action !== "ADD") {
+  if (!isOneOf(["PUT", "DELETE", "ADD"], action)) {
     throw new SimDynamoDbValidationException(
       `One or more parameter values were invalid: Action '${action}' for ` +
         `${attribute} is not one of PUT, DELETE, ADD`,

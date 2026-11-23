@@ -34,8 +34,6 @@ export function simLambdaHttpModuleScheme(specifier: string): string {
   return httpModuleSchemes.get(specifier) ?? "https:";
 }
 
-type RequestFunction = (...callArguments: unknown[]) => unknown;
-
 interface SimLambdaHttpModuleProperties {
   readonly hostModule: NodeHttpModule;
   readonly outbound: SimLambdaOutboundHttp;
@@ -66,6 +64,7 @@ interface SimLambdaHttpModuleProperties {
 export function makeSimLambdaHttpModule(
   properties: SimLambdaHttpModuleProperties,
 ): NodeHttpModule {
+  type RequestFunction = (...callArguments: unknown[]) => unknown;
   const { hostModule } = properties;
   const hostRequest = hostModule["request"] as RequestFunction;
   const hostGet = hostModule["get"] as RequestFunction;

@@ -7,11 +7,6 @@ import {
   simLambdaHttp2ExchangeId,
 } from "./sim-lambda-http2-messages.js";
 
-type SessionRequestFunction = (
-  headers?: http2.OutgoingHttpHeaders,
-  options?: http2.ClientSessionRequestOptions,
-) => http2.ClientHttp2Stream;
-
 /**
  * A request sent on a simulated session, waiting for its answer.
  */
@@ -37,6 +32,11 @@ export class SimLambdaHttp2Exchanges {
    * Tag each request the session sends with the context it was sent from.
    */
   track(session: http2.ClientHttp2Session): void {
+    type SessionRequestFunction = (
+      headers?: http2.OutgoingHttpHeaders,
+      options?: http2.ClientSessionRequestOptions,
+    ) => http2.ClientHttp2Stream;
+
     const hostRequest = session.request.bind(session);
     const request: SessionRequestFunction = (headers, options) => {
       const exchangeId = randomUUID();

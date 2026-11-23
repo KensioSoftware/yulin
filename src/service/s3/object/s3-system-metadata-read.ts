@@ -45,6 +45,13 @@ export interface SimS3SystemMetadataOutput {
 export function simS3SystemMetadataOutput(
   headers: Readonly<Record<string, string>>,
 ): SimS3SystemMetadataOutput {
+  /** The output being built, before it is handed out as read-only. */
+  type SimS3MutableSystemMetadataOutput = {
+    -readonly [
+      Field in keyof SimS3SystemMetadataOutput
+    ]: SimS3SystemMetadataOutput[Field];
+  };
+
   const output: SimS3MutableSystemMetadataOutput = {};
 
   for (const header of simS3SystemMetadataHeaders) {
@@ -120,10 +127,3 @@ function outputFieldOf(
 
   return header.field;
 }
-
-/** The output being built, before it is handed out as read-only. */
-type SimS3MutableSystemMetadataOutput = {
-  -readonly [
-    Field in keyof SimS3SystemMetadataOutput
-  ]: SimS3SystemMetadataOutput[Field];
-};
