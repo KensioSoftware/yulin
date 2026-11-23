@@ -34,7 +34,10 @@ function hasType(value: unknown, type: string): boolean {
       return isJsonObject(value);
     }
     case "integer": {
-      return Number.isSafeInteger(value);
+      // JSON Schema calls any number with no fractional part an integer,
+      // including one beyond the safe integer range.
+      // oxlint-disable-next-line unicorn-js/prefer-number-is-safe-integer
+      return Number.isInteger(value);
     }
     default: {
       return typeof value === type;

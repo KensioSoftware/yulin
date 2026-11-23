@@ -1,9 +1,9 @@
 import {
-  resolveSchemaRef,
   schemaNode,
   schemaText,
   type SimBedrockSchemaNode,
 } from "./sim-bedrock-json-schema.js";
+import { resolveSchemaRef } from "./sim-bedrock-schema-pointer.js";
 import {
   firstFound,
   memberMismatch,
@@ -26,6 +26,7 @@ import {
  */
 export class SimBedrockSchemaMatch {
   private readonly root: SimBedrockSchemaNode;
+  private readonly refResults = new Map<string, string | undefined>();
 
   constructor(root: SimBedrockSchemaNode) {
     this.root = root;
@@ -36,6 +37,8 @@ export class SimBedrockSchemaMatch {
    * matches.
    */
   mismatch(value: unknown): string | undefined {
+    this.refResults.clear();
+
     return this.nodeMismatch(value, this.root, "");
   }
 
@@ -66,13 +69,23 @@ export class SimBedrockSchemaMatch {
   ): string | undefined {
     const { $ref: ref } = node;
 
-    return ref === undefined
-      ? undefined
-      : this.nodeMismatch(
-          value,
-          resolveSchemaRef(this.root, schemaText(ref)),
-          at,
-        );
+    if (ref === undefined) {
+      return undefined;
+    }
+
+    // The value at one place in a reply is always the same value, so a
+    // target checked there once answers every other reference to it there.
+    const target = schemaText(ref);
+    const key = `${target}\n${at}`;
+
+    if (!this.refResults.has(key)) {
+      this.refResults.set(
+        key,
+        this.nodeMismatch(value, resolveSchemaRef(this.root, target), at),
+      );
+    }
+
+    return this.refResults.get(key);
   }
 
   private combinedMismatch(

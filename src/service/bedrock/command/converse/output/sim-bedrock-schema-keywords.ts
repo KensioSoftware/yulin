@@ -1,10 +1,8 @@
 import { SimBedrockValidationException } from "../../../error/sim-bedrock.error.js";
 import { refuseKeyword } from "./sim-bedrock-schema-keyword-names.js";
-import {
-  namedTypes,
-  schemaPattern,
-  schemaText,
-} from "./sim-bedrock-json-schema.js";
+import { checkPattern } from "./sim-bedrock-schema-pattern.js";
+import { checkType } from "./sim-bedrock-schema-type.js";
+import { namedTypes, schemaText } from "./sim-bedrock-json-schema.js";
 
 const supportedFormats = new Set([
   "date-time",
@@ -19,9 +17,6 @@ const supportedFormats = new Set([
   "uuid",
 ]);
 
-const lookaround = /\(\?<?[!=]/u;
-const backreference = /\\[1-9]|\\k</u;
-
 function isEnumValue(value: unknown): boolean {
   return (
     value === null ||
@@ -29,16 +24,6 @@ function isEnumValue(value: unknown): boolean {
     typeof value === "number" ||
     typeof value === "boolean"
   );
-}
-
-function compiles(pattern: string): boolean {
-  try {
-    schemaPattern(pattern);
-
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function checkEnum(enumerated: unknown, at: string): void {
@@ -68,23 +53,6 @@ function checkFormat(format: unknown, at: string): void {
       `The structured output schema at ${at} uses the unsupported string ` +
         `format ${JSON.stringify(format)}`,
     );
-  }
-}
-
-function checkPattern(pattern: unknown): void {
-  if (pattern === undefined) {
-    return;
-  }
-
-  const source = typeof pattern === "string" ? pattern : "";
-
-  if (
-    source.length === 0 ||
-    !compiles(source) ||
-    lookaround.test(source) ||
-    backreference.test(source)
-  ) {
-    throw new SimBedrockValidationException("Invalid regex in pattern field.");
   }
 }
 
@@ -119,5 +87,6 @@ export function checkSchemaKeywords(
   checkMinItems(node["minItems"], at);
   checkFormat(node["format"], at);
   checkPattern(node["pattern"]);
+  checkType(node["type"], at);
   checkClosedObject(node, at);
 }

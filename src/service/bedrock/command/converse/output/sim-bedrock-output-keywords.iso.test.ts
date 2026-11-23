@@ -78,6 +78,24 @@ describe("Bedrock structured output keywords", () => {
     ],
     ["a dated string", { type: "string", format: "date" }, '"2026-11-23"'],
     ["the true schema", true, '{"any":"thing"}'],
+    [
+      "an integer beyond the safe range",
+      { type: "integer" },
+      "9007199254740992",
+    ],
+    [
+      "a reference into a list",
+      {
+        $ref: "#/$defs/choice/anyOf/1",
+        $defs: { choice: { anyOf: [{ type: "string" }, { type: "number" }] } },
+      },
+      "7",
+    ],
+    [
+      "a pattern holding lookaround characters in a class",
+      { type: "string", pattern: "^[(?=)]+$" },
+      '"(?="',
+    ],
   ])("accepts a reply matching %s", async (_, schema, reply) => {
     // When the declared reply matches the schema.
     const answered = await answer(reply, schemaFormat(schema));
@@ -124,6 +142,14 @@ describe("Bedrock structured output keywords", () => {
     ["a pattern that does not compile", { pattern: "(" }, "Invalid regex"],
     ["a backreference", { pattern: String.raw`(a)\1` }, "Invalid regex"],
     ["an undefined reference", { $ref: "#/$defs/id" }, "does not define"],
+    ["a type that is not a name", { type: 7 }, "not a JSON Schema type"],
+    ["a type JSON Schema lacks", { type: "text" }, "not a JSON Schema type"],
+    ["an empty type list", { type: [] }, "not a JSON Schema type"],
+    [
+      "a reference past a list",
+      { $ref: "#/$defs/a/5", $defs: { a: [] } },
+      "does not define",
+    ],
     [
       "a property that is a number",
       { properties: { id: 3 }, additionalProperties: false },
@@ -157,6 +183,27 @@ describe("Bedrock structured output keywords", () => {
     // Then it is refused as invalid.
     assertIdentical(error.name, "ValidationException");
     assertStringIncludes(error.message, message);
+  });
+
+  it("checks a schema sharing one reference target many times", async () => {
+    // Given thirty definitions, each referring twice to the one before.
+    const definitions: Record<string, unknown> = { d0: { type: "string" } };
+
+    for (let index = 1; index <= 30; index += 1) {
+      const previous = { $ref: `#/$defs/d${index - 1}` };
+
+      definitions[`d${index}`] = { allOf: [previous, previous] };
+    }
+
+    // When a reply is checked against the last of them, once matching and
+    // once not.
+    const format = schemaFormat({ $ref: "#/$defs/d30", $defs: definitions });
+    const answered = await answer('"tone"', format);
+    const error = await refusal("3", format);
+
+    // Then both finish, each target checked once.
+    assertIdentical(answered, '"tone"');
+    assertStringIncludes(error.message, "which is not of type string");
   });
 
   it("answers as usual where outputConfig carries no text format", async () => {

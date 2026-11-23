@@ -1,34 +1,17 @@
 import { SimBedrockValidationException } from "../../../error/sim-bedrock.error.js";
 import {
   isJsonObject,
-  namedTypes,
-  resolveSchemaRef,
   schemaNode,
   schemaText,
   type SimBedrockSchemaNode,
 } from "./sim-bedrock-json-schema.js";
+import { resolveSchemaRef } from "./sim-bedrock-schema-pointer.js";
 import { checkSchemaKeywords } from "./sim-bedrock-schema-keywords.js";
-
-const maxOptionalProperties = 12;
-const maxUnionProperties = 16;
-
-function isUnion(node: SimBedrockSchemaNode): boolean {
-  return isJsonObject(node) && (namedTypes(node).length > 1 || "anyOf" in node);
-}
-
-function subschemas(value: unknown, at: string): readonly unknown[] {
-  if (value === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new SimBedrockValidationException(
-      `The structured output schema at ${at} is not a list of schemas`,
-    );
-  }
-
-  return value;
-}
+import {
+  isUnion,
+  refuseOverLimits,
+  subschemas,
+} from "./sim-bedrock-schema-limits.js";
 
 /**
  * Checks a structured output schema against the JSON Schema subset Bedrock
@@ -40,12 +23,14 @@ function subschemas(value: unknown, at: string): readonly unknown[] {
  * is checked against every keyword the schema uses, and one the checker
  * cannot read would let through a reply Bedrock could never send.
  *
- * Internal `$ref` targets are checked where they are referenced. A definition
- * nothing references is left unchecked.
+ * Internal `$ref` targets are checked where they are first referenced, and
+ * their properties counted wherever they are referenced. A definition nothing
+ * references is left unchecked.
  */
 export class SimBedrockSchemaSubset {
   private readonly root: SimBedrockSchemaNode;
   private readonly refsInProgress: string[] = [];
+  private readonly checkedRefs = new Map<string, readonly [number, number]>();
   private optionalProperties = 0;
   private unionProperties = 0;
 
@@ -63,17 +48,7 @@ export class SimBedrockSchemaSubset {
   private checkRoot(): void {
     this.checkNode(this.root, "#");
 
-    if (this.optionalProperties > maxOptionalProperties) {
-      throw new SimBedrockValidationException("Schema is too complex.");
-    }
-
-    if (this.unionProperties > maxUnionProperties) {
-      throw new SimBedrockValidationException(
-        `The structured output schema has ${this.unionProperties} ` +
-          `union-typed properties. At most ${maxUnionProperties} are ` +
-          `supported.`,
-      );
-    }
+    refuseOverLimits(this.optionalProperties, this.unionProperties);
   }
 
   private checkNode(node: SimBedrockSchemaNode, at: string): void {
@@ -94,6 +69,13 @@ export class SimBedrockSchemaSubset {
     }
 
     const target = schemaText(ref);
+    const counted = this.checkedRefs.get(target);
+
+    if (counted !== undefined) {
+      this.count(...counted);
+
+      return;
+    }
 
     if (this.refsInProgress.includes(target)) {
       throw new SimBedrockValidationException(
@@ -102,9 +84,25 @@ export class SimBedrockSchemaSubset {
       );
     }
 
+    const optionalBefore = this.optionalProperties;
+    const unionBefore = this.unionProperties;
+
     this.refsInProgress.push(target);
     this.checkNode(resolveSchemaRef(this.root, target), target);
     this.refsInProgress.pop();
+    this.checkedRefs.set(target, [
+      this.optionalProperties - optionalBefore,
+      this.unionProperties - unionBefore,
+    ]);
+  }
+
+  /**
+   * Count the optional and union-typed properties of a target already
+   * checked once, where it is referenced again.
+   */
+  private count(optional: number, union: number): void {
+    this.optionalProperties += optional;
+    this.unionProperties += union;
   }
 
   private checkProperties(
