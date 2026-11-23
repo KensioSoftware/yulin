@@ -39,7 +39,9 @@ function checkEnum(enumerated: unknown, at: string): void {
 }
 
 function checkMinItems(minItems: unknown, at: string): void {
-  if (minItems !== undefined && minItems !== 0 && minItems !== 1) {
+  const supported: readonly unknown[] = [undefined, 0, 1];
+
+  if (!supported.includes(minItems)) {
     throw new SimBedrockValidationException(
       `The structured output schema at ${at} sets minItems to ` +
         `${JSON.stringify(minItems)}. Only 0 and 1 are supported.`,

@@ -1,4 +1,5 @@
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
+import { isOneOf } from "../../../util/type-guard/one-of.js";
 
 /**
  * What a rule found when it read the request field it inspects.
@@ -39,7 +40,7 @@ export function requiredSimWafOversizeHandling(
 ): SimWafOversizeHandling {
   const wanted = handling ?? "CONTINUE";
 
-  if (wanted !== "CONTINUE" && wanted !== "MATCH" && wanted !== "NO_MATCH") {
+  if (!isOneOf(["CONTINUE", "MATCH", "NO_MATCH"], wanted)) {
     invalidSimWafRule(
       ruleName,
       `The oversize handling ${String(handling)} is not valid`,

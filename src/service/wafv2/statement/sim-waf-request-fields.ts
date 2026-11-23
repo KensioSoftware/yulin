@@ -1,5 +1,6 @@
 import type { SimWafPatternSelection } from "./sim-waf-match-pattern.js";
 import { invalidSimWafRule } from "./sim-waf-rule-refusals.js";
+import { isOneOf } from "../../../util/type-guard/one-of.js";
 
 /**
  * One header, cookie or query argument, as WAF sees it.
@@ -96,7 +97,7 @@ export function requiredSimWafMatchScope(
   matchScope: string | undefined,
   ruleName: string,
 ): SimWafMatchScope {
-  if (matchScope !== "ALL" && matchScope !== "KEY" && matchScope !== "VALUE") {
+  if (!isOneOf(["ALL", "KEY", "VALUE"], matchScope)) {
     invalidSimWafRule(
       ruleName,
       `The match scope ${String(matchScope)} is not valid`,

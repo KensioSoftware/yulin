@@ -5,11 +5,6 @@ import {
 } from "../send-patch.js";
 
 /**
- * A static method of an SDK client class, called through a wrapper.
- */
-type SimSdkStaticMethod = (...arguments_: unknown[]) => unknown;
-
-/**
  * The wrapped static methods of one intercepted SDK client class.
  *
  * A static factory such as `DynamoDBDocumentClient.from` constructs from the
@@ -42,6 +37,11 @@ export class SimSdkStaticClientFactories {
    * surface, such as its name, length and any properties hung off it.
    */
   private wrapMethod(method: object): unknown {
+    /**
+     * A static method of an SDK client class, called through a wrapper.
+     */
+    type SimSdkStaticMethod = (...arguments_: unknown[]) => unknown;
+
     const sendHandler = this.sendHandler;
     return new Proxy(method as SimSdkStaticMethod, {
       apply(

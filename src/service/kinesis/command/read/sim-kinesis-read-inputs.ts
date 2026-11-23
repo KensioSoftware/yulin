@@ -48,11 +48,7 @@ export function assertSimKinesisStreamArnMatches(
   streamArn: string | undefined,
   iteratorStreamArn: string,
 ): void {
-  if (
-    streamArn !== undefined &&
-    streamArn !== "" &&
-    streamArn !== iteratorStreamArn
-  ) {
+  if (streamArn !== undefined && !["", iteratorStreamArn].includes(streamArn)) {
     throw new SimKinesisInvalidArgumentException(
       `StreamARN ${streamArn} is not the stream the ShardIterator was made ` +
         `on, which is ${iteratorStreamArn}`,

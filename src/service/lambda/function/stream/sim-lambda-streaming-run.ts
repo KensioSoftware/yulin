@@ -8,12 +8,6 @@ import {
   SimLambdaStreamedResponse,
 } from "./sim-lambda-response-stream.js";
 
-type SimLambdaStreamingHandler = (
-  event: unknown,
-  responseStream: SimLambdaResponseStream,
-  context: SimLambdaContext,
-) => unknown;
-
 /**
  * Run a handler wrapped in `awslambda.streamifyResponse` to the end of its
  * response.
@@ -44,6 +38,11 @@ export async function simLambdaStreamingRun(
     ?.onResponseStream?.(stream);
 
   try {
+    type SimLambdaStreamingHandler = (
+      event: unknown,
+      responseStream: SimLambdaResponseStream,
+      context: SimLambdaContext,
+    ) => unknown;
     await (handler as SimLambdaStreamingHandler)(event, stream, context);
   } catch (error) {
     stream.destroy();

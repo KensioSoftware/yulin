@@ -8,12 +8,12 @@ import {
 } from "../../../../../../test/cloudformation/sam-api-auth.js";
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
 
-/**
- * One malformed `Auth` block, and the fragment the refusal has to name.
- */
-type RefusalCase = readonly [SimCfnTemplateValue, string];
-
 describe("SAM API Auth refusals", () => {
+  /**
+   * One malformed `Auth` block, and the fragment the refusal has to name.
+   */
+  type RefusalCase = readonly [SimCfnTemplateValue, string];
+
   it("refuses a REST API Auth block it cannot read", () => {
     // Given Auth blocks written as something other than the shapes SAM states.
     // A string in place of the block, of the authorizer map and of one

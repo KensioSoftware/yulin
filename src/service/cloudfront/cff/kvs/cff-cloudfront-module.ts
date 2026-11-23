@@ -1,6 +1,7 @@
 import { SimCloudFrontCffKvsUnavailable } from "../../error/sim-cf-key-value-store.error.js";
 import type { SimCloudFrontKeyValueStore } from "../../key-value-store/sim-cf-key-value-store.js";
 import { CffKvsHandle } from "./cff-kvs-handle.js";
+import { isOneOf } from "../../../../util/type-guard/one-of.js";
 
 /**
  * What a Function can reach a key value store through.
@@ -39,7 +40,7 @@ export function cffCloudFrontModule(
         );
       }
 
-      if (kvsId !== undefined && kvsId !== store.id && kvsId !== store.arn) {
+      if (kvsId !== undefined && !isOneOf([store.id, store.arn], kvsId)) {
         throw new SimCloudFrontCffKvsUnavailable(
           `This CloudFront Function is associated with key value store ` +
             `${store.id}, so cf.kvs() cannot open ${kvsId}`,
