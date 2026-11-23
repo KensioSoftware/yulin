@@ -42,7 +42,10 @@ function requireRuleKey(key: string, description: string): string {
 export class SimBedrockResponses {
   private readonly rules =
     new SimDeclaredResultRules<SimBedrockResolvedResponse>(
-      new SimBedrockResolvedResponse("any request", simBedrockDefaultResponse),
+      new SimBedrockResolvedResponse(
+        "any request with no rule of its own (the built-in default)",
+        simBedrockDefaultResponse,
+      ),
     );
 
   /**

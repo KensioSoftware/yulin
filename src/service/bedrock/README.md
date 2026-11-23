@@ -142,6 +142,14 @@ no effect. They decide what a model generates, and no model generates anything h
 would refuse most production code on its first call. Which tools the model calls is decided by the
 declared response, which either carries a tool use block or leaves one out.
 
+`outputConfig` is read by `command/converse/output/sim-bedrock-output-format.ts`. Real Bedrock
+constrains the model's text to the schema while it is generated, and this simulation has no model to
+constrain. It checks the declared reply against the schema instead and refuses one that departs from
+it as a `SimBedrockDeclarationError`. A test declaring such a reply is asserting on a reply Bedrock
+could never send. `sim-bedrock-schema-subset.ts` refuses the schemas Bedrock refuses, and refuses as
+unsimulated any keyword `sim-bedrock-schema-match.ts` cannot check a reply against. `effort` is
+refused as unsimulated.
+
 The model id goes unresolved. Bedrock publishes no enumerable table of model ids, and a
 model this simulation refused to recognise would be a model Yulin decided did not exist. That is the
 reasoning that leaves simulated Rekognition without a label ontology.

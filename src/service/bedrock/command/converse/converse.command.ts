@@ -37,6 +37,7 @@ export interface SimConverseCommandInput {
   readonly inferenceConfig?: unknown;
   readonly toolConfig?: unknown;
   readonly additionalModelRequestFields?: unknown;
+  readonly outputConfig?: unknown;
 }
 
 export interface SimConverseOutput {
