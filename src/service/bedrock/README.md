@@ -28,8 +28,21 @@ the Region it belongs to.
 ## The rule mechanism
 
 `response/sim-bedrock-responses.ts` is the whole of it. There is one kind of rule and one order
-between them. An exact prompt wins, then an exact model id, then the default. That ordering is
-`SimDeclaredResultRules`, which simulated Rekognition and simulated Personalize both match with.
+between them. An exact prompt wins, then an exact system prompt, then an exact model id, then the
+default. The prompt and model tiers are `SimDeclaredResultRules`, which simulated Rekognition and
+simulated Personalize both match with. That class holds two keyed tiers, so the system tier is a
+map of its own in `SimBedrockResponses`, consulted between the two.
+
+The system tier exists for an application whose features share a model. Each feature sends its own
+instructions and expects a reply in its own shape (a JSON verdict, free text). A model rule answers
+them all alike. A prompt rule would need one declaration per prompt the test sends. A system rule
+picks out the feature.
+
+The system prompt of a `Converse` request is the text of its `system` blocks, joined with a newline
+the way the prompt is joined from a message's blocks. A cache point marks where a cached prefix
+ends. It holds no text and is skipped. `InvokeModel` carries any system prompt inside its
+model-specific body, and the body is opaque here. A system rule never matches an `InvokeModel`
+request.
 
 Rules name no resource. Simulated Personalize hangs its rules off a campaign, because a campaign is
 what a runtime call names and what a test creates first. A foundation model was there before the
@@ -137,8 +150,8 @@ an option missing from a denylist would be dropped.
 request naming a guardrail would be answered here without it and filtered for real in production,
 which is the failure that looks like a pass.
 
-`system`, `inferenceConfig`, `toolConfig` and `additionalModelRequestFields` are accepted and have
-no effect. They decide what a model generates, and no model generates anything here. Refusing them
+`inferenceConfig`, `toolConfig` and `additionalModelRequestFields` are accepted and have no
+effect. `system` is read as a rule key and otherwise has none. They decide what a model generates, and no model generates anything here. Refusing them
 would refuse most production code on its first call. Which tools the model calls is decided by the
 declared response, which either carries a tool use block or leaves one out.
 

@@ -22,6 +22,16 @@ export interface SimBedrockRequestMessage {
 }
 
 /**
+ * One content block of the system prompt a request carries.
+ *
+ * Only the text of a block is read. A cache point or guard content block holds
+ * no text of its own here and is skipped when the system prompt is assembled.
+ */
+export interface SimBedrockSystemContentBlock {
+  readonly text?: string | undefined;
+}
+
+/**
  * Minimal structural sim Bedrock Runtime Converse command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/bedrock-runtime/command/ConverseCommand/
@@ -33,7 +43,7 @@ export interface SimConverseCommand {
 export interface SimConverseCommandInput {
   readonly modelId?: string | undefined;
   readonly messages?: readonly SimBedrockRequestMessage[] | undefined;
-  readonly system?: unknown;
+  readonly system?: readonly SimBedrockSystemContentBlock[] | undefined;
   readonly inferenceConfig?: unknown;
   readonly toolConfig?: unknown;
   readonly additionalModelRequestFields?: unknown;
