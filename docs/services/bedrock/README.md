@@ -116,6 +116,68 @@ console.log(answered.output.message.content.at(0)?.toolUse?.name);
 // "lookUpEntry"
 ```
 
+## Asking for structured output
+
+A `Converse` or `ConverseStream` request can set `outputConfig.textFormat` to a JSON schema. Yulin
+checks the schema the way Bedrock does and refuses an unsupported one with a `ValidationException`.
+Every object in the schema must set `additionalProperties` to `false`.
+
+Bedrock constrains the model's reply to the schema. A declared reply whose text is not JSON, or does
+not match the schema, is one Bedrock could never send. Yulin refuses it with a
+`SimBedrockDeclarationError` naming the mismatch.
+
+```typescript sim-bedrock-structured-output
+/**
+ * Declaring a reply that matches the structured output schema a request asks for.
+ */
+
+import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+simAws
+  .bedrock()
+  .responses()
+  .onModel("qwen.qwen3-32b-v1:0", {
+    text: JSON.stringify({ verdict: "approved", reason: "On topic." }),
+  });
+
+const answered = await simAws.bedrock().converse(
+  new ConverseCommand({
+    modelId: "qwen.qwen3-32b-v1:0",
+    messages: [{ role: "user", content: [{ text: "Review entry 1042" }] }],
+    outputConfig: {
+      textFormat: {
+        type: "json_schema",
+        structure: {
+          jsonSchema: {
+            name: "entry_review",
+            schema: JSON.stringify({
+              type: "object",
+              properties: {
+                verdict: { type: "string", enum: ["approved", "rejected"] },
+                reason: { type: "string" },
+              },
+              required: ["verdict", "reason"],
+              additionalProperties: false,
+            }),
+          },
+        },
+      },
+    },
+  }),
+);
+
+console.log(answered.output.message.content.at(0)?.text);
+// '{"verdict":"approved","reason":"On topic."}'
+```
+
+The built-in default reply is plain text, so a structured output request needs a declared reply.
+A reply holding only a tool call is left unchecked. So is one declared with a `stopReason` of
+`max_tokens`, because Bedrock sends incomplete JSON when the token limit cuts a reply short.
+
 ## Streaming a conversation
 
 `ConverseStream` uses the same rules as `Converse`. Declare `chunks` to control the text in each
@@ -295,6 +357,8 @@ simSdk.restoreAll();
   `InvokeModel`, and optionally a `stopReason` and a `usage`.
 - Streamed responses with caller-controlled chunks.
 - Tool calls, as a declared `toolUse` content block.
+- Structured output through `outputConfig.textFormat`, with the schema checked against the subset
+  Bedrock supports and the declared reply checked against the schema.
 - IAM authorization of `bedrock:InvokeModel` against the foundation model, inference profile or
   provisioned model ARN the request names.
 - Rules scoped by account and Region.
@@ -320,6 +384,13 @@ simSdk.restoreAll();
 - `system`, `inferenceConfig`, `toolConfig` and `additionalModelRequestFields` are accepted and have
   no effect. `maxTokens` truncates no declared response, and a `toolConfig` naming no tools
   still gets a declared tool call.
+- A structured output schema is checked for the limits Bedrock documents (closed objects, internal
+  references only, no recursion, no length or numeric bounds, `minItems` of 0 or 1, a `pattern`
+  without lookaround or backreferences, at most 12 optional and 16 union-typed properties). A
+  keyword Bedrock documents neither way, such as `oneOf`, is refused as unsimulated. A definition
+  under `$defs` that nothing references goes unchecked.
+- A declared reply is checked against every schema keyword except `format`.
+- `outputConfig.effort` is refused as unsimulated.
 - Token counts are fixed unless the declaration carries them. Counting them needs the tokenizer of
   the model the request names. Declare a `usage` where the code under test meters spend.
 - `metrics.latencyMs` is always zero. No time passes during an invocation.

@@ -33,7 +33,7 @@ const toolUseStopReason = "tool_use";
  * because which operation reaches a rule is only known then.
  */
 export class SimBedrockResolvedResponse {
-  private readonly subject: string;
+  readonly subject: string;
   private readonly declared: SimBedrockDeclaredResponse;
   private readonly declaredUsage: SimBedrockResponseUsage;
   private readonly content:

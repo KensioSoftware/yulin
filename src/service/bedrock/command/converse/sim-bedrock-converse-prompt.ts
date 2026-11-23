@@ -12,6 +12,9 @@ const userRole = "user";
  * tools the model may call is decided by the declared response, which either
  * carries a tool use block or leaves one out.
  *
+ * `outputConfig` is accepted and read by `SimBedrockOutputFormat`, which
+ * checks its schema and the declared reply against it.
+ *
  * `Converse` and `ConverseStream` take the same request, so they accept the
  * same inputs.
  */
@@ -22,6 +25,7 @@ export const simBedrockConverseAccepted = [
   "inferenceConfig",
   "toolConfig",
   "additionalModelRequestFields",
+  "outputConfig",
 ];
 
 /**

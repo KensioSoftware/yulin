@@ -2,6 +2,7 @@ import { simSdkEventStream } from "../../../../sdk/index.js";
 import { SimBedrockCommandGroup } from "../sim-bedrock-command-group.js";
 import type { SimBedrockRequestOptions } from "../sim-bedrock-request-options.js";
 import { SimBedrockUnsimulatedInput } from "../sim-bedrock-unsimulated-input.js";
+import { SimBedrockOutputFormat } from "./output/sim-bedrock-output-format.js";
 import {
   simBedrockConverseAccepted,
   simBedrockConversePrompt,
@@ -37,10 +38,16 @@ export class SimBedrockConverseStreamHandler extends SimBedrockCommandGroup {
 
     const modelId = this.requireModelId(input.modelId, operation);
     const prompt = simBedrockConversePrompt(input.messages, operation);
+    const outputFormat = SimBedrockOutputFormat.fromInput(
+      input.outputConfig,
+      operation,
+    );
 
     this.authorizeModel(modelId, options);
 
     const declared = this.responses.responseFor({ prompt, modelId });
+
+    outputFormat?.requireConforming(declared);
 
     return {
       stream: simSdkEventStream(simBedrockConverseStreamEvents(declared)),
