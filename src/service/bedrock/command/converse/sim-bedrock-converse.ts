@@ -9,6 +9,7 @@ import type {
 import {
   simBedrockConverseAccepted,
   simBedrockConversePrompt,
+  simBedrockConverseSystem,
 } from "./sim-bedrock-converse-prompt.js";
 
 const operation = "Converse";
@@ -20,8 +21,9 @@ const unsimulated = new SimBedrockUnsimulatedInput(operation);
  *
  * The response comes from the rule the request matches, and nothing in the
  * conversation is read for meaning. A prompt rule answers the exchange it was
- * declared for, a model rule answers every other call to that model, and a
- * request matching neither is answered with the default.
+ * declared for, a system rule answers every call carrying those instructions,
+ * a model rule answers every other call to that model, and a request matching
+ * none of them is answered with the default.
  */
 export class SimBedrockConverseHandler extends SimBedrockCommandGroup {
   /**
@@ -37,6 +39,7 @@ export class SimBedrockConverseHandler extends SimBedrockCommandGroup {
 
     const modelId = this.requireModelId(input.modelId, operation);
     const prompt = simBedrockConversePrompt(input.messages, operation);
+    const system = simBedrockConverseSystem(input.system);
     const outputFormat = SimBedrockOutputFormat.fromInput(
       input.outputConfig,
       operation,
@@ -44,7 +47,7 @@ export class SimBedrockConverseHandler extends SimBedrockCommandGroup {
 
     this.authorizeModel(modelId, options);
 
-    const declared = this.responses.responseFor({ prompt, modelId });
+    const declared = this.responses.responseFor({ prompt, system, modelId });
 
     outputFormat?.requireConforming(declared);
 

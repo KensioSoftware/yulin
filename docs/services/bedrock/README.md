@@ -70,8 +70,51 @@ const answered = await simAws.bedrock().converse(
 console.log(answered.output.message.content.at(0)?.text); // "A short summary."
 ```
 
-`byDefault` handles calls that match no prompt or model rule. With no matching declaration, Yulin
-returns a built-in simulated response for `Converse`.
+## Answering every call with one system prompt
+
+Use `onSystem` when two features call the same model with different instructions. A model rule
+gives both features the same response. A system rule gives each feature its own, whatever prompt it
+sends.
+
+```typescript sim-bedrock-system-rule
+/**
+ * Declaring a response for each of two features that share one model.
+ */
+
+import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const responses = simAws.bedrock().responses();
+
+responses.onSystem("Review the entry and answer with a JSON verdict.", {
+  text: JSON.stringify({ verdict: "approved" }),
+});
+responses.onSystem("Translate the entry into English.", {
+  text: "The translated entry.",
+});
+
+const answered = await simAws.bedrock().converse(
+  new ConverseCommand({
+    modelId: "amazon.nova-pro-v1:0",
+    system: [{ text: "Translate the entry into English." }],
+    messages: [{ role: "user", content: [{ text: "Entry 1042" }] }],
+  }),
+);
+
+console.log(answered.output.message.content.at(0)?.text);
+// "The translated entry."
+```
+
+The system prompt is the text of the request's `system` blocks, joined with a newline in the order
+they were sent. Blocks holding no text (a cache point, for example) are skipped. `ConverseStream`
+matches the same way. An `InvokeModel` request has no `system` field. A system rule never
+matches one.
+
+A prompt rule takes precedence over a system rule, and a system rule over a model rule.
+`byDefault` handles calls that match none of them. With no matching declaration, Yulin returns a
+built-in simulated response for `Converse`.
 
 ## Answering with a tool call
 
@@ -352,7 +395,8 @@ simSdk.restoreAll();
 
 - `Converse`, `ConverseStream`, `InvokeModel` and `InvokeModelWithResponseStream`, through
   `simAws.bedrock()` and through an intercepted `BedrockRuntimeClient`.
-- Responses declared with `onPrompt`, `onModel` and `byDefault`, in that precedence order.
+- Responses declared with `onPrompt`, `onSystem`, `onModel` and `byDefault`, in that precedence
+  order.
 - A declared response carries `text`, `chunks` or `content` blocks for `Converse`, a `body` for
   `InvokeModel`, and optionally a `stopReason` and a `usage`.
 - Streamed responses with caller-controlled chunks.
@@ -381,9 +425,9 @@ simSdk.restoreAll();
 - `ApplyGuardrail` is unsimulated, and a `guardrailConfig` or a `guardrailIdentifier` on an
   invocation is refused outright. Answering without the guardrail would make one look applied here
   and be applied in production.
-- `system`, `inferenceConfig`, `toolConfig` and `additionalModelRequestFields` are accepted and have
-  no effect. `maxTokens` truncates no declared response, and a `toolConfig` naming no tools
-  still gets a declared tool call.
+- `inferenceConfig`, `toolConfig` and `additionalModelRequestFields` are accepted and have no
+  effect. `system` is read only to match a system rule. `maxTokens` truncates no declared response,
+  and a `toolConfig` naming no tools still gets a declared tool call.
 - A structured output schema is checked for the limits Bedrock documents (closed objects, internal
   references only, no recursion, no length or numeric bounds, `minItems` of 0 or 1, a `pattern`
   without lookaround or backreferences, at most 12 optional and 16 union-typed properties). A

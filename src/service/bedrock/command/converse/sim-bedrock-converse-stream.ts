@@ -6,6 +6,7 @@ import { SimBedrockOutputFormat } from "./output/sim-bedrock-output-format.js";
 import {
   simBedrockConverseAccepted,
   simBedrockConversePrompt,
+  simBedrockConverseSystem,
 } from "./sim-bedrock-converse-prompt.js";
 import type {
   SimConverseStreamCommand,
@@ -38,6 +39,7 @@ export class SimBedrockConverseStreamHandler extends SimBedrockCommandGroup {
 
     const modelId = this.requireModelId(input.modelId, operation);
     const prompt = simBedrockConversePrompt(input.messages, operation);
+    const system = simBedrockConverseSystem(input.system);
     const outputFormat = SimBedrockOutputFormat.fromInput(
       input.outputConfig,
       operation,
@@ -45,7 +47,7 @@ export class SimBedrockConverseStreamHandler extends SimBedrockCommandGroup {
 
     this.authorizeModel(modelId, options);
 
-    const declared = this.responses.responseFor({ prompt, modelId });
+    const declared = this.responses.responseFor({ prompt, system, modelId });
 
     outputFormat?.requireConforming(declared);
 

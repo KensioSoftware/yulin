@@ -1,14 +1,18 @@
 import { SimBedrockValidationException } from "../../error/sim-bedrock.error.js";
-import type { SimBedrockRequestMessage } from "./converse.command.js";
+import type {
+  SimBedrockRequestMessage,
+  SimBedrockSystemContentBlock,
+} from "./converse.command.js";
 
 const userRole = "user";
 
 /**
  * The inputs a simulated conversation reads or can honestly ignore.
  *
- * `system`, `inferenceConfig` and `additionalModelRequestFields` are accepted
- * and have no effect, because they change what a model generates and no model
- * generates anything here. `toolConfig` is accepted for the same reason: which
+ * `inferenceConfig` and `additionalModelRequestFields` are accepted and have no
+ * effect, because they change what a model generates and no model generates
+ * anything here. `system` is read as a key a response rule can match on, and
+ * has no other effect. `toolConfig` is accepted for the same reason: which
  * tools the model may call is decided by the declared response, which either
  * carries a tool use block or leaves one out.
  *
@@ -55,6 +59,29 @@ export function simBedrockConversePrompt(
     (message) => message.role === userRole,
   );
   const text = (lastUserMessage?.content ?? [])
+    .map((block) => block.text)
+    .filter((block) => block !== undefined)
+    .join("\n");
+
+  return text.length === 0 ? undefined : text;
+}
+
+/**
+ * The system prompt a `Converse` request is matched on.
+ *
+ * It is the text of the `system` blocks joined with a newline, in the order
+ * they were sent, which is how the prompt is joined from a message's blocks. A
+ * cache point between two text blocks marks where a cached prefix ends, and
+ * the instructions read the same on either side of it, so it adds nothing to
+ * the joined text.
+ *
+ * A request with no system blocks, or with none holding text, has no system
+ * prompt, and a system rule never matches it.
+ */
+export function simBedrockConverseSystem(
+  system: readonly SimBedrockSystemContentBlock[] | undefined,
+): string | undefined {
+  const text = (system ?? [])
     .map((block) => block.text)
     .filter((block) => block !== undefined)
     .join("\n");
